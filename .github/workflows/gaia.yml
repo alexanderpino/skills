@@ -181,6 +181,10 @@ jobs:
                                                '    pass')],
               "notopened_banner": [("check.py",
                   '    problems.extend(notopened_inline_problems())', '    pass')],
+              # The reported metrics have no `problems` row to stub, so the rule under test is
+              # the FIXTURE gate in --selftest: cripple the pattern and the gate must catch it.
+              "dated_crossover_fixtures": [("check.py",
+                  "or cbad or xdbad or", "or cbad or")],
 
               # --- citations ------------------------------------------------------------
               "source_key_unknown": [("check.py", '            if extra:', '            if False:')],
@@ -794,6 +798,21 @@ jobs:
           red_check "the never-opened declaration placed below the citation it qualifies" \
             'is below the first bare citation' notopened_banner
           cp /tmp/bk_nob references/stream-power.md
+
+          # dated-crossover's year window, pinned by two fixtures at its boundary. The first
+          # fixture set did not pin it: crippling the pattern to (20\d\d) passed all nine.
+          cp scripts/check.py /tmp/bk_xd
+          python3 - <<'PYXD'
+          import pathlib
+          p = pathlib.Path("scripts/check.py"); s = p.read_text(encoding="utf-8")
+          old = 'CROSSOVER_YEAR = re.compile(r"(?<![\\w.\\-/])(20[1-2]\\d)(?![\\w.\\-/%])")'
+          assert s.count(old) == 1, "the dated-crossover year pattern moved"
+          p.write_text(s.replace(old, 'CROSSOVER_YEAR = re.compile(r"(20\\d\\d)")'), encoding="utf-8")
+          PYXD
+          expect_red "python3 scripts/check.py --selftest" \
+            "dated-crossover's year window widened past its fixtures" \
+            'dated-crossover fixture' dated_crossover_fixtures
+          cp /tmp/bk_xd scripts/check.py
 
           # ── the decoys ───────────────────────────────────────────────────────────────
           # Reworded prose OUTSIDE both anchors, and it ASSERTS that: the old form of this

@@ -652,6 +652,11 @@ def selftest() -> int:
     for t, want in ubad:
         print(f"  FAIL  not-opened fixture: {t!r} should be "
               f"{'COUNTED as unread' if want else 'not counted'}")
+    xdbad = [(t, want) for t, want in DATED_CROSSOVER_FIXTURES
+             if bool(CROSSOVER_YEAR.search(_scrub_years(t))) != want]
+    for t, want in xdbad:
+        print(f"  FAIL  dated-crossover fixture: {t!r} should be "
+              f"{'COUNTED as dated' if want else 'not counted'}")
     cbad = [(t, want) for t, want in COST_FIXTURES
             if bool(COST_UNIT.search(t)) != want]
     for t, want in cbad:
@@ -693,7 +698,7 @@ def selftest() -> int:
     for msg in gbad:
         print(f"  FAIL  execution register: {msg}")
     xbad += xpbad + xrbad
-    if bad or nbad or ubad or ebad or cbad or rbad or pbad or xbad or xcbad or gbad \
+    if bad or nbad or ubad or ebad or cbad or xdbad or rbad or pbad or xbad or xcbad or gbad \
             or dbad or bbad:
         # `ebad` used to gate the exit code and not appear in this sentence, so a run with
         # only entry-tag failures printed "0 ... 0 ... 0 misclassified" above a non-zero exit.
@@ -701,6 +706,7 @@ def selftest() -> int:
               f"{len(nbad)} of {len(NO_ARTEFACT_FIXTURES)} no-artefact fixtures, "
               f"{len(ubad)} of {len(NOT_OPENED_FIXTURES)} not-opened fixtures and "
               f"{len(ebad)} of {len(ENTRY_TAG_FIXTURES)} entry-tag fixtures and "
+              f"{len(xdbad)} of {len(DATED_CROSSOVER_FIXTURES)} dated-crossover fixtures and "
               f"{len(cbad)} of {len(COST_FIXTURES)} cost fixtures and "
               f"{len(rbad)} of {len(ERROR_FIXTURES)} error fixtures and "
               f"{len(pbad)} of {len(PROPAGATION_FIXTURES)} propagation fixtures and "
@@ -717,6 +723,7 @@ def selftest() -> int:
           f"not-opened marker: {len(NOT_OPENED_FIXTURES)}/{len(NOT_OPENED_FIXTURES)} correct; "
           f"entry tag: {len(ENTRY_TAG_FIXTURES)}/{len(ENTRY_TAG_FIXTURES)} correct; "
           f"cost unit: {len(COST_FIXTURES)}/{len(COST_FIXTURES)} correct; "
+          f"dated-crossover: {len(DATED_CROSSOVER_FIXTURES)}/{len(DATED_CROSSOVER_FIXTURES)} correct; "
           f"error: {len(ERROR_FIXTURES)}/{len(ERROR_FIXTURES)} correct; "
           f"propagation: {len(PROPAGATION_FIXTURES)}/{len(PROPAGATION_FIXTURES)} correct; "
           f"crossref: {len(CROSSREF_FIXTURES)}/{len(CROSSREF_FIXTURES)} formula, "
@@ -2618,6 +2625,90 @@ def check_index() -> list[str]:
             for ln in (r.stdout + r.stderr).splitlines() if ln.strip()][:8]
 
 
+# ── dated-crossover ──────────────────────────────────────────────────────────────────────
+# `SKILL.md`'s crossover bullet -- "a crossover stated without a year is a claim with a hidden
+# expiry ... Three documents in this corpus currently do it" -- was the ONE doctrine rule in this
+# skill with no instrument behind it, and its count was a hand-count. Audit S1. This is the
+# instrument.
+#
+# It is deliberately the TIGHT reading. A crossover is a recommendation with an expiry date, so
+# the date has to be where the recommendation is: inside the crossover paragraph itself, not
+# three paragraphs below in the same section. The loose section-scoped figure is reported
+# alongside, because the gap between the two IS the finding -- the corpus knows its dates and
+# writes them somewhere other than the claim that needs them.
+CROSSOVER_YEAR = re.compile(r"(?<![\w.\-/])(20[1-2]\d)(?![\w.\-/%])")
+
+# 2010-2029 only, because the doctrine asks WHEN THIS WAS TRUE, not when a paper was published:
+# a crossover paragraph whose only year is 1996 is dating its source, and that is what the
+# `sources:` block is for. ⚠️ The floor is a CHOICE and it has a cost -- a crossover honestly
+# dated "as of 2008" is not counted, and the corpus holds none today. The two fixtures at the
+# boundary exist because the first fixture set did not pin it at all: crippling this pattern to
+# `(20\d\d)` passed all nine, since no fixture lived in 2000-2009. A fixture set that cannot
+# fail is the same defect as a mutation that cannot go red.
+
+
+def _scrub_years(text: str) -> str:
+    """Strip every four-digit run that is NOT a statement about when something was true."""
+    text = re.sub(r"\[[^\]]*\]", " ", text)                                   # [burns2013]
+    text = re.sub(r"\b[A-Za-z_][A-Za-z0-9_]*\d{4}[a-z]?\b", " ", text)        # bare bib keys
+    text = re.sub(r"\(\s*\d{4}[a-z]?\s*\)", " ", text)                       # (2013)
+    text = re.sub(r"\d{3,5}\s*[x\u00d7]\s*\d{3,5}(\s*[x\u00d7]\s*\d{3,5})?", " ", text)  # 2048x2048x256
+    text = re.sub(r"\b\d{4}\s*(?:m|km|cells?|px|p|MB|GB|KB|ms|fps|Hz|kHz|tris?|bytes?)\b",
+                  " ", text, flags=re.I)                                        # unit suffix
+    return text
+
+
+DATED_CROSSOVER_FIXTURES = [
+    ("**Crossover — as of 2026, the visibility buffer wins above 2 M triangles.**", True),
+    ("**Crossover.** True in 2024 and moving toward mesh shaders.", True),
+    ("**Crossover — the fullscreen-triangle analytic plane** [burns2013].", False),
+    ("**Crossover.** Marching cubes, per Lorensen and Cline (1987).", False),
+    ("**Crossover** at a 2048\u00d72048\u00d7256 voxel grid.", False),
+    ("**Crossover** above 4096 px of virtual texture.", False),
+    ("**Crossover — mirror below 1996 cells of blend width.**", False),
+    ("**Crossover.** The 1993 result still holds.", False),
+    ("**Crossover.** The 2026 default everywhere.", True),
+    ("**Crossover.** True as of 2009 and unrevisited.", False),   # the floor, from below
+    ("**Crossover.** True as of 2010 and unrevisited.", True),    # and from above
+]
+
+
+def dated_crossover() -> tuple[int, int, int, int, int]:
+    """(documents dated, documents with a crossover, paragraphs dated, paragraphs, section-dated)."""
+    ddoc = doc = dpara = para = sdoc = 0
+    for d in content_documents():
+        try:
+            _, body = parse_front_matter(d)
+        except (OSError, Unparseable):
+            continue
+        lines = body.split("\n")
+        heads = [i for i, ln in enumerate(lines) if ln.startswith("#")]
+        marks = [i for i, ln in enumerate(lines) if "crossover" in ln.lower()]
+        if not marks:
+            continue
+        doc += 1
+        hit = sec_hit = False
+        seen: set[int] = set()
+        for i in marks:
+            if i in seen:
+                continue
+            j = i
+            while j < len(lines) and lines[j].strip():
+                seen.add(j)
+                j += 1
+            para += 1
+            if CROSSOVER_YEAR.search(_scrub_years(" ".join(lines[i:j]))):
+                dpara += 1
+                hit = True
+            a = max([h for h in heads if h <= i], default=0)
+            b = min([h for h in heads if h > i], default=len(lines))
+            if CROSSOVER_YEAR.search(_scrub_years(" ".join(lines[a:b]))):
+                sec_hit = True
+        ddoc += hit
+        sdoc += sec_hit
+    return ddoc, doc, dpara, para, sdoc
+
+
 def selfdescription_problems() -> list[str]:
     """SKILL.md and STATE.md describe this corpus. This file can COMPUTE what they describe.
 
@@ -2911,6 +3002,21 @@ def main() -> int:
               f"more honest. The tier vocabulary has no cell for 'peer-reviewed, not read', so "
               f"this counts the declaration instead. A writer who declines to declare is making "
               f"a claim in prose the guard will not repeat for them.")
+
+    xdoc, xdocs, xpara, xparas, xsec = dated_crossover()
+    if xdocs:
+        print(f"dated-crossover {xdoc}/{xdocs} documents state a year INSIDE a crossover "
+              f"paragraph -- {xpara} of {xparas} paragraphs. `SKILL.md`'s own doctrine says a "
+              f"crossover stated without a year is a claim with a hidden expiry, and this is the "
+              f"instrument behind it (audit S1); the bullet hand-counted THREE and the tight "
+              f"reading finds {xdoc}. ⚠️ Widen the scope to the crossover's whole SECTION and it "
+              f"is {xsec}/{xdocs} -- the gap IS the finding: this corpus knows its dates and "
+              f"writes them somewhere other than the claim that expires. ⚠️ It counts a year in "
+              f"2010-2029 only, because the doctrine asks when the claim was TRUE, not when its "
+              f"paper was published; a crossover whose only year is 1996 is dating its source. "
+              f"Citation keys, publication parens, resolutions and unit suffixes are rejected, "
+              f"and there are {len(DATED_CROSSOVER_FIXTURES)} fixtures pinning that. Reported, "
+              f"not enforced; see registers/guard-proofs.tsv.")
 
     problems.extend(selfdescription_problems())
     problems.extend(notopened_inline_problems())

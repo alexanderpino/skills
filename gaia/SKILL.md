@@ -76,7 +76,13 @@ Four rules that decide most arguments before they start:
   reference. So a crossover stated without a year is a claim with a hidden expiry. Say when it
   was true, which way it is moving, and what would move it — that is more useful than the
   threshold itself, and it is the difference between a skill that ages and one that dates
-  itself honestly. Three documents in this corpus currently do it.
+  itself honestly. ⚠️ **One document does it.** This bullet said *three* from the day it was
+  written until 2026-09-15, hand-counted and never re-counted; `check.py`'s `dated-crossover`
+  line is the instrument behind the rule now, and on the tight reading — a year inside the
+  crossover paragraph itself — it finds **1 of 26** documents and **1 of 58** paragraphs. Widen
+  it to the crossover's whole section and it is 5 of 26. The gap between the two readings is the
+  real finding: this corpus knows its dates and writes them somewhere other than the claim that
+  expires. The rule stands; the corpus does not yet keep it.
 
 ## Provenance is the point
 
