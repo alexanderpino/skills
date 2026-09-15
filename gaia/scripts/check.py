@@ -1685,9 +1685,13 @@ def check_not_opened(bib: dict[str, dict], cites: dict[str, list[tuple[Path, str
 AXIS_TAGS = ("generation", "simulation", "rendering", "architecture")
 
 # The closed budget vocabulary a `tags:` line may use. It is a MEASUREMENT of the corpus, not a
-# wish: over the 39 content documents the tag counts are authoring-time 26, real-time 19,
-# near-real-time 3, and `runtime` -- the fourth word the migration started from -- appears in no
-# `tags:` line at all. It was collapsed into `real-time` and the collapse is complete.
+# wish: over the 40 content documents the tag counts are authoring-time 27, real-time 19,
+# near-real-time 3 (re-counted 2026-09-15; it read "39 documents ... authoring-time 26" for nine
+# days after the fortieth landed), and `runtime` -- the fourth word the migration started from --
+# appears in no `tags:` line at all. It was collapsed into `real-time` and the collapse is
+# complete. ⚠️ Re-derive this comment rather than trusting it: nothing checks a sentence inside
+# this file, which is how it went stale, and `selfdescription_problems()` reads SKILL.md and
+# STATE.md, never its own source.
 BUDGET_TAGS = ("authoring-time", "near-real-time", "real-time")
 # `runtime` survives in ONE Tier line (simulation-time-budget.md: "the boundary between
 # authoring-time and runtime") as the pre-migration spelling of the real-time budget. It is
@@ -1732,8 +1736,8 @@ def check_budget_agreement() -> tuple[list[str], int, int, list[str]]:
     """The `**Tier:` line on the page must agree with the budget tag in `tags:`.
 
     Criterion 6 of the plan reads "37/37 carry a `**Tier:` line that agrees with one canonical
-    budget tag, CHECKED". The lines landed -- 38 of 39 documents carry one -- and for two days
-    nothing compared them to anything. The fact was on the page 38 times and enforced zero
+    budget tag, CHECKED". The lines landed -- 38 of the 39 documents there were THEN, 40 of 40
+    today -- and for two days nothing compared them to anything. The fact was on the page 38 times and enforced zero
     times, which is the same shape as the `tier:` field before check_documents grew a comparison
     for it: a value that LOOKS graded, that a reader trusts, and that no run can contradict.
 
