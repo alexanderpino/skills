@@ -29,6 +29,9 @@ Halting: one fixed-count Simpson quadrature, no loop with a data-dependent bound
 a convergence report, not a search.
 """
 import math
+import pathlib
+import re
+import sys
 
 N_REF = 1.335   # sea water, ~550 nm, the value water-optics.md uses
 
@@ -65,6 +68,33 @@ SKIES = {
     "CIE standard overcast":          lambda t: (1.0 + 2.0 * math.cos(t)) / 3.0,
 }
 
+# ── what the PAGE says, parsed from it, never typed here ────────────────────────────────
+# ⚠️ Added 2026-09-15, hours after this rig shipped. As first written it computed two numbers,
+# printed them and exited 0 whatever the page said -- a calculator sold as a check, shipped on
+# the same day as two commits whose whole subject was rigs that assert against their document.
+# A re-rating panel caught it by re-applying the very mislabel this rig exists to prevent and
+# watching the rig stay green. The defect a corpus has just repaired is the one it commits next.
+DOC = pathlib.Path(__file__).resolve().parents[2] / "references" / "water-optics.md"
+
+
+def page_figures() -> dict:
+    """The two mu_d values water-optics.md prints, and which sky it attaches each to."""
+    if not DOC.exists():
+        return {}
+    text = DOC.read_text(encoding="utf-8")
+    out = {}
+    m = re.search(r"an overcast sky gives about \*\*([\d.]+)\*\*", text)
+    if m:
+        out["overcast"] = float(m.group(1))
+    m = re.search(r"\*\*uniform\*\* \(isotropic\) sky is \*\*([\d.]+)\*\*", text)
+    if m:
+        out["uniform"] = float(m.group(1))
+    out["labels_overcast_as_cie"] = bool(re.search(r"\*\*CIE standard overcast\*\*", text))
+    out["labels_uniform_as_uniform"] = bool(
+        re.search(r"A genuinely\s+\*\*uniform\*\* \(isotropic\) sky", text))
+    return out
+
+
 if __name__ == "__main__":
     print(f"n = {N_REF}, Snell cone half-angle = {math.degrees(math.asin(1.0/N_REF)):.2f} deg\n")
     out = {}
@@ -86,6 +116,33 @@ if __name__ == "__main__":
         print(f"    n = {n:.3f}  uniform {mu_d(SKIES['uniform (isotropic)'], n=n):.4f}"
               f"   overcast {mu_d(SKIES['CIE standard overcast'], n=n):.4f}")
 
+    # ---- assert against the page -------------------------------------------------------
+    print("\n  against water-optics.md:")
+    pg = page_figures()
+    ok = True
+    if not pg:
+        ok = False
+        print(f"    FAIL  cannot find {DOC}")
+    for key, got in (("uniform", u), ("overcast", c)):
+        want = pg.get(key)
+        if want is None:
+            ok = False
+            print(f"    FAIL  the page no longer prints a {key} mu_d")
+        elif abs(round(got, 2) - want) > 5e-3:
+            ok = False
+            print(f"    FAIL  {key}: this rig gives {got:.4f} -> {got:.2f}, page says {want:.2f}")
+        else:
+            print(f"    PASS  {key}: {got:.4f} -> {got:.2f}, page says {want:.2f}")
+    # The LABEL is the whole finding -- the numbers were never wrong, the skies were swapped.
+    for key, msg in (("labels_overcast_as_cie", "0.86 named as the CIE standard overcast sky"),
+                     ("labels_uniform_as_uniform", "0.84 named as the uniform (isotropic) sky")):
+        if pg.get(key):
+            print(f"    PASS  {msg}")
+        else:
+            ok = False
+            print(f"    FAIL  {msg} -- the page has stopped saying which sky this is, which IS "
+                  f"the defect this rig was written for")
+
     print("\n  no-Fresnel control (T = 1, refraction only):")
     for name, sky in SKIES.items():
         num = den = 0.0
@@ -99,3 +156,5 @@ if __name__ == "__main__":
             num += w * f
             den += w * f / cw
         print(f"    {name:<26} {num/den:.4f}")
+
+    sys.exit(0 if ok else 1)

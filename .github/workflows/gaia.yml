@@ -696,18 +696,25 @@ jobs:
           import pathlib, re, sys
           sys.path.insert(0, "scripts")
           import check
+          # ⚠️ This was line-scoped until 2026-09-15 and rewrote `N of M` only on lines carrying
+          # the word "stamp" -- so it missed a count whose sentence wrapped, or that said
+          # "`verified:` header" instead, and left six stamp rows red for the wrong reason. The
+          # SAME defect as the guard it is feeding, one level down. It is count-scoped now: the
+          # fixture adds exactly ONE stamp, so every "<n-1> of <docs>" in the router files becomes
+          # "<n> of <docs>", wherever it sits and however it wraps.
           docs = check.content_documents()
           n = sum(1 for d in docs
                   if (check.parse_front_matter(d)[0] or {}).get("verified"))
+          before, total = n - 1, len(docs)
+          hits = 0
           for name in ("SKILL.md", "STATE.md"):
               f = pathlib.Path(name)
-              out = []
-              for line in f.read_text(encoding="utf-8").split("\n"):
-                  if "stamp" in line.lower():
-                      line = re.sub(r"\b\d+ of \d+\b", f"{n} of {len(docs)}", line)
-                  out.append(line)
-              f.write_text("\n".join(out), encoding="utf-8")
-          print(f"  (fixture re-counted the router files to {n} of {len(docs)})")
+              s = f.read_text(encoding="utf-8")
+              s, k = re.subn(rf"\b{before}(\s+)of(\s+){total}\b", rf"{n}\g<1>of\g<2>{total}", s)
+              hits += k
+              f.write_text(s, encoding="utf-8")
+          assert hits, f"fixture found no '{before} of {total}' to re-count -- the router files moved"
+          print(f"  (fixture re-counted {hits} claim(s) to {n} of {total})")
           PYRC
           python3 /tmp/recount.py
           python3 scripts/index.py >/dev/null   # the index prints **checked** for a stamp
@@ -776,6 +783,40 @@ jobs:
           PYSD
           red_check "SKILL.md understating the stamp count" 'stamps; the tree has' selfdescription
           cp /tmp/bk_skill SKILL.md
+
+          # Rule 1 of the same guard -- a SENTENCE denying the stamps -- had no mutation at all
+          # when it shipped, and the version that shipped read one line at a time. STATE.md
+          # carried such a denial WRAPPED across two lines and the check exited 0 on it for a
+          # day. So this mutation writes the denial wrapped ON PURPOSE: it is the shape that
+          # defeated the first implementation, and the only shape worth asserting.
+          cp STATE.md /tmp/bk_state1
+          python3 - <<'PYSD1'
+          import pathlib
+          p = pathlib.Path("STATE.md"); s = p.read_text(encoding="utf-8")
+          anchor = "## Audit state, per document\n"
+          assert anchor in s, "the audit-state heading moved"
+          wrapped = anchor + "\nNothing here is verified: **no document carries\nthis yet**, so read the tiers below as hearsay.\n"
+          p.write_text(s.replace(anchor, wrapped, 1), encoding="utf-8")
+          PYSD1
+          red_check "a stamp denial WRAPPED across two lines, the shape that defeated v1" \
+            "says 'no document carries this yet'" selfdescription
+          cp /tmp/bk_state1 STATE.md
+
+          # And the Status-table row the flagship commit got wrong ON ARRIVAL: it wrote
+          # "**233** rows" while the register held 238, in the commit whose subject was the
+          # corpus describing itself wrongly. That row is computed now.
+          cp STATE.md /tmp/bk_state2
+          python3 - <<'PYSD2'
+          import pathlib, re
+          p = pathlib.Path("STATE.md"); s = p.read_text(encoding="utf-8")
+          m = re.search(r"\| Corrections \| \*\*(\d+)\*\* rows", s)
+          assert m, "the Corrections row moved"
+          p.write_text(s.replace(m.group(0), m.group(0).replace(m.group(1), "999"), 1),
+                       encoding="utf-8")
+          PYSD2
+          red_check "the Corrections row disagreeing with the register" \
+            "the .Corrections. row states" selfdescription
+          cp /tmp/bk_state2 STATE.md
 
           # A source the front matter declares NOT OPENED, cited bare in the body with nothing
           # above it saying so. The real instance was 67 such citations across 10 documents.

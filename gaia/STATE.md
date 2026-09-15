@@ -6,7 +6,9 @@
 > given page can find out what has actually been checked. If you are here for the skill, read
 > `SKILL.md`.
 
-Last updated at commit `560b241`. Regenerate the numbers with the commands at the bottom rather
+⚠️ **This line said `560b241` for 163 commits.** A hand-written "last updated at" is a claim
+nothing computes, so it decays silently; it is deliberately not replaced with another SHA that
+would do the same. Regenerate the numbers with the commands at the bottom rather
 than trusting this paragraph; they were true when written and this file has no guard.
 
 ---
@@ -14,8 +16,8 @@ than trusting this paragraph; they were true when written and this file has no g
 ## What Gaia is
 
 A citation-grounded reference corpus on terrain and water, for people building a game engine or an
-authoring tool in the class of Gaea or World Machine. 37 documents on four axes — Generation,
-Simulation, Rendering, Architecture — plus six bibliographies, three registers of what was measured
+authoring tool in the class of Gaea or World Machine. 40 documents on four axes — Generation,
+Simulation, Rendering, Architecture — plus seven bibliographies, four registers of what was measured
 and what went wrong, and a guard script.
 
 Its distinguishing claim is not coverage. It is that **every recommendation names a source, every
@@ -29,7 +31,7 @@ claim points at a real bibliography entry with a locator. It does not prove the 
 what the document claims. A green run means the citation is well-formed. Nothing more.
 
 Where a human or an adversarial reviewer *has* read the source, the audit table below says so. That
-covers 16 of 37 documents.
+covers 16 of 40 documents.
 
 ## Status
 
@@ -38,7 +40,7 @@ covers 16 of 37 documents.
 | Documents | **40** written, 13 planned, 6 explicitly out of scope (53 topics in scope) |
 | Bibliography | 228 entries, 228 cited, 1 background |
 | Adversarially audited | **40 of 40** |
-| Corrections | **233** rows in `registers/corrections.tsv`; every one of the 40 documents carries at least one. ⚠️ **34 are `verifier=pending`** — named individually below, not counted away |
+| Corrections | **236** rows in `registers/corrections.tsv`; every one of the 40 documents carries at least one. ⚠️ **34 are `verifier=pending`** — named individually below, not counted away |
 | `verified:` stamps | **4 of 40**, signed 2026-09-14. ⚠️ Each covers `## Use this` and the failure table only — 8%, 11%, 15% and 19% of its document's body. Read it as "the recommendation and the diagnoses were read", never as "the document was read" |
 | Guards | `check.py` exit 0 · `--selftest` green · `index --check` current · `requote --selftest` green · CI `bites` **41 red + 6 green**, every mutation biting for the reason its row names |
 | Measurement rigs | **37** in `rigs/`, 19 with saved output. Every register reference to one resolves; before 2026-09-14 they lived in a scratch directory and none did |
@@ -57,8 +59,17 @@ Reported metrics, none of them enforced:
 
 ## Audit state, per document
 
-Three tiers. Nothing here is "verified" in the strong sense — **no document carries the `verified:`
-header**, which is the only one of the three channels that means a human read the cited work.
+Three tiers, and almost nothing here is "verified" in the strong sense. **4 of 40 documents carry
+a `verified:` header** — the only one of the three channels that means a human read the cited work
+— and each covers `## Use this` plus the failure table alone, so the signed fraction of the corpus
+is **194 of 13,930 body lines, 1.39%**. ⚠️ Until 2026-09-15 this paragraph denied, in bold, that any
+document carried that header — nineteen lines under a Status row that already said `4 of 40`. It
+survived the check written that morning to stop exactly this, because the sentence wrapped across
+two lines and that check read one line at a time. The check reads the whitespace-normalised whole
+file now, and the denial is not quoted here verbatim for a reason worth knowing: **the check cannot
+tell a claim from a quotation of one**, so writing the old sentence down would make this file fail
+on its own confession. That is the standing limit of a matcher, and the argument for replacing it
+with a generator.
 
 ⚠️ **The tiering below predates the 2026-09-05 audit and its sittings.** Since then every document
 has been through an implementer and an independent verifier, and 143 corrections carry both
@@ -146,7 +157,9 @@ threshold that scales with terrain elevation; a guard that fired 0 times in 4.8M
 passages depending on it; a `P` tier resting on a printing that stamps "(non-peer-reviewed)" on all
 eight pages; a units error that would make a tool never braid; four quotations cut at the clause
 that reverses the conclusion; a recommendation that is an exact fixed point of the equation it tells
-you to integrate. **The 21 unexamined documents have no reason to be cleaner.**
+you to integrate. **The 24 documents this tiering never examined have no reason to be cleaner.**
+(21 until 2026-09-15, when it was recounted: 16 of 40 are named in a tier, and `clastic-debris`,
+`resolution-independence` and `shader-craft` were written after the tiering and never added to it.)
 
 **2. The tooling has never been audited.** `check.py`, `index.py`, `okf.py`, the CI workflow, the
 three registers, both eval files and `SKILL.md` have had no hostile review — and `check.py` is what
@@ -162,7 +175,8 @@ not a logic limit — several hosts serve bot challenges, one has an expired cer
 is reported rather than passed over, but it means the corpus's worst recurring defect is still
 mostly caught by hand.
 
-**4. Most citations cannot be cross-checked at all.** `propagation` is 16 of 256: only that many
+**4. Most citations cannot be cross-checked at all.** `propagation` is 18 of 287 (16 of 256 when
+this was written): only that many
 name a section at both the document end and the bibliography end. The guard catches disagreement
 where both ends speak; it is silent everywhere else.
 
@@ -173,7 +187,7 @@ output arrives with proposed replacement text, and replacement text invents thin
 fixes were refused for shipping a *new* defect, including a sign error and fabricated hardware
 labels. **Do not apply a finding here without verifying it.**
 
-**6. 11 coverage rows are planned and unwritten**, listed in `references/coverage.md`. The corpus
+**6. 13 coverage rows are planned and unwritten**, listed in `references/coverage.md`. The corpus
 names them rather than pretending the map is complete. `resolution-independence` is the one it
 calls the most common complaint against tools in this class.
 
@@ -191,8 +205,13 @@ What remains, in the order I would now do it:
 1. **The five sittings still being repaired** — VT + clouds, tiled-streaming + mesh-extraction +
    sea-ice, precision + craters + coastal + sketch, caustics, stratigraphy. Their verifiers have
    reported; the fixes are not yet applied.
-2. ~~**Point the eleven rendering documents at `shader-craft.md`.**~~ **Done** — eleven files now
-   cite it. (`SKILL.md` said otherwise until 2026-09-15; see the self-description note below.)
+2. ~~**Point the eleven rendering documents at `shader-craft.md`.**~~ **8 of the 11 do.**
+   `atmosphere-and-aerial-perspective`, `caustics` and `mesh-extraction` still do not.
+   ⚠️ This item read *Done — eleven files now cite it* until 2026-09-15. Eleven is the count
+   `SKILL.md` repudiated **the same day**, in a parenthetical reading *"Recount, do not re-read"*:
+   `grep -rln shader-craft.md references/` returns 11 files, of which two are generated indexes and
+   one is a bibliography. The correction landed in one front-door file and not the other, inside
+   one day, on the very item about one-end corrections.
 3. **The budget-tag migration** — 37+ documents carrying one canonical tag with a `**Tier:` line
    that agrees. Success criterion 6, and the last structural item.
 4. ~~**Widen the artefact cache**~~ — **the gate is closed on its ADMISSION branch, 2026-09-15.**

@@ -94,6 +94,7 @@ INDEX = ROOT / "references" / "index.md"
 COVERAGE = ROOT / "references" / "coverage.md"
 TRIGGERS = ROOT / "evals" / "trigger-evals.json"
 PSEUDOCODE = ROOT / "registers" / "pseudocode-execution.tsv"
+CORRECTIONS = ROOT / "registers" / "corrections.tsv"
 
 
 # One spelling of the bibliography glob, used by `paper_files()` and by the error text that
@@ -2733,65 +2734,157 @@ def dated_crossover() -> tuple[int, int, int, int, int]:
     return ddoc, doc, dpara, para, sdoc
 
 
-def selfdescription_problems() -> list[str]:
-    """SKILL.md and STATE.md describe this corpus. This file can COMPUTE what they describe.
+def selfdescription_truth() -> dict[str, int]:
+    """Every number SKILL.md and STATE.md claim about this corpus, COMPUTED from the tree.
 
-    Added 2026-09-15, on a finding from an independent rating panel and as the single action it
-    named as dominating every other. Four documents carried a `verified:` stamp while `SKILL.md`
-    said in bold that none did, and `STATE.md` said `0 of 39`. That is this corpus's own
-    most-recorded defect -- a correction landing at one end only -- live in the two files a new
-    reader opens first, for the simple reason that `documents()` globs `references/*.md` and the
-    router is not in that glob. Nothing could see it.
-
-    Deliberately NARROW. It pins the self-describing counts that are cheap to compute and were
-    observed to go stale; it does not try to parse arbitrary prose, because a check that guesses
-    at sentences is a check that cries wolf. Each rule names the claim it reads and the truth it
-    reads it against, so a failure tells you which end to move.
+    One place, so a rule cannot read a different truth from the rule beside it.
     """
     docs = content_documents()
-    stamped = 0
+    papers = paper_files()
+    corr = CORRECTIONS.read_text(encoding="utf-8").split("\n") if CORRECTIONS.exists() else []
+    crows = [ln.split("\t") for ln in corr if len(ln.split("\t")) > 3]
+    entries = 0
+    for f in papers:
+        entries += len(re.findall(r"^- \*\*[a-z_][a-z0-9_]*\*\*", f.read_text(encoding="utf-8"), re.M))
+    stamps = 0
     for d in docs:
         try:
             fm, _ = parse_front_matter(d)
         except (OSError, Unparseable):
             continue
         if fm.get("verified"):
-            stamped += 1
-    truth = {"documents": len(docs), "stamps": stamped}
+            stamps += 1
+    rigs = ROOT / "rigs"
+    return {
+        "documents": len(docs),
+        "bibliographies": len(papers),
+        "entries": entries,
+        "corrections": len(crows),
+        "pending": sum(1 for f in crows if len(f) > 6 and "pending" in f[6]),
+        "stamps": stamps,
+        "rigs": len(list(rigs.rglob("*.py"))) if rigs.exists() else 0,
+        "runs": len(list(rigs.rglob("*.run.txt"))) if rigs.exists() else 0,
+    }
+
+
+# A Status-table row in STATE.md, keyed by its LABEL, and which computed number it must agree with.
+# Keyed by label rather than by line, because rows move and a line number does not survive an edit.
+STATUS_ROWS = {
+    "Documents": ("documents", r"\*\*(\d+)\*\* written"),
+    "Corrections": ("corrections", r"\*\*(\d+)\*\* rows"),
+    "Measurement rigs": ("rigs", r"\*\*(\d+)\*\* in `rigs/`"),
+}
+
+# Sentences that are FALSE while the tree holds a stamp. Matched against the whitespace-normalised
+# whole text, never line by line -- see the docstring of selfdescription_problems().
+STAMP_DENIALS = (
+    "no document carries this yet",
+    "no document carries the `verified:` header",
+    "none carries one yet",
+    "no document in the corpus carries one",
+    "nothing here is verified in the strong sense",
+)
+
+
+def _normalised(text: str) -> tuple[str, list[int]]:
+    """Collapse all whitespace to single spaces, and map each output char to its source line.
+
+    This is the whole point of the rewrite. The line-scoped version of this check could not see
+    a claim that had wrapped, and every falsehood it failed to catch was in one: STATE.md carried
+    "**no document carries the `verified:` header**" split across two lines, nineteen lines below
+    a row the same check had already corrected to "4 of 40", and exited 0 on it for a day.
+    """
+    out: list[str] = []
+    lines: list[int] = []
+    line = 1
+    prev_space = True
+    for ch in text:
+        if ch == "\n":
+            line += 1
+        if ch.isspace():
+            if not prev_space:
+                out.append(" ")
+                lines.append(line)
+                prev_space = True
+            continue
+        out.append(ch)
+        lines.append(line)
+        prev_space = False
+    return "".join(out), lines
+
+
+def selfdescription_problems() -> list[str]:
+    """SKILL.md and STATE.md describe this corpus. This file can COMPUTE what they describe.
+
+    Added 2026-09-15 on a rating panel's finding, and REWRITTEN the same day when a second panel
+    showed the first version could not do its job. Two defects, both structural:
+
+    1. It scanned line by line, so any claim long enough to wrap was invisible to it whatever
+       phrases were listed. STATE.md's "**no document carries the `verified:` header**" wrapped
+       across two lines and survived, nineteen lines under a row this check had corrected.
+    2. It checked three phrases and one table cell. The numbers it did not read went stale
+       immediately: the commit that introduced it wrote "**233** rows" into STATE.md while the
+       register held 238, wrong on arrival, in the commit titled "the corpus described itself
+       wrongly in the two files a reader opens first".
+
+    Both are fixed by the same move: compute the truth ONCE (`selfdescription_truth()`), then
+    match against the whitespace-NORMALISED whole text.
+
+    THREE THINGS IT STILL CANNOT DO, and the third is why a generator is the honest successor:
+
+    1. It does not read prose for meaning. A claim phrased in a way no rule anticipates escapes.
+    2. It reads SKILL.md and STATE.md, never its own source, and never PLAN.md. Stale sentences
+       inside this file were found by hand twice on the day it was written.
+    3. **It cannot tell a claim from a QUOTATION of one.** Writing the old false sentence into
+       STATE.md to record it made STATE.md fail on its own confession -- observed, 2026-09-15.
+       A corpus whose whole method is recording where it was wrong cannot use a matcher that
+       punishes the recording, so the note there paraphrases where it would rather quote. A
+       generator emitting these rows does not have this problem, because it never has to
+       recognise a sentence in the first place.
+    """
+    truth = selfdescription_truth()
     problems: list[str] = []
 
     for name in ("SKILL.md", "STATE.md"):
         f = ROOT / name
         if not f.exists():
             continue
-        for n, line in enumerate(f.read_text(encoding="utf-8").split("\n"), 1):
-            low = line.lower()
+        raw = f.read_text(encoding="utf-8")
+        flat, lines = _normalised(raw)
+        low = flat.lower()
 
-            # 1. "no document carries this yet" and its spellings, about the stamp
-            if "verified" in low or "stamp" in low:
-                for phrase in ("no document carries this yet", "none carries one yet",
-                               "no document in the corpus carries one"):
-                    if phrase in low and truth["stamps"] != 0:
-                        problems.append(
-                            f"{name}:{n}: says {phrase!r} about `verified:`, but "
-                            f"{truth['stamps']} document(s) carry one. The corpus is describing "
-                            f"itself wrongly in the file a reader opens first.")
+        # 1. a sentence denying the stamps, while the tree carries them
+        if truth["stamps"]:
+            for phrase in STAMP_DENIALS:
+                i = low.find(phrase.lower())
+                if i >= 0:
+                    problems.append(
+                        f"{name}:{lines[i]}: says {phrase!r} about `verified:`, but "
+                        f"{truth['stamps']} document(s) carry one. The corpus is describing "
+                        f"itself wrongly in a file a reader opens first.")
 
-                # 2. "N of M" about the stamp
-                m = re.search(r"(\d+)\s*(?:of|/)\s*(\d+)", line)
-                if m and "stamp" in low:
-                    claimed, over = int(m.group(1)), int(m.group(2))
-                    if claimed != truth["stamps"] or over != truth["documents"]:
-                        problems.append(
-                            f"{name}:{n}: claims `{claimed} of {over}` `verified:` stamps; the "
-                            f"tree has {truth['stamps']} of {truth['documents']}.")
-
-            # 3. the document count, where the file states it as a fact about itself
-            m = re.search(r"\|\s*Documents\s*\|\s*\*\*(\d+)\*\*", line)
-            if m and int(m.group(1)) != truth["documents"]:
+        # 2. "N of M" about the stamp, anywhere, wrapped or not
+        for m in re.finditer(r"(\d+)\s*(?:of|/)\s*(\d+)", flat):
+            window = low[max(0, m.start() - 120):m.end() + 60]
+            if "stamp" not in window and "verified:" not in window:
+                continue
+            claimed, over = int(m.group(1)), int(m.group(2))
+            if claimed != truth["stamps"] or over != truth["documents"]:
                 problems.append(
-                    f"{name}:{n}: states **{m.group(1)}** written documents; there are "
-                    f"{truth['documents']}.")
+                    f"{name}:{lines[m.start()]}: claims `{claimed} of {over}` `verified:` "
+                    f"stamps; the tree has {truth['stamps']} of {truth['documents']}.")
+
+        # 3. every Status-table row this check knows how to compute
+        for label, (key, pattern) in STATUS_ROWS.items():
+            rm = re.search(r"\|\s*" + re.escape(label) + r"\s*\|([^|]*)\|", flat)
+            if not rm:
+                continue
+            vm = re.search(pattern, rm.group(1))
+            if vm and int(vm.group(1)) != truth[key]:
+                problems.append(
+                    f"{name}:{lines[rm.start()]}: the `{label}` row states "
+                    f"**{vm.group(1)}**; the tree has {truth[key]}.")
+
     return problems
 
 

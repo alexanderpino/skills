@@ -16,6 +16,12 @@ n = 1.335, Snell cone half-angle = 48.51 deg
     n = 1.335  uniform 0.8388   overcast 0.8571
     n = 1.340  uniform 0.8403   overcast 0.8584
 
+  against water-optics.md:
+    PASS  uniform: 0.8388 -> 0.84, page says 0.84
+    PASS  overcast: 0.8571 -> 0.86, page says 0.86
+    PASS  0.86 named as the CIE standard overcast sky
+    PASS  0.84 named as the uniform (isotropic) sky
+
   no-Fresnel control (T = 1, refraction only):
     uniform (isotropic)        0.8312
     CIE standard overcast      0.8516
