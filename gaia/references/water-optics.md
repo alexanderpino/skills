@@ -108,7 +108,12 @@ c / K_d  =  mu_d * (a + b) / (a + b_b)
 
 `mu_d` is the mean cosine of the downwelling field just below the surface, and refraction bounds it
 hard: a sun at zenith angle 0 / 30 / 45 / 60° gives `mu_0 = 1.00 / 0.93 / 0.85 / 0.76` below a flat
-surface, and a uniform overcast sky gives about **0.86**. The other factor is the water's entire
+surface, and an overcast sky gives about **0.86** — ⚠️ the **CIE standard overcast** sky,
+`L(t) ~ (1 + 2·cos t)/3`, three times brighter at the zenith than at the horizon. A genuinely
+**uniform** (isotropic) sky is **0.84**, not 0.86: dimmer overhead, so less of its light enters
+steeply. Both computed here, not cited — `rigs/optics/mu-d-overcast.py`, unpolarised Fresnel and
+Snell at `n = 1.335`, Simpson-converged to 6 dp; refraction alone gives 0.83/0.85, so Fresnel is
+worth only about +0.008. This page said *"uniform"* for 0.86 in two places until 2026-09-15. The other factor is the water's entire
 contribution, and in **pure water it runs 1.00 to 1.20 across 450–610 nm** — this document's own
 Pope & Fry absorption against molecular scattering, `b_w(500 nm) = 0.0029 m^-1` falling as
 `lambda^-4.32` [morel1974], with `b_b = b/2` because the Rayleigh phase function is symmetric. So
@@ -118,7 +123,7 @@ larger is decided by the sun, not by the water**:
 ```
 mu_d    c/K_d at 450 / 500 / 550 / 610 nm     pure water
 1.00    1.20 / 1.07 / 1.02 / 1.00             sun at the zenith            -> c > K_d
-0.86    1.03 / 0.92 / 0.87 / 0.86             uniform overcast sky         -> c ~ K_d
+0.86    1.03 / 0.92 / 0.87 / 0.86             CIE standard overcast sky    -> c ~ K_d
 0.75    0.90 / 0.80 / 0.76 / 0.75             scattering-dominated deep    -> K_d > c
         #  0.75 is an asymptote pure water never reaches -- it needs b >> a to get there
 ```

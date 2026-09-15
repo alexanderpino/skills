@@ -31,3 +31,10 @@ survives a port; **absolute wall-clock does not**, and this session measured the
 Where a figure is deterministic (a byte count, an exact arithmetic result, a seeded error bound) it
 reproduces byte-for-byte and several documents state it to four or more digits. Where it is
 wall-clock, quote the ratio.
+
+`optics/` — one rig, added 2026-09-15. `mu-d-overcast.py` computes `mu_d` just below a flat
+surface for a uniform (isotropic) sky and for the CIE standard overcast sky, from Snell and
+unpolarised Fresnel at `n = 1.335`. It exists because `water-optics.md` printed 0.86 and called
+it *uniform*; 0.86 is the standard overcast sky and uniform is 0.84. Unlike most rigs here it
+asserts nothing against the page — it computes two numbers and prints a convergence table, an
+`n`-sensitivity table and a no-Fresnel control, and the page was corrected to match.

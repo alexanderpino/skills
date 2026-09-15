@@ -832,8 +832,13 @@ def approximation_coverage() -> tuple[int, int, int, int]:
     approximation carries, and the cost it incurs. Either alone is unactionable -- an error
     bound with no cost cannot be budgeted, a cost with no error cannot be justified.
 
-    Measured honestly: **4 of 36 documents state both**. 10 say how good and not what it costs;
-    4 say what it costs and not how good; 18 say neither.
+    Measured honestly: **39 of 40 documents state both** (2026-09-15). 1 says how good and not
+    what it costs; 0 say what it costs and not how good; 0 say neither. ⚠️ This docstring read
+    **4 of 36** for nine days after the count moved -- a sentence about the corpus, inside the
+    file that computes the corpus, that the file never read back. It is the same defect the
+    2026-09-15 `selfdescription_problems()` check was written for, and that check cannot see this
+    line: it reads `SKILL.md` and `STATE.md`, not its own source. The run line is generated; only
+    this prose was stale. Re-derive with `approximation_coverage()` before quoting it.
 
     It read 10/36 for half a day, and that was this metric committing the defect it exists to
     detect. `COST_UNIT` matched the bare phrases "per frame", "budget tier" and "offline bake", so
