@@ -1,0 +1,32 @@
+{
+ "ok": false,
+ "agreeing": 91,
+ "missed": 12,
+ "spurious": 0,
+ "errsByKind": {
+  "primary": {
+   "n": 29,
+   "maxMm": 97625.2846965607,
+   "meanMm": 19980.78080217371
+  },
+  "ascending": {
+   "n": 36,
+   "maxMm": 7.790855525688478,
+   "meanMm": 2.457937026814479
+  },
+  "grazing": {
+   "n": 16,
+   "maxMm": 7.917387866539727,
+   "meanMm": 2.8509851136668427
+  },
+  "picking": {
+   "n": 10,
+   "maxMm": 745.7239773347375,
+   "meanMm": 417.4978112456682
+  }
+ },
+ "stepsMean": 39.12380952380953,
+ "msPerDraw": 0.0009999999962747098,
+ "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+ "glVersion": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+}
