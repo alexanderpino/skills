@@ -59,7 +59,7 @@ grazing view, and until someone runs one, budget from that capture — everythin
 and residency, never time.
 
 ```
-level = coarsestMip; t = tEnter; steps = 0          // tEnter = max(0, ·), tExit: ray ∩ [mapMin, mapMax]
+level = coarsestMip; t = tEnter; steps = 0          // tEnter = max(EPS, ·) — NOT max(0, ·); tExit: ray ∩ [mapMin, mapMax]
                                                     // both FINITE and NON-NEGATIVE
 while (t < tExit) {
   node      = texelAt(rayPos(t), level)             // explicit-LOD fetch: SampleLevel or Load, never Sample
@@ -126,12 +126,19 @@ under `## Use this`. ⚠️ It does **not** remove every NaN: a reciprocal-form 
 `(bound − o.x)·invD = 0·∞ = NaN`, and `min(NaN, tExit)` is still NaN. Which branch that takes
 depends on your `min`: a NaN-propagating one skips and reports clear line of sight through
 terrain it never tested; an IEEE `minNum` descends instead. Test the one your target ships.
-**Termination is then structural, given `tEnter ≥ 0`** — each iteration strictly increases `t` or
+**Termination is then structural, given `tEnter > 0`** — each iteration strictly increases `t` or
 decreases `level`, and `level` only rises on the branch that increases `t`. ⚠️ The precondition is
-load-bearing and the caller owns it: at `t = 0` the relative advance is `0·(1+2⁻²²) = 0` and the
-loop cycles, and at negative `t` the multiply moves *away* from zero, i.e. backward, to an exact
-fixed point. Clamp `tEnter` with `max(0, ·)`; the textbook slab entry for an origin inside the
-map is negative. That is why the step cap is a belt against a pathological
+load-bearing, it is **strict**, and the caller owns it: at `t = 0` the relative advance is
+`0·(1+2⁻²²) = 0` and the loop cycles, and at negative `t` the multiply moves *away* from zero,
+i.e. backward, to an exact fixed point. So clamp `tEnter` with `max(EPS, ·)` for a small positive
+`EPS`, **never `max(0, ·)`**; the textbook slab entry for an origin inside the map is negative.
+
+⚠️ **This paragraph read `tEnter ≥ 0` and prescribed `max(0, ·)` until 2026-09-15, and the two
+sentences refuted each other four lines apart.** `≥ 0` admits zero, `max(0, ·)` *produces* zero for
+exactly the case the clamp exists to handle — an origin inside the map — and the next sentence
+already said that zero cycles. The recommendation manufactured the livelock its own warning
+describes. Found by a completeness critic reading the page against itself, not by any guard: no
+instrument here can see a precondition contradicted by the prose below it. That is why the step cap is a belt against a pathological
 field, not the argument. Say that out loud in review: a capped livelock looks exactly like a slow
 frame.
 

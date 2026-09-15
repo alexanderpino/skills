@@ -83,10 +83,30 @@ jobs:
         run: |
           set -u
           fails=0
-          for rig in gaia/rigs/approx/heightfield-lod.py \
-                     gaia/rigs/approx/node-graph-runtime.py \
-                     gaia/rigs/networks/hydraulic_geometry.py \
-                     gaia/rigs/optics/mu-d-overcast.py; do
+          # ⚠️ The list is DISCOVERED, not typed. It was a literal loop of four paths plus a
+          # hardcoded `if n != 4` until 2026-09-15, and a completeness critic pointed out what
+          # that costs: every repair the triage fleet proposed is "convert a print-only rig into
+          # one that asserts", and each conversion would have made n = 5 and turned the build red
+          # on a constant -- so the first gate anyone landed failed CI for a reason that had
+          # nothing to do with any page. A gate list that punishes adding a gate is worse than no
+          # list. `rig_asserts()` is the single definition of what belongs here; the job runs
+          # whatever it returns, and the count cannot disagree with the list because it IS the
+          # list.
+          mapfile -t RIGS < <(python3 - <<'PYL'
+          import pathlib, sys
+          sys.path.insert(0, "gaia/scripts")
+          import check
+          root = pathlib.Path("gaia/rigs")
+          for f in sorted(root.rglob("*.py")):
+              if check.rig_asserts(f):
+                  print(f)
+          PYL
+          )
+          if [ "${#RIGS[@]}" -eq 0 ]; then
+            echo "::error::no asserting rigs found at all -- rig_asserts() has stopped matching"
+            exit 1
+          fi
+          for rig in "${RIGS[@]}"; do
             if python3 "$rig" > /tmp/rig.out 2>&1; then
               echo "  OK    $rig"
             else
@@ -95,18 +115,12 @@ jobs:
               fails=$((fails + 1))
             fi
           done
-          # The gate is the LIST above, and the list must not silently shrink: check.py's own
-          # count of asserting rigs has to match it, or a rig was converted and never wired in.
           python3 - <<'PYC'
           import sys
           sys.path.insert(0, "gaia/scripts")
           import check
-          n = check.selfdescription_truth()["rigs_asserting"]
-          if n != 4:
-              print(f"::error::check.py counts {n} asserting rigs; this job runs 4. "
-                    f"Add the new one to the loop above, or find out why one stopped asserting.")
-              raise SystemExit(1)
-          print(f"  rigs-asserting {n}/{check.selfdescription_truth()['rigs']}, all 4 gated here")
+          t = check.selfdescription_truth()
+          print(f"  rigs-asserting {t['rigs_asserting']}/{t['rigs']}, every one of them gated here")
           PYC
           [ "$fails" -eq 0 ]
 
