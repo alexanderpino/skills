@@ -184,8 +184,18 @@ What remains, in the order I would now do it:
    cite it. (`SKILL.md` said otherwise until 2026-09-15; see the self-description note below.)
 3. **The budget-tag migration** — 37+ documents carrying one canonical tag with a `**Tier:` line
    that agrees. Success criterion 6, and the last structural item.
-4. **Widen the artefact cache** so `requote.py` covers more than 5%. ⚠️ **This one cannot be done
-   by an agent** — it needs artefacts nobody here can fetch.
+4. ~~**Widen the artefact cache**~~ — **the gate is closed on its ADMISSION branch, 2026-09-15.**
+   `PLAN.md` Phase 6 asked for a mechanism reaching `≥ 60%` *or* the statement that the cache is
+   unbounded and outside the plan. It is **unbounded and outside the plan**, and the reason is now
+   stated rather than implied: the missing artefacts sit behind **eight named publisher paywalls**
+   — AGU, AIP, Elsevier, GeoScienceWorld, IEEE, Optica, Taylor & Francis, Wiley — and **27 of the
+   229 bibliography ids already say so in their own locators**. ⚠️ Two consequences, and they are
+   the point of writing it down: `requote.py` exits 0 having asserted **nothing**, so a green run
+   of it is not evidence and must never be quoted as any (`--require-cache` exits 2 for CI so a
+   pipeline cannot mistake silence for a pass); and the corpus's worst recurring defect is caught
+   by a human reading the source and by nothing else. **Reversible by the maintainer and only by
+   the maintainer** — institutional access, a browser-side fetch committed as a private cache, or
+   author copies each take the other branch.
 5. ~~**Raise `approximation`**~~ — **done, 39/40.** ⚠️ But an independent rating panel found the
    metric oversold at the tails: it credits a document for holding both halves *anywhere* in the
    body, and 5 of the 38 put them more than 50 lines apart (`water-optics` 249, `terrain-analysis-masks`
