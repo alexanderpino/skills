@@ -2864,6 +2864,85 @@ def _normalised(text: str) -> tuple[str, list[int]]:
     return "".join(out), lines
 
 
+# ── the two things `approximation` counts and should not be read as counting ──────────────
+# `approximation 39/40` is this corpus's headline number and BOTH rating panels called it
+# oversold, for two different reasons that deserve two different metrics rather than a footnote.
+#
+# It asks only that a document state an error SOMEWHERE and a cost SOMEWHERE. It does not ask
+# that the two describe the same technique, and it does not ask that either be reproducible.
+# Neither of these replaces it -- a floor is still worth having, and 39/40 is a defensible floor.
+# They sit beside it so a reader can see what the floor is a floor OVER.
+#
+# Hardware named in a `P` locator, and a resolution. Deliberately coarse: this asks whether the
+# citation is the kind of artefact a cost could be read out of, never whether it was.
+APPROX_HARDWARE = re.compile(
+    r"\b(RTX|GTX|RX\s*\d|Radeon|GeForce|PS4|PS5|Xbox|M1|M2|M3|Ryzen|Core\s+i[3579]|Titan"
+    r"|A100|V100|Quadro|Adreno|Mali|CPU|GPU)\b", re.I)
+APPROX_RESOLUTION = re.compile(
+    r"\b(\d{3,4}\s*[x\u00d7]\s*\d{3,4}|1080p|720p|4k|1440p|2160p|\d+\u00b2)\b", re.I)
+
+# The band the colocated figure is reported at. 50 body lines is about a screen and a half --
+# far enough to allow a cost table under an error discussion, near enough that a reader meets
+# both without searching. Reported at three bands so the choice is visible rather than implied.
+APPROX_BANDS = (20, 50, 100)
+
+
+def approximation_quality() -> tuple[int, int, dict[int, int], list[tuple[str, int]]]:
+    """Of the documents `approximation` credits, how many are SOURCED and how many COLOCATED?
+
+    Returns (sourced, credited, {band: colocated}, widest gaps).
+
+    ⚠️ Gaps are measured from MATCH OFFSETS, not by scanning lines. The first version of this
+    scanned line by line and reported `surface-and-scale-space.md` as having no error statement
+    at all, because its sentence reads "lands **0.0050%\nlow** on Sigma-h" and the match spans
+    the line break. The document states its error perfectly well; the instrument could not see a
+    wrapped one. That is the same defect the self-description check was rewritten for on the
+    same day, committed here while measuring something else entirely.
+    """
+    reg_docs: set[str] = set()
+    if PSEUDOCODE.exists():
+        for ln in PSEUDOCODE.read_text(encoding="utf-8").split("\n"):
+            f = ln.split("\t")
+            if len(f) >= 7 and f[0].endswith(".md"):
+                reg_docs.add(f[0])
+
+    sourced = credited = 0
+    per_band = {b: 0 for b in APPROX_BANDS}
+    gaps: list[tuple[str, int]] = []
+    for d in content_documents():
+        try:
+            fm, body = parse_front_matter(d)
+        except (OSError, Unparseable):
+            continue
+        if not (ERROR_STATED.search(body) and COST_UNIT.search(body)):
+            continue
+        credited += 1
+
+        # (a) is there anything a second engineer could go and re-run or re-read?
+        by_register = d.name in reg_docs
+        by_locator = any(
+            s.get("tier") == "P"
+            and APPROX_HARDWARE.search(str(s.get("locator", "")))
+            and APPROX_RESOLUTION.search(str(s.get("locator", "")))
+            for s in (fm.get("sources") or []))
+        if by_register or by_locator:
+            sourced += 1
+
+        # (b) do the two halves sit where one reader meets both?
+        def line_of(off: int) -> int:
+            return body.count("\n", 0, off) + 1
+        cost_at = [line_of(m.start()) for m in COST_UNIT.finditer(body)]
+        err_at = [line_of(m.start()) for m in ERROR_STATED.finditer(body)]
+        gap = min(abs(a - b) for a in cost_at for b in err_at)
+        gaps.append((d.name, gap))
+        for band in APPROX_BANDS:
+            if gap <= band:
+                per_band[band] += 1
+
+    gaps.sort(key=lambda r: -r[1])
+    return sourced, credited, per_band, gaps[:4]
+
+
 # ── the generated Status block ───────────────────────────────────────────────────────────
 # WHY THIS IS GENERATED. Every falsehood two rating panels found by hand across 2026-09-14/15
 # was a hand-written claim about this corpus: a stamp count, a document count, a register row
@@ -3287,6 +3366,24 @@ def main() -> int:
               f"paper was published; a crossover whose only year is 1996 is dating its source. "
               f"Citation keys, publication parens, resolutions and unit suffixes are rejected, "
               f"and there are {len(DATED_CROSSOVER_FIXTURES)} fixtures pinning that. Reported, "
+              f"not enforced; see registers/guard-proofs.tsv.")
+
+    _s, _c, _bands, _worst = approximation_quality()
+    if _c:
+        _wide = ", ".join(f"{n} {g}" for n, g in _worst)
+        print(f"approximation-sourced {_s}/{_c} of the documents `approximation` credits have a "
+              f"`pseudocode-execution.tsv` row OR a `P` locator naming hardware AND a resolution "
+              f"-- something a second engineer could re-run or re-read. The other "
+              f"{_c - _s} state a cost that rests on nothing but the page. "
+              f"\u26a0\ufe0f This asks whether the citation is the KIND of artefact a cost could "
+              f"come out of, never whether it did. Reported, not enforced.")
+        print(f"approximation-colocated {_bands[50]}/{_c} put their error and their cost within 50 "
+              f"body lines of each other; {_bands[20]}/{_c} within 20 and {_bands[100]}/{_c} "
+              f"within 100. `approximation` itself requires only that both appear SOMEWHERE in "
+              f"the body, so it credits a document whose two halves describe different "
+              f"techniques. Widest gaps, in body lines: {_wide}. \u26a0\ufe0f Proximity is not "
+              f"relevance -- two figures ten lines apart can still be about different things, and "
+              f"this cannot tell. It bounds the overstatement; it does not remove it. Reported, "
               f"not enforced; see registers/guard-proofs.tsv.")
 
     _t = selfdescription_truth()
