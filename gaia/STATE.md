@@ -129,6 +129,17 @@ defect — and 2 of 7 disputes raised were themselves wrong and were rejected by
 
 ## Known issues
 
+**0. Seven documents sit at exactly 450 lines against a 450-line cap.** `driver-fields`,
+`flow-routing`, `node-graph-runtime`, `river-networks`, `shader-craft`,
+`stratigraphy-and-lithology` and `surface-and-scale-space` have **zero** headroom, and
+`resolution-independence` has one line. That is ground rule 2 working exactly as intended — every
+one of them reached the cap by paying for an addition with a subtraction, and three did so on
+2026-09-15 alone. It is also a standing cost a maintainer should know before opening one: **any
+correction to those seven must delete something first**, the re-wrap trick is exhausted on at
+least `flow-routing` and `river-networks` (measured: zero paragraphs re-wrap shorter at width
+100), and the cap message *"it is two topics"* is a real diagnosis for several of them. The cap
+is not the problem; a document that can only be corrected by amputation is.
+
 **1. The base rate is the headline. Every audited document contained at least one HIGH-severity
 defect.** Not one came back clean. Found so far: a live underflow bug that stranded water past a
 threshold that scales with terrain elevation; a guard that fired 0 times in 4.8M updates with three
