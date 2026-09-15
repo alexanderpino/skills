@@ -429,25 +429,37 @@ jobs:
           # Pasting `no artefact:` onto a real paper makes a gap disappear and the reported
           # percentage RISE -- 53% to 54% when this was written. It is the one mutation in the
           # suite that IMPROVES a number, which is exactly why it needs a guard.
-          cp references/stream-power.md /tmp/bk
-          sed -i '0,/id: braun2013/s/locator: "/locator: "no artefact: /' references/stream-power.md
+          # SUBJECT MOVED 2026-09-15: was stream-power.md, which now carries a `verified:` stamp.
+          # Mutating a stamped document's sources: invalidates `covers`, so the stamp goes red and
+          # the second pass can no longer tell whether no_artefact_locator was the rule that bit.
+          # A mutation subject must be an UNSTAMPED document. simulation-time-budget.md cites the
+          # same paper and is draft.
+          cp references/simulation-time-budget.md /tmp/bk
+          sed -i 's/{ id: braun2013, tier: P, locator: "/{ id: braun2013, tier: P, locator: "no artefact: /' references/simulation-time-budget.md
+          grep -q 'braun2013, tier: P, locator: "no artefact: ' references/simulation-time-budget.md || {
+            echo "::error::no-artefact decoy: the simulation-time-budget sed matched nothing"
+            fails=$((fails + 1)); }
           red_check "a real paper marked as having no artefact" 'is marked .no artefact:.' no_artefact_locator
-          cp /tmp/bk references/stream-power.md
+          cp /tmp/bk references/simulation-time-budget.md
 
           # The same attack dressed to beat the PREVIOUS implementation, which regex-matched the
           # bibliography entry's prose and read only its first line. A reviewer showed that
           # moving four words onto line 1 of a source with a real artefact passed green.
           cp references/papers-architecture.md /tmp/bk
-          cp references/node-graph-runtime.md /tmp/bk2
+          cp references/layering-filters-and-masks.md /tmp/bk2
           sed -i 's/- \*\*nuke_request\*\* `F` — Foundry\./- **nuke_request** `F` — No canonical paper. Foundry./' references/papers-architecture.md
           grep -q 'nuke_request\*\* `F` — No canonical paper' references/papers-architecture.md || {
             echo "::error::bypass decoy: the papers-architecture sed matched nothing, so this row"
             echo "::error::  degenerates into a duplicate of the row above it"
             fails=$((fails + 1)); }
-          sed -i 's/{ id: nuke_request, tier: F, locator: "the DD/{ id: nuke_request, tier: F, locator: "no artefact: the DD/' references/node-graph-runtime.md
+          # SUBJECT MOVED 2026-09-15, same reason: node-graph-runtime.md is stamped.
+          sed -i 's/{ id: nuke_request, tier: F, locator: "DD/{ id: nuke_request, tier: F, locator: "no artefact: DD/' references/layering-filters-and-masks.md
+          grep -q 'nuke_request, tier: F, locator: "no artefact: DD' references/layering-filters-and-masks.md || {
+            echo "::error::bypass decoy: the layering-filters-and-masks sed matched nothing"
+            fails=$((fails + 1)); }
           red_check "the prose-regex bypass of the no-artefact exclusion" 'is marked .no artefact:.' no_artefact_locator
           cp /tmp/bk references/papers-architecture.md
-          cp /tmp/bk2 references/node-graph-runtime.md
+          cp /tmp/bk2 references/layering-filters-and-masks.md
 
           cp references/wave-models.md /tmp/bk
           sed -i '0,/id: airy_coastal/s/locator: "no artefact: /locator: "\xc2\xa74 the dispersion relation, /' references/wave-models.md
