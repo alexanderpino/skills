@@ -131,6 +131,14 @@ jobs:
         # regenerating, or a forged verification banner. Proved by all three mutations.
         run: python3 gaia/scripts/ledger.py --check
 
+      - name: The skill-library wiki must not have drifted from the tree
+        # Ten live skills and nothing told you what they were or what evidence any of them
+        # carried. `obsolete/README.md` did that job by hand for two retired ones and is a
+        # second end of every figure it quotes. This is derived instead; --check fails on a
+        # hand edit, on a skill that grew without regenerating, and on an orphan page left
+        # behind by a skill that is gone. Proved by all three.
+        run: python3 tools/wiki.py --check
+
       - name: Evals must be valid JSON with the shape the runner expects
         run: |
           python3 - <<'PY'
