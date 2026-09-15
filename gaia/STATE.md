@@ -41,9 +41,9 @@ covers 16 of 40 documents.
 |---|---|
 | Documents | **40** written · 13 planned · 6 out of scope (59 topics claimed in `coverage.md`) |
 | Bibliography | **231** entries across 7 `papers-*.md` files |
-| Corrections | **236** rows in `registers/corrections.tsv`, **36** still `verifier=pending` |
+| Corrections | **237** rows in `registers/corrections.tsv`, **37** still `verifier=pending` |
 | `verified:` stamps | **4 of 40** documents — and **194 of 13,937 body lines, 1.39%**, because a stamp covers `## Use this` and the failure table and nothing else |
-| Measurement rigs | **37** in `rigs/`, **19** with saved output, **5** asserting against their own page |
+| Measurement rigs | **38** in `rigs/`, **19** with saved output, **6** asserting against their own page |
 
 <!-- /generated: status -->
 
