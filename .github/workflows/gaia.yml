@@ -185,6 +185,15 @@ jobs:
               # the FIXTURE gate in --selftest: cripple the pattern and the gate must catch it.
               "dated_crossover_fixtures": [("check.py",
                   "or cbad or xdbad or", "or cbad or")],
+              # --- the three surfaces no mutation can prove ------------------------------
+              # PLAN.md criterion 1 requires T3, T4 and T8 to be OPEN rows in guard-proofs.tsv
+              # AND named in `--list`. The rows are checked by the assertion below; this stub
+              # removes the block that names them, so the assertion has something to catch.
+              # Dropping the heading is not enough -- `--list` prints the whole docstring, so the
+              # three lettered paragraphs below it would still name T3/T4/T8. The stub takes the
+              # letter off ONE of them, which is what a drifting rewrite would really do.
+              "list_names_open_surfaces": [("check.py",
+                  "  T3 -- FABRICATION, as a whole.", "  Fabrication, as a whole.")],
 
               # --- citations ------------------------------------------------------------
               "source_key_unknown": [("check.py", '            if extra:', '            if False:')],
@@ -813,6 +822,41 @@ jobs:
             "dated-crossover's year window widened past its fixtures" \
             'dated-crossover fixture' dated_crossover_fixtures
           cp /tmp/bk_xd scripts/check.py
+
+          # `--list` must name the three surfaces the guard cannot see, and guard-proofs.tsv
+          # must carry them as OPEN rows. Criterion 1's last clause, which went unmet for nine
+          # days while the first three clauses were green -- "a phase gate that is
+          # three-quarters met is not met" (PLAN.md:116).
+          cat > /tmp/listcheck.py <<'PYLC'
+          import re, subprocess, sys
+          out = subprocess.run([sys.executable, "scripts/check.py", "--list"],
+                               capture_output=True, text=True).stdout
+          rows = open("registers/guard-proofs.tsv", encoding="utf-8").read()
+          bad = []
+          for t in ("T3", "T4", "T8"):
+              if not re.search(rf"\b{t}\b", out):
+                  bad.append(f"--list does not name {t}")
+              if not re.search(rf"audit {t}\)[^\n]*\bOPEN\b", rows):
+                  bad.append(f"guard-proofs.tsv has no OPEN row for {t}")
+          for b in bad:
+              print(f"  FAIL  {b}")
+          sys.exit(1 if bad else 0)
+          PYLC
+          if python3 /tmp/listcheck.py; then
+            echo "  GREEN  --list names T3, T4 and T8, and all three are OPEN rows"
+          else
+            echo "::error::criterion 1's last clause: --list or guard-proofs.tsv lost a surface"
+            fails=$((fails + 1))
+          fi
+          cp scripts/check.py /tmp/bk_lc
+          python3 /tmp/stub.py list_names_open_surfaces
+          if python3 /tmp/listcheck.py >/dev/null 2>&1; then
+            echo "::error::the --list assertion stayed GREEN with the naming block removed"
+            fails=$((fails + 1))
+          else
+            echo "  BITES  --list stops naming T3/T4/T8   (red via list_names_open_surfaces)"
+          fi
+          cp /tmp/bk_lc scripts/check.py
 
           # ── the decoys ───────────────────────────────────────────────────────────────
           # Reworded prose OUTSIDE both anchors, and it ASSERTS that: the old form of this

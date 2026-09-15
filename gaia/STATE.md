@@ -40,7 +40,7 @@ covers 16 of 37 documents.
 | Adversarially audited | **40 of 40** |
 | Corrections | **233** rows in `registers/corrections.tsv`; every one of the 40 documents carries at least one. ⚠️ **34 are `verifier=pending`** — named individually below, not counted away |
 | `verified:` stamps | **4 of 40**, signed 2026-09-14. ⚠️ Each covers `## Use this` and the failure table only — 8%, 11%, 15% and 19% of its document's body. Read it as "the recommendation and the diagnoses were read", never as "the document was read" |
-| Guards | `check.py` exit 0 · `--selftest` green · `index --check` current · `requote --selftest` green · CI `bites` **40 red + 5 green**, every mutation biting for the reason its row names |
+| Guards | `check.py` exit 0 · `--selftest` green · `index --check` current · `requote --selftest` green · CI `bites` **41 red + 6 green**, every mutation biting for the reason its row names |
 | Measurement rigs | **37** in `rigs/`, 19 with saved output. Every register reference to one resolves; before 2026-09-14 they lived in a scratch directory and none did |
 | Phase 0 | **closed** 2026-09-07 — the guard layer, verified by mutation under `bash -e` |
 

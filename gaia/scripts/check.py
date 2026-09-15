@@ -26,6 +26,26 @@ In this repo's vocabulary a green run here is an `attestation` channel, not an `
 one: the same kind of author writes the claim, the citation and this guard. Saying "grounded"
 because this passes would be the exact overstatement Gaia exists to avoid.
 
+THREE SURFACES NO MUTATION CAN PROVE. `registers/guard-proofs.tsv` carries these as `OPEN` rows
+and `PLAN.md`'s criterion 1 requires them to be named here, in the list a reader actually runs.
+An honest mutation for each would go GREEN by design, which is the finding rather than a bug:
+
+  T3 -- FABRICATION, as a whole. No guard can tell a quotation that was read from one that was
+      invented. `requote.py` is the only instrument aimed at it and can only compare against
+      artefacts already in a cache; with no cache present it asserts nothing either way and
+      says so (`--require-cache` exits 2 for CI). The surface is open by construction and is
+      closed only by a human reading the source. That human's signature is `verified:`.
+
+  T4 -- `[background]` as an exit from the orphan check. Any bibliography entry escapes
+      `check_orphans` by carrying the tag, and nothing audits the tag, so an entry cited by
+      nobody is indistinguishable from one deliberately kept for context. 1 entry carries it.
+      The honest mutation -- tag a genuinely orphaned entry -- passes, which is the point.
+
+  T8 -- coverage-row floors measure LENGTH, not content. `check_coverage` wants 25 characters
+      for a `planned` row and 60 for `out-of-scope`. 60 characters of padding passes exactly as
+      well as 60 characters of reason. A mutation proving this would have to assert that
+      padding passes. The floor is a nudge; the review that catches a shrug is human.
+
 Two structural facts about a document are checked against each other rather than reported. A
 `**Tier:` line's budget regime must agree with the budget tag in `tags:`, in BOTH directions:
 a regime named on the page must be a tag, and a tag must be named on the page. It CANNOT check
