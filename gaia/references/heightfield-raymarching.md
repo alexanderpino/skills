@@ -23,6 +23,8 @@ triangles and letting the hardware find the pixels. The lineage runs from 1992 s
 raycasters through per-pixel relief mapping to heightfields as procedural primitives in ray-tracing
 pipelines, and the *same kernel* is infrastructure for shadows, occlusion, picking and gameplay
 queries.
+⚠️ **Never opened here: `policarpo2007`** — cited by name below; its front-matter locator says what
+was read instead, and what is left unverified.
 
 The recurring engineering pattern, learned once and reused by every member: **a precomputed
 conservative bound turns a blind fixed-step march into a safe adaptive one.**

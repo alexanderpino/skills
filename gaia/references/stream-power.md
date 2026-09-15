@@ -19,6 +19,8 @@ sources:
 
 **Tier: authoring-time.** `Δt` is a millennium and the whole solve is a bake; what ships is the
 eroded heightfield, not this loop.
+⚠️ **Never opened here: `braun2013`, `whipple1999`, `crosby2006`, `culling1960`** — cited by name
+below; their front-matter locators say what was read instead, and what is left unverified.
 
 Past roughly 50 km of extent, this is the only erosion model that is stable over geological time
 and the only one that produces correct large-scale drainage. Everything it needs comes from

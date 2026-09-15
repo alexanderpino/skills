@@ -173,6 +173,15 @@ jobs:
               "covers_body": [("check.py", '            if entry["covers_body"] != bdigest:',
                                            '            if False:')],
 
+              # --- the two self-description guards, added 2026-09-15 ---------------------
+              # Both were written because a claim ABOUT the corpus, made in prose, had gone
+              # stale where no guard could see it. Both therefore need a mutation of their own,
+              # or the corpus repeats the defect one level up: a guard nobody proves bites.
+              "selfdescription": [("check.py", '    problems.extend(selfdescription_problems())',
+                                               '    pass')],
+              "notopened_banner": [("check.py",
+                  '    problems.extend(notopened_inline_problems())', '    pass')],
+
               # --- citations ------------------------------------------------------------
               "source_key_unknown": [("check.py", '            if extra:', '            if False:')],
               "locator_usable": [("check.py",
@@ -641,11 +650,21 @@ jobs:
           cp /tmp/bk_ix references/index.md
 
           # ── the verified: stamp ──────────────────────────────────────────────────────
-          # No document in the corpus carries one yet, so the fixture stamps a document HERE,
-          # in the copy. Without it the six `verified:` rules are unreachable by mutation --
-          # there is nothing to invalidate -- and "untested because untestable" is how an
-          # assertion defined and never invoked survives.
+          # Four documents carry one since 2026-09-14, but none of them may be a mutation
+          # subject: a stamp covers `sources:` and the two anchor sections, so mutating either
+          # trips the stamp instead of the rule under test. The fixture therefore stamps a
+          # FIFTH document HERE, in the copy. Without it the six `verified:` rules are
+          # unreachable by mutation -- there is nothing to invalidate -- and "untested because
+          # untestable" is how an assertion defined and never invoked survives.
+          #
+          # ⚠️ And stamping a fifth makes the tree disagree with SKILL.md and STATE.md, which
+          # say `4 of 40`. That is `selfdescription_problems()` doing its job on a fixture, and
+          # it turned six stamp rows into "stayed RED for another reason" the day it landed.
+          # So the fixture re-counts those two files while it is in place, from check.py's own
+          # computed truth. This does mean the fixture satisfies that guard by construction --
+          # which is why the guard has a mutation of its own, below, that does not.
           cp $SUBJ /tmp/bk_st
+          cp SKILL.md /tmp/bk_st_skill; cp STATE.md /tmp/bk_st_state
           cat > /tmp/stamp.py <<'PYST'
           import pathlib, re, subprocess, sys
           p = pathlib.Path("references/caustics.md"); s = p.read_text(encoding="utf-8")
@@ -660,6 +679,24 @@ jobs:
                                  f"covers_body: {body} }}\n", 1), encoding="utf-8")
           PYST
           python3 /tmp/stamp.py
+          cat > /tmp/recount.py <<'PYRC'
+          import pathlib, re, sys
+          sys.path.insert(0, "scripts")
+          import check
+          docs = check.content_documents()
+          n = sum(1 for d in docs
+                  if (check.parse_front_matter(d)[0] or {}).get("verified"))
+          for name in ("SKILL.md", "STATE.md"):
+              f = pathlib.Path(name)
+              out = []
+              for line in f.read_text(encoding="utf-8").split("\n"):
+                  if "stamp" in line.lower():
+                      line = re.sub(r"\b\d+ of \d+\b", f"{n} of {len(docs)}", line)
+                  out.append(line)
+              f.write_text("\n".join(out), encoding="utf-8")
+          print(f"  (fixture re-counted the router files to {n} of {len(docs)})")
+          PYRC
+          python3 /tmp/recount.py
           python3 scripts/index.py >/dev/null   # the index prints **checked** for a stamp
           expect_green "a correctly scoped verified: stamp"
 
@@ -709,8 +746,54 @@ jobs:
           python3 scripts/index.py >/dev/null
 
           cp /tmp/bk_st $SUBJ
+          cp /tmp/bk_st_skill SKILL.md; cp /tmp/bk_st_state STATE.md
           python3 scripts/index.py >/dev/null
           expect_green "the stamp removed again"
+
+          # ── the two self-description guards ──────────────────────────────────────────
+          # A number in SKILL.md/STATE.md that disagrees with the tree. The real instance was
+          # four `verified:` stamps against a bolded "no document carries this yet".
+          cp SKILL.md /tmp/bk_skill
+          python3 - <<'PYSD'
+          import pathlib, re
+          p = pathlib.Path("SKILL.md"); s = p.read_text(encoding="utf-8")
+          m = re.search(r"\*\*(\d+) of (\d+)\*\*, signed", s)
+          assert m, "the stamp-count sentence moved; this mutation has nothing to bend"
+          p.write_text(s.replace(m.group(0), f"**0 of {m.group(2)}**, signed", 1), encoding="utf-8")
+          PYSD
+          red_check "SKILL.md understating the stamp count" 'stamps; the tree has' selfdescription
+          cp /tmp/bk_skill SKILL.md
+
+          # A source the front matter declares NOT OPENED, cited bare in the body with nothing
+          # above it saying so. The real instance was 67 such citations across 10 documents.
+          cp references/stream-power.md /tmp/bk_nob
+          sed -i '/Never opened here/,/left unverified\./d' references/stream-power.md
+          red_check "a never-opened source cited with no declaration above it" \
+            'no .Never opened here:. line names it' notopened_banner
+          cp /tmp/bk_nob references/stream-power.md
+
+          # The declaration present but BELOW the first citation -- the reader reaches it second.
+          cp references/stream-power.md /tmp/bk_nob
+          python3 - <<'PYNB'
+          import pathlib
+          p = pathlib.Path("references/stream-power.md")
+          lines = p.read_text(encoding="utf-8").split("\n")
+          i = next(k for k, l in enumerate(lines) if "Never opened here" in l)
+          j = i
+          while j < len(lines) and lines[j].strip():
+              j += 1
+          blk = lines[i:j]
+          del lines[i:j]
+          # Immediately ABOVE the last section heading: below every citation on the page, and
+          # still outside `## Use this` and the failure table, so the stamp is untouched and
+          # this row proves the banner rule rather than the digest rule.
+          k = max(n for n, l in enumerate(lines) if l.startswith("## "))
+          lines[k:k] = blk + [""]
+          p.write_text("\n".join(lines), encoding="utf-8")
+          PYNB
+          red_check "the never-opened declaration placed below the citation it qualifies" \
+            'is below the first bare citation' notopened_banner
+          cp /tmp/bk_nob references/stream-power.md
 
           # ── the decoys ───────────────────────────────────────────────────────────────
           # Reworded prose OUTSIDE both anchors, and it ASSERTS that: the old form of this

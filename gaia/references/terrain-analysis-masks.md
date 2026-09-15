@@ -23,6 +23,8 @@ sources:
 **Tier: authoring-time and real-time.** §Time budget splits the page: slope, aspect, normals,
 Laplacian, curvature and the selectors over them are 3×3 stencils safe in a shader; horizon
 occlusion, insolation, TWI and anything consuming drainage area are bakes.
+⚠️ **Never opened here: `zevenbergen1987`, `horn1981`, `beven1979`, `he2010`** — cited by name
+below; their front-matter locators say what was read instead, and what is left unverified.
 
 Analysis describes a terrain. Masks turn that description into material coverage. Both are cheap;
 both are wrong in ways that look fine, which is what this document is about.

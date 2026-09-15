@@ -12,6 +12,16 @@ graded unverifiable. It CANNOT check that a cited paper says what the document c
 one step is human, and `verified:` in a document's front matter is where a human records
 having done it.
 
+Since 2026-09-15 it also checks what the corpus SAYS ABOUT ITSELF, in the two places that were
+found to have gone stale where nothing could see them. `selfdescription_problems()` compares
+`SKILL.md` and `STATE.md`'s stamp count, document count and "no document carries this yet"
+sentence against the tree -- all three were wrong on its first run, including a bolded claim
+that no document carried a `verified:` stamp while four did. `notopened_inline_problems()`
+requires a document that declares a source NOT OPENED in its front matter to say so in its body
+too, above the first bare `[id]` citation of it: 67 such citations across 10 documents were bare
+when the rule was written, including four in a `status: stable` document under a human stamp.
+Neither rule reads prose for meaning. They pin counts and position, which is what rots.
+
 In this repo's vocabulary a green run here is an `attestation` channel, not an `independent`
 one: the same kind of author writes the claim, the citation and this guard. Saying "grounded"
 because this passes would be the exact overstatement Gaia exists to avoid.
@@ -504,6 +514,11 @@ LOCATOR_NO_ARTEFACT = "no artefact:"
 # It is NOT a failure and must never become one. A corpus that cannot cite a paywalled paper is
 # not more honest, it is less useful. What matters is that the count is on screen every run.
 LOCATOR_NOT_OPENED = ("NOT OPENED", "NO LOCATOR")
+
+# The BODY-side spelling of the same declaration -- one line per document, placed inside the
+# opening paragraph so it is above every citation on the page. One literal, because a guard
+# that accepts three spellings of its own marker is a guard that will meet a fourth.
+NOTOPENED_BANNER = "Never opened here:"
 
 # The ENTRY side of the same claim. These assert the grammar accepts the tag where it belongs
 # and nowhere else -- a tag the regex silently dropped would turn the bidirectional check into a
@@ -2665,6 +2680,72 @@ def selfdescription_problems() -> list[str]:
     return problems
 
 
+def notopened_inline_problems() -> list[str]:
+    """A source declared NOT OPENED in the front matter must say so where the reader is.
+
+    Added 2026-09-15, on the second-ranked finding of an independent rating panel. The corpus's
+    handling of unread sources was already the best thing in it -- the locator says which
+    paywall, what was read in its place and what stays unverified -- but ALL of that lives in
+    the YAML. Measured when this was written: **67 inline `[id]` citations across 10 documents
+    named a source the same document declares it never opened**, every one of them bare.
+    `stream-power.md` was the worst case and is `status: stable` with a human `verified:` stamp:
+    it names `[braun2013]` under its `## Use this` headline and three more times, while line 11
+    says the paper was never obtained. A reader who starts at the recommendation -- which is what
+    `## Use this` is FOR -- meets a citation that looks read and is not.
+
+    The fix is one line of body text per affected document rather than 67 inline markers, which
+    would be unreadable and would also have voided two `verified:` stamps by editing `## Use
+    this`. This check enforces that line: for every not-opened id, some body line must both name
+    the id and be marked as the never-opened declaration, and it must come BEFORE the first bare
+    inline citation of that id.
+
+    What it does NOT do: read the banner's prose, or check that the ids it lists are the right
+    ones beyond set membership. A banner naming every id and saying something false about them
+    passes. It pins position and coverage, which is what rots.
+    """
+    problems: list[str] = []
+    for d in content_documents():
+        try:
+            fm, body = parse_front_matter(d)
+        except (OSError, Unparseable):
+            continue
+        ids = [str(s.get("id")) for s in (fm.get("sources") or [])
+               if any(m in str(s.get("locator", "")).upper() for m in LOCATOR_NOT_OPENED)]
+        if not ids:
+            continue
+        lines = body.split("\n")
+        # The banner is a PARAGRAPH, not a line: it starts at the marker and runs to the next
+        # blank line. Matching the marker line alone read only the first 100 characters of it,
+        # and this check failed on its own first run for three ids that had wrapped onto the
+        # second and third lines -- the guard's bug, not the corpus's.
+        banner: list[int] = []
+        for i, ln in enumerate(lines):
+            if NOTOPENED_BANNER not in ln:
+                continue
+            j = i
+            while j < len(lines) and lines[j].strip():
+                banner.append(j)
+                j += 1
+        for sid in ids:
+            cited = [i for i, ln in enumerate(lines) if f"[{sid}]" in ln]
+            if not cited:
+                continue                      # declared but never cited in prose: nothing to warn
+            named = [i for i in banner if f"`{sid}`" in lines[i]]
+            if not named:
+                problems.append(
+                    f"{d.name}: cites [{sid}] in the body {len(cited)} time(s) and declares in "
+                    f"its front matter that the source was never opened, but no "
+                    f"{NOTOPENED_BANNER!r} line names it. The reader meets a citation that looks "
+                    f"read.")
+                continue
+            if min(named) > min(cited):
+                problems.append(
+                    f"{d.name}: the {NOTOPENED_BANNER!r} line naming `{sid}` is below the first "
+                    f"bare citation of it (body line {min(named) + 1} against {min(cited) + 1}). "
+                    f"A declaration the reader reaches second is not a declaration.")
+    return problems
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--list", action="store_true", help="what is checked, and what is not")
@@ -2832,6 +2913,7 @@ def main() -> int:
               f"a claim in prose the guard will not repeat for them.")
 
     problems.extend(selfdescription_problems())
+    problems.extend(notopened_inline_problems())
 
     if problems:
         for p in problems:

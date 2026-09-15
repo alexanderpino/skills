@@ -19,6 +19,8 @@ sources:
 **Tier: authoring-time and real-time.** The same virtual-pipe discretisation runs at both budgets —
 a generator's hydraulic-erosion bake and an engine's bounded interactive patch — and only the
 scheduler differs; `simulation-time-budget.md` owns that scheduler.
+⚠️ **Never opened here: `obrien1995`** — cited by name below; its front-matter locator says what was
+read instead, and what is left unverified.
 
 When water must *respond* — fill, drain, slosh, flood, ripple around the player, break against a
 wall you moved — a wave field cannot do it, because a wave field has no state. This is the solver

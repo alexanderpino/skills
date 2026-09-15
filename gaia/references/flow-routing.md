@@ -23,6 +23,8 @@ sources:
 **Tier: authoring-time; route once and cache — the runtime reads the baked arrays.** Every drainage
 network, river mask, wetness map and hydraulic-erosion step starts by deciding, for each cell,
 **where its water goes next**. Two decisions, in this order: depressions, then the receiver rule.
+⚠️ **Never opened here: `lindsay2016`, `braun2013`** — cited by name below; their front-matter
+locators say what was read instead, and what is left unverified.
 
 ## Use this
 
@@ -413,12 +415,10 @@ and the symptom of a cycle is silently missing area rather than a crash.
 
 ## Where the network starts
 
-Flow accumulation gives contributing area for every cell, including hilltops. A river does not
-start at the drainage divide, so a threshold decides where the channel head is. The standard
-criterion combines area and slope rather than using area alone: in [montgomery1992] the
-critical source area falls as slope rises, in the form **A·S² ≈ constant** — *not* the product
-A·S. Using area alone puts channel heads at a constant contributing area regardless of
-steepness, which draws rivers straight over ridges in steep terrain.
+Flow accumulation gives contributing area for every cell, including hilltops. A river does not start
+at the drainage divide, so a threshold decides where the channel head is. The standard criterion
+combines area and slope rather than using area alone: in [montgomery1992] the critical source area
+falls as slope rises, in the form **A·S² ≈ constant** — *not* the product A·S.
 
 ⚠️ **The constant is quoted in m² and is not a physical quantity — it moves with the cell size.**
 Only `S` carries a cell-size exponent: `A` is an area in m² on either grid, its own failure being

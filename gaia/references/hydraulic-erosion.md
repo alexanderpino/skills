@@ -21,6 +21,8 @@ sources:
 **Tier: authoring-time.** §Time budget says it for both families — *"Both are authoring-time"* —
 and neither is a per-frame operation at authoring resolution; the per-frame pipe patch belongs to
 `shallow-water.md`, not to this document.
+⚠️ **Never opened here: `obrien1995`, `beyer2015`, `musgrave1989`** — cited by name below; their
+front-matter locators say what was read instead, and what is left unverified.
 
 Two families, one lineage, and a taxonomy that is wrong in most reference tables. The virtual-pipe
 abstraction — a fluid surface as height columns coupled by pipes driven by head difference —

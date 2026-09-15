@@ -18,6 +18,8 @@ decisive fact is not aesthetic. A pebble bed is **133 million instances per squa
 3.20 GB of transforms, and no amount of culling makes that a list you ship. The boulder class is
 0.67 per square metre and 16.1 MB per square kilometre, which is nothing. The whole engineering
 content of scattering rock is knowing where between those two numbers the instance path ends.
+⚠️ **Never opened here: `wentworth1922`** — cited by name below; its front-matter locator says what
+was read instead, and what is left unverified.
 
 ## Use this
 

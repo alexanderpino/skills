@@ -26,6 +26,8 @@ cost unless it is named as offline or as memory — the offline ones are the 201
 name a desktop card, the GTX 680 and the GTX 1080. The technique only fits a frame because the
 march is spread across frames and, in several configurations here, run below output resolution —
 which makes the resolve back to full res part of the technique rather than a detail of it.
+⚠️ **Never opened here: `olajos2026`** — cited by name below; its front-matter locator says what was
+read instead, and what is left unverified.
 
 ## Use this
 

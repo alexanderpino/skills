@@ -19,6 +19,9 @@ sources:
 
 **Tier: authoring-time.** Every pass here is an iterated bake — thermal run to a measured over-steep
 count, the slab automaton to a settled bed — and what ships is the result, not the loop.
+⚠️ **Never opened here: `musgrave1989`, `werner1995`, `momiji2000`, `bagnold1941`, `montgomery1994`,
+`corominas1996`** — cited by name below; their front-matter locators say what was read instead, and
+what is left unverified.
 
 Three processes that share one idea: material moves when a *threshold* is crossed — a slope angle,
 a friction angle, a shear velocity. Each is cheap, and each is the thing that makes a hydraulic

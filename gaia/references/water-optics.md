@@ -24,6 +24,9 @@ sources:
 **Tier: authoring-time.** Nothing here is a per-frame cost: this document owns the *quantities* an
 authoring tool exports once, and every renderer that reads them is named as a consumer rather than
 priced here. That is why the tag is a single regime even though both budgets touch the numbers.
+⚠️ **Never opened here: `popefry1997`, `nicodemus1963`, `solonenko2015`, `gordon1989`, `morel1974`,
+`schlick1994`, `bornwolf_optics`** — cited by name below; their front-matter locators say what was
+read instead, and what is left unverified.
 
 ⚠️ **The consuming cost is unpriced.** Neither `water-rendering.md` nor `caustics.md` prints a
 machine cost, so nothing on this axis says what `L_scatter` or an exact Fresnel evaluation costs in

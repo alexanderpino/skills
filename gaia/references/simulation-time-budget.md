@@ -18,6 +18,8 @@ sources:
 
 **Tier: the crossover document; both budgets.** Its subject *is* the boundary between authoring-time
 and runtime, so every section states the same step under each regime and says what changes.
+⚠️ **Never opened here: `braun2013`** — cited by name below; its front-matter locator says what was
+read instead, and what is left unverified.
 
 This is the axis every other simulation document in Gaia hangs off, because it is the question the
 source material does not ask. An authoring tool assumes it has minutes and an artist willing to
