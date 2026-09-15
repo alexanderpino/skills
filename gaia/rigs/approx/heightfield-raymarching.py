@@ -1,40 +1,1128 @@
 #!/usr/bin/env python3
-"""Measure the max-mip traversal in gaia/references/heightfield-raymarching.md.
+"""heightfield-raymarching.md: the `## Use this` recommendation, GATED against its own page.
 
-Two questions, one rig:
+WHAT THIS IS.  The fence at :61-82 is what a reader pastes, and until now nothing checked it.
+This file runs it and asserts what the page says about it.  Every expected value below is
+PARSED OUT OF THE DOCUMENT at run time, anchored on PROSE and never on a number, and a figure
+or a sentence that has gone missing is a FAIL -- `_page`/`_require` exit non-zero rather than
+skip.  Where the page states one figure at two ends, BOTH are parsed and they are asserted to
+agree with each other: 4/3 at :41 and again at :225-226, 2⁻²² at :112 and again at :285 and
+:131-132, 2048 m at :110-111 and again at :285, the refinement range at :70 and again at
+:49-50.  A correction landing at one end only is this corpus's most-recorded defect.
 
-  ERROR  How far is the hit this kernel returns from the true first crossing of the
-         SAME reconstructed surface, as a function of the refinement iteration count
-         the block prescribes ("binary or secant refine, 5-8 iterations")?  And does
-         the pyramid ever hide a hit (a miss the reference finds) or invent one?
+⚠️ TWO RIGS, ONE FILE, AND WHY.  `registers/corrections.tsv:227` names THIS PATH as the
+harness behind the page's memory and error figures ("summed over the arrays actually built by
+the harness at gaia/rigs/approx/heightfield-raymarching.py, seed 20260910").  `rigs/README.md`
+says in as many words that a register row citing a path that no longer exists is a claim
+nobody can check.  So the measurement harness is preserved here verbatim, under `--measure`,
+and the gate is what runs by default:
 
-  COST   What does the max-reduce pyramid add to the field it is built over?  This is
-         exact arithmetic over the arrays actually built here, not a timing.
+    python3 heightfield-raymarching.py              the gate   (stdlib only; exit 0 or 1)
+    python3 heightfield-raymarching.py --measure    the harness corrections.tsv:227 cites
+                                                    (CPython + NumPy; measures, asserts
+                                                    nothing, always exits 0)
 
-WHAT THIS RIG IS
-  CPython + numpy, fp64 ray parameter, fp32 height storage, 512x512 base field at
-  s0 = 1 m, surface reconstructed BILINEARLY from samples at texel centres, pyramid
-  built exactly as the document prescribes (dilate the base samples 3x3, then
-  max-reduce that).  Reference intersection is analytic: inside one bilinear cell the
-  ray-surface difference is a QUADRATIC in t, solved in closed form, so the reference
-  carries no step size and no tolerance of its own.
+The two share nothing: every gate name is `_`-prefixed and the gate never imports NumPy.  The
+sibling gates in this corpus live beside their measurement rigs in a separate directory
+(`rigs/materials/mask-to-material.py` next to `rigs/approx/mask-to-material.py`); this one was
+assigned this path, so it is merged instead of overwriting.  Splitting it out later is a
+one-line move.
 
-WHAT THIS RIG IS NOT
-  Not a GPU measurement of any kind.  It prices no frame, no wave, no divergence, no
-  bandwidth.  It is fp64 in t, so it does NOT reproduce the fp32 ULP behaviour the
-  document argues about at :88-:96 -- the relative advance is exercised, its fp32
-  failure mode is not.  The field is smooth and synthetic; a real terrain with cliffs
-  has longer level-0 spans and therefore a larger refinement residual at the same
-  iteration count.
+WHAT THE GATE ASSERTS, AND WHAT IT REFUSES TO.  The page's own measurements at :47-53 -- 515
+rays, 398 hits, ±21/±11/±2.6 mm, 57 m median, ±0.64 m -- are NOT gated and cannot be: :54
+gives the field's FORM, `h = a·sin(kx) + b·sin(k′z)`, and never a, b, k or k′, so no rig can
+rebuild that ray set, and the register records the printed millimetres as rounded UP from the
+run, i.e. as bounds.  Asserting a bound one-sidedly is precisely the shape this corpus keeps
+catching: walk ±11 mm to ±110 mm and `worst < claimed` stays green.  What that same sentence
+states EXACTLY -- zero missed, zero spurious, written as words -- is reproduced on this rig's
+own field and gated at tolerance zero.  Everything else the gate declines to check is printed
+at the end, with its reason, including one claim whose two sides move together under any edit
+and therefore cannot be gated at all.
 
-Run:  python3 heightfield-raymarching.py
-Seed: 20260910 (fixed below)
+NO PARAMETER IS TAKEN FROM THE NUMBER UNDER TEST.  The grid this rig marches over is 2^_N_EXP
+with _N_EXP a literal; its a, b, k, k′ are literals; its ray count, seed, scan width and caps
+are literals.  The only page-derived inputs are the ones that are not themselves the quantity
+being checked: the 512² at :54 (input to the memory formula, whose RATIO is what is checked),
+the refinement counts at :49-50 and :70, the 1e-4 and 2048 m at :110-111, and the exponent 22.
+
+HALTING.  No loop anywhere has a data-dependent bound.  Every `for` is over a literal range or
+over an integer parsed from the page (the mip-chain depth, the refinement count); the march's
+`while` is bounded by the literal _STATE_CAP and reports a livelock as a PROVEN CYCLE -- a
+repeated (t, level) state -- never as a timeout; the closed-form reference's cell walk is
+bounded by the literal _CELL_CAP and overrunning it is a FAIL.
+
+Exit 0 when everything reproduces, non-zero otherwise.
 """
 import math
+import pathlib
 import random
+import re
+import struct
+import sys
+from fractions import Fraction
 
-import numpy as np
+try:                       # the preserved measurement harness only; the gate never uses it
+    import numpy as np
+except ImportError:        # pragma: no cover
+    np = None
 
+_DOC = pathlib.Path(__file__).resolve().parents[2] / "references" / "heightfield-raymarching.md"
+_ok = True
+_SUP = {"⁰": "0", "¹": "1", "²": "2", "³": "3", "⁴": "4", "⁵": "5",
+        "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9"}
+_WORDS = {"zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+          "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10, "third": 3}
+
+
+def _load():
+    if not _DOC.exists():
+        sys.exit(f"cannot find {_DOC} -- run this rig from inside the repo")
+    return _DOC.read_text(encoding="utf-8")
+
+
+_BODY = _load()
+
+
+def _page(pattern, what, group=1):
+    """Parse one group out of the page. A missing anchor is a FAIL, never a skip."""
+    m = re.search(pattern, _BODY)
+    if not m:
+        sys.exit(f"ANCHOR GONE -- the page no longer states {what} (pattern {pattern!r})")
+    return m.group(group)
+
+
+def _require(pattern, what):
+    """Assert the page still SAYS something. A vanished sentence is a FAIL, not a skip."""
+    if not re.search(pattern, _BODY):
+        sys.exit(f"ANCHOR GONE -- the page no longer states {what} (pattern {pattern!r})")
+    return True
+
+
+def _num(pattern, what, group=1):
+    return float(_page(pattern, what, group))
+
+
+def _int(pattern, what, group=1):
+    return int(_page(pattern, what, group))
+
+
+def _sup(pattern, what, group=1):
+    return int("".join(_SUP.get(c, c) for c in _page(pattern, what, group)))
+
+
+def _word(pattern, what, group=1):
+    w = _page(pattern, what, group).lower()
+    if w not in _WORDS:
+        sys.exit(f"the page writes {what} as {w!r}, which is not a number this rig knows")
+    return _WORDS[w]
+
+
+def _fail(msg):
+    global _ok
+    _ok = False
+    print(f"FAIL  {msg}")
+
+
+def _check(label, got, want, tol=0.0):
+    global _ok
+    if isinstance(got, (int, float, Fraction)) and isinstance(want, (int, float, Fraction)):
+        good = abs(got - want) <= tol
+    else:
+        good = got == want
+    _ok = _ok and good
+    print(f"{'PASS' if good else 'FAIL'}  {label}: derived {got!r}, page says {want!r}")
+    return good
+
+
+def _agree(label, a, b):
+    global _ok
+    good = a == b
+    _ok = _ok and good
+    print(f"{'PASS' if good else 'FAIL'}  BOTH ENDS {label}: {a!r} and {b!r}")
+    return good
+
+
+# ── fp32, by bit pattern ─────────────────────────────────────────────────────────────────
+def _f32(x):
+    return struct.unpack("<f", struct.pack("<f", x))[0]
+
+
+def _i32(x):
+    return struct.unpack("<I", struct.pack("<f", _f32(x)))[0]
+
+
+def _from_i32(b):
+    return struct.unpack("<f", struct.pack("<I", b & 0xFFFFFFFF))[0]
+
+
+def _ulp32(x):
+    x = _f32(x)
+    return _from_i32(_i32(x) + 1) - x
+
+
+def _ulps32(a, b):
+    return _i32(b) - _i32(a)
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# GATE 1 -- what the pyramid costs.  Exact rational arithmetic, tolerance ZERO.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+def gate_cost():
+    print("\n── 1. the pyramid's memory, at :41-46 / :225-226 / :262-263 ─────────────────")
+    n_rig = _int(r"(\d+)² samples of `h = ", "the resolution its own rig ran at (:54)")
+    if n_rig <= 0 or (n_rig & (n_rig - 1)):
+        _fail(f"the page's rig resolution {n_rig} is not a power of two; the "
+              f"`2ⁿ×2ⁿ` formula at :45-46 does not apply to it")
+        return
+    n = n_rig.bit_length() - 1
+
+    # the closed form the page prints, with ITS OWN integers parsed out of it
+    fa, fb, fc = (int(x) for x in re.search(
+        r"`\(4\^\(n\+(\d+)\) − (\d+)\)/\((\d+)·4\^n\)` of the base for a 2ⁿ×2ⁿ field",
+        _BODY).groups()) if re.search(
+        r"`\(4\^\(n\+(\d+)\) − (\d+)\)/\((\d+)·4\^n\)` of the base for a 2ⁿ×2ⁿ field",
+        _BODY) else sys.exit("ANCHOR GONE -- the closed form at :45-46")
+
+    # The structure the page prescribes, BUILT: level 0 is the 3x3-dilated max -- a SECOND
+    # full-resolution array -- and the levels above it halve.  Loop bound: n, parsed.
+    size, cells = n_rig, [n_rig * n_rig]
+    for _ in range(n):
+        size //= 2
+        cells.append(size * size)
+    if size != 1:
+        _fail(f"the mip chain over {n_rig}² did not reach 1×1 in {n} reductions")
+    base = Fraction(n_rig * n_rig)
+    ratio = Fraction(sum(cells), 1) / base
+    upper = Fraction(sum(cells[1:]), 1) / base
+
+    closed = Fraction(4 ** (n + fa) - fb, fc * 4 ** n)
+    _check(f"pyramid/field over the {n_rig}² field it built, against the page's own "
+           f"(4^(n+{fa}) − {fb})/({fc}·4^n) at n={n}", ratio, closed)
+
+    p, q = (int(x) for x in re.search(r"\*\*(\d+)/(\d+) of the field it is built over\*\*",
+                                      _BODY).groups())
+    p2, q2 = (int(x) for x in re.search(r"plus the pyramid's (\d+)/(\d+)\s*\n?of it",
+                                        _BODY).groups())
+    _agree("state the pyramid's size (:41 and :225-226)", (p, q), (p2, q2))
+    _check(f"({p}/{q} − built ratio) against the page's own remainder 1/({fc}·4^n)",
+           Fraction(p, q) - ratio, Fraction(fb, fc * 4 ** n))
+
+    third = _word(r"only the levels above it sum to the (\w+)\.", "what the upper levels sum to")
+    _check(f"(1/{third} − the levels above level 0) against 1/({fc}·4^n) -- "
+           f"'only the levels above it sum to the {'third' if third == 3 else third}'",
+           Fraction(1, third) - upper, Fraction(fb, fc * 4 ** n))
+    _check("level 0 is a SECOND full-resolution array (cells at level 0 / base cells)",
+           Fraction(cells[0]) / base, Fraction(1))
+
+    b16 = _num(r"Over an R16 field at \*\*(\d+) bytes per cell\*\*", "the R16 cell size (:44)")
+    bpyr = _num(r"\*\*([\d.]+) bytes per cell\*\* of pyramid", "the pyramid's bytes/cell")
+    bres = _num(r"\*\*([\d.]+) bytes per cell\*\* resident", "the resident bytes/cell")
+    mult = _num(r"— ([\d.]+)× the field, not the field itself\*\*", "the RT-section multiple")
+    _check(f"{b16:g} bytes/cell × the built ratio", round(b16 * float(ratio), 2), bpyr)
+    _check(f"{b16:g} bytes/cell × (1 + the built ratio)",
+           round(b16 * (1 + float(ratio)), 2), bres)
+    _check("1 + the built ratio, against the procedural-AABB end at :262-263",
+           round(1 + float(ratio), 2), mult)
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# GATE 2 -- the fp32 constants the termination argument rests on.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+def gate_fp32():
+    print("\n── 2. the relative advance in fp32, at :77 / :110-113 / :285 ────────────────")
+    lit = _page(r"t\s+= max\(t, tExitNode\) \* \(1\.0f \+ ([\d.e+-]+)f\)",
+                "the relative-advance literal in the fence (:77)")
+    e_prose = _sup(r"`max\(t, tExitNode\)·\(1 \+ 2⁻([⁰¹²³⁴⁵⁶⁷⁸⁹]+)\)` moves",
+                   "the relative advance as a power of two (:112)")
+    e_table = _sup(r"\| `t = max\(t, tExitNode\)·\(1 \+ 2⁻([⁰¹²³⁴⁵⁶⁷⁸⁹]+)\)`",
+                   "the same advance in the failure table (:285)")
+    e_zero = _sup(r"the relative advance is\s*\n?`0·\(1\+2⁻([⁰¹²³⁴⁵⁶⁷⁸⁹]+)\) = 0`",
+                  "the advance in the t = 0 argument (:131-132)")
+    _agree("write the same exponent (:112 and :285)", e_prose, e_table)
+    _agree("write the same exponent (:112 and :131-132)", e_prose, e_zero)
+    _check(f"the fence's literal {lit!r} against 2^-{e_prose} in fp32",
+           _f32(float(lit)), _f32(2.0 ** -e_prose))
+    norm = lambda v: re.sub(r"e([+-])0*(\d)", r"e\1\2", v)
+    _check(f"2^-{e_prose} printed to as many significant digits as the fence's literal",
+           norm("%.9g" % (2.0 ** -e_prose)), norm(lit))
+
+    lo = _int(r"moves (\d+)–\d+ ULP \*at every positive normal", "the low ULP count (:112)")
+    hi = _int(r"moves \d+–(\d+) ULP \*at every positive normal", "the high ULP count (:112)")
+    k = 1.0 + 2.0 ** -e_prose
+    seen_lo, seen_hi, bad = 99, -1, 0
+    for e in range(-126, 128):                      # every fp32 normal binade: 254, a literal
+        for j in range(32):                         # a fixed mantissa sample, not exhaustive
+            t = _f32(math.ldexp(1.0 + j / 32.0, e))
+            d = _f32(t * k)
+            if not d > t:
+                bad += 1
+                continue
+            u = _ulps32(t, d)
+            seen_lo, seen_hi = min(seen_lo, u), max(seen_hi, u)
+    if bad:
+        _fail(f"the advance failed to increase t on {bad} of the sampled magnitudes")
+    _check(f"smallest ULP step over 254 binades × 32 mantissas", seen_lo, lo)
+    _check(f"largest ULP step over 254 binades × 32 mantissas", seen_hi, hi)
+
+    nudge = _num(r"`t \+ ([\d.e+-]+)` is a \*no-op in fp32 for\s*\n?every `t ≥ \d+ m`\*",
+                 "the absolute nudge (:110-111)")
+    thr = _num(r"`t \+ [\d.e+-]+` is a \*no-op in fp32 for\s*\n?every `t ≥ (\d+) m`\*",
+               "the distance past which it is a no-op (:110-111)")
+    thr_tbl = _num(r"absorbed by fp32 ULP past (\d+) m", "the same distance in the failure "
+                                                         "table (:285)")
+    _agree("state the same no-op distance (:110-111 and :285)", thr, thr_tbl)
+    first = None
+    for e in range(-20, 61):                        # a literal sweep of binades
+        t = _f32(math.ldexp(1.0, e))
+        if _f32(t + nudge) == t:
+            first = t
+            break
+    _check(f"smallest fp32 magnitude where `t + {nudge:g}` is a no-op", first, thr)
+    just_below = _from_i32(_i32(thr) - 1)
+    if _f32(just_below + nudge) == just_below:
+        _fail(f"`t + {nudge:g}` is ALREADY a no-op one ULP below {thr:g} m, so the page's "
+              f"threshold is not the threshold")
+    else:
+        print(f"PASS  and NOT a no-op one ULP below it ({just_below!r}), so {thr:g} m is the "
+              f"exact threshold, not a round number near it")
+    _check(f"ULP at {thr:g} m in fp32", float("%.2g" % _ulp32(thr)),
+           _num(r"\(ULP ([\d.e+-]+)\)", "the ULP it prints there (:111)"))
+
+    pairs = re.search(r"\((\d+) mm at (\d+) km, (\d+) mm at (\d+) km", _BODY)
+    if not pairs:
+        sys.exit("ANCHOR GONE -- the two `N mm at N km` instantiations at :113")
+    for mm, km in ((int(pairs.group(1)), int(pairs.group(2))),
+                   (int(pairs.group(3)), int(pairs.group(4)))):
+        t = _f32(km * 1000.0)
+        _check(f"the step `max(t,·)·(1 + 2^-{e_prose})` takes at {km} km, in mm",
+               round((_f32(t * k) - t) * 1000.0), mm)
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# the field, the pyramid and the block itself.
+#
+# a, b, k and k' are NOT on the page -- :54 gives the FORM `h = a·sin(kx) + b·sin(k′z)` and
+# nothing else -- so these four are this rig's own, stated here and never presented as a
+# reproduction of the page's 515-ray run.  The grid is 2^_N_EXP, a literal: nothing checked
+# below is derived from it.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+_N_EXP = 6
+_NG = 1 << _N_EXP
+_S0 = 1.0
+_AMP_X, _KX = 40.0, 2.0 * math.pi / 16.0
+_AMP_Z, _KZ = 15.0, 2.0 * math.pi / 8.0
+_MAPMAX = _AMP_X + _AMP_Z
+_MAXDIST = 120.0
+_EPS_T = 1.0 / 1024.0
+_SEED = 424242
+_CELL_CAP = 20000
+_STATE_CAP = 20000
+
+
+def _analytic(x, z):
+    return _AMP_X * math.sin(_KX * x) + _AMP_Z * math.sin(_KZ * z)
+
+
+def _samples():
+    """Heights at texel CENTRES, per :146-147.  Periodic, so `floor` wraps exactly."""
+    return [[_analytic((i + 0.5) * _S0, (j + 0.5) * _S0) for i in range(_NG)]
+            for j in range(_NG)]
+
+
+def _dilate3(a):
+    n = len(a)
+    return [[max(a[(j + dj) % n][(i + di) % n] for dj in (-1, 0, 1) for di in (-1, 0, 1))
+             for i in range(n)] for j in range(n)]
+
+
+def _reduce2(a, op=max):
+    n = len(a) // 2
+    return [[op(a[2 * j][2 * i], a[2 * j][2 * i + 1],
+                a[2 * j + 1][2 * i], a[2 * j + 1][2 * i + 1]) for i in range(n)]
+            for j in range(n)]
+
+
+def _pyramid(h, apron="level0", op=max):
+    """`dilate the base samples 3×3 and max-reduce *that*` (:148-150)."""
+    lvl0 = _dilate3(h) if apron in ("level0", "perlevel") else [r[:] for r in h]
+    out = [lvl0]
+    for _ in range(_N_EXP):                         # literal bound
+        nxt = _reduce2(out[-1], op)
+        if apron == "perlevel":
+            nxt = _dilate3(nxt)
+        out.append(nxt)
+    if apron == "toponly":
+        out[-1] = _dilate3(out[-1])
+    return out
+
+
+def _surface(h, x, z):
+    """Bilinear reconstruction from samples at texel centres (:147, :151-153)."""
+    u, v = x / _S0 - 0.5, z / _S0 - 0.5
+    i, j = math.floor(u), math.floor(v)
+    p, q = u - i, v - j
+    i0, j0, i1, j1 = i % _NG, j % _NG, (i + 1) % _NG, (j + 1) % _NG
+    a = h[j0][i0] + (h[j0][i1] - h[j0][i0]) * p
+    b = h[j1][i0] + (h[j1][i1] - h[j1][i0]) * p
+    return a + (b - a) * q
+
+
+def _corners(x, z):
+    u, v = x / _S0 - 0.5, z / _S0 - 0.5
+    i, j = math.floor(u), math.floor(v)
+    return [(j % _NG, i % _NG), (j % _NG, (i + 1) % _NG),
+            ((j + 1) % _NG, i % _NG), ((j + 1) % _NG, (i + 1) % _NG)]
+
+
+def _node_max(pyr, level, x, z):
+    s = _S0 * (1 << level)
+    n = len(pyr[level])
+    return pyr[level][math.floor(z / s) % n][math.floor(x / s) % n]
+
+
+def _exit_distance(o, d, t, level):
+    """DDA to the node boundary.  +inf for an axis the ray does not move along -- which is
+    the column-locked picking ray of :120-122, and why the clamp exists."""
+    s = _S0 * (1 << level)
+    out = math.inf
+    for ax in (0, 2):
+        if d[ax] == 0.0:
+            continue
+        c = math.floor((o[ax] + d[ax] * t) / s)
+        bound = (c + (1 if d[ax] > 0 else 0)) * s
+        out = min(out, (bound - o[ax]) / d[ax])
+    return out
+
+
+# ── the block at :61-82, transcribed ─────────────────────────────────────────────────────
+_SCAN = 8            # a literal
+
+
+def _refine(h, o, d, t0, t1, iters):
+    """`refine(t, tExitNode)` -- `binary or secant refine, 5-8 iterations` (:70).
+
+    ⚠️ TWO DEVIATIONS from the block, both forced and both reported rather than hidden:
+
+      * the block writes `return refine(t, tExitNode)`, which returns UNCONDITIONALLY.  A
+        refine that finds no crossing must fall through and keep marching, or the traversal
+        reports a hit on a level-0 node the interval test only said a hit was POSSIBLE in.
+      * `binary refine` presupposes a BRACKET, and the endpoints of a level-0 span need not
+        bracket: inside one texel a bilinear surface can dip below the ray and come back, so
+        f(t) > 0 and f(tExitNode) > 0 with a real crossing between.  A short fixed scan finds
+        the bracket first.  Without it this rig read a genuine first hit as a later one.
+    """
+    f = lambda t: (o[1] + d[1] * t) - _surface(h, o[0] + d[0] * t, o[2] + d[2] * t)
+    flo, fhi = f(t0), f(t1)
+    if flo <= 0.0:
+        return t0
+    lo, hi = t0, t1
+    if not (fhi <= 0.0):
+        prev_t, prev_f, found = t0, flo, False
+        for si in range(1, _SCAN + 1):              # literal bound
+            tt = t0 + (t1 - t0) * si / _SCAN
+            ft = f(tt)
+            if prev_f > 0.0 >= ft:
+                lo, hi, found = prev_t, tt, True
+                break
+            prev_t, prev_f = tt, ft
+        if not found:
+            return None
+    for _ in range(iters):     # bound: `iters`, parsed from the page
+        mid = 0.5 * (lo + hi)
+        if f(mid) > 0.0:
+            lo = mid
+        else:
+            hi = mid
+    return 0.5 * (lo + hi)
+
+
+def _march(h, pyr, o, d, t_enter, t_exit, iters=6, *, advance="relative", nudge=1e-4,
+           descend="interval", fp32=False, literal_return=False):
+    """The fence at :61-82.  `advance` and `descend` select the page's own counterfactuals.
+
+    Halting: the while loop is bounded by _STATE_CAP, a literal; a livelock is reported as a
+    PROVEN CYCLE (a repeated (t, level) state), never as a timeout.
+    """
+    coarsest = len(pyr) - 1
+    level, t, steps = coarsest, t_enter, 0
+    seen, spans = set(), []
+    prev = None
+    invariant_broken = None
+    while t < t_exit:
+        if fp32:
+            t = _f32(t)
+        key = (struct.pack("<d", t), level)
+        if key in seen:
+            return ("CYCLE", steps, spans, invariant_broken)
+        seen.add(key)
+        node_max = _node_max(pyr, level, o[0] + d[0] * t, o[2] + d[2] * t)
+        t_exit_node = min(_exit_distance(o, d, t, level), t_exit)
+        h_t, h_e = o[1] + d[1] * t, o[1] + d[1] * t_exit_node
+        if descend == "interval":
+            candidate = min(h_t, h_e) < node_max
+        else:                                        # the widely-circulated crossing form
+            if d[1] < 0.0:
+                candidate = ((node_max - o[1]) / d[1]) < t_exit_node
+            else:
+                candidate = h_t < node_max and False  # no crossing => it skips
+        t_before, level_before = t, level
+        if candidate:
+            if level == 0:
+                spans.append((t, t_exit_node))
+                hit = _refine(h, o, d, t, t_exit_node, iters)
+                if hit is not None:
+                    return ("HIT", hit, spans, invariant_broken)
+                if literal_return:
+                    # `if (level == 0) return refine(t, tExitNode)` returns UNCONDITIONALLY.
+                    return ("HIT-NO-BRACKET", t, spans, invariant_broken)
+            else:
+                if d[1] < 0.0:
+                    t = max(t, (node_max - o[1]) / d[1])
+                level -= 1
+        if (not candidate) or level == level_before:
+            if advance == "relative":
+                t = max(t, t_exit_node) * (1.0 + 2.0 ** -22)
+            elif advance == "absolute":
+                t = max(t, t_exit_node) + nudge
+            else:                                    # the page's `t = tExitNode` (:108)
+                t = t_exit_node
+            if fp32:
+                t = _f32(t)
+            level = min(level + 1, coarsest)
+        if not (t > t_before or level < level_before):
+            invariant_broken = (t_before, level_before, t, level)
+        if level > level_before and not t > t_before:
+            invariant_broken = (t_before, level_before, t, level)
+        steps += 1
+        if steps > _STATE_CAP:
+            return ("CAP", steps, spans, invariant_broken)
+    return ("MISS", steps, spans, invariant_broken)
+
+
+def _reference(h, o, d, t0, t1):
+    """First crossing of the SAME bilinear surface, in closed form per cell.  Halting: the
+    cell walk is bounded by _CELL_CAP, a literal, and overrunning it is a FAIL."""
+    t = t0
+    for _ in range(_CELL_CAP):
+        if not t < t1:
+            return None
+        x, z = o[0] + d[0] * t, o[2] + d[2] * t
+        i, j = math.floor(x / _S0 - 0.5), math.floor(z / _S0 - 0.5)
+        tx = math.inf if d[0] == 0 else (((i + 1.5) * _S0) - o[0]) / d[0] if d[0] > 0 else \
+            (((i + 0.5) * _S0) - o[0]) / d[0]
+        tz = math.inf if d[2] == 0 else (((j + 1.5) * _S0) - o[2]) / d[2] if d[2] > 0 else \
+            (((j + 0.5) * _S0) - o[2]) / d[2]
+        t_cell = min(tx, tz, t1)
+        h00 = h[j % _NG][i % _NG]
+        h10 = h[j % _NG][(i + 1) % _NG]
+        h01 = h[(j + 1) % _NG][i % _NG]
+        h11 = h[(j + 1) % _NG][(i + 1) % _NG]
+        c1, c2 = h10 - h00, h01 - h00
+        c3 = h00 - h10 - h01 + h11
+        p0 = (o[0] - (i + 0.5) * _S0) / _S0
+        q0 = (o[2] - (j + 0.5) * _S0) / _S0
+        pd, qd = d[0] / _S0, d[2] / _S0
+        a2 = -(c3 * pd * qd)
+        a1 = d[1] - (c1 * pd + c2 * qd + c3 * (p0 * qd + q0 * pd))
+        a0 = o[1] - (h00 + c1 * p0 + c2 * q0 + c3 * p0 * q0)
+        # ⚠️ the NUMERICALLY STABLE form.  `(-a1 ± sqrt(disc))/(2·a2)` is catastrophic here:
+        # a2 = -(c3·pd·qd) goes to ~1e-16 on an axis-aligned ray while a1 is O(1), and the
+        # subtraction of two nearly equal quantities then returns a root off by 0.1 m.  That
+        # was this rig's own bug, and it showed up as the march DISAGREEING with the page.
+        roots = []
+        if a2 == 0.0:
+            if a1 != 0.0:
+                roots.append(-a0 / a1)
+        else:
+            disc = a1 * a1 - 4 * a2 * a0
+            if disc >= 0.0:
+                qq = -0.5 * (a1 + math.copysign(math.sqrt(disc), a1 if a1 != 0.0 else 1.0))
+                roots.append(qq / a2)
+                if qq != 0.0:
+                    roots.append(a0 / qq)
+        got = sorted(r for r in roots if t - 1e-12 <= r <= t_cell + 1e-12)
+        if got:
+            return max(got[0], t0)
+        t = t_cell * (1.0 + 2.0 ** -22) if t_cell > 0 else t_cell + 1e-9
+    _fail("the closed-form reference overran its literal cell cap")
+    return None
+
+
+def _reference_selfcheck(h, rs, ref):
+    """The closed-form reference, checked against a dense scan of the SAME surface.
+
+    Without this the gate cannot tell a wrong reference from a wrong page, and a wrong
+    reference is what it had: see the note in _reference.  Halting: the scan step and the
+    ray length are literals, so the loop count is fixed.
+    """
+    step, bad_late, bad_root, bad_ghost = 0.02, 0, 0, 0
+    for (o, d, t0, t1, _k), rt in zip(rs, ref):
+        f = lambda t: (o[1] + d[1] * t) - _surface(h, o[0] + d[0] * t, o[2] + d[2] * t)
+        hi = t1 if rt is None else rt
+        n = int((hi - t0) / step)
+        prev, crossed = f(t0), False
+        for s_i in range(1, n + 1):
+            cur = f(t0 + s_i * step)
+            if prev > 0.0 >= cur:
+                crossed = True
+                break
+            prev = cur
+        if rt is None:
+            bad_ghost += crossed
+        else:
+            bad_late += crossed
+            bad_root += abs(f(rt)) > 1e-6
+    _check("reference roots that are not crossings of the same surface", bad_root, 0)
+    _check("references that skipped an EARLIER crossing (dense 20 mm scan)", bad_late, 0)
+    _check("rays the reference called a miss that the dense scan crosses", bad_ghost, 0)
+
+
+def _rays(h):
+    rng = random.Random(_SEED)
+    out = []
+
+    def push(o, dv, kind):
+        L = math.sqrt(sum(c * c for c in dv))
+        dv = [c / L for c in dv]
+        if dv[1] == 0.0:
+            return
+        # tExit: the ray ∩ [mapMin, mapMax], capped finite per the fence comment at :62-63
+        t_slab = ((_MAPMAX if dv[1] > 0 else -_MAPMAX) - o[1]) / dv[1]
+        t_exit = min(t_slab, _MAXDIST)
+        if t_exit <= _EPS_T:
+            return
+        if (o[1] + dv[1] * _EPS_T) - _surface(h, o[0] + dv[0] * _EPS_T,
+                                              o[2] + dv[2] * _EPS_T) <= 0.0:
+            return          # an origin inside the terrain is outside this kernel's contract
+        out.append((o, dv, _EPS_T, t_exit, kind))
+
+    for _ in range(40):
+        o = [rng.uniform(0, _NG), rng.uniform(_MAPMAX * 0.6, _MAPMAX), rng.uniform(0, _NG)]
+        yaw, pitch = rng.uniform(0, 2 * math.pi), math.radians(rng.uniform(-40, -3))
+        push(o, [math.cos(pitch) * math.cos(yaw), math.sin(pitch),
+                 math.cos(pitch) * math.sin(yaw)], "primary")
+    for _ in range(40):
+        x, z = rng.uniform(0, _NG), rng.uniform(0, _NG)
+        o = [x, _surface(h, x, z) + 0.05, z]
+        yaw, pitch = rng.uniform(0, 2 * math.pi), math.radians(rng.uniform(4, 30))
+        push(o, [math.cos(pitch) * math.cos(yaw), math.sin(pitch),
+                 math.cos(pitch) * math.sin(yaw)], "ascending")
+    for _ in range(20):
+        x, z = rng.uniform(0, _NG), rng.uniform(0, _NG)
+        o = [x, _surface(h, x, z) + 0.5, z]
+        yaw, pitch = rng.uniform(0, 2 * math.pi), math.radians(rng.uniform(-0.8, 0.8))
+        push(o, [math.cos(pitch) * math.cos(yaw), math.sin(pitch),
+                 math.cos(pitch) * math.sin(yaw)], "grazing")
+    for _ in range(10):
+        push([rng.uniform(0, _NG), _MAPMAX, rng.uniform(0, _NG)], [0.0, -1.0, 0.0], "picking")
+    return out
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# GATE 3 -- registration: the apron, and what it is conservative against.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+def gate_registration(h):
+    print("\n── 3. the apron and the reduce, at :145-153 / :290 ──────────────────────────")
+    _require(r"dilate the base\s*\n?samples 3×3 and max-reduce \*that\*, which stays "
+          r"conservative at every level", "that the 3×3 dilate stays conservative (:148-150)")
+    _require(r"an un-aproned reduce is not conservative there",
+          "that an un-aproned reduce is NOT conservative (:153-155)")
+    _require(r"Max-\*\*height\*\* reduce for the ray pyramid, min-\*\*height\*\* reduce for the\s*\n?"
+          r"occluder proxy", "the two opposite reduces (:290)")
+
+    good = _pyramid(h, "level0")
+    bare = _pyramid(h, "none")
+    mini = _pyramid(h, "level0", op=min)
+    if len(good) != _N_EXP + 1 or len(good[0]) != _NG:
+        _fail(f"the prescribed pyramid is {len(good)} levels with a {len(good[0])}² level 0")
+    else:
+        print(f"PASS  the prescribed build gives {len(good)} levels, level 0 {len(good[0])}² "
+              f"-- a second full-resolution array, which is GATE 1's 4/3")
+
+    SUB = 4                                          # a literal
+    pts = [(i + 0.5) / SUB for i in range(_NG * SUB)]
+    bad_good = bad_bare = bad_min = 0
+    worst_bare = 0.0
+    for z in pts:
+        for x in pts:
+            cs = _corners(x, z)
+            for level in range(len(good)):
+                s = _S0 * (1 << level)
+                jj, ii = math.floor(z / s) % len(good[level]), math.floor(x / s) % len(good[level])
+                gm, bm, mm = good[level][jj][ii], bare[level][jj][ii], mini[level][jj][ii]
+                for (cj, ci) in cs:                  # EXACT: stored float against stored float
+                    if not gm >= h[cj][ci]:
+                        bad_good += 1
+                    if not bm >= h[cj][ci]:
+                        bad_bare += 1
+                        worst_bare = max(worst_bare, h[cj][ci] - bm)
+                    if not mm >= h[cj][ci]:
+                        bad_min += 1
+    _check("bracketing samples the 3×3-dilated max-reduce fails to bound, over "
+           f"{len(pts)}² positions × {len(good)} levels", bad_good, 0)
+    if bad_bare > 0:
+        print(f"PASS  the UN-aproned reduce fails to bound {bad_bare} of them, by up to "
+              f"{worst_bare:.2f} m -- the page's 'not conservative there'")
+    else:
+        _fail("the un-aproned reduce bounded every bracketing sample, so this field cannot "
+              "demonstrate the page's claim at :153-155 -- the gate is inert, not green")
+    if bad_min > 0:
+        print(f"PASS  a MIN-height reduce fails to bound {bad_min} of them -- :290's "
+              f"'two pyramids', not one shared")
+    else:
+        _fail("a min-height reduce bounded every sample, contradicting :290")
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# GATE 4 -- the block, RUN: termination, and the page's own counterfactuals.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+def gate_termination(h, pyr, rs):
+    print("\n── 4. termination, at :107-134 / :285 ───────────────────────────────────────")
+    _require(r"each iteration strictly increases `t` or\s*\n?decreases `level`, and `level` "
+          r"only rises on the branch that increases `t`",
+          "the structural termination invariant (:129-130)")
+    cyc = broke = 0
+    for (o, d, t0, t1, _k) in rs:
+        r = _march(h, pyr, o, d, t0, t1, fp32=True)
+        if r[0] in ("CYCLE", "CAP"):
+            cyc += 1
+        if r[3] is not None:
+            broke += 1
+    _check(f"rays of {len(rs)} that livelock under the fence as written, in fp32", cyc, 0)
+    _check("iterations that violated the page's own invariant", broke, 0)
+
+    # (a) `t = tExitNode`, the page's :108-110 and failure-table :285
+    _require(r"`t = tExitNode` lands the ray exactly on a node boundary", "the bare-assign hang")
+    bare = sum(1 for (o, d, t0, t1, _k) in rs
+               if _march(h, pyr, o, d, t0, t1, advance="bare", fp32=True)[0] == "CYCLE")
+    if bare > 0:
+        print(f"PASS  `t = tExitNode` is a PROVEN CYCLE on {bare} of {len(rs)} rays "
+              f"(repeated (t, level) state, not a timeout)")
+    else:
+        _fail("`t = tExitNode` livelocked on no ray, so this rig cannot see the hang the "
+              "page's whole termination paragraph is about")
+
+    # (b) the absolute nudge, above and below the distance the page names.  The geometry is
+    #     held FIXED and only the ray PARAMETER is moved: shifting the origin back by T along
+    #     d leaves o + d*t identical, so the only thing that changes is the magnitude of t.
+    nudge = _num(r"`t \+ ([\d.e+-]+)` is a \*no-op in fp32 for", "the absolute nudge")
+    thr = _num(r"is a \*no-op in fp32 for\s*\n?every `t ≥ (\d+) m`\*", "the no-op distance")
+    cyclers = [(o, d, t0, t1) for (o, d, t0, t1, _k) in rs
+               if _march(h, pyr, o, d, t0, t1, advance="bare", fp32=True)[0] == "CYCLE"]
+    counts = {}
+    for tag, shift in (("far", 4.0 * thr), ("near", thr / 8.0)):
+        n_cyc = 0
+        for (o, d, t0, t1) in cyclers:
+            os_ = [o[a] - d[a] * shift for a in (0, 1, 2)]
+            r = _march(h, pyr, os_, d, t0 + shift, t1 + shift,
+                       advance="absolute", nudge=nudge, fp32=True)
+            n_cyc += (r[0] == "CYCLE")
+        counts[tag] = n_cyc
+    if counts["far"] > 0 and counts["near"] == 0:
+        print(f"PASS  `t + {nudge:g}` is a PROVEN CYCLE on {counts['far']} of {len(cyclers)} "
+              f"rays at t ≈ {4 * thr:g} m and on {counts['near']} of them at t ≈ {thr / 8:g} m "
+              f"-- ':285 hides it near the camera and is absorbed past {thr:g} m'")
+    else:
+        _fail(f"`t + {nudge:g}` cycled on {counts['far']} rays far and {counts['near']} near; "
+              f"the page says absorbed past {thr:g} m and hidden below it")
+
+    # (c) tEnter = 0 and tEnter < 0 -- the precondition at :129-134
+    _require(r"So clamp `tEnter` with `max\(EPS, ·\)` for a small positive\s*\n?`EPS`, "
+          r"\*\*never `max\(0, ·\)`\*\*", "the strict clamp (:133-134)")
+    _require(r"tEnter = max\(EPS, ·\) — NOT max\(0, ·\)",
+          "the same clamp in the fence's own comment (:62)")
+    _require(r"\*\*Termination is then structural, given `tEnter > 0`\*\*",
+          "the STRICT precondition (:129)")
+    e = _sup(r"the relative advance is\s*\n?`0·\(1\+2⁻([⁰¹²³⁴⁵⁶⁷⁸⁹]+)\) = 0`",
+             "the t = 0 advance")
+    _check(f"0·(1+2^-{e}) in fp32", _f32(0.0 * (1.0 + 2.0 ** -e)), 0.0)
+    # the origin sits on x = z = 0, a node boundary at EVERY level, and travels back into
+    # negative x and z, so `exitDistance` is 0 at every level: `tExitNode == t == 0`.
+    o, d = [0.0, _MAPMAX, 0.0], [-0.6, -0.5, -0.62]
+    L = math.sqrt(sum(c * c for c in d))
+    d = [c / L for c in d]
+    at_zero = _march(h, pyr, o, d, 0.0, 60.0, fp32=True)
+    at_eps = _march(h, pyr, o, d, _EPS_T, 60.0, fp32=True)
+    if at_zero[0] == "CYCLE" and at_eps[0] in ("HIT", "MISS"):
+        print(f"PASS  a ray entered at t = 0 on a node boundary is a PROVEN CYCLE, and the "
+              f"same ray entered at max(EPS, ·) terminates ({at_eps[0]}) -- :131-134, "
+              f"both halves")
+    else:
+        _fail(f"the t = 0 precondition did not bite: at 0 -> {at_zero[0]}, "
+              f"at EPS -> {at_eps[0]}; the page says cycles, then terminates")
+
+    _require(r"at negative `t` the multiply moves \*away\* from zero,\s*\n?i\.e\. backward, "
+          r"to an exact fixed point", "the negative-t fixed point (:132-133)")
+    back = all(_f32(tn * (1.0 + 2.0 ** -e)) < tn
+               for tn in (-1.0, -3584.0, -2.5e-3, -1e5))
+    tn = _f32(-3584.0)
+    fixed = _f32(tn * (1.0 + 2.0 ** -e))
+    if back and _f32(fixed) == _f32(_f32(fixed)) and _f32(max(fixed, tn) * (1.0 + 2.0 ** -e)) == fixed:
+        print(f"PASS  negative t moves BACKWARD and `max(t, tExitNode)·(1+2^-{e})` sits on an "
+              f"exact fixed point ({fixed!r} from tExitNode {tn!r})")
+    else:
+        _fail("negative t did not move backward to an exact fixed point")
+
+    # the textbook slab entry the page says the caller hands in
+    _require(r"the textbook slab entry for an origin inside the map is negative",
+          "the reason the clamp exists (:134)")
+    o = [_NG * 0.5, 0.0, _NG * 0.5]
+    d = [0.0, -1.0, 0.0]
+    t_near = ((_MAPMAX if d[1] < 0 else -_MAPMAX) - o[1]) / d[1]
+    if t_near < 0.0:
+        print(f"PASS  the slab entry for an origin inside the map is {t_near:.3f} < 0")
+    else:
+        _fail(f"the slab entry for an interior origin came out {t_near:.3f}, not negative")
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# GATE 5 -- the clamp: the column-locked ray, and the NaN the clamp does NOT remove.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+def gate_clamp(h, pyr, rs):
+    print("\n── 5. the clamp, at :120-128 / :286 ─────────────────────────────────────────")
+    _require(r"never\s*\n?leaves its column, so `exitDistance` is `\+inf`",
+          "the column-locked ray's infinite exitDistance (:120-122)")
+    _require(r"a \*\*column-locked picking\s*\n?ray never leaves its column\*\*, so its level-0 "
+          r"span is the rest of the ray", "the level-0 span of a picking ray (:51-53)")
+    bad = checked = no_span = off = 0
+    for (o, d, t0, t1, kind) in rs:
+        if kind != "picking":
+            continue
+        checked += 1
+        for level in range(len(pyr)):
+            if _exit_distance(o, d, t0, level) != math.inf:
+                bad += 1
+        r = _march(h, pyr, o, d, t0, t1)
+        if not r[2]:
+            no_span += 1
+            continue
+        # every level-0 span this ray handed to refine IS the rest of the ray, exactly
+        for (t_at, t_end) in r[2]:
+            if t_end != t1:
+                off += 1
+    _check(f"levels where a column-locked ray's exitDistance was finite ({checked} rays × "
+           f"{len(pyr)} levels)", bad, 0)
+    _check("column-locked rays that reached level 0 with no span recorded", no_span, 0)
+    _check("level-0 spans of a column-locked ray that were NOT the rest of the ray "
+           "(tExitNode != tExit) -- ':51-53, its level-0 span is the rest of the ray'", off, 0)
+
+    _require(r"`\(bound − o\.x\)·invD = 0·∞ = NaN`, and `min\(NaN, tExit\)` is still NaN",
+          "the reciprocal-form NaN (:125-126)")
+    inv_d = 1.0 / 0.0 if False else math.inf      # invD = 1/0, as the page writes it
+    prod = 0.0 * inv_d                            # (bound − o.x)·invD with bound == o.x
+    if prod == prod:
+        _fail("0·∞ did not produce NaN here, so :125-126 cannot be reproduced")
+    else:
+        print("PASS  `(bound − o.x)·invD` = 0·∞ is NaN")
+
+    def min_nan_prop(a, b):
+        return float("nan") if (a != a or b != b) else min(a, b)
+
+    def min_num(a, b):
+        return b if a != a else (a if b != b else min(a, b))
+
+    t_exit = 100.0
+    prop, num = min_nan_prop(prod, t_exit), min_num(prod, t_exit)
+    # the predicate at :69 with tExitNode = NaN.  `min(rayHeight(t), NaN) < node.maxH`
+    h_t, node_max = 5.0, 10.0
+    pred_prop = min_nan_prop(h_t, h_t + prop) < node_max     # NaN < x is False -> SKIP
+    pred_num = min(h_t, h_t + (0.0 if num != num else 0.0)) < node_max  # finite -> DESCEND
+    if prop == prop or num != t_exit:
+        _fail(f"the two min semantics did not split as :126-128 says: propagating gave "
+              f"{prop!r}, minNum gave {num!r}")
+    elif pred_prop or not pred_num:
+        _fail(f"the NaN branch did not land where :126-128 says: propagating predicate "
+              f"{pred_prop}, minNum predicate {pred_num}")
+    else:
+        print("PASS  `min(NaN, tExit)` is still NaN under a NaN-propagating min, the "
+              "predicate is FALSE and the branch SKIPS ('reports clear sight'); an IEEE "
+              "minNum returns tExit and the branch DESCENDS -- :126-128, both halves")
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# GATE 6 -- the predicate.  Interval test against the crossing test.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+def gate_predicate(h, pyr, rs):
+    print("\n── 6. the predicate, at :67-69 / :95-105 / :291 ─────────────────────────────")
+    _require(r"That is correct\s*\n?\*only for a descending ray\*", "the asymmetry (:96-97)")
+    _require(r"the traversal \*\*skips a node that can contain a hit\*\*",
+          "what the crossing form does (:100-101)")
+    _require(r"Ascending and horizontal rays simply enter the candidate span at `t`",
+             "what the interval form does instead (:105)")
+    # the predicate itself, at BOTH ends: the fence line at :69 and the fix column at :291
+    p_fence = _page(r"if \((min\(rayHeight\(t\), rayHeight\(tExitNode\)\) < node\.maxH)\) \{",
+                    "the interval predicate in the fence (:69)")
+    p_table = _page(r"\| Descend on the interval test `([^`]+)`",
+                    "the interval predicate in the failure table (:291)")
+    _agree("write the same predicate (:69 and :291)", p_fence, p_table)
+
+    # (a) exhaustive over a fixed grid of node geometries -- no page number involved, the
+    #     page's SENTENCE is the expectation.
+    dis_desc = dis_asc = wrong_way = 0
+    for hy in range(-20, 21):                       # literal bounds
+        for dy_i in (-8, -4, -1, 0, 1, 4, 8):
+            for nm in range(-20, 21):
+                h_t, dy, node_max = hy * 1.0, dy_i * 1.0, nm * 1.0
+                span = 3.0
+                h_e = h_t + dy * span
+                interval = min(h_t, h_e) < node_max
+                if dy < 0:
+                    crossing = ((node_max - h_t) / dy) < span
+                else:
+                    crossing = False
+                if interval != crossing:
+                    if dy < 0:
+                        dis_desc += 1
+                    else:
+                        dis_asc += 1
+                    if crossing and not interval:
+                        wrong_way += 1
+    _check("disagreements on DESCENDING rays ('correct only for a descending ray')",
+           dis_desc, 0)
+    if dis_asc > 0:
+        print(f"PASS  {dis_asc} disagreements on ascending/horizontal rays, and in every one "
+              f"the interval form descends where the crossing form skips")
+    else:
+        _fail("the two predicates never disagreed on an ascending ray, so :95-105 has no "
+              "instance here -- the gate is inert, not green")
+    _check("disagreements where the CROSSING form descends and the interval form skips "
+           "(the page says the error is one-directional)", wrong_way, 0)
+
+    # (b) the whole march: the page's ZERO missed and ZERO spurious, written as words
+    z1 = _word(r"the traversal returns\s*\n?\*\*(\w+) missed and \w+ spurious hits\*\*",
+               "the missed-hit count (:48-49)")
+    z2 = _word(r"the traversal returns\s*\n?\*\*\w+ missed and (\w+) spurious hits\*\*",
+               "the spurious-hit count (:48-49)")
+    fence_lo = _int(r"refine\((?:[^)]*)\)\s*// binary or secant refine, (\d+)-\d+ iterations",
+                    "the low refinement count in the fence (:70)")
+    fence_hi = _int(r"// binary or secant refine, \d+-(\d+) iterations",
+                    "the high refinement count in the fence (:70)")
+    mid = _int(r"\*\*±[\d.]+ mm\s*\n?at (\d+) bisections\*\*",
+               "the bisection count the prose bolds (:49-50)")
+    lo_hi = re.search(r"\(±[\d.]+ mm at (\d+), ±[\d.]+ mm at (\d+)\)", _BODY)
+    if not lo_hi:
+        sys.exit("ANCHOR GONE -- the two other refinement counts at :50")
+    prose = sorted({mid, int(lo_hi.group(1)), int(lo_hi.group(2))})
+    if not prose:
+        sys.exit("ANCHOR GONE -- the refinement counts the prose instantiates (:49-50)")
+    _agree("the fence's refinement range and the prose's own counts (low)",
+           fence_lo, min(prose))
+    _agree("the fence's refinement range and the prose's own counts (high)",
+           fence_hi, max(prose))
+
+    ref = [_reference(h, o, d, t0, t1) for (o, d, t0, t1, _k) in rs]
+    _reference_selfcheck(h, rs, ref)
+    print(f"      ray set: {len(rs)} rays, {sum(1 for r in ref if r is not None)} of them "
+          f"hits under the closed-form reference (this rig's field, NOT the page's)")
+    for iters in prose:
+        missed = spurious = late = 0
+        for (o, d, t0, t1, _k), rt in zip(rs, ref):
+            r = _march(h, pyr, o, d, t0, t1, iters=iters)
+            got = r[1] if r[0] == "HIT" else None
+            if rt is not None and got is None:
+                missed += 1
+            elif rt is None and got is not None:
+                spurious += 1
+            elif rt is not None and got is not None:
+                # a hit at the WRONG crossing is a missed first hit wearing a hit's clothes.
+                # The only residual the block allows is the refinement's own: span/2^k.
+                span = r[2][-1][1] - r[2][-1][0]
+                if abs(got - rt) > span / 2.0 ** iters + 1e-9:
+                    late += 1
+        _check(f"missed hits at {iters} bisections", missed, z1)
+        _check(f"spurious hits at {iters} bisections", spurious, z2)
+        _check(f"hits at {iters} bisections that are NOT the first crossing "
+               f"(beyond the refinement's own span/2^{iters})", late, z1)
+
+    # the crossing form, on the same rays: the page says it MISSES
+    missed_x = 0
+    for (o, d, t0, t1, kind), rt in zip(rs, ref):
+        if kind != "ascending" or rt is None:
+            continue
+        r = _march(h, pyr, o, d, t0, t1, descend="crossing")
+        if r[0] != "HIT":
+            missed_x += 1
+    if missed_x > 0:
+        print(f"PASS  the crossing form misses {missed_x} ascending-ray hits the interval "
+              f"form finds -- ':291 the ascending shadow ray skips nodes that hold the "
+              f"occluder'")
+    else:
+        _fail("the crossing form missed nothing on this ray set, so :291 has no instance "
+              "here -- the gate is inert, not green")
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# GATE 7 -- the depth token, derived from the two depth conventions.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+def gate_depth():
+    print("\n── 7. the conservative-depth token, at :232-240 ─────────────────────────────")
+    rev = _page(r"which is `(SV_Depth\w+)` under \*\*reversed-Z", "the reversed-Z token")
+    std = _page(r"and `(SV_Depth\w+)` under standard depth\*\*", "the standard-depth token")
+    _require(r"the promise is \*never nearer than\s*\n?the rasterized proxy\*", "the promise")
+    _require(r"It holds only if the proxy is a \*\*max-height\*\* surface", "the proxy condition")
+    # the proxy is a max-height hull, so it is at or NEARER than the hit: proxy_dist <= hit
+    near_plane, far_plane = 1.0, 1000.0
+    proxy_dist, hit_dist = 40.0, 55.0                # literals: the hull is nearer
+    z_std = lambda t: (t - near_plane) / (far_plane - near_plane)
+    z_rev = lambda t: 1.0 - z_std(t)
+    want_rev = "SV_DepthLessEqual" if z_rev(hit_dist) <= z_rev(proxy_dist) else \
+               "SV_DepthGreaterEqual"
+    want_std = "SV_DepthLessEqual" if z_std(hit_dist) <= z_std(proxy_dist) else \
+               "SV_DepthGreaterEqual"
+    _check("the token 'never nearer than the proxy' needs under reversed-Z", want_rev, rev)
+    _check("the token it needs under standard depth", want_std, std)
+    if rev == std:
+        _fail("the page gives the same token for both depth conventions; :237 calls them "
+              "'opposite tokens for one promise'")
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# GATE 8 -- the rig the page describes at :54 IS the harness at the bottom of this file.
+# `registers/corrections.tsv:227` names this path as the source of the figures at :41-53, so
+# the page's description of it and the harness's own constants are two ends of one claim.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+def gate_rig_description():
+    print("\n── 8. the rig the page describes, at :54, against the harness below ─────────")
+    _require(r"reference roots solved in closed form per bilinear cell",
+             "how the reference is computed (:54-55)")
+    bits = _int(r"\*\*The rig\*\*: CPython/fp(\d+), \d+² samples of", "the rig's precision (:54)")
+    res = _int(r"\*\*The rig\*\*: CPython/fp\d+, (\d+)² samples of", "the rig's resolution (:54)")
+    tex = _num(r"b·sin\(k′z\)` at ([\d.]+) m texels", "the rig's texel size (:54)")
+    seed = _int(r"seed (\d+), reference roots", "the rig's seed (:54)")
+    _agree("the resolution the page states and the harness's own N", res, N)
+    _agree("the texel size the page states and the harness's own S0", tex, S0)
+    _agree("the seed the page states and the harness's own SEED", seed, SEED)
+    mant = {24: 32, 53: 64}.get(sys.float_info.mant_dig)
+    _agree("the ray-parameter precision the page states and this interpreter's float",
+           bits, mant)
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# DIAGNOSTICS -- measured, printed, and DELIBERATELY NOT GATED.  Each says why.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+def diagnostics(h, pyr, rs):
+    print("\n── not gated, and why ───────────────────────────────────────────────────────")
+    print("      :47-53  515 rays / 398 hits / ±21, ±11, ±2.6 mm / 57 m median / ±0.64 m:")
+    print("              UNREPRODUCIBLE FROM THE PAGE.  :54 gives the FORM of the field,")
+    print("              `h = a·sin(kx) + b·sin(k′z)`, and never a, b, k or k′, so no rig")
+    print("              can rebuild that ray set.  The register says the printed mm are")
+    print("              each ROUNDED UP from the run, so they are bounds, and asserting a")
+    print("              bound one-sidedly is the defect this corpus keeps catching: walk")
+    print("              ±11 mm to ±110 mm and `worst < claimed` stays green.  The counts")
+    print("              the same sentence states as WORDS -- zero missed, zero spurious --")
+    print("              are exact and ARE gated above, on this rig's own field.")
+    ref = [_reference(h, o, d, t0, t1) for (o, d, t0, t1, _k) in rs]
+    worst = 0.0
+    for (o, d, t0, t1, _k), rt in zip(rs, ref):
+        r = _march(h, pyr, o, d, t0, t1, iters=6)
+        if r[0] != "HIT" or rt is None or not r[2]:
+            continue
+        span = r[2][-1][1] - r[2][-1][0]
+        if span > 0:
+            worst = max(worst, abs(r[1] - rt) / (span / 2.0 ** 6))
+    print(f"      :51    residual = span/2ᵏ: worst |hit − reference| on this field is "
+          f"{worst:.3f}× span/2⁶.")
+    print("              NOT GATED: `err <= span/2^k` is a property of bisection, true for")
+    print("              any k and any span, so both sides move together when the page is")
+    print("              edited.  A gate that cannot fail is not a gate.")
+
+    # the block's own `return refine(...)`, run literally
+    bad = 0
+    for (o, d, t0, t1, _k) in rs:
+        if _march(h, pyr, o, d, t0, t1, iters=6, literal_return=True)[0] == "HIT-NO-BRACKET":
+            bad += 1
+    print(f"      :70    `if (level == 0) return refine(t, tExitNode)` returns UNCONDITIONALLY.")
+    print(f"              Run literally, {bad} of {len(rs)} rays reach a level-0 node whose")
+    print(f"              interval brackets no crossing, and the block returns a hit there.")
+    print(f"              Every gate above marches on instead, which is the only way the")
+    print(f"              page's own `zero spurious` can hold.  A PAGE DEFECT, not gated,")
+    print(f"              and not fixed here: this rig may not edit the document.")
+
+    # the per-level apron's reach, measured
+    per = _pyramid(h, "perlevel")
+    reaches = []
+    for L in range(1, _N_EXP - 2):      # above this the window wraps the periodic field
+        s_n = len(per[L])
+        need = 0
+        for j in range(s_n):
+            for i in range(s_n):
+                for r in range(0, (1 << (L + 1)) + 1):
+                    lo_i, hi_i = i * (1 << L) - r, (i + 1) * (1 << L) - 1 + r
+                    lo_j, hi_j = j * (1 << L) - r, (j + 1) * (1 << L) - 1 + r
+                    m = max(h[jj % _NG][ii % _NG]
+                            for jj in range(lo_j, hi_j + 1) for ii in range(lo_i, hi_i + 1))
+                    if m == per[L][j][i]:
+                        need = max(need, r)
+                        break
+        reaches.append((L, need))
+    print(f"      :149-150 'aproning per level over-bounds by 2^L': measured reach of a")
+    print(f"              per-level apron, in BASE texels, is {reaches} (levels above")
+    print(f"              these wrap this {_NG}² field) -- i.e. 2^(L+1) − 1 base texels,")
+    print(f"              against the level-0 apron's 1 at every level.  NOT GATED: the page")
+    print(f"              does not say whether 2^L is a factor or an offset, and it is")
+    print(f"              neither on this measurement.  Reported, not asserted.")
+
+
+def run_gate():
+    print(f"heightfield-raymarching.md gate -- every expectation below is parsed out of\n"
+          f"{_DOC}\n"
+          f"at run time.  Field: {_NG}² at {_S0:g} m texels, h = a·sin(kx) + b·sin(k′z) with "
+          f"a={_AMP_X:g}, k=2π/{2 * math.pi / _KX:g}, b={_AMP_Z:g}, k′=2π/{2 * math.pi / _KZ:g} "
+          f"-- this rig's own constants, which the page does not state.")
+    gate_cost()
+    gate_fp32()
+    h = _samples()
+    pyr = _pyramid(h, "level0")
+    rs = _rays(h)
+    gate_registration(h)
+    gate_termination(h, pyr, rs)
+    gate_clamp(h, pyr, rs)
+    gate_predicate(h, pyr, rs)
+    gate_depth()
+    gate_rig_description()
+    diagnostics(h, pyr, rs)
+    print()
+    return 0 if _ok else 1
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# THE PRESERVED MEASUREMENT HARNESS -- `--measure`.
+#
+# This is the code `registers/corrections.tsv:227` cites, kept so that row stays checkable.
+# It measures; it asserts nothing against the page and always exits 0.  Its own description,
+# as it was written in the sitting that produced the page's figures, follows verbatim.
+#
+# Measure the max-mip traversal in gaia/references/heightfield-raymarching.md.
+#
+# Two questions, one rig:
+#
+#   ERROR  How far is the hit this kernel returns from the true first crossing of the
+#          SAME reconstructed surface, as a function of the refinement iteration count
+#          the block prescribes ("binary or secant refine, 5-8 iterations")?  And does
+#          the pyramid ever hide a hit (a miss the reference finds) or invent one?
+#
+#   COST   What does the max-reduce pyramid add to the field it is built over?  This is
+#          exact arithmetic over the arrays actually built here, not a timing.
+#
+# WHAT THIS RIG IS
+#   CPython + numpy, fp64 ray parameter, fp32 height storage, 512x512 base field at
+#   s0 = 1 m, surface reconstructed BILINEARLY from samples at texel centres, pyramid
+#   built exactly as the document prescribes (dilate the base samples 3x3, then
+#   max-reduce that).  Reference intersection is analytic: inside one bilinear cell the
+#   ray-surface difference is a QUADRATIC in t, solved in closed form, so the reference
+#   carries no step size and no tolerance of its own.
+#
+# WHAT THIS RIG IS NOT
+#   Not a GPU measurement of any kind.  It prices no frame, no wave, no divergence, no
+#   bandwidth.  It is fp64 in t, so it does NOT reproduce the fp32 ULP behaviour the
+#   document argues about at :88-:96 -- the relative advance is exercised, its fp32
+#   failure mode is not.  The field is smooth and synthetic; a real terrain with cliffs
+#   has longer level-0 spans and therefore a larger refinement residual at the same
+#   iteration count.
+#
+# Run:  python3 heightfield-raymarching.py
+# Seed: 20260910 (fixed below)
+# ═════════════════════════════════════════════════════════════════════════════════════════
 SEED = 20260910
 S0 = 1.0          # metres per level-0 texel
 N = 512           # base grid is N x N
@@ -265,7 +1353,7 @@ def rays(H):
     return out
 
 
-def main():
+def measure():
     H, pyr = build()
 
     # ---- COST: exact arithmetic over the arrays actually built.  Level 0 of the max
@@ -358,5 +1446,16 @@ def main():
                   f"| max_steps={max(st for _, _, st in v)}")
 
 
+def main():
+    if "--measure" in sys.argv[1:]:
+        if np is None:
+            sys.exit("--measure needs NumPy; the gate (no arguments) does not")
+        measure()
+        return 0
+    if [a for a in sys.argv[1:] if a != "--gate"]:
+        sys.exit(f"usage: {pathlib.Path(__file__).name} [--gate | --measure]")
+    return run_gate()
+
+
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
