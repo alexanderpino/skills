@@ -1,0 +1,30 @@
+rig: 3.11.15 / numpy 2.4.6 / x86_64 / Linux
+cpu: Intel(R) Xeon(R) Processor @ 2.10GHz
+seed=20260910 N=1000000 R=6371000 m patch=+/-2000 m
+
+ULP table (exact float32 spacing, for cross-check against the document's table):
+        1000 m  ulp = 6.10351562e-05 m
+       10000 m  ulp = 0.0009765625 m
+      100000 m  ulp = 0.0078125 m
+     1000000 m  ulp = 0.0625 m
+     6371000 m  ulp = 0.5 m
+
+position error over the patch (Euclidean, metres):
+  camera-relative (prescribed) max 0.000104124 m   rms 4.57158e-05 m
+  absolute float32             max 0.39834 m   rms 0.204827 m
+  camera-relative max error in mm: 0.1041
+
+  qualifications on the absolute-float32 figure:
+    camera position (km):        [  130.02308487 -1544.56827285  6179.56663917]
+    per-axis float32 ULP (m):    [0.0078125, 0.125, 0.5]
+    per-axis max |error| (m):    [0.00888425 0.08535212 0.38916632]
+    rigid offset, cam truncation (m): [-0.00106923 -0.02279472  0.13906173]  |0.1409| 
+    max error with rigid offset removed (differential/wobble, m): 0.257741
+
+cost, prescribed per-frame op (pos_f64 - cam_f64).astype(float32), best of 9:
+       4096 positions:    0.0294 ms   (  7.19 ns each)
+      16384 positions:    0.1127 ms   (  6.88 ns each)
+    1000000 positions:   10.6159 ms   ( 10.62 ns each)
+  store: f64 authoritative 24 MB vs float32 12 MB for 1000000 positions
+
+NOT a GPU cost. NOT an engine transform loop. numpy on one cloud CPU core, one contiguous array, allocation included.

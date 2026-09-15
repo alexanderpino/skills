@@ -1,0 +1,42 @@
+# rig: lambda=0.5 m  A=0.02 m  depth=3.0 m  n=1.335  bed bins=512  reference=4194304 photons
+# converged gain: mean 1.000000  min 0.297  peak 15.90  (folds present: peak/mean = 15.9)
+
+photons/wavelength  photons/bed texel  RMS error (gain units, mean=1)  peak error
+               512                1.0                          0.562        1.71
+              1024                2.0                          0.273        0.86
+              2048                4.0                          0.134        0.44
+              4096                8.0                          0.068        0.18
+              8192               16.0                          0.031        0.11
+             16384               32.0                          0.018        0.06
+             32768               64.0                          0.008        0.02
+
+tent kernel at 1 emitted photon per bed texel: does a kernel buy convergence?
+half-width [texels]   RMS error   peak gain (converged peak = 15.9)
+                  0       0.562                           16.00
+                  1       0.381                           14.14
+                  2       0.487                            9.61
+                  4       0.671                            7.06
+                  8       0.814                            5.10
+
+resident light-space storage (arithmetic: resolution x format, not a measurement)
+  512^2: caustic R16F 0.5 MiB + depth R32F 1.0 MiB = 1.5 MiB
+  1024^2: caustic R16F 2.0 MiB + depth R32F 4.0 MiB = 6.0 MiB
+  2048^2: caustic R16F 8.0 MiB + depth R32F 16.0 MiB = 24.0 MiB
+  emission image, IF materialised rather than emitted from the wave field:
+    1024^2 RG16F normals: 4.0 MiB
+    2048^2 RG16F normals: 16.0 MiB
+    4096^2 RG16F normals: 64.0 MiB
+    8192^2 RG16F normals: 256.0 MiB
+2-D crossed ripple h = A(sin kx + sin ky), same lambda/A/depth/n; bed 256x256 texels per cell, reference 8192x8192 photons
+# converged gain: mean 1.000000  min 0.079  peak 69.11
+photons/axis  photons/bed texel  RMS error (gain units, mean=1)  peak error
+         256                  1                          1.265       13.89
+         512                  4                          0.518        5.94
+        1024                 16                          0.225        2.96
+        2048                 64                          0.110        1.02
+        4096                256                          0.050        0.71
+
+temporal accumulation of 4 frames at 256 photons/axis -- jittered vs not
+  4x the SAME grid         RMS error 1.265
+  4x quarter-texel jitter  RMS error 0.518
+  (the jittered set is exactly the 512-photons/axis grid, so it reproduces that row)

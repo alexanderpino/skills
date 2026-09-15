@@ -1,0 +1,18 @@
+PART 1  STORAGE  (exact; IEEE widths from numpy itemsize)
+  float16 itemsize = 2 bytes      float32 itemsize = 4 bytes
+  (A, A^2) pair, fp16 (RG16F)   = 4 bytes per cell
+  (A, A^2) pair, fp32 (R32G32F) = 8 bytes per cell     ratio = 2x
+  full 2D mip chain multiplier  = 1 + 0.333333 = 1.333333  (limit 4/3)
+  mipped fp16 pair   = 5.33 bytes per cell
+  mipped fp32 pair   = 10.67 bytes per cell
+  at 1024^2 mipped: fp16    5.33 MB   fp32   10.67 MB   delta    5.33 MB
+  at 2048^2 mipped: fp16   21.33 MB   fp32   42.67 MB   delta   21.33 MB
+  at 4096^2 mipped: fp16   85.33 MB   fp32  170.67 MB   delta   85.33 MB
+
+PART 2  ERROR  (re-check of figures already on the page)
+  model: A ~ N(1 + k*sigma, sigma), sigma = 0.01, footprint 64x64, 20 seeds
+  k    amplification 1+k^2   mean |rel err| in sigma_A   worst over seeds
+  3    10                        0.20%                      0.37%
+  10   101                       2.92%                      5.40%
+  30   901                      35.80%                    100.00%
+  uncentred pair on calm water (mu_A = 1, sigma = 0.01): recovered sigma_A = 0.000 (page says 0.000)

@@ -1,0 +1,24 @@
+PASS  §1 at-a-station b+f+m: derived 1, page says 1
+PASS  §1 downstream b+f+m: derived 1, page says 1
+PASS  §2 metric coefficient: derived 7.32001, page says 7.32
+PASS  §3 SI coefficient: derived 0.0125041, page says 0.0125
+PASS  §4 800 cfs in m3/s: derived 22.6535, page says 22.7
+PASS  §4 S_crit: derived 0.00316805, page says 0.00317
+PASS  §5 disagreement at 10 km2: derived 1.42889, page says 1.43
+PASS  §5 disagreement at 1000 km2: derived 2.91743, page says 2.92
+PASS  §6 fixed-shape w and d exponent: derived 0.45, page says 0.45
+PASS  §6 error over three decades: derived 1.41254, page says 1.41
+PASS  §6 w/d growth over three decades: derived 1.99526, page says 2
+PASS  §6b understatement using 6.5 with metres: derived 11.2023, page says 11.2
+PASS  §7 least-squares slope b: derived 0.547167, page says 0.547
+PASS  §7 bifurcation ratio r_b: derived 3.52506, page says 3.53
+PASS  §7 10^(Strahler's printed slope): derived 3.47536, page says 3.475
+PASS  §8 drainage-area fraction: derived 0.00241184, page says 0.0024
+PASS  §8 one over that, in the page's words: derived 414.622, page says 400
+PASS  §9 doubling belt width multiplies m by: derived 2.82843, page says 2.83
+PASS  §9 resulting B_i from m = 1: derived 1.91421, page says 1.9
+PASS  §9 the page's word for it: derived 8, page says 8
+PASS  §10 width variation at area factor 1.32: derived 10.052, page says 10
+PASS  §10 width variation at area factor 2: derived 27.0151, page says 27
+PASS  §10 width variation at area factor 10: derived 121.309, page says 121
+

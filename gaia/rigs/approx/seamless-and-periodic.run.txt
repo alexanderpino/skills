@@ -1,0 +1,20 @@
+rig      CPython 3.11.15, numpy 2.4.6, float64, single process, CPU
+seed     20260910   samples 512x512 = 262144   repeats 15 (median, min, max ms)
+
+A  noise2, raw index               37.13 ms   (36.42 .. 39.86)
+A  noise2, index mod P             39.48 ms   (38.78 .. 41.37)
+A  ratio mod/raw                   1.063 x
+A  per megasample, mod            150.62 ms/Msample
+
+B  noise2 (4 corners)              39.48 ms   (38.78 .. 41.37)
+B  torus4 (16 corners + 4 trig)   241.85 ms   (233.31 .. 261.45)
+B  ratio torus4/noise2             6.125 x   (corner count says 16/4 = 4.000 x)
+B  per megasample, torus4         922.60 ms/Msample
+
+B' torus4 max wrap error, x     3.454e-14
+B' torus4 max wrap error, y     5.249e-14
+
+C  permutation table, measured as numpy nbytes:
+C    P = 1024, a P-entry table                    int32 doubled     8.0 KB   uint16 plain     2.0 KB
+C    P = 1024, 6 octaves lac 2 -> finest is 32768 int32 doubled   256.0 KB   uint16 plain    64.0 KB
+C  (an integer mixer with no table pays 0 bytes and is the recommended route)

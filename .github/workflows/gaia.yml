@@ -9,9 +9,17 @@ name: gaia
 # The `bites` job below is the part that matters. A workflow that only runs a PASSING guard
 # cannot tell you the guard still works; check.py once had two assertions that were defined
 # and never invoked, and it stayed green throughout. So CI also applies mutations and requires
-# the guard to go RED, plus a decoy it must stay GREEN on. That is the repo's standing rule --
+# the guard to go RED, plus decoys it must stay GREEN on. That is the repo's standing rule --
 # a guard never seen to fail is not known to be a guard -- executed on every push rather than
 # recorded in a register once.
+#
+# ⚠️ AND "RED" ON ITS OWN IS NOT EVIDENCE. It says something objected, not that the guard the
+# row names did. Two rows here were already vacuous for exactly that reason: `status: finished`
+# was red because the generated index went stale, and a re-pointed coverage arrow was red
+# because two other functions reported the same broken row in their own words. Both would have
+# stayed red with the guard they named deleted. So every mutation row now proves BOTH
+# directions -- the FAIL line must match the named guard's message, and with that one rule
+# stubbed out the run must go GREEN.
 
 on:
   push:
@@ -60,6 +68,77 @@ jobs:
       - name: Generated index must be current
         run: python3 gaia/scripts/index.py --check
 
+      # ── the rigs that assert ────────────────────────────────────────────────────────────
+      # `grep -c "rigs/" .github/workflows/gaia.yml` returned 0 until 2026-09-15: 37 measurement
+      # rigs on disk, cited by 59 register rows, and CI ran none of them. Three independent
+      # raters named it in the same round.
+      #
+      # ONLY the rigs that assert against their document run here, and that is the whole design.
+      # A rig that computes a number and prints it cannot fail, so running it would add a log
+      # nobody reads and a green tick nobody should trust. A rig that PARSES its page and exits
+      # non-zero on a mismatch is a gate, and each of these four has its red-and-green proof in
+      # `registers/guard-proofs.tsv`. `check.py` reports `rigs-asserting N/M` so the gap between
+      # the two populations stays on screen and converting another rig visibly moves it.
+      - name: Rigs that assert against their document must still agree with it
+        run: |
+          set -u
+          fails=0
+          # ⚠️ The list is DISCOVERED, not typed. It was a literal loop of four paths plus a
+          # hardcoded `if n != 4` until 2026-09-15, and a completeness critic pointed out what
+          # that costs: every repair the triage fleet proposed is "convert a print-only rig into
+          # one that asserts", and each conversion would have made n = 5 and turned the build red
+          # on a constant -- so the first gate anyone landed failed CI for a reason that had
+          # nothing to do with any page. A gate list that punishes adding a gate is worse than no
+          # list. `rig_asserts()` is the single definition of what belongs here; the job runs
+          # whatever it returns, and the count cannot disagree with the list because it IS the
+          # list.
+          mapfile -t RIGS < <(python3 - <<'PYL'
+          import pathlib, sys
+          sys.path.insert(0, "gaia/scripts")
+          import check
+          root = pathlib.Path("gaia/rigs")
+          for f in sorted(root.rglob("*.py")):
+              if check.rig_asserts(f):
+                  print(f)
+          PYL
+          )
+          if [ "${#RIGS[@]}" -eq 0 ]; then
+            echo "::error::no asserting rigs found at all -- rig_asserts() has stopped matching"
+            exit 1
+          fi
+          for rig in "${RIGS[@]}"; do
+            if python3 "$rig" > /tmp/rig.out 2>&1; then
+              echo "  OK    $rig"
+            else
+              echo "::error::$rig disagrees with the document it checks"
+              grep -E 'FAIL|Error|Traceback' /tmp/rig.out | head -5
+              fails=$((fails + 1))
+            fi
+          done
+          python3 - <<'PYC'
+          import sys
+          sys.path.insert(0, "gaia/scripts")
+          import check
+          t = check.selfdescription_truth()
+          print(f"  rigs-asserting {t['rigs_asserting']}/{t['rigs']}, every one of them gated here")
+          PYC
+          [ "$fails" -eq 0 ]
+
+      - name: The published errata page must not have drifted from the registers
+        # A page describing this corpus is a SECOND END of every claim it repeats, and on the
+        # open web it is the end that gets cited. `ledger.py --check` re-renders from the
+        # registers and fails on any difference -- a hand edit, a register row added without
+        # regenerating, or a forged verification banner. Proved by all three mutations.
+        run: python3 gaia/scripts/ledger.py --check
+
+      - name: The skill-library wiki must not have drifted from the tree
+        # Ten live skills and nothing told you what they were or what evidence any of them
+        # carried. `obsolete/README.md` did that job by hand for two retired ones and is a
+        # second end of every figure it quotes. This is derived instead; --check fails on a
+        # hand edit, on a skill that grew without regenerating, and on an orphan page left
+        # behind by a skill that is gone. Proved by all three.
+        run: python3 tools/wiki.py --check
+
       - name: Evals must be valid JSON with the shape the runner expects
         run: |
           python3 - <<'PY'
@@ -78,14 +157,128 @@ jobs:
           # Negatives are what make a trigger suite mean anything; a suite of positives only
           # proves the description is broad, which is the failure mode, not the goal.
           assert pos and len(tr) - pos, f'{pos} positive, {len(tr) - pos} negative -- need both'
+          # ⚠️ A TRIPWIRE, NOT A SEMANTIC CHECK. Eval 11 used to require the answer to note
+          # that "no Gaia document carries `verified:` yet" -- a CONSTANT, which goes false the
+          # moment the first stamp lands, so the suite would have started failing on the
+          # corpus getting better. An expectation must ask for the CURRENT count, not for a
+          # state of the world. This catches those two sentences coming back and NOTHING ELSE:
+          # a differently worded constant passes it, and only a reader can see that. It is
+          # here because this eval gates the first stamp, not because grep can judge an eval.
+          frozen = [(e['id'], t) for e in ev['evals']
+                    for t in list(e['expectations']) + [e['expected_output']]
+                    if 'no gaia document carries' in t.lower()
+                    or 'none currently does' in t.lower()]
+          assert not frozen, ("an eval asserts a CONSTANT verification state, which the first "
+                              f"stamp makes false: {frozen}")
           print(f"{len(ev['evals'])} evals, {len(tr)} trigger queries "
                 f"({pos} positive, {len(tr) - pos} negative)")
           PY
 
+      - name: A page gate must go red when its own page moves, and green when it is put back
+        # The mutation table above proves `check.py` and `index.py` bite. It says nothing about
+        # the rigs the `guard` job runs -- and a rig is exactly the artefact this corpus has
+        # caught four times checking its own memory instead of its page. Each row below moves
+        # ONE figure on ONE page and requires (a) the rig to exit non-zero and (b) its output to
+        # NAME the figure. A rig that goes red for some other reason is not a gate for this
+        # figure, which is the same rule the stub table enforces on the guards.
+        #
+        # The converse is the second half of every row: put the page back, and the rig must be
+        # green again. Without it a rig that is simply broken would read as 47 passing bites.
+        run: |
+          set -u
+          # `cd` into the COPY or die. Extracted and run from the wrong directory during
+          # development, the `&&` chain below skipped the `cd` on a failed copy and every
+          # mutation ran against the real tree -- restoring each time, so it exited 0 and
+          # looked like a pass. A guard that can silently operate on the original is the
+          # same defect this job exists to catch, committed by the job.
+          rm -rf /tmp/rg
+          cp -r gaia /tmp/rg || { echo "::error::no gaia/ here -- run this from the repo root"; exit 1; }
+          cd /tmp/rg || exit 1
+          [ -d references ] && [ -d rigs ] || { echo "::error::/tmp/rg is not the corpus copy"; exit 1; }
+          fails=0
+
+          rig_bites() {
+            label="$1"; rig="$2"; page="$3"; mut="$4"; want="$5"
+            cp "$page" /tmp/page.bak
+            sed -i "$mut" "$page"
+            if ! cmp -s "$page" /tmp/page.bak; then :; else
+              echo "::error::$label -- the mutation changed nothing; its anchor has drifted"
+              fails=$((fails + 1))
+            fi
+            if python3 "$rig" > /tmp/rb.out 2>&1; then
+              echo "::error::$label -- $rig stayed GREEN with its own page mutated"
+              fails=$((fails + 1))
+            elif ! grep -qF -- "$want" /tmp/rb.out; then
+              echo "::error::$label -- $rig went red but never named: $want"
+              grep -E '^FAIL|no longer states|ANCHOR GONE' /tmp/rb.out | head -3
+              fails=$((fails + 1))
+            else
+              echo "  BITES  $label"
+            fi
+            cp /tmp/page.bak "$page"
+            if python3 "$rig" > /tmp/rb.out 2>&1; then
+              echo "  GREEN  ...and green again once the page is restored"
+            else
+              echo "::error::$label -- $rig is red on the UNMUTATED page; its row proves nothing"
+              grep -E '^FAIL|no longer states|ANCHOR GONE' /tmp/rb.out | head -3
+              fails=$((fails + 1))
+            fi
+          }
+
+          # ── the conclusion a page draws from a figure it cannot reproduce ───────────────
+          # ±11 mm is unreproducible here (the page gives the FORM of its field and never
+          # a, b, k or k'), and the rig says so. The INFERENCE from it is arithmetic over the
+          # page's own numbers and needs no field at all.
+          rig_bites "±0.64 m stops following from ±11 mm at a 57 m span" \
+            rigs/approx/heightfield-raymarching.py references/heightfield-raymarching.md \
+            's/±0\.64 m\*\*/±0.90 m**/' \
+            'does not follow from its ±11 mm'
+          rig_bites "the 57 m column-locked span moves under the same conclusion" \
+            rigs/approx/heightfield-raymarching.py references/heightfield-raymarching.md \
+            's/57 m median here/40 m median here/' \
+            'does not follow from its ±11 mm'
+
+          # ── the area half of the global size-law table, three checks of three shapes ────
+          rig_bites "one area cell moves: the row stops summing to 100%" \
+            rigs/clasts/clastic-debris.py references/clastic-debris.md \
+            's/| 55\.36% |/| 80.00% |/' \
+            '§10b b=1.5 boulder area share'
+          rig_bites "a row-internal transposition that keeps the sum at 100%" \
+            rigs/clasts/clastic-debris.py references/clastic-debris.md \
+            's/| 27\.54% | 24\.77% | \*\*47\.69%\*\* |/| 47.69% | 24.77% | **27.54%** |/' \
+            '§10b b=2 boulder area share'
+          # Four cells across two rows, every one inside its own 4-sigma band and both rows
+          # still summing to 100. Only :262's direction sentence catches this one, which is why
+          # that check is in the rig at all.
+          rig_bites "four cells across two rows, all in band, sums intact" \
+            rigs/clasts/clastic-debris.py references/clastic-debris.md \
+            's/| 8\.87% | 14\.02% | 77\.10% |/| 3.00% | 14.02% | 82.98% |/; s/| 1\.55% | 5\.24% | 93\.21% |/| 8.00% | 5.24% | 86.76% |/' \
+            'the boulder area share moves down at every step of b'
+
+          # ── a figure printed at three ends, moved at one ────────────────────────────────
+          rig_bites "0.01% corrected in the failure table and nowhere else" \
+            rigs/clasts/clastic-debris.py references/clastic-debris.md \
+            's/67 clasts and 0\.01% of the patch/67 clasts and 0.03% of the patch/' \
+            'the one-pass coverage agrees at 3 ends'
+
+          # ── the rig that used to print the page's figure from its own source ───────────
+          rig_bites "the R(L) support-radius formula moves off its own measurement" \
+            rigs/approx/surface-and-scale-space.py references/surface-and-scale-space.md \
+            's/3·2\^L − 2/3·2^L − 3/' \
+            'but the page'
+          rig_bites "the halo arithmetic moves" \
+            rigs/approx/surface-and-scale-space.py references/surface-and-scale-space.md \
+            's/704/708/g' \
+            'tile + 2 x halo'
+
+          [ "$fails" -eq 0 ]
+
   bites:
-    # Proves the guard still fails on things it is supposed to fail on. Runs against a COPY so
-    # a mutation can never be left behind in the tree, and mutates only SUBJECTS (documents,
-    # the coverage map, the index) -- never the guard itself, which would prove nothing.
+    # Proves the guard still fails on what it is supposed to fail on, AND that each failure
+    # belongs to the guard its row names. Runs against a COPY so a mutation can never be left
+    # behind in the tree. Subjects (documents, the coverage map, the index, the eval suite)
+    # are what get mutated; the guard itself is only ever touched by `stub.py`, in the second
+    # pass, to prove the first pass was not measuring something else.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -93,195 +286,459 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Mutations must turn the guard red, and the decoy must not
+      - name: Each mutation must go red for the reason its row names, and green without it
         run: |
           set -u
-          cp -r gaia /tmp/g && cd /tmp/g
+          rm -rf /tmp/g && cp -r gaia /tmp/g && cd /tmp/g
           fails=0
 
-          expect_red() {   # $1 = label
-            if python3 scripts/check.py >/tmp/out 2>&1; then
-              echo "::error::guard stayed GREEN on mutation '$1' -- it does not bite"
-              fails=$((fails + 1))
+          # ── the stub table ───────────────────────────────────────────────────────────
+          cat > /tmp/stub.py <<'STUBPY'
+          #!/usr/bin/env python3
+          """Neutralise ONE named guard rule in the scratch copy.
+
+          A mutation that goes red proves only that SOMETHING objected. Each row here names
+          the rule it is testing; that rule is stubbed and the run must then go GREEN.
+
+          Every entry asserts its anchor appears EXACTLY ONCE. A stub whose anchor had drifted
+          would patch nothing and the second pass would pass vacuously -- which is the failure
+          this whole mechanism exists to prevent, committed by the mechanism itself.
+          """
+          import pathlib
+          import sys
+
+          STUBS = {
+              # --- the OKF conformance block, run on EVERY document -------------------
+              "type_required": [("check.py", '        if "type" not in fm:', '        if False:')],
+              # The rejected repair, applied on purpose: default the key in BOTH doors. That
+              # is what makes the mutation a no-op, which is why the key is required instead.
+              "status_absent": [
+                  ("check.py", '        status = fm.get("status")\n        if status is None:',
+                               '        status = fm.get("status", "draft")\n        if status is None:'),
+                  ("index.py", '        if "status" not in fm:', '        if False:'),
+                  ("index.py", '            "status": fm["status"],',
+                               '            "status": fm.get("status", "draft"),'),
+              ],
+              "status_vocab": [("check.py", '        elif status not in STATUS:', '        elif False:')],
+              "okf_version": [("check.py", '        if "okf_version" in fm and path != INDEX:',
+                                           '        if False:')],
+              "line_cap": [("check.py", '            if n > cap:', '            if False:')],
+
+              # --- verified: -----------------------------------------------------------
+              # The pre-fix rule restored verbatim: len(who) > len("human:") passed `human: `.
+              "verified_actor": [("check.py",
+                  '            if not (who.startswith("human:") and who[len("human:"):].strip()):',
+                  '            if not (who.startswith("human:") and len(who) > len("human:")):')],
+              "verified_needs_stable": [("check.py", '        if ver and status != "stable":',
+                                                     '        if False:')],
+              "verified_keys": [
+                  ("check.py",
+                   '            if not isinstance(entry, dict) or "covers" not in entry or "covers_body" not in entry:',
+                   '            if not isinstance(entry, dict) or "covers" not in entry:'),
+                  ("check.py", '            if entry["covers_body"] != bdigest:',
+                               '            if entry.get("covers_body", bdigest) != bdigest:'),
+              ],
+              "covers_sources": [("check.py", '            if entry["covers"] != digest:',
+                                              '            if False:')],
+              "covers_body": [("check.py", '            if entry["covers_body"] != bdigest:',
+                                           '            if False:')],
+
+              # --- the two self-description guards, added 2026-09-15 ---------------------
+              # Both were written because a claim ABOUT the corpus, made in prose, had gone
+              # stale where no guard could see it. Both therefore need a mutation of their own,
+              # or the corpus repeats the defect one level up: a guard nobody proves bites.
+              "selfdescription": [("check.py", '    problems.extend(selfdescription_problems())',
+                                               '    pass')],
+              "notopened_banner": [("check.py",
+                  '    problems.extend(notopened_inline_problems())', '    pass')],
+              # The reported metrics have no `problems` row to stub, so the rule under test is
+              # the FIXTURE gate in --selftest: cripple the pattern and the gate must catch it.
+              "dated_crossover_fixtures": [("check.py",
+                  "or cbad or xdbad or", "or cbad or")],
+              # --- the three surfaces no mutation can prove ------------------------------
+              # PLAN.md criterion 1 requires T3, T4 and T8 to be OPEN rows in guard-proofs.tsv
+              # AND named in `--list`. The rows are checked by the assertion below; this stub
+              # removes the block that names them, so the assertion has something to catch.
+              # Dropping the heading is not enough -- `--list` prints the whole docstring, so the
+              # three lettered paragraphs below it would still name T3/T4/T8. The stub takes the
+              # letter off ONE of them, which is what a drifting rewrite would really do.
+              "list_names_open_surfaces": [("check.py",
+                  "  T3 -- FABRICATION, as a whole.", "  Fabrication, as a whole.")],
+              # The generated Status block. Stubbing the comparison is what makes these rows
+              # prove the GENERATOR rather than some other rule that happens to notice.
+              "generated_block": [("check.py",
+                  "    problems.extend(generated_block_problems())", "    pass")],
+              # The liveness assertion on the prose-count rules. Stubbing it lets a rule that
+              # matches nothing pass, which is what the coverage-rows rule did on arrival.
+              "prose_count_liveness": [("check.py",
+                  "    dead = prose_count_coverage()", "    dead = []")],
+
+              # --- citations ------------------------------------------------------------
+              "source_key_unknown": [("check.py", '            if extra:', '            if False:')],
+              "locator_usable": [("check.py",
+                  '            if len(str(s.get("locator", "")).strip()) < 3:',
+                  '            if False:')],
+              "marker_resolves": [("check.py", '        for mid in sorted(markers - declared):',
+                                               '        for mid in sorted(()):')],
+              "declared_is_cited": [("check.py", '        for did in sorted(declared - markers):',
+                                                 '        for did in sorted(()):')],
+              "no_artefact_locator": [("check.py", '            if not entry["no_artefact"]:',
+                                                   '            if False:')],
+              "no_artefact_entry": [("check.py",
+                  '                if not loc.startswith(LOCATOR_NO_ARTEFACT):',
+                  '                if False:')],
+              "not_opened_agree": [("check.py", '            elif declares and not tagged:',
+                                                '            elif False:')],
+              "propagation": [("check.py", '            if not (btoks & ltoks):', '            if False:')],
+
+              # --- structure ------------------------------------------------------------
+              "use_this_required": [("check.py",
+                  '        if not any(h.lower().startswith("## use this") for h in heads):',
+                  '        if False:')],
+              "failure_heading": [("check.py", '        if len(fails) != 1:', '        if False:')],
+              "heading_duplicate": [("check.py", '            if (level, text) in seen:',
+                                                 '            if False:')],
+              "axis_agreement": [("check.py", '        elif axis != section:', '        elif False:')],
+              # Both directions of the Tier/tag comparison, because the rule the rows below
+              # name is the AGREEMENT, and it is one rule with two failure modes. The
+              # "no budget tag at all" branch is a different rule and is deliberately left
+              # standing: a stub that removes more than the row names proves less.
+              "budget_agreement": [
+                  ("check.py", '        if extra := claimed - tags:', '        if False:'),
+                  ("check.py", '        if unnamed := tags - evidenced:', '        if False:'),
+              ],
+              "path_exists": [("check.py", '                if name not in existing:',
+                                           '                if False:')],
+              "coverage_target": [("check.py",
+                  '            if not (ROOT / "references" / target).exists():',
+                  '            if False:')],
+              "trigger_reach": [("check.py",
+                  '                 for d in sorted(set(claimed) - reached)]',
+                  '                 for d in sorted(())]')],
+
+              # --- the generated index ---------------------------------------------------
+              "index_stale": [("index.py", '        if strip(have) != strip(want):',
+                                           '        if False:')],
+              # The pre-fix normaliser restored verbatim: [^,] and [^}] match NEWLINES, so it
+              # ran from `at: ` to the next `}` anywhere in the file.
+              "index_stamp_anchor": [("index.py",
+                  '        strip = lambda s: re.sub(r"^(generated: \\{ by: [^,\\n]*, at: )[^}\\n]*(\\}\\s*)$",\n'
+                  '                                 r"\\1<stamp>\\2", s, flags=re.M)',
+                  '        strip = lambda s: re.sub(r"^(generated: \\{ by: [^,]*, at: )[^}]*(\\}\\s*)$",\n'
+                  '                                 r"\\1<stamp>\\2", s, flags=re.M)')],
+
+              # --- okf.py, the parser -----------------------------------------------------
+              "okf_inline_dup_key": [("okf.py", '        if k in out:', '        if False:')],
+              # The pre-fix fence rule restored verbatim: strip() closed the front matter at
+              # any indentation, and the pre-scan that rejects an indented `---` never ran.
+              "okf_indented_fence": [
+                  ("okf.py",
+                   '        close = next(i for i in range(1, len(lines)) if lines[i].rstrip() == _FENCE)',
+                   '        close = next(i for i in range(1, len(lines)) if lines[i].strip() == _FENCE)'),
+                  ("okf.py", '    for i in range(1, close):\n        if lines[i].strip() == _FENCE:',
+                             '    for i in range(1, 1):\n        if lines[i].strip() == _FENCE:'),
+              ],
+
+              # --- requote.py ---------------------------------------------------------------
+              "requote_nothing_checked": [("requote.py", '    if match + altered == 0:',
+                                                         '    if False:')],
+          }
+
+          name = sys.argv[1]
+          if name not in STUBS:
+              sys.exit(f"stub.py: no rule named {name!r}; known: {', '.join(sorted(STUBS))}")
+          for script, old, new in STUBS[name]:
+              p = pathlib.Path("scripts") / script
+              s = p.read_text(encoding="utf-8")
+              n = s.count(old)
+              if n != 1:
+                  sys.exit(f"stub.py: rule {name!r} wanted exactly one copy of its anchor in "
+                           f"{script}, found {n}. The guard moved, so this stub would patch "
+                           f"nothing and the second pass would pass vacuously.\n"
+                           f"  anchor: {old.splitlines()[0]!r}")
+              p.write_text(s.replace(old, new), encoding="utf-8")
+          STUBPY
+
+          mkdir -p /tmp/gbk
+          cp scripts/check.py scripts/index.py scripts/okf.py scripts/requote.py /tmp/gbk/
+          restore_guard() {
+            cp /tmp/gbk/check.py /tmp/gbk/index.py /tmp/gbk/okf.py /tmp/gbk/requote.py scripts/
+          }
+
+          # $1 command   $2 label   $3 ERE the failing output must carry   $4 stub name
+          # STATE.md's generated status block is DERIVED STATE, not an assertion: it moves
+          # whenever the tree moves, including for a mutation aimed at some entirely other rule.
+          # Left alone it made fifteen unrelated rows report "stayed RED, something ELSE reports
+          # it" -- the same cross-talk the stamp fixture's re-count already exists to prevent,
+          # one level up. So every row reconciles the block with the tree it is about to test,
+          # and the two rows that TEST the block set NO_REGEN=1 because staleness is their
+          # subject. A row that needs derived state stale says so; the rest never see it.
+          NO_REGEN=""
+          regen() { [ -n "$NO_REGEN" ] || python3 scripts/check.py --emit-state >/dev/null 2>&1 || true; }
+
+          expect_red() {
+            cmd="$1"; label="$2"; pat="$3"; stub="$4"
+            regen
+            if $cmd >/tmp/out 2>&1; then
+              echo "::error::guard stayed GREEN on mutation '$label' -- it does not bite"
+              fails=$((fails + 1)); return
+            fi
+            if ! grep -qE -- "$pat" /tmp/out; then
+              echo "::error::'$label' went red, but NOT with the message of the guard it names."
+              echo "          wanted /$pat/, got:"
+              grep -m3 -E 'FAIL|Unparseable|out of date' /tmp/out | cut -c1-160
+              fails=$((fails + 1)); return
+            fi
+            if ! python3 /tmp/stub.py "$stub"; then
+              echo "::error::'$label': stub '$stub' did not apply"
+              fails=$((fails + 1)); restore_guard; return
+            fi
+            regen
+            if $cmd >/tmp/out2 2>&1; then
+              say "  BITES  $label   (red via $stub, green without it)"
             else
-              echo "  red as required: $1  -- $(grep -m1 FAIL /tmp/out | cut -c1-100)"
+              echo "::error::'$label' stayed RED with '$stub' stubbed -- something ELSE reports"
+              echo "          it, so this row proves nothing about the guard it names:"
+              grep -m3 -E 'FAIL|Unparseable|out of date' /tmp/out2 | cut -c1-160
+              fails=$((fails + 1))
+            fi
+            restore_guard
+          }
+          # Every BITES/GREEN line also lands in a log, so the tail of this job can count what
+          # it actually observed rather than trusting a number typed into STATE.md.
+          : > /tmp/bites.log
+          say() { echo "$1"; echo "$1" >> /tmp/bites.log; }
+
+          red_check() { expect_red "python3 scripts/check.py" "$@"; }
+          red_index() { expect_red "python3 scripts/index.py --check" "$@"; }
+
+          # The decoys. A guard that fires on rewording gets ignored within a week, and this
+          # corpus is reworded constantly -- so staying green here is a requirement.
+          expect_green() {
+            regen
+            if python3 scripts/check.py >/tmp/out 2>&1; then
+              say "  GREEN  $1"
+            else
+              echo "::error::guard fired on '$1' -- it is too eager to be trusted"
+              grep -m3 FAIL /tmp/out | cut -c1-160
+              fails=$((fails + 1))
             fi
           }
 
+          # A mutation applied to the GUARD's own fixtures. There is no second pass here: the
+          # mutation IS the guard removed, and the `guard` job runs the same command green on
+          # an intact tree, so the pair is already complete.
+          # $1 command, $2 label, $3 pattern the failure output must carry. Without $3 this
+          # asserted only a non-zero exit: a `raise RuntimeError` at the top of selftest() made
+          # it print BITES, which is the "something went wrong" standard this job rejects.
+          expect_red_crippled() {
+            if $1 >/tmp/out 2>&1; then
+              echo "::error::$2 stayed GREEN with the guard crippled"
+              fails=$((fails + 1))
+            elif ! grep -qE "$3" /tmp/out; then
+              echo "::error::$2 went red, but not for its own reason (no match for: $3)"
+              sed -n '1,12p' /tmp/out
+              fails=$((fails + 1))
+            else
+              say "  BITES  $2"
+            fi
+            restore_guard
+          }
+
           SUBJ=references/caustics.md
+          cp $SUBJ /tmp/bk0
 
-          # Written in Python, not sed, and it ASSERTS the mutation applied. A sed range that
-          # silently matches nothing turns this whole job into a vacuous pass -- which is
-          # exactly what happened to the first draft of this step, caught only by running it.
-          cat > /tmp/mut1.py <<'PY'
-          import re, sys, pathlib
-          p = pathlib.Path(sys.argv[1]); s = p.read_text(encoding="utf-8")
-          ids = re.findall(r"\{\s*id:\s*([A-Za-z0-9_]+)", s)
-          assert ids, "no source ids in " + str(p) + " -- mutation would pass vacuously"
-          for i in ids:
-              if f"[{i}]" in s:
-                  p.write_text(s.replace(f"[{i}]", f"[{i}_broken]"), encoding="utf-8")
-                  print("broke", i); break
-          else:
-              raise SystemExit("no declared id appears as a body marker")
-          PY
-
-          cp $SUBJ /tmp/bk
-          python3 /tmp/mut1.py $SUBJ
-          expect_red "citation key points at nothing"
-          cp /tmp/bk $SUBJ
-
-          cp $SUBJ /tmp/bk
-          sed -i '0,/locator: "/s/locator: "[^"]*"/locator: ""/' $SUBJ
-          expect_red "locator emptied"
-          cp /tmp/bk $SUBJ
-
-          cp $SUBJ /tmp/bk
-          python3 -c "p='$SUBJ';open(p,'a').write('\nfiller\n'*400)"
-          expect_red "line cap exceeded"
-          cp /tmp/bk $SUBJ
-
+          # ── the OKF conformance block, on a CONTENT document ─────────────────────────
           cp $SUBJ /tmp/bk
           sed -i 's/^status: draft/status: finished/' $SUBJ
-          expect_red "illegal status value"
+          # Regenerate the index FIRST. The status is printed in the index, so without this
+          # the run is red because the index went stale, not because the value is illegal --
+          # it stayed red with the status rule deleted, and proved nothing. Caught by adding
+          # the second pass.
+          python3 scripts/index.py >/dev/null
+          red_check "illegal status value" 'status .finished. is not one of' status_vocab
+          cp /tmp/bk $SUBJ; python3 scripts/index.py >/dev/null
+
+          cp $SUBJ /tmp/bk
+          sed -i '/^status: draft$/d' $SUBJ
+          red_check "status: deleted entirely" 'no .status:. -- required, not defaulted' status_absent
           cp /tmp/bk $SUBJ
 
           cp $SUBJ /tmp/bk
           sed -i 's/^status: draft/status: draft\nokf_version: "0.2"/' $SUBJ
-          expect_red "okf_version outside the bundle root"
+          red_check "okf_version outside the bundle root" 'belongs in the bundle root only' okf_version
           cp /tmp/bk $SUBJ
-
-          cp references/coverage.md /tmp/bk
-          sed -i 's/→ caustics.md/→ caustics-nonexistent.md/' references/coverage.md
-          expect_red "coverage points at a document that does not exist"
-          cp /tmp/bk references/coverage.md
-
-          cp references/tiled-streaming.md /tmp/bk
-          sed -i 's/^## Use this/## Some notes/' references/tiled-streaming.md
-          expect_red "document surveys instead of recommending"
-          cp /tmp/bk references/tiled-streaming.md
-
-          # The `no artefact:` marker excludes a citation from the locator ratio. Pasting it
-          # onto a real paper makes a gap disappear and the percentage RISE -- 53% to 54% when
-          # this was written. That is the one mutation here that improves a reported number,
-          # which is exactly why it needs a guard.
-          cp references/stream-power.md /tmp/bk
-          sed -i '0,/id: braun2013/s/locator: "/locator: "no artefact: /' references/stream-power.md
-          expect_red "a real paper marked as having no artefact"
-          cp /tmp/bk references/stream-power.md
-
-          # The same attack dressed to beat the PREVIOUS implementation, which regex-matched the
-          # bibliography entry's prose and read only its first line. A reviewer showed that moving
-          # four words onto line 1 of a source with a real artefact passed green.
-          cp references/papers-architecture.md /tmp/bk
-          cp references/node-graph-runtime.md /tmp/bk2
-          sed -i 's/- \*\*nuke_request\*\* `F` — Foundry\./- **nuke_request** `F` — No canonical paper. Foundry./' references/papers-architecture.md
-          sed -i 's/{ id: nuke_request, tier: F, locator: "the DD/{ id: nuke_request, tier: F, locator: "no artefact: the DD/' references/node-graph-runtime.md
-          expect_red "the prose-regex bypass of the no-artefact exclusion"
-          cp /tmp/bk references/papers-architecture.md
-          cp /tmp/bk2 references/node-graph-runtime.md
-
-          # And the other direction: an entry tagged [no-artefact] cited with a real locator.
-          cp references/wave-models.md /tmp/bk
-          sed -i '0,/id: airy_coastal/s/locator: "no artefact: /locator: "\u00a74 the dispersion relation, /' references/wave-models.md
-          expect_red "a [no-artefact] entry given an openable locator"
-          cp /tmp/bk references/wave-models.md
-
-          cp references/index.md /tmp/bk
-          sed -i 's/^# Gaia index/# Gaia index EDITED/' references/index.md
-          if python3 scripts/index.py --check >/dev/null 2>&1; then
-            echo "::error::index --check stayed GREEN on a hand edit"
-            fails=$((fails + 1))
-          else
-            echo "  red as required: generated index hand-edited"
-          fi
-          cp /tmp/bk references/index.md
-
-          # The decoys. A guard that fires on rewording gets ignored within a week, and this
-          # corpus is reworded constantly -- so staying green here is a requirement, not a nicety.
-          expect_green() {   # $1 = label
-            if python3 scripts/check.py >/dev/null 2>&1; then
-              echo "  green as required: $1"
-            else
-              echo "::error::guard fired on '$1' -- it is too eager to be trusted"
-              fails=$((fails + 1))
-            fi
-          }
 
           cp $SUBJ /tmp/bk
-          sed -i 's/\bthe bed\b/the pool floor/g' $SUBJ
-          expect_green "prose reworded, no citation touched"
+          python3 -c "p='$SUBJ';open(p,'a').write('\nfiller\n'*400)"
+          red_check "line cap exceeded" 'over the 450 cap' line_cap
           cp /tmp/bk $SUBJ
 
-          cp references/tiled-streaming.md /tmp/bk
-          sed -i 's/^## How this fails.*/## Failure modes/' references/tiled-streaming.md
-          expect_green "a heading that is not the recommendation renamed"
+          # The same block, on APPARATUS. `if path in skip: continue` used to exempt the
+          # bibliographies, the index and the coverage map from the FORMAT contract as well as
+          # from the citation checks, so a bibliography could lose its `type:`, take an illegal
+          # status, grow an `okf_version` or carry a `verified:` naming nobody, unwatched.
+          cp references/papers-flow.md /tmp/bk_pf
+          sed -i '/^type: Bibliography$/d' references/papers-flow.md
+          red_check "a bibliography with no type:" 'papers-flow.md: no .type.' type_required
+          cp /tmp/bk_pf references/papers-flow.md
 
-          # The two metrics added after a grounding pass disagreed with an honest writer:
-          # a locator naming source-code line ranges scored vague because the pattern knew
-          # only the designators a PAPER uses, and 21 unopened sources had nowhere in the
-          # tier vocabulary to live. Both are now fixtures, so crippling either is caught.
-          cp scripts/check.py /tmp/bk_guard
-          python3 - <<'PY2'
+          # ── citations ────────────────────────────────────────────────────────────────
+          # Written in Python, not sed, and it ASSERTS the mutation applied. A sed range that
+          # silently matches nothing turns a row into a vacuous pass -- which is what happened
+          # to the first draft of this step, caught only by running it.
+          cp $SUBJ /tmp/bk
+          python3 - <<'PYMK'
           import pathlib
-          p = pathlib.Path("scripts/check.py"); s = p.read_text(encoding="utf-8")
-          old = r"| \blines?\s+\d"
-          assert old in s, "locator source-line alternative missing -- mutation would pass vacuously"
-          p.write_text(s.replace(old, r"| \bNEVERMATCHES?\s+\d"), encoding="utf-8")
-          PY2
-          if python3 scripts/check.py --selftest >/tmp/out 2>&1; then
-            echo "::error::--selftest stayed GREEN with the locator pattern crippled"
-            fails=$((fails + 1))
-          else
-            echo "  red as required: selftest catches a crippled locator pattern"
-          fi
-          cp /tmp/bk_guard scripts/check.py
+          p = pathlib.Path("references/caustics.md"); s = p.read_text(encoding="utf-8")
+          h = "# Caustics"
+          assert h in s, "heading moved -- mutation would pass vacuously"
+          p.write_text(s.replace(h, h + "\n\nAs [nonexistent_paper] shows, this is invented.\n", 1),
+                       encoding="utf-8")
+          PYMK
+          red_check "a body marker that exists in NO bibliography" 'exists in NO bibliography' marker_resolves
+          cp /tmp/bk $SUBJ
 
-          python3 - <<'PY3'
+          cp $SUBJ /tmp/bk
+          python3 - <<'PYUC'
           import pathlib
-          p = pathlib.Path("scripts/check.py"); s = p.read_text(encoding="utf-8")
-          old = 'LOCATOR_NOT_OPENED = ("NOT OPENED", "NO LOCATOR")'
-          assert old in s, "not-opened marker missing -- mutation would pass vacuously"
-          p.write_text(s.replace(old, 'LOCATOR_NOT_OPENED = ("ZZ_NEVER",)'), encoding="utf-8")
-          PY3
-          if python3 scripts/check.py --selftest >/tmp/out 2>&1; then
-            echo "::error::--selftest stayed GREEN with the not-opened marker disabled"
-            fails=$((fails + 1))
-          else
-            echo "  red as required: selftest catches a disabled not-opened marker"
-          fi
-          cp /tmp/bk_guard scripts/check.py
-          cp /tmp/bk references/tiled-streaming.md
+          p = pathlib.Path("references/caustics.md"); s = p.read_text(encoding="utf-8")
+          assert s.count("[jensen1996]") >= 1, "jensen1996 not cited -- pick another id"
+          p.write_text(s.replace("[jensen1996]", "the photon-map paper"), encoding="utf-8")
+          PYUC
+          red_check "a declared source cited nowhere in the body" 'never cited in the body' declared_is_cited
+          cp /tmp/bk $SUBJ
 
-          # Three guards were added in a single day and NOTHING asserted they run. Gutting them
-          # to `return []` left check.py and --selftest both green -- because on a clean corpus a
-          # check that finds nothing is indistinguishable from a check that does nothing. So the
-          # mutation has to be a VIOLATION each guard uniquely catches.
+          cp $SUBJ /tmp/bk
+          sed -i '0,/locator: "/s/locator: "[^"]*"/locator: ""/' $SUBJ
+          red_check "locator emptied" 'has no usable .locator.' locator_usable
+          cp /tmp/bk $SUBJ
 
-          # check_not_opened: an entry whose citing locator declares NOT OPENED, untagged.
+          # `Tier:`, `teir:` and `locater:` all used to pass in silence, and a misspelled
+          # `tier:` is worse than an absent one: the agreement check reads `if "tier" in s`, so
+          # the row loses its comparison while still LOOKING graded on the page.
+          cp $SUBJ /tmp/bk
+          sed -i '0,/id: shah2007, tier: P/s/id: shah2007, tier: P/id: shah2007, teir: P/' $SUBJ
+          red_check "a misspelled sources: key (teir:)" 'unknown .sources:. key' source_key_unknown
+          cp /tmp/bk $SUBJ
+
+          # `{ id: x, tier: F, tier: P }` used to resolve to P: the document graded the source
+          # F on the page, the parser read P, and the agreement check compared P against the
+          # bibliography's P and passed.
+          cp $SUBJ /tmp/bk
+          sed -i '0,/id: shah2007, tier: P/s/id: shah2007, tier: P/id: shah2007, tier: F, tier: P/' $SUBJ
+          red_check "a duplicate key inside an inline map" 'duplicate key .tier. in an inline map' okf_inline_dup_key
+          cp /tmp/bk $SUBJ
+
+          # A fence closes at column 0 only. `strip()` accepted `---` at any indentation, so an
+          # indented one closed the front matter early and every key below it -- visibly inside
+          # the fences -- vanished into the body without a word.
+          cp $SUBJ /tmp/bk
+          python3 - <<'PYFN'
+          import pathlib
+          p = pathlib.Path("references/caustics.md"); s = p.read_text(encoding="utf-8")
+          i = s.index("\n---\n", 4)
+          p.write_text(s[:i] + "\n  ---" + s[i:], encoding="utf-8")
+          PYFN
+          red_check "an indented --- inside the front matter" 'indented .---. inside the front matter' okf_indented_fence
+          cp /tmp/bk $SUBJ
+
+          # ── the no-artefact exclusion, both directions ───────────────────────────────
+          # Pasting `no artefact:` onto a real paper makes a gap disappear and the reported
+          # percentage RISE -- 53% to 54% when this was written. It is the one mutation in the
+          # suite that IMPROVES a number, which is exactly why it needs a guard.
+          # SUBJECT MOVED 2026-09-15: was stream-power.md, which now carries a `verified:` stamp.
+          # Mutating a stamped document's sources: invalidates `covers`, so the stamp goes red and
+          # the second pass can no longer tell whether no_artefact_locator was the rule that bit.
+          # A mutation subject must be an UNSTAMPED document. simulation-time-budget.md cites the
+          # same paper and is draft.
+          cp references/simulation-time-budget.md /tmp/bk
+          sed -i 's/{ id: braun2013, tier: P, locator: "/{ id: braun2013, tier: P, locator: "no artefact: /' references/simulation-time-budget.md
+          grep -q 'braun2013, tier: P, locator: "no artefact: ' references/simulation-time-budget.md || {
+            echo "::error::no-artefact decoy: the simulation-time-budget sed matched nothing"
+            fails=$((fails + 1)); }
+          red_check "a real paper marked as having no artefact" 'is marked .no artefact:.' no_artefact_locator
+          cp /tmp/bk references/simulation-time-budget.md
+
+          # The same attack dressed to beat the PREVIOUS implementation, which regex-matched the
+          # bibliography entry's prose and read only its first line. A reviewer showed that
+          # moving four words onto line 1 of a source with a real artefact passed green.
+          cp references/papers-architecture.md /tmp/bk
+          cp references/layering-filters-and-masks.md /tmp/bk2
+          sed -i 's/- \*\*nuke_request\*\* `F` — Foundry\./- **nuke_request** `F` — No canonical paper. Foundry./' references/papers-architecture.md
+          grep -q 'nuke_request\*\* `F` — No canonical paper' references/papers-architecture.md || {
+            echo "::error::bypass decoy: the papers-architecture sed matched nothing, so this row"
+            echo "::error::  degenerates into a duplicate of the row above it"
+            fails=$((fails + 1)); }
+          # SUBJECT MOVED 2026-09-15, same reason: node-graph-runtime.md is stamped.
+          sed -i 's/{ id: nuke_request, tier: F, locator: "DD/{ id: nuke_request, tier: F, locator: "no artefact: DD/' references/layering-filters-and-masks.md
+          grep -q 'nuke_request, tier: F, locator: "no artefact: DD' references/layering-filters-and-masks.md || {
+            echo "::error::bypass decoy: the layering-filters-and-masks sed matched nothing"
+            fails=$((fails + 1)); }
+          red_check "the prose-regex bypass of the no-artefact exclusion" 'is marked .no artefact:.' no_artefact_locator
+          cp /tmp/bk references/papers-architecture.md
+          cp /tmp/bk2 references/layering-filters-and-masks.md
+
+          cp references/wave-models.md /tmp/bk
+          sed -i '0,/id: airy_coastal/s/locator: "no artefact: /locator: "\xc2\xa74 the dispersion relation, /' references/wave-models.md
+          red_check "a [no-artefact] entry given an openable locator" 'tagged .no-artefact.' no_artefact_entry
+          cp /tmp/bk references/wave-models.md
+
           cp references/papers-generation.md /tmp/bk_no
           python3 - <<'PYNO'
-          import re, pathlib
+          import pathlib
           p = pathlib.Path("references/papers-generation.md"); s = p.read_text(encoding="utf-8")
           assert "`P` [not-opened]" in s, "no tagged entry -- mutation would pass vacuously"
           p.write_text(s.replace("`P` [not-opened]", "`P`", 1), encoding="utf-8")
           PYNO
-          expect_red "a not-opened tag removed while the locator still declares it"
+          red_check "a not-opened tag removed while the locator still declares it" 'not tagged .not-opened.' not_opened_agree
           cp /tmp/bk_no references/papers-generation.md
 
-          # check_headings: a duplicated heading at the same level.
+          # Moves ONE end of a citation, which is exactly the defect. It must target a pair the
+          # guard can SEE -- one whose bibliography entry also names a section. The first
+          # version moved a locator whose entry named none, so the pair fell into the 94% that
+          # cannot be cross-checked and the job passed vacuously. Caught by running it.
+          cp references/mask-operators.md /tmp/bk_pr
+          python3 - <<'PYPR'
+          import pathlib
+          p = pathlib.Path("references/mask-operators.md"); s = p.read_text(encoding="utf-8")
+          assert "§1 Introduction and overview" in s, "fiorio1996 locator not as expected"
+          p.write_text(s.replace("§1 Introduction and overview", "§9 Introduction and overview", 1),
+                       encoding="utf-8")
+          PYPR
+          red_check "a locator moved at one end of a citation only" 'do not overlap' propagation
+          cp /tmp/bk_pr references/mask-operators.md
+
+          # ── structure ────────────────────────────────────────────────────────────────
+          cp references/tiled-streaming.md /tmp/bk_ts
+          sed -i 's/^## Use this/## Some notes/' references/tiled-streaming.md
+          red_check "document surveys instead of recommending" 'no .## Use this. section' use_this_required
+          cp /tmp/bk_ts references/tiled-streaming.md
+
+          # The failure table is structure too: it is half of what a `verified:` stamp digests,
+          # and a digest keyed on a heading spelling can be EMPTIED by renaming the heading.
+          # This used to be a decoy that had to stay green; it is a mutation now.
+          cp references/tiled-streaming.md /tmp/bk_ts
+          sed -i 's/^## How this fails.*/## Failure modes/' references/tiled-streaming.md
+          red_check "the failure-table heading renamed" 'exactly one is required' failure_heading
+          cp /tmp/bk_ts references/tiled-streaming.md
+
           cp $SUBJ /tmp/bk
           python3 - <<'PYHD'
           import pathlib
           p = pathlib.Path("references/caustics.md"); s = p.read_text(encoding="utf-8")
-          h = "## Use this"
-          assert h in s, "no `## Use this` -- mutation would pass vacuously"
-          p.write_text(s.replace(h, h + "\n\ndup\n\n" + h, 1), encoding="utf-8")
+          # Anchor on the heading AS A LINE. A plain substring replace hit the first `## Use this`
+          # in the file, which is inside a code span in the Tier block -- splicing the mutation into
+          # backticks and tripping the unbalanced-backtick rule instead of the duplicate-heading one.
+          # The mutation went red for a real defect that was not the one it names, which is exactly
+          # the vacuity the second pass exists to catch.
+          h = "\n## Use this\n"
+          assert s.count(h) == 1, "expected exactly one `## Use this` HEADING -- mutation would be ambiguous"
+          p.write_text(s.replace(h, h + "\ndup\n" + h, 1), encoding="utf-8")
           PYHD
-          expect_red "a heading duplicated at the same level"
+          red_check "a heading duplicated at the same level" 'duplicate heading' heading_duplicate
           cp /tmp/bk $SUBJ
 
-          # check_axis_agreement: a document tagged onto an axis coverage.md does not file it under.
           cp references/sea-ice.md /tmp/bk_ax
           python3 - <<'PYAX'
           import re, pathlib
@@ -290,54 +747,566 @@ jobs:
           p.write_text(re.sub(r"^tags: \[simulation", "tags: [generation", s, count=1, flags=re.M),
                        encoding="utf-8")
           PYAX
-          # Regenerate the index first. Without this the mutation is red because the index went
-          # stale, NOT because the axes disagree -- so it would stay red with check_axis_agreement
-          # deleted, and prove nothing about the guard it names. Caught by running this job.
-          python3 scripts/index.py >/dev/null
-          expect_red "axis tag disagreeing with the coverage section"
+          python3 scripts/index.py >/dev/null    # same stale-index trap as the status row
+          red_check "axis tag disagreeing with the coverage section" 'but coverage.md files it under' axis_agreement
           cp /tmp/bk_ax references/sea-ice.md
           python3 scripts/index.py >/dev/null
 
+          # ── the budget regime on the page, against the tag ───────────────────────────
+          # Criterion 6 shipped 38 Tier lines and nothing compared them to anything. Two rows,
+          # because the rule is asymmetric and one mutation would prove only half of it: the
+          # page may not claim a regime the tags deny, AND the tags may not carry a regime the
+          # page never names. Both anchors are asserted UNIQUE in their file -- the heading row
+          # below is in this suite because a first-substring replace hit a code span instead of
+          # the line it meant.
+          cp references/virtual-texturing.md /tmp/bk_bud
+          python3 - <<'PYBD1'
+          import pathlib
+          p = pathlib.Path("references/virtual-texturing.md"); s = p.read_text(encoding="utf-8")
+          old = "**Tier: real-time rasteriser.**"
+          assert s.count(old) == 1, f"Tier line appears {s.count(old)} times, want 1"
+          p.write_text(s.replace(old, "**Tier: real-time and near-real-time rasteriser.**", 1),
+                       encoding="utf-8")
+          PYBD1
+          red_check "the page claims a budget regime the tags do not carry" \
+                    'line claims .near-real-time.' budget_agreement
+          cp /tmp/bk_bud references/virtual-texturing.md
+
+          cp $SUBJ /tmp/bk
+          python3 - <<'PYBD2'
+          import pathlib
+          p = pathlib.Path("references/caustics.md"); s = p.read_text(encoding="utf-8")
+          old = "real-time rasteriser and near-real-time ray-traced."
+          assert s.count(old) == 1, f"Tier line appears {s.count(old)} times, want 1"
+          # The tag stays `near-real-time`; only the page stops saying so. That is the drift
+          # criterion 6 exists to catch -- a reader cannot tell the regime from the page.
+          p.write_text(s.replace(old, "real-time rasteriser.", 1), encoding="utf-8")
+          PYBD2
+          red_check "a budget tag the Tier line stops naming" \
+                    'line never names it' budget_agreement
+          cp /tmp/bk $SUBJ
+
+          # ── a cross-reference to a document nobody wrote ─────────────────────────────
+          # Audit G#9: a reviewer renamed a `.md` reference in caustics.md to a file that does
+          # not exist and check.py exited 0. 560 of these carry a reader through the corpus and
+          # none was read. A rename is the ordinary event that breaks one.
+          cp references/gpu-driven-culling.md /tmp/bk_pa
+          python3 - <<'PYPA'
+          import pathlib
+          p = pathlib.Path("references/gpu-driven-culling.md"); s = p.read_text(encoding="utf-8")
+          old = "`heightfield-raymarching.md`"
+          assert s.count(old) == 1, f"cross-reference appears {s.count(old)} times, want 1"
+          p.write_text(s.replace(old, "`heightfield-raymarch.md`", 1), encoding="utf-8")
+          PYPA
+          red_check "a cross-reference to a document that does not exist" \
+                    'references/heightfield-raymarch.md does not exist' path_exists
+          cp /tmp/bk_pa references/gpu-driven-culling.md
+
+          # A coverage target that does not exist. The old form RE-POINTED an existing row,
+          # which also unclaimed a real document and broke `routes_to` -- three messages from
+          # three functions, so it stayed red with check_coverage gone. ADDING a row leaves
+          # exactly one rule to fire.
+          cp references/coverage.md /tmp/bk_cv
+          python3 - <<'PYCV'
+          import pathlib
+          p = pathlib.Path("references/coverage.md"); s = p.read_text(encoding="utf-8")
+          anchor = "- **caustics** `covered`"
+          assert anchor in s, "anchor row moved -- mutation would pass vacuously"
+          row = ("- **ghost** `covered` — Does a topic naming a file nobody wrote get caught? "
+                 "→ ghost.md\n")
+          p.write_text(s.replace(anchor, row + anchor, 1), encoding="utf-8")
+          PYCV
+          red_check "a covered topic pointing at a document that does not exist" 'which does not exist' coverage_target
+          cp /tmp/bk_cv references/coverage.md
+
           # A trigger suite is graded by size and never by reach. Before `routes_to` existed,
-          # 17 of 34 written documents had no positive query and nothing could say so, because
-          # `should_trigger` records whether the SKILL fires, never which document answers.
-          # Deleting one query is the violation this guard uniquely catches: every other check
-          # in this file stays green on it.
+          # 17 of 34 written documents had no positive query and nothing could say so.
           cp evals/trigger-evals.json /tmp/bk_tr
-          cat > /tmp/mut_tr.py <<'PYTR'
+          python3 - <<'PYTR'
           import json, pathlib
           p = pathlib.Path("evals/trigger-evals.json")
           rows = json.loads(p.read_text(encoding="utf-8"))
           keep = [r for r in rows if r.get("routes_to") != ["sea-ice.md"]]
-          assert len(keep) < len(rows), "no query routes to sea-ice.md -- mutation would pass vacuously"
+          assert len(keep) < len(rows), "no query routes to sea-ice.md -- would pass vacuously"
           p.write_text(json.dumps(keep, indent=2), encoding="utf-8")
           PYTR
-          python3 /tmp/mut_tr.py
-          expect_red "a covered document no trigger query reaches"
+          red_check "a covered document no trigger query reaches" 'no positive trigger' trigger_reach
           cp /tmp/bk_tr evals/trigger-evals.json
 
-          # The propagation guard: both ends of a citation must name overlapping sections. This
-          # mutation moves ONE end, which is exactly the defect -- a locator sharpened in a
-          # document while its bibliography entry keeps the old section. No other check in this
-          # file sees it: the id still resolves, the locator is still non-empty and still sharp.
-          # It must target a citation the guard can SEE -- one whose bibliography entry also names
-          # a section. The first version of this mutation moved a locator whose entry named none,
-          # so the pair fell into the 94% that cannot be cross-checked and the job passed
-          # vacuously. Caught by running it.
-          cp references/mask-operators.md /tmp/bk_pr
-          cat > /tmp/mut_pr.py <<'PYPR'
-          import pathlib
-          p = pathlib.Path("references/mask-operators.md")
-          s = p.read_text(encoding="utf-8")
-          assert "§1 Introduction and overview" in s, "fiorio1996 locator not as expected"
-          p.write_text(s.replace("§1 Introduction and overview",
-                                 "§9 Introduction and overview", 1), encoding="utf-8")
-          print("moved fiorio1996 from section 1 to section 9 at the document end only")
-          PYPR
-          python3 /tmp/mut_pr.py
-          expect_red "a locator moved at one end of a citation only"
-          cp /tmp/bk_pr references/mask-operators.md
+          # ── the generated index ──────────────────────────────────────────────────────
+          cp references/index.md /tmp/bk_ix
+          sed -i 's/^# Gaia index/# Gaia index EDITED/' references/index.md
+          red_index "generated index hand-edited" 'out of date' index_stale
+          cp /tmp/bk_ix references/index.md
 
-          python3 scripts/check.py >/dev/null || { echo "::error::copy not restored"; fails=$((fails+1)); }
+          # The staleness filter normalises the timestamp, and that normaliser has to be
+          # ANCHORED TO ONE LINE. `[^,]` and `[^}]` match newlines, so the unanchored form ran
+          # from `at: ` to the next `}` ANYWHERE IN THE FILE and collapsed whatever lay between
+          # them on both sides -- so an index announcing every document human-verified reported
+          # "index.md is current", exit 0. That forges the state of the whole corpus at once,
+          # where a forged `verified:` forges one document.
+          cp references/index.md /tmp/bk_ix
+          python3 - <<'PYIX'
+          import pathlib, re
+          p = pathlib.Path("references/index.md"); s = p.read_text(encoding="utf-8")
+          m = re.search(r"^generated: \{ by: [^,\n]*, at: [^}\n]*\}\s*$", s, re.M)
+          assert m, "stamp line not as expected -- mutation would pass vacuously"
+          line = m.group(0)
+          forged = line[:-1].rstrip() + "\n**ALL 44 DOCUMENTS HUMAN-VERIFIED, EVERY CITATION READ.**\n}"
+          p.write_text(s.replace(line, forged, 1), encoding="utf-8")
+          PYIX
+          red_index "a }-free block injected after the index stamp" 'out of date' index_stamp_anchor
+          cp /tmp/bk_ix references/index.md
+
+          # ── the verified: stamp ──────────────────────────────────────────────────────
+          # Four documents carry one since 2026-09-14, but none of them may be a mutation
+          # subject: a stamp covers `sources:` and the two anchor sections, so mutating either
+          # trips the stamp instead of the rule under test. The fixture therefore stamps a
+          # FIFTH document HERE, in the copy. Without it the six `verified:` rules are
+          # unreachable by mutation -- there is nothing to invalidate -- and "untested because
+          # untestable" is how an assertion defined and never invoked survives.
+          #
+          # ⚠️ And stamping a fifth makes the tree disagree with SKILL.md and STATE.md, which
+          # say `4 of 40`. That is `selfdescription_problems()` doing its job on a fixture, and
+          # it turned six stamp rows into "stayed RED for another reason" the day it landed.
+          # So the fixture re-counts those two files while it is in place, from check.py's own
+          # computed truth. This does mean the fixture satisfies that guard by construction --
+          # which is why the guard has a mutation of its own, below, that does not.
+          cp $SUBJ /tmp/bk_st
+          cp SKILL.md /tmp/bk_st_skill; cp STATE.md /tmp/bk_st_state
+          cat > /tmp/stamp.py <<'PYST'
+          import pathlib, re, subprocess, sys
+          p = pathlib.Path("references/caustics.md"); s = p.read_text(encoding="utf-8")
+          out = subprocess.run([sys.executable, "scripts/check.py", "--digest",
+                                "references/caustics.md"], capture_output=True, text=True).stdout
+          covers = re.search(r"covers: (\w+)", out).group(1)
+          body = re.search(r"covers_body: (\w+)", out).group(1)
+          assert "status: draft\n" in s, "status line moved -- the fixture would stamp nothing"
+          p.write_text(s.replace("status: draft\n",
+                                 "status: stable\nverified:\n"
+                                 f'  - {{ by: "human:ci-fixture", covers: {covers}, '
+                                 f"covers_body: {body} }}\n", 1), encoding="utf-8")
+          PYST
+          python3 /tmp/stamp.py
+          cat > /tmp/recount.py <<'PYRC'
+          import pathlib, re, sys
+          sys.path.insert(0, "scripts")
+          import check
+          # ⚠️ This was line-scoped until 2026-09-15 and rewrote `N of M` only on lines carrying
+          # the word "stamp" -- so it missed a count whose sentence wrapped, or that said
+          # "`verified:` header" instead, and left six stamp rows red for the wrong reason. The
+          # SAME defect as the guard it is feeding, one level down. It is count-scoped now: the
+          # fixture adds exactly ONE stamp, so every "<n-1> of <docs>" in the router files becomes
+          # "<n> of <docs>", wherever it sits and however it wraps.
+          docs = check.content_documents()
+          n = sum(1 for d in docs
+                  if (check.parse_front_matter(d)[0] or {}).get("verified"))
+          before, total = n - 1, len(docs)
+          hits = 0
+          for name in ("SKILL.md", "STATE.md"):
+              f = pathlib.Path(name)
+              s = f.read_text(encoding="utf-8")
+              s, k = re.subn(rf"\b{before}(\s+)of(\s+){total}\b", rf"{n}\g<1>of\g<2>{total}", s)
+              hits += k
+              f.write_text(s, encoding="utf-8")
+          assert hits, f"fixture found no '{before} of {total}' to re-count -- the router files moved"
+          print(f"  (fixture re-counted {hits} claim(s) to {n} of {total})")
+          PYRC
+          python3 /tmp/recount.py
+          python3 scripts/index.py >/dev/null   # the index prints **checked** for a stamp
+          expect_green "a correctly scoped verified: stamp"
+
+          cp $SUBJ /tmp/bk_stamped
+          python3 - <<'PYUT'
+          import pathlib
+          p = pathlib.Path("references/caustics.md"); s = p.read_text(encoding="utf-8")
+          old = "its cost is independent of screen resolution"
+          assert s.count(old) == 1, f"anchor sentence appears {s.count(old)} times, want 1"
+          p.write_text(s.replace(old, "its cost scales with screen resolution"),
+                       encoding="utf-8")
+          PYUT
+          red_check "a claim rewritten inside ## Use this, under a stamp" 'the CLAIMS changed' covers_body
+          cp /tmp/bk_stamped $SUBJ
+
+          cp $SUBJ /tmp/bk_stamped
+          sed -i '0,/id: shah2007/s/locator: "the light-space/locator: "\xc2\xa74, the light-space/' $SUBJ
+          red_check "a locator re-pointed under a stamp" 'the SOURCES changed' covers_sources
+          cp /tmp/bk_stamped $SUBJ
+
+          cp $SUBJ /tmp/bk_stamped
+          python3 - <<'PYCB'
+          import pathlib, re
+          p = pathlib.Path("references/caustics.md"); s = p.read_text(encoding="utf-8")
+          n = len(re.findall(r", covers_body: \w+ \}", s))
+          assert n == 1, f"{n} stamps carry covers_body, want 1"
+          p.write_text(re.sub(r", covers_body: \w+ \}", " }", s), encoding="utf-8")
+          PYCB
+          red_check "a stamp that scopes the citations but not the claims" 'is missing .covers_body.' verified_keys
+          cp /tmp/bk_stamped $SUBJ
+
+          cp $SUBJ /tmp/bk_stamped
+          python3 - <<'PYBY'
+          import pathlib
+          p = pathlib.Path("references/caustics.md"); s = p.read_text(encoding="utf-8")
+          assert '"human:ci-fixture"' in s, "fixture actor moved"
+          p.write_text(s.replace('"human:ci-fixture"', '"human: "'), encoding="utf-8")
+          PYBY
+          red_check "a stamp naming nobody after human:" 'names nobody' verified_actor
+          cp /tmp/bk_stamped $SUBJ
+
+          cp $SUBJ /tmp/bk_stamped
+          sed -i 's/^status: stable$/status: draft/' $SUBJ
+          python3 scripts/index.py >/dev/null
+          red_check "a verified: stamp on a draft document" 'verified:. on a .draft. document' verified_needs_stable
+          cp /tmp/bk_stamped $SUBJ
+          python3 scripts/index.py >/dev/null
+
+          cp /tmp/bk_st $SUBJ
+          cp /tmp/bk_st_skill SKILL.md; cp /tmp/bk_st_state STATE.md
+          python3 scripts/index.py >/dev/null
+          expect_green "the stamp removed again"
+
+          # ── the two self-description guards ──────────────────────────────────────────
+          # A number in SKILL.md/STATE.md that disagrees with the tree. The real instance was
+          # four `verified:` stamps against a bolded "no document carries this yet".
+          cp SKILL.md /tmp/bk_skill
+          python3 - <<'PYSD'
+          import pathlib, re
+          p = pathlib.Path("SKILL.md"); s = p.read_text(encoding="utf-8")
+          m = re.search(r"\*\*(\d+) of (\d+)\*\*, signed", s)
+          assert m, "the stamp-count sentence moved; this mutation has nothing to bend"
+          p.write_text(s.replace(m.group(0), f"**0 of {m.group(2)}**, signed", 1), encoding="utf-8")
+          PYSD
+          red_check "SKILL.md understating the stamp count" 'stamps; the tree has' selfdescription
+          cp /tmp/bk_skill SKILL.md
+
+          # Rule 1 of the same guard -- a SENTENCE denying the stamps -- had no mutation at all
+          # when it shipped, and the version that shipped read one line at a time. STATE.md
+          # carried such a denial WRAPPED across two lines and the check exited 0 on it for a
+          # day. So this mutation writes the denial wrapped ON PURPOSE: it is the shape that
+          # defeated the first implementation, and the only shape worth asserting.
+          cp STATE.md /tmp/bk_state1
+          python3 - <<'PYSD1'
+          import pathlib
+          p = pathlib.Path("STATE.md"); s = p.read_text(encoding="utf-8")
+          anchor = "## Audit state, per document\n"
+          assert anchor in s, "the audit-state heading moved"
+          wrapped = anchor + "\nNothing here is verified: **no document carries\nthis yet**, so read the tiers below as hearsay.\n"
+          p.write_text(s.replace(anchor, wrapped, 1), encoding="utf-8")
+          PYSD1
+          red_check "a stamp denial WRAPPED across two lines, the shape that defeated v1" \
+            "says 'no document carries this yet'" selfdescription
+          cp /tmp/bk_state1 STATE.md
+
+
+          # A source the front matter declares NOT OPENED, cited bare in the body with nothing
+          # above it saying so. The real instance was 67 such citations across 10 documents.
+          cp references/stream-power.md /tmp/bk_nob
+          sed -i '/Never opened here/,/left unverified\./d' references/stream-power.md
+          red_check "a never-opened source cited with no declaration above it" \
+            'no .Never opened here:. line names it' notopened_banner
+          cp /tmp/bk_nob references/stream-power.md
+
+          # The declaration present but BELOW the first citation -- the reader reaches it second.
+          cp references/stream-power.md /tmp/bk_nob
+          python3 - <<'PYNB'
+          import pathlib
+          p = pathlib.Path("references/stream-power.md")
+          lines = p.read_text(encoding="utf-8").split("\n")
+          i = next(k for k, l in enumerate(lines) if "Never opened here" in l)
+          j = i
+          while j < len(lines) and lines[j].strip():
+              j += 1
+          blk = lines[i:j]
+          del lines[i:j]
+          # Immediately ABOVE the last section heading: below every citation on the page, and
+          # still outside `## Use this` and the failure table, so the stamp is untouched and
+          # this row proves the banner rule rather than the digest rule.
+          k = max(n for n, l in enumerate(lines) if l.startswith("## "))
+          lines[k:k] = blk + [""]
+          p.write_text("\n".join(lines), encoding="utf-8")
+          PYNB
+          red_check "the never-opened declaration placed below the citation it qualifies" \
+            'is below the first bare citation' notopened_banner
+          cp /tmp/bk_nob references/stream-power.md
+
+          # dated-crossover's year window, pinned by two fixtures at its boundary. The first
+          # fixture set did not pin it: crippling the pattern to (20\d\d) passed all nine.
+          cp scripts/check.py /tmp/bk_xd
+          python3 - <<'PYXD'
+          import pathlib
+          p = pathlib.Path("scripts/check.py"); s = p.read_text(encoding="utf-8")
+          old = 'CROSSOVER_YEAR = re.compile(r"(?<![\\w.\\-/])(20[1-2]\\d)(?![\\w.\\-/%])")'
+          assert s.count(old) == 1, "the dated-crossover year pattern moved"
+          p.write_text(s.replace(old, 'CROSSOVER_YEAR = re.compile(r"(20\\d\\d)")'), encoding="utf-8")
+          PYXD
+          expect_red "python3 scripts/check.py --selftest" \
+            "dated-crossover's year window widened past its fixtures" \
+            'dated-crossover fixture' dated_crossover_fixtures
+          cp /tmp/bk_xd scripts/check.py
+
+          # `--list` must name the three surfaces the guard cannot see, and guard-proofs.tsv
+          # must carry them as OPEN rows. Criterion 1's last clause, which went unmet for nine
+          # days while the first three clauses were green -- "a phase gate that is
+          # three-quarters met is not met" (PLAN.md:116).
+          cat > /tmp/listcheck.py <<'PYLC'
+          import re, subprocess, sys
+          out = subprocess.run([sys.executable, "scripts/check.py", "--list"],
+                               capture_output=True, text=True).stdout
+          rows = open("registers/guard-proofs.tsv", encoding="utf-8").read()
+          bad = []
+          for t in ("T3", "T4", "T8"):
+              if not re.search(rf"\b{t}\b", out):
+                  bad.append(f"--list does not name {t}")
+              if not re.search(rf"audit {t}\)[^\n]*\bOPEN\b", rows):
+                  bad.append(f"guard-proofs.tsv has no OPEN row for {t}")
+          for b in bad:
+              print(f"  FAIL  {b}")
+          sys.exit(1 if bad else 0)
+          PYLC
+          if python3 /tmp/listcheck.py; then
+            say "  GREEN  --list names T3, T4 and T8, and all three are OPEN rows"
+          else
+            echo "::error::criterion 1's last clause: --list or guard-proofs.tsv lost a surface"
+            fails=$((fails + 1))
+          fi
+          cp scripts/check.py /tmp/bk_lc
+          python3 /tmp/stub.py list_names_open_surfaces
+          if python3 /tmp/listcheck.py >/dev/null 2>&1; then
+            echo "::error::the --list assertion stayed GREEN with the naming block removed"
+            fails=$((fails + 1))
+          else
+            say "  BITES  --list stops naming T3/T4/T8   (red via list_names_open_surfaces)"
+          fi
+          cp /tmp/bk_lc scripts/check.py
+
+          # ── the generated Status block ───────────────────────────────────────────────
+          # Two directions, because they are different failures with the same fix. (1) Someone
+          # edits inside the markers. (2) The TREE moves and nobody regenerates -- which is the
+          # one that actually happened: the commit that introduced the self-description check
+          # wrote "**233** rows" into STATE.md while the register held 238, wrong on arrival.
+          cp STATE.md /tmp/bk_gen
+          python3 - <<'PYG1'
+          import pathlib, re
+          p = pathlib.Path("STATE.md"); s = p.read_text(encoding="utf-8")
+          m = re.search(r"\| Bibliography \| \*\*(\d+)\*\* entries", s)
+          assert m, "the generated Bibliography row moved"
+          p.write_text(s.replace(m.group(0), m.group(0).replace(m.group(1), "999"), 1),
+                       encoding="utf-8")
+          PYG1
+          NO_REGEN=1
+          red_check "a hand edit inside the generated status block" \
+            "generated status block is out of date" generated_block
+          cp /tmp/bk_gen STATE.md
+
+          cp gaia_corrections_bk /dev/null 2>/dev/null || cp registers/corrections.tsv /tmp/bk_corr
+          printf 'CI-FIXTURE-ROW\treferences/x.md\tprose\tevidence\tgate\tactor\tverified\tnote\n' \
+            >> registers/corrections.tsv
+          red_check "the tree moving with nobody regenerating the status block" \
+            "generated status block is out of date" generated_block
+          NO_REGEN=""
+          cp /tmp/bk_corr registers/corrections.tsv
+
+          # And regenerating must actually fix it -- a generator whose output does not satisfy
+          # its own checker is worse than no generator.
+          cp /tmp/bk_corr /tmp/bk_corr2
+          printf 'CI-FIXTURE-ROW2\treferences/x.md\tprose\tevidence\tgate\tactor\tverified\tnote\n' \
+            >> registers/corrections.tsv
+          python3 scripts/check.py --emit-state >/dev/null
+          if python3 scripts/check.py >/dev/null 2>&1; then
+            say "  GREEN  --emit-state reconciles the block with a changed tree"
+          else
+            echo "::error::--emit-state ran but check.py is still red; the generator disagrees with its own checker"
+            python3 scripts/check.py 2>&1 | grep -m3 FAIL
+            fails=$((fails + 1))
+          fi
+          cp /tmp/bk_corr2 registers/corrections.tsv
+          cp /tmp/bk_gen STATE.md
+
+          # ── the prose counts outside the generated markers ───────────────────────────
+          # Seven of the nine falsehoods a rating panel found by hand lived in prose, not in the
+          # table the generator owns. And the FIRST version of one of these rules matched
+          # nothing at all -- it anchored on `**` while the sentence reads "**6. 13 coverage
+          # rows" -- so it passed its own tamper test by never firing. Both are asserted.
+          cp STATE.md /tmp/bk_prose
+          python3 - <<'PYP1'
+          import pathlib
+          p = pathlib.Path("STATE.md"); s = p.read_text(encoding="utf-8")
+          assert "documents on four axes" in s, "the opening sentence moved"
+          import re
+          p.write_text(re.sub(r"(\d+)(\s+documents on four axes)", r"37\2", s, count=1),
+                       encoding="utf-8")
+          PYP1
+          red_check "a prose count disagreeing with the tree" \
+            "documents on four axes; the tree has" selfdescription
+          cp /tmp/bk_prose STATE.md
+
+          # A rule that has quietly stopped matching. --selftest owns this one, not check.py.
+          cp scripts/check.py /tmp/bk_live
+          python3 - <<'PYP2'
+          import pathlib
+          p = pathlib.Path("scripts/check.py"); s = p.read_text(encoding="utf-8")
+          old = '(r"(\\d+) coverage rows are planned"'
+          assert s.count(old) == 1, "the coverage-rows prose rule moved"
+          p.write_text(s.replace(old, '(r"(\\d+) coverage rowz are planned"', 1), encoding="utf-8")
+          PYP2
+          expect_red "python3 scripts/check.py --selftest" \
+            "a prose-count rule that matches nothing" \
+            "matches nothing in" prose_count_liveness
+          cp /tmp/bk_live scripts/check.py
+
+          # PLAN.md, which until 2026-09-15 no guard read at all -- which is how its Now
+          # column came to be raised on five dimensions by the hand being rated. Only the
+          # stamp-denial rule applies there: its NUMBERS are deliberately frozen before-states
+          # ("37 documents" at :91 because that is what there were), and no matcher can tell a
+          # historical count from a stale one. The denial is different -- false the moment a
+          # stamp exists, whenever it was written -- and it is written WRAPPED here, because
+          # that is the shape that defeated the first implementation of this rule.
+          cp PLAN.md /tmp/bk_plan
+          python3 - <<'PYPL'
+          import pathlib
+          p = pathlib.Path("PLAN.md"); s = p.read_text(encoding="utf-8")
+          anchor = "## Target: 9+ / 10\n"
+          assert anchor in s, "the Target heading moved"
+          p.write_text(s.replace(
+              anchor,
+              anchor + "\nNothing here is signed: **no document carries\nthis yet**, so read the "
+              "scores as hearsay.\n", 1), encoding="utf-8")
+          PYPL
+          red_check "a stamp denial in PLAN.md, the file nothing used to read" \
+            "says 'no document carries this yet'" selfdescription
+          cp /tmp/bk_plan PLAN.md
+
+          # ── the decoys ───────────────────────────────────────────────────────────────
+          # Reworded prose OUTSIDE both anchors, and it ASSERTS that: the old form of this
+          # decoy ran a global `the bed -> the pool floor` over caustics.md, which edits
+          # `## Use this` -- harmless while nothing is stamped, red the moment something is.
+          cp $SUBJ /tmp/bk
+          python3 - <<'PYDC'
+          import pathlib, sys
+          sys.path.insert(0, "scripts")
+          from check import body_digest
+          from okf import parse_front_matter
+          p = pathlib.Path("references/caustics.md")
+          before = body_digest(parse_front_matter(p)[1])
+          s = p.read_text(encoding="utf-8")
+          old = "shrinks and the bed brightens"
+          assert s.count(old) == 1, f"decoy phrase appears {s.count(old)} times, want 1"
+          p.write_text(s.replace(old, "shrinks and the pool floor brightens"), encoding="utf-8")
+          assert before == body_digest(parse_front_matter(p)[1]), \
+              "the decoy edited an ANCHOR section; it has to sit outside both"
+          print("  (decoy verified outside the digest: covers_body unmoved at " + before + ")")
+          PYDC
+          expect_green "prose reworded outside both anchors, no citation touched"
+          cp /tmp/bk $SUBJ
+
+          # A `.md` name that is NOT a cross-reference. check_paths would be worthless if it
+          # fired on the corpus's own examples: a `locator:` in front matter names a place
+          # inside somebody else's repository ("the front-to-back bullet in README.md"), and a
+          # fenced block is code or a template, not prose a reader follows. Both exemptions are
+          # live in the corpus today, so a clean run alone cannot prove they are still wired --
+          # this asserts it with a name that resolves NOWHERE.
+          cp references/tiled-streaming.md /tmp/bk_ts
+          python3 - <<'PYDP'
+          import pathlib
+          p = pathlib.Path("references/tiled-streaming.md"); s = p.read_text(encoding="utf-8")
+          old = "         * frustumFactor"
+          assert s.count(old) == 1, f"fenced anchor appears {s.count(old)} times, want 1"
+          p.write_text(s.replace(old, "// see `no-such-document.md` for the derivation\n" + old, 1),
+                       encoding="utf-8")
+          PYDP
+          grep -q 'no-such-document.md' references/tiled-streaming.md \
+            || { echo "::error::path decoy inserted nothing"; fails=$((fails + 1)); }
+          expect_green "a dangling .md name inside a fenced block"
+          cp /tmp/bk_ts references/tiled-streaming.md
+
+          # A heading that is NEITHER anchor. This decoy used to rename `## How this fails`,
+          # which is structural now -- it went red, correctly, so it is retired and pointed at
+          # an ordinary section instead.
+          cp references/tiled-streaming.md /tmp/bk_ts
+          sed -i 's/^## The residency state machine$/## Residency, as a state machine/' references/tiled-streaming.md
+          grep -q '^## Residency, as a state machine$' references/tiled-streaming.md \
+            || { echo "::error::decoy sed matched nothing"; fails=$((fails + 1)); }
+          expect_green "a heading that is neither anchor renamed"
+          cp /tmp/bk_ts references/tiled-streaming.md
+
+          # ── the guard's own fixtures ─────────────────────────────────────────────────
+          # The two metrics added after a grounding pass disagreed with an honest writer: a
+          # locator naming source-code line ranges scored vague, and 21 unopened sources had
+          # nowhere in the tier vocabulary to live. Both are fixtures now, so crippling either
+          # is caught.
+          python3 - <<'PY2'
+          import pathlib
+          p = pathlib.Path("scripts/check.py"); s = p.read_text(encoding="utf-8")
+          old = r"| \blines?\s+\d"
+          assert old in s, "locator source-line alternative missing -- would pass vacuously"
+          p.write_text(s.replace(old, r"| \bNEVERMATCHES?\s+\d"), encoding="utf-8")
+          PY2
+          expect_red_crippled "python3 scripts/check.py --selftest" \
+            "--selftest catches a crippled locator pattern" "locator"
+
+          python3 - <<'PY3'
+          import pathlib
+          p = pathlib.Path("scripts/check.py"); s = p.read_text(encoding="utf-8")
+          old = 'LOCATOR_NOT_OPENED = ("NOT OPENED", "NO LOCATOR")'
+          assert old in s, "not-opened marker missing -- would pass vacuously"
+          p.write_text(s.replace(old, 'LOCATOR_NOT_OPENED = ("ZZ_NEVER",)'), encoding="utf-8")
+          PY3
+          expect_red_crippled "python3 scripts/check.py --selftest" \
+            "--selftest catches a disabled not-opened marker" "not.opened|NOT OPENED"
+
+          # requote's `check()` is the function its selftest exists to exercise. The corpus path
+          # used to be hard-coded inside it, so `--selftest` never called it at all: gutting it
+          # to `return [], 0, 0, 0, 0` left the selftest green. A `docs=` parameter fixed that,
+          # and this is what holds it fixed.
+          python3 - <<'PY4'
+          import pathlib
+          p = pathlib.Path("scripts/requote.py"); s = p.read_text(encoding="utf-8")
+          old = '    docs = sorted(REFS.glob("*.md")) if docs is None else sorted(docs)'
+          assert old in s, "check() body moved -- would pass vacuously"
+          p.write_text(s.replace(old, "    return [], 0, 0, 0, 0, {}\n" + old), encoding="utf-8")
+          PY4
+          expect_red_crippled "python3 scripts/requote.py --selftest" \
+            "requote --selftest catches a gutted check()" "selftest|MATCH|ALTERED|UNFETCHED"
+
+          # "Nothing checked is not a pass." A cache was supplied and not one quotation was
+          # located or refuted, so the run enumerated the corpus rather than checking it.
+          rm -rf /tmp/emptycache && mkdir -p /tmp/emptycache
+          echo "this cache holds no artefact at all" > /tmp/emptycache/README.txt
+          expect_red "python3 scripts/requote.py --cache /tmp/emptycache" \
+                     "a cache holding no artefact is not a pass" \
+                     "NOT ONE quotation was located" requote_nothing_checked
+
+          # ── the copy must be clean again ─────────────────────────────────────────────
+          cp /tmp/bk0 $SUBJ
+          python3 scripts/index.py >/dev/null
+          python3 scripts/check.py >/dev/null \
+            || { echo "::error::copy not restored"; fails=$((fails + 1)); }
+          python3 scripts/check.py --selftest >/dev/null \
+            || { echo "::error::guard not restored"; fails=$((fails + 1)); }
+          # ── STATE.md's Guards row, policed by the thing that actually knows ──────────
+          # The bites counts are a property of a RUN, so `check.py` cannot compute them and the
+          # generated status block deliberately leaves them out. That made them the one
+          # self-description with no owner, and they went stale twice in a single day (36 -> 41
+          # -> 43 -> 44 while the row said 36). The authority belongs here: this job counted
+          # them, so this job checks the claim.
+          OBS_RED=$(grep -c "  BITES " /tmp/bites.log 2>/dev/null || true)
+          OBS_GREEN=$(grep -c "  GREEN " /tmp/bites.log 2>/dev/null || true)
+          if [ -z "${OBS_RED:-}" ] || [ "$OBS_RED" = "0" ]; then
+            echo "  (bites counts not captured; skipping the STATE.md assertion)"
+          else
+            CLAIM=$(grep -oE '\*\*[0-9]+ red \+ [0-9]+ green\*\*' STATE.md | head -1)
+            WANT="**$OBS_RED red + $OBS_GREEN green**"
+            if [ "$CLAIM" = "$WANT" ]; then
+              echo "  GREEN  STATE.md's Guards row matches what this job observed ($WANT)"
+            else
+              echo "::error::STATE.md's Guards row says '$CLAIM'; this run observed '$WANT'."
+              echo "          The bites counts are not computable from the tree, so this job is"
+              echo "          their only check. Update the row."
+              fails=$((fails + 1))
+            fi
+          fi
+
           echo
-          [ "$fails" -eq 0 ] && echo "all mutations bite; decoy clean" || { echo "$fails problem(s)"; exit 1; }
+          [ "$fails" -eq 0 ] && echo "every mutation bites for the reason its row names; decoys clean" \
+            || { echo "$fails problem(s)"; exit 1; }

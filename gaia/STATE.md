@@ -6,7 +6,9 @@
 > given page can find out what has actually been checked. If you are here for the skill, read
 > `SKILL.md`.
 
-Last updated at commit `560b241`. Regenerate the numbers with the commands at the bottom rather
+⚠️ **This line said `560b241` for 163 commits.** A hand-written "last updated at" is a claim
+nothing computes, so it decays silently; it is deliberately not replaced with another SHA that
+would do the same. Regenerate the numbers with the commands at the bottom rather
 than trusting this paragraph; they were true when written and this file has no guard.
 
 ---
@@ -14,8 +16,8 @@ than trusting this paragraph; they were true when written and this file has no g
 ## What Gaia is
 
 A citation-grounded reference corpus on terrain and water, for people building a game engine or an
-authoring tool in the class of Gaea or World Machine. 37 documents on four axes — Generation,
-Simulation, Rendering, Architecture — plus six bibliographies, three registers of what was measured
+authoring tool in the class of Gaea or World Machine. 40 documents on four axes — Generation,
+Simulation, Rendering, Architecture — plus seven bibliographies, four registers of what was measured
 and what went wrong, and a guard script.
 
 Its distinguishing claim is not coverage. It is that **every recommendation names a source, every
@@ -29,32 +31,71 @@ claim points at a real bibliography entry with a locator. It does not prove the 
 what the document claims. A green run means the citation is well-formed. Nothing more.
 
 Where a human or an adversarial reviewer *has* read the source, the audit table below says so. That
-covers 16 of 37 documents.
+covers 16 of 40 documents.
 
 ## Status
 
+<!-- generated: status -- `python3 gaia/scripts/check.py --emit-state` -->
+
 | | |
 |---|---|
-| Documents | **37** written, 11 planned, 4 explicitly out of scope (48 topics in scope) |
-| Bibliography | 214 entries, 214 cited, 0 orphaned |
-| Adversarially audited | **16 of 37** |
-| Never examined | **21 of 37** |
-| Guards | `check.py` exit 0 · 72/72 fixtures · `requote` 6/6 · index current |
+| Documents | **40** written · 13 planned · 6 out of scope (59 topics claimed in `coverage.md`) |
+| Bibliography | **231** entries across 7 `papers-*.md` files |
+| Corrections | **254** rows in `registers/corrections.tsv`, **53** still `verifier=pending` |
+| `verified:` stamps | **4 of 40** documents — and **194 of 13,937 body lines, 1.39%**, because a stamp covers `## Use this` and the failure table and nothing else |
+| Measurement rigs | **45** in `rigs/`, **19** with saved output, **16** asserting against their own page |
+
+<!-- /generated: status -->
+
+The rows above are **computed from the tree**, not typed. Every self-description this
+corpus was caught getting wrong — eleven of them in two days, found by two rating panels
+and never by a guard — was a hand-written count. `check.py` fails if the block drifts from
+the tree, or if anyone edits inside the markers. These three are **not** computable and stay
+hand-written:
+
+| | |
+|---|---|
+| Adversarially audited | **40 of 40** — a judgement about coverage, not a count |
+| Guards | `check.py` exit 0 · `--selftest` green · `index --check` current · `requote --selftest` green · CI `bites` **47 red + 7 green**, every mutation biting for the reason its row names. ⚠️ Not generated, because these are properties of a RUN and not of the tree — but the `bites` job asserts this row against what it actually observed, so the authority sits with the thing that knows. A separate `guard`-job step proves the **page gates** bite too: 8 mutations across 3 rigs, each required to exit non-zero AND to name the figure moved, then required to go green again with the page restored. Those 8 are NOT in the count above — they run in a different job and write no `bites.log`, which is the only reason the two counts stay separable |
+| Phase 0 | **closed** 2026-09-07 — the guard layer, verified by mutation under `bash -e` |
+
+⚠️ **Read the stamp row's second number, not its first.** `4 of 40` is the count a reader
+remembers and it overstates the position by about a factor of seven: a stamp covers
+`## Use this` and the failure table, so what a human has actually signed is **1.39% of the
+corpus body**. Everything else is *attested* — the same kind of author wrote the claim, the
+citation, and the guard that checks them.
 
 Reported metrics, none of them enforced:
 
 | Metric | Value | What it means |
 |---|---|---|
-| `approximation` | **7/37** | documents stating *both* how good a recommendation is and what it costs |
-| `locators` | ~70% | citations naming a section, equation or page rather than a topic |
-| `propagation` | **16/256** | citations naming a section at *both* ends, so the two can be cross-checked at all |
-| `reach` | 17/193 | body sections sharing no word with `## Use this` or the failure table |
-| `unread` | 26/256 | citations that *declare* the source was never opened here |
+| `approximation` | **39/40** | documents stating *both* how good a recommendation is and what it costs. ⚠️ The fortieth, `shader-craft.md`, is a *tested* refusal, not a gap. ⚠️ And the metric does not require the two halves to describe the same technique: 5 documents put them over 50 body lines apart, 2 over 100 |
+| `locators` | 188/267 (70%) | citations naming a section, equation or page rather than a topic |
+| `propagation` | **18/287** | citations naming a section at *both* ends, so the two can be cross-checked at all |
+| `reach` | 14/213 | body sections sharing no word with `## Use this` or the failure table |
+| `unread` | 31/287 | citations that *declare* the source was never opened here |
+| `crossrefs` | **2/381** | shared magnitudes that DISAGREE. Both are known false positives; its reach is 12% of linked pairs |
 
 ## Audit state, per document
 
-Three tiers. Nothing here is "verified" in the strong sense — no document carries the `verified:`
-header that would mean a human read every cited work.
+Three tiers, and almost nothing here is "verified" in the strong sense. **4 of 40 documents carry
+a `verified:` header** — the only one of the three channels that means a human read the cited work
+— and each covers `## Use this` plus the failure table alone, so the signed fraction of the corpus
+is **194 of 13,930 body lines, 1.39%**. ⚠️ Until 2026-09-15 this paragraph denied, in bold, that any
+document carried that header — nineteen lines under a Status row that already said `4 of 40`. It
+survived the check written that morning to stop exactly this, because the sentence wrapped across
+two lines and that check read one line at a time. The check reads the whitespace-normalised whole
+file now, and the denial is not quoted here verbatim for a reason worth knowing: **the check cannot
+tell a claim from a quotation of one**, so writing the old sentence down would make this file fail
+on its own confession. That is the standing limit of a matcher, and the argument for replacing it
+with a generator.
+
+⚠️ **The tiering below predates the 2026-09-05 audit and its sittings.** Since then every document
+has been through an implementer and an independent verifier, and 143 corrections carry both
+signatures. That raises the middle channel a long way and moves the third not at all: an agent can
+re-derive a number, run a block and read both ends of a cross-reference, and none of that is a
+human having opened the paper. Read the tiers below as *what had been examined by hand before the
+audit*, and `registers/corrections.tsv` as what has been examined since.
 
 **Subject critic + adversarial verifier, findings applied** — a domain specialist audited the
 document, ran its pseudocode and re-derived its numbers; a second agent then tried to *disprove*
@@ -85,7 +126,49 @@ wrong; they are unexamined, which is a different thing.
 `simulation-time-budget` · `sketch-based-authoring` · `tectonic-uplift` · `tiled-streaming` ·
 `virtual-texturing` · `water-closed-vs-open` · `water-optics` · `water-rendering`
 
+## The 34 unverified corrections, by name
+
+`registers/corrections.tsv` has 233 rows. **34 read `verifier=pending`** — one hand wrote the
+change and no second hand has re-derived it. A count reads like rounding, so here they are.
+
+**15 are one incident.** The `PD-*-APX` rows — CAUS, DRIV, GPUC, HFLOD, HFRAY, LAYER, NGR, PLANP,
+SIMTB, SURF, TAM, TECT, VT, WCVO, WOPT. Commit `11a235d` promised a per-document row for each and
+the digest that was to write them never returned; they were recovered four days later in `c234f87`,
+verbatim from each applying agent's own report. Nothing in them is invented and none of it is
+independently checked. An external rating panel named this cluster as the reason the corpus's
+headline jump is not fully earned, and that reading is correct.
+
+**7 are this project's own bookkeeping** — the one-end sweep row, the two audit-file rows, the
+pseudocode-register row, the criterion-6 row, the coastal-erosion false-positive row, and
+`VB-TRUNCATION`, which records that my own row-writing script silently truncated seven register
+fields mid-word.
+
+**6 are Phase C** — `PC1` impact-craters, `PC2` planetary-precision, `PC3` mesh-extraction,
+`PC4` river-networks, `PC5` coverage, `PC7` water-closed-vs-open. Verification was scoped by the
+owner to the oldest and newest surfaces; these are neither.
+
+**6 are from the verification waves themselves and from the sign-off** — `VA-CI-ANCHORS`,
+`VA-CRITIC-1`, `VB-CRITIC-1`, `VB-RATIO`, `CD1`, `SIGNOFF-SP`. Each records a defect found and
+fixed; what is unverified is the fix, not the finding.
+
+⚠️ **What `pending` does and does not mean here.** It does not mean unmeasured: every `PD-*-APX`
+row names a rig in `rigs/` that re-runs, and the orchestrator re-ran them. It means no hand other
+than the one that made the change has re-derived the reasoning around the numbers. On this project
+that distinction has mattered: of 26 rows given an independent hostile reader, 10 carried a real
+defect — and 2 of 7 disputes raised were themselves wrong and were rejected by a second reader.
+
 ## Known issues
+
+**0. Seven documents sit at exactly 450 lines against a 450-line cap.** `driver-fields`,
+`flow-routing`, `node-graph-runtime`, `river-networks`, `shader-craft`,
+`stratigraphy-and-lithology` and `surface-and-scale-space` have **zero** headroom, and
+`resolution-independence` has one line. That is ground rule 2 working exactly as intended — every
+one of them reached the cap by paying for an addition with a subtraction, and three did so on
+2026-09-15 alone. It is also a standing cost a maintainer should know before opening one: **any
+correction to those seven must delete something first**, the re-wrap trick is exhausted on at
+least `flow-routing` and `river-networks` (measured: zero paragraphs re-wrap shorter at width
+100), and the cap message *"it is two topics"* is a real diagnosis for several of them. The cap
+is not the problem; a document that can only be corrected by amputation is.
 
 **1. The base rate is the headline. Every audited document contained at least one HIGH-severity
 defect.** Not one came back clean. Found so far: a live underflow bug that stranded water past a
@@ -93,7 +176,9 @@ threshold that scales with terrain elevation; a guard that fired 0 times in 4.8M
 passages depending on it; a `P` tier resting on a printing that stamps "(non-peer-reviewed)" on all
 eight pages; a units error that would make a tool never braid; four quotations cut at the clause
 that reverses the conclusion; a recommendation that is an exact fixed point of the equation it tells
-you to integrate. **The 21 unexamined documents have no reason to be cleaner.**
+you to integrate. **The 24 documents this tiering never examined have no reason to be cleaner.**
+(21 until 2026-09-15, when it was recounted: 16 of 40 are named in a tier, and `clastic-debris`,
+`resolution-independence` and `shader-craft` were written after the tiering and never added to it.)
 
 **2. The tooling has never been audited.** `check.py`, `index.py`, `okf.py`, the CI workflow, the
 three registers, both eval files and `SKILL.md` have had no hostile review — and `check.py` is what
@@ -109,7 +194,8 @@ not a logic limit — several hosts serve bot challenges, one has an expired cer
 is reported rather than passed over, but it means the corpus's worst recurring defect is still
 mostly caught by hand.
 
-**4. Most citations cannot be cross-checked at all.** `propagation` is 16 of 256: only that many
+**4. Most citations cannot be cross-checked at all.** `propagation` is 18 of 287 (16 of 256 when
+this was written): only that many
 name a section at both the document end and the bibliography end. The guard catches disagreement
 where both ends speak; it is silent everywhere else.
 
@@ -120,25 +206,58 @@ output arrives with proposed replacement text, and replacement text invents thin
 fixes were refused for shipping a *new* defect, including a sign error and fabricated hardware
 labels. **Do not apply a finding here without verifying it.**
 
-**6. 11 coverage rows are planned and unwritten**, listed in `references/coverage.md`. The corpus
+**6. 13 coverage rows are planned and unwritten**, listed in `references/coverage.md`. The corpus
 names them rather than pretending the map is complete. `resolution-independence` is the one it
 calls the most common complaint against tools in this class.
 
 ## Next steps, in the order I would do them
 
-1. **Audit the tooling** (issue 2). Highest value, because everything downstream trusts it.
-2. **Audit the 21 unexamined documents**, in batches of three, subject critic + adversarial
-   verifier, and an architect pass for anything on Rendering, Architecture or Simulation. Risk
-   order by how heavily a document has already been edited: `mask-to-material` (4 register rows),
-   `sketch-based-authoring` (3), `shallow-water` (3). Promote `node-graph-runtime` (longest
-   unaudited document, on the axis everything else assumes) and `simulation-time-budget` (it tells
-   you how to spend a frame, and cost figures have been found wrong by 1000× and by four orders of
-   magnitude elsewhere in this corpus).
-3. **Widen the artefact cache** so `requote.py` covers more than 5%.
-4. **Write the 11 planned rows**, starting with `resolution-independence`.
-5. **Raise `approximation`** — 30 of 37 documents still give an error or a cost, not both. Do it by
-   supplying the missing half from sources, not by loosening the pattern; the metric has already
-   been caught mismeasuring its own fix once.
+⚠️ **This list was written before the 2026-09-05 audit and is reordered here rather than
+rewritten, because what replaced it is the more useful record.** Items 1, 2 and 4 are done: the
+tooling audit became Phase 0 and closed; the batched audit of 21 documents became 20 per-document
+sittings, each with an independent verifier; and `resolution-independence` is written, along with
+`shader-craft`. The batching was the wrong unit — a sitting that owns one document and states its
+own gates found defects a batch of three would have averaged over.
+
+What remains, in the order I would now do it:
+
+1. **The five sittings still being repaired** — VT + clouds, tiled-streaming + mesh-extraction +
+   sea-ice, precision + craters + coastal + sketch, caustics, stratigraphy. Their verifiers have
+   reported; the fixes are not yet applied.
+2. ~~**Point the eleven rendering documents at `shader-craft.md`.**~~ **8 of the 11 do.**
+   `atmosphere-and-aerial-perspective`, `caustics` and `mesh-extraction` still do not.
+   ⚠️ This item read *Done — eleven files now cite it* until 2026-09-15. Eleven is the count
+   `SKILL.md` repudiated **the same day**, in a parenthetical reading *"Recount, do not re-read"*:
+   `grep -rln shader-craft.md references/` returns 11 files, of which two are generated indexes and
+   one is a bibliography. The correction landed in one front-door file and not the other, inside
+   one day, on the very item about one-end corrections.
+3. **The budget-tag migration** — 37+ documents carrying one canonical tag with a `**Tier:` line
+   that agrees. Success criterion 6, and the last structural item.
+4. ~~**Widen the artefact cache**~~ — **the gate is closed on its ADMISSION branch, 2026-09-15.**
+   `PLAN.md` Phase 6 asked for a mechanism reaching `≥ 60%` *or* the statement that the cache is
+   unbounded and outside the plan. It is **unbounded and outside the plan**, and the reason is now
+   stated rather than implied: the missing artefacts sit behind **eight named publisher paywalls**
+   — AGU, AIP, Elsevier, GeoScienceWorld, IEEE, Optica, Taylor & Francis, Wiley — and **27 of the
+   229 bibliography ids already say so in their own locators**. ⚠️ Two consequences, and they are
+   the point of writing it down: `requote.py` exits 0 having asserted **nothing**, so a green run
+   of it is not evidence and must never be quoted as any (`--require-cache` exits 2 for CI so a
+   pipeline cannot mistake silence for a pass); and the corpus's worst recurring defect is caught
+   by a human reading the source and by nothing else. **Reversible by the maintainer and only by
+   the maintainer** — institutional access, a browser-side fetch committed as a private cache, or
+   author copies each take the other branch.
+5. ~~**Raise `approximation`**~~ — **done, 39/40.** ⚠️ But an independent rating panel found the
+   metric oversold at the tails: it credits a document for holding both halves *anywhere* in the
+   body, and 5 of the 38 put them more than 50 lines apart (`water-optics` 249, `terrain-analysis-masks`
+   205). A colocated variant is the honest successor metric.
+6. **The `verified:` stamps.** **4 of 40**, signed 2026-09-14 by `human:alexander.pino` on
+   `flow-routing`, `terrain-analysis-masks`, `node-graph-runtime` and `stream-power`, after four
+   one-page briefs. The stamps were proved to bite: rewording a claim under one goes red,
+   re-pointing a locator goes red, editing prose outside the two anchor sections is correctly
+   ignored. ⚠️ **Also not available to any agent**, by construction —
+   the stamp means a human read the cited work. Phase 0's verifier found that a stamp on a
+   bibliography certified nothing at all (the digest hashed the empty string, so one stamp was
+   valid on all nine apparatus files); that hole is closed, which makes the stamp worth having and
+   still leaves it a human's to give.
 
 ## Checking any of this yourself
 

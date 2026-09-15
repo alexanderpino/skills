@@ -2,7 +2,7 @@
 type: Technique
 title: Mask operators — distance fields and component filtering
 description: "The two utilities the rest of this corpus assumes and never provides: an exact Euclidean distance transform, including distance from a spline, and an area-thresholded component filter that despeckles a mask without eroding it."
-tags: [generation, masks, distance-field, morphology, authoring-time]
+tags: [generation, masks, distance-field, morphology, authoring-time, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-03T00:00:00Z }
 sources:
@@ -15,6 +15,10 @@ sources:
   - { id: salembier2009, tier: P, locator: "§Increasing criterion p. 146 (NOT §Size filtering p. 140, which is the opening by reconstruction of an erosion) — the area opening removes components below a pixel-count threshold and 'is equal to the supremum of all possible openings by a connected structuring element involving T_A pixels'; the abstract for connected operators that 'cannot create new contours nor modify their position'; Figs. 17–18 for the union-find implementation; Fig. 21(b) vs 21(c) for a disk opening against an area filter on the same image" }
 ---
 # Mask operators — distance fields and component filtering
+
+**Tier: authoring-time for the exact transform, real-time for the jump-flood variant.** The
+separable exact transform is a two-sweep bake; the crossover below hands the field to jump flooding
+when it must be rebuilt per frame from moving seeds, and prices that at `log n` full-field passes.
 
 Two operators that half this corpus already assumes. `tectonic-uplift.md` tells you to author
 uplift as "a distance field from a spline" and never says how to compute one.
@@ -34,11 +38,24 @@ about forty lines, it is exact, it is O(N) in the number of cells at any radius,
 parameter. For a distance *from a spline*, rasterise the curve into the seed mask first and
 transform that; for a *signed* field, run it twice and subtract.
 
+**What it costs: one full-resolution scratch field.** Measured here — peak RSS against grid size
+over 1536²–3072², least-squares slope, both passes swept in place, three runs giving 8.54, 8.63
+and 8.53 — **8.5 bytes per cell** including the seed mask, so **136 MiB at 4096²** and **2.1 GiB
+at 16384²**. That is the number to budget: the passes are linear and the CPU is not what a bake
+runs out of. Halving it takes a 4-byte *integer* field, not a float one — float32 stops
+representing integers exactly at 2²⁴ = 16 777 216, and a 4096² grid carries squared distances to
+33 538 050.
+
 Everything else on this axis is a compromise you should be able to name:
 
 - **Chamfer masks** (the 3-4 and 5-7-11 sweeps) — same asymptotic cost, one less array, and a
-  **maximum relative error of 5.7% and 2.0% respectively** [hajdu2012], reproduced below. Use
-  only where the field feeds something with a soft threshold and never a measurement.
+  **maximum relative error of 5.7% and 2.0% respectively** [hajdu2012], reproduced below. Price
+  that trade before you take it: the array it saves is the per-line envelope stack, one grid
+  *line* — **96 KiB against a 128 MiB field at 4096²** — and the same rig measures the chamfer at
+  **8.5 bytes per cell** too, the two slopes differing by −0.09 to +0.07 bytes per cell across
+  three runs, which changes sign and is therefore the measurement's noise. The 5.7% costs accuracy
+  and returns no memory. Use only where the field feeds something with a soft threshold and never
+  a measurement.
 - **Jump flooding** [rongtan2006] — the GPU answer, `log n` passes over the whole field, and
   approximate. Cross over when the field must be rebuilt per frame from moving seeds.
 - **Brute force over seed pixels** — correct, trivial, and O(N · seeds); fine below a few
@@ -187,10 +204,10 @@ the step schedule must *halve*, and the intuitive small-to-large order fails cat
 
 | Situation | Do | Because |
 |---|---|---|
-| Authoring-time bake, any seed count | Exact separable [felzenszwalb2012] | O(N), exact, no parameter; the CPU is not the bottleneck in a bake |
+| Authoring-time bake, any seed count | Exact separable [felzenszwalb2012] | O(N), exact, no parameter; the CPU is not the bottleneck in a bake — the 8.5 bytes/cell field is |
 | Seeds move every frame, GPU already resident | JFA+1 [rongtan2006] | `log n` full-screen passes, error at the fourth decimal, cost flat in seed count |
 | Field feeds a hard threshold or a measurement | Exact, always | 5.7% of a 2 km radius is 114 m of misplaced mountain |
-| Field feeds a soft mask you will noise-break anyway | 5-7-11 chamfer is defensible | 2.0% is under the noise you are about to add |
+| Field feeds a soft mask you will noise-break anyway | 5-7-11 chamfer is defensible | 2.0% is under the noise you are about to add — and it buys simpler code, not cheaper memory |
 | Fewer than ~1000 seed pixels, one-off | Brute force | It is four lines and cannot be wrong |
 | You reached for a Gaussian blur | Stop | Blur saturates; it is not a distance and does not scale with radius |
 
@@ -247,12 +264,14 @@ at a corner. Reversing the two terms gives +4.00 and −9.90 — the same field,
 comment that reads exactly as plausible. This is the failure the table below calls "a coin flip",
 and nothing downstream will tell you: an inverted SDF still looks like a distance field, still has
 the right gradient magnitude, and still produces a smooth falloff — it just selects the outside.
-Assert the sign at one known interior cell before you use it.
-Two cautions. The sign convention is a coin flip and both are in circulation — write it into the
-node name, because the failure is a silently inverted mask. And the two transforms are each exact,
-but the *combined* field has a one-cell plateau of zeros at the boundary, because a boundary cell
-is at distance 0 from itself under both. If the zero crossing matters — it does for anything that
-marches the field — offset by half a cell or reconstruct the boundary sub-cell.
+Assert the sign at one known interior cell before you use it, and write the convention into the
+node name. The two transforms are each exact, but ⚠️ the *combined* field never takes the value
+zero **at all**. `inside` and `outside` **partition** the grid, so no cell belongs to both and no
+cell can draw 0 from both terms: on the 7×7-in-21² configuration above, 0 of 441 cells are zero
+and the smallest `|sdf|` anywhere in the field is exactly 1.0, the step from −1 to +1 across the
+boundary. If the zero crossing matters — it does for anything that marches the field — offset by
+half a cell or reconstruct the boundary sub-cell. A marcher testing for a *sign change* still
+finds one; a marcher testing for a *zero* finds nothing and runs off the end of the field.
 
 **What a distance field gets you beyond a mask.** A falloff whose width is in metres and does not
 change with the terrain's height range; a coastline shelf profile; erosion strength that fades from
@@ -339,11 +358,12 @@ differently — the same defect `terrain-analysis-masks.md` documents for slope 
 | A thresholded distance region is an octagon, not a circle | Chamfer error is bipolar and direction-dependent: 3-4 runs +5.41% at 18° and **−5.72% at 45°**, so the region bulges on the diagonals and pulls in near 18° | 5-7-11 if approximate is fine (+1.98%/−1.61%); exact separable if the threshold is a specification [felzenszwalb2012] |
 | Field is right near seeds, wrong far away | Squared distance square-rooted between the two passes | Stay in squared distance until the end |
 | NaNs in the second pass | `inf` used as the empty value; `inf − inf` in the intersection | A large finite float; the floor must exceed `m² + n²` — `m + n` is [meijster2000]'s unsquared first-phase constant and saturates silently |
+| The bake fits at 2k and dies at 16k | The working set is one full-resolution field — 8.5 bytes/cell measured, 136 MiB at 4096² and 2.1 GiB at 16384² | Budget the field, not the CPU; a 4-byte integer squared-distance field halves it and a 4-byte float does not |
 | Beads-on-a-string bumps along a spline-driven ridge | Curve rasterised at more than half-cell spacing | Sample at ≤ 0.5 cell, or rasterise conservatively |
 | Ridge from a spline has a flat top and cliff sides | Distance thresholded rather than profiled | `exp(−d²/2σ²)` or a smoothstep band |
 | Distance mask breaks at a different LOD | Threshold left in cells | Multiply by cell size; threshold in metres |
 | Signed field inverted; interior selected instead of exterior | Sign convention is a coin flip and both ship | Write the convention into the node name |
-| Marching a signed field snags at the boundary | One-cell plateau of zeros where both transforms give 0 | Offset by half a cell, or reconstruct sub-cell |
+| A marcher on a signed field never finds the surface | The field has NO zero: `inside` and `outside` partition the grid, so the smallest `\|sdf\|` is 1.0 and it steps −1 to +1 | Test for a sign change, not a zero; offset by half a cell or reconstruct sub-cell |
 | GPU distance field has a few wrong cells near cell corners | JFA misses a seed at a Voronoi vertex [rongtan2006] | JFA+1 — one extra round of step length 1 |
 | GPU distance field is wrong nearly everywhere | Step length doubling instead of halving | Halve: `n/2, n/4, …, 1` [rongtan2006] Fig. 4 |
 | Mask is 900 specks and 6 real features | Threshold on a second-derivative field | Area-filter the components, not an opening |

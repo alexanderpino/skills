@@ -70,11 +70,22 @@ def collect() -> tuple[dict[str, list[dict]], list[str]]:
             problems.append(f"{path.relative_to(ROOT)}: tags {tags} name no axis "
                             f"({', '.join(k for k, _ in AXES)}) -- it cannot be routed to")
             continue
+        # NEVER DEFAULTED. `fm.get("status", "stable")` printed **stable** for a document with no
+        # `status:` line at all -- so deleting one line from a draft made the index advertise it
+        # as the strongest state the column has, while check.py's "stable needs `verified:`" rule
+        # read None and stayed silent. Defaulting to `draft` instead would fix the display and
+        # hide the same hole behind a friendlier value; the index does not guess, it reports.
+        # check.py fails the same document independently, so this is the second of two doors.
+        if "status" not in fm:
+            problems.append(f"{path.relative_to(ROOT)}: no `status:` -- the index will not guess "
+                            f"one. An absent key printed as `stable` here, which is the whole "
+                            f"point of the column claimed for a document nobody graded")
+            continue
         by_axis[axis].append({
             "file": path.name,
             "title": fm.get("title", path.stem),
             "description": fm.get("description", ""),
-            "status": fm.get("status", "stable"),
+            "status": fm["status"],
             "verified": bool(fm.get("verified")),
             "tags": [t for t in tags if t != axis],
         })
@@ -152,7 +163,16 @@ def main() -> int:
         # was invisible: injecting `generated: FABRICATED -- 99 documents, all human-verified`
         # under the heading left --check reporting "index.md is current", exit 0, while the
         # banner three lines above promises it would fail.
-        strip = lambda s: re.sub(r"^(generated: \{ by: [^,]*, at: )[^}]*(\})",
+        #
+        # ANCHORED TO ONE LINE, and that is the whole of the second fix. `[^,]` and `[^}]` match
+        # NEWLINES, so the normaliser ran from `at: ` to the next `}` ANYWHERE IN THE FILE and
+        # collapsed everything between them to `<stamp>` on both sides. Any injection containing
+        # no `}` was therefore invisible -- an index opening
+        # "**ALL 44 DOCUMENTS HUMAN-VERIFIED.**" reported "index.md is current (44 documents)",
+        # exit 0, with check.py green beside it. That forges the verification state of the whole
+        # corpus at once, where a forged `verified:` forges one document. `\n` is excluded from
+        # both classes and the match is closed at the line end.
+        strip = lambda s: re.sub(r"^(generated: \{ by: [^,\n]*, at: )[^}\n]*(\}\s*)$",
                                  r"\1<stamp>\2", s, flags=re.M)
         if strip(have) != strip(want):
             print("index.md is out of date. Run `python3 gaia/scripts/index.py`.")

@@ -90,6 +90,16 @@ _QUOTE_PATTERNS = [
     re.compile(r"(?<![A-Za-z])'([^'\n]{%d,})'(?![A-Za-z])" % MIN_QUOTE),
 ]
 
+# The same three shapes BELOW the threshold, so what MIN_QUOTE discards is a number on screen
+# rather than a silence. A threshold nobody can see is a threshold nobody can argue with: 40
+# characters was chosen against a false-positive rate, and the only way to revisit it is to know
+# how much it is throwing away. Same lookarounds on the apostrophe, for the same reason.
+_SHORT_PATTERNS = [
+    re.compile(r'"([^"\n]{1,%d})"' % (MIN_QUOTE - 1)),
+    re.compile(r'“([^”\n]{1,%d})”' % (MIN_QUOTE - 1)),
+    re.compile(r"(?<![A-Za-z])'([^'\n]{1,%d})'(?![A-Za-z])" % (MIN_QUOTE - 1)),
+]
+
 
 def normalise(s: str) -> str:
     """Collapse a string to what survives PDF extraction on both sides.
@@ -182,7 +192,7 @@ def nearest_citation(line: str, prior: list[str]) -> str | None:
 _LOCATOR = re.compile(r'locator:\s*"(.*)"\s*\}?\s*$')
 
 
-def quotations(paths):
+def quotations(paths, excluded: dict | None = None):
     """Yield (path, lineno, citation_id, quoted_text) for every checkable quotation.
 
     ⚠️ FRONT MATTER IS NOT QUOTATION. A `locator:` field is YAML, so its whole body sits
@@ -192,16 +202,33 @@ def quotations(paths):
     inside a locator (single- or curly-quoted) are the paper's words. Reading a description
     as a quotation is the same error the corpus records as "right content, wrong
     coordinate", committed by the instrument built to catch it.
+
+    ⚠️ WHAT IT DROPS, IT COUNTS. `excluded` accumulates the three silent exclusions this
+    generator used to make with no record at all: a quotation under `MIN_QUOTE`, a quoted
+    stretch inside or full of code, and -- counted by `check()` rather than here -- a
+    quotation whose citation the 3-line lookback cannot resolve. A reader was told "119
+    checkable quotations" and had no way to learn what the other several hundred were, which
+    is the same shape as a coverage figure quoted without its denominator.
     """
+    exc = excluded if excluded is not None else {}
+    for k in ("short", "code", "fenced_lines"):
+        exc.setdefault(k, 0)
     for p in sorted(paths):
         lines = p.read_text(encoding="utf-8").split("\n")
-        in_fm, fences = False, 0
+        in_fm, fences, in_fence = False, 0, False
         for i, line in enumerate(lines, 1):
             if line.rstrip() == "---" and fences < 2:
                 fences += 1
                 in_fm = fences == 1
                 continue
             if line.lstrip().startswith("```"):
+                # A fenced block is code, not prose, and its string literals are not
+                # quotations. This used to skip the FENCE LINE ONLY, so everything between a
+                # pair of fences was read as though it were prose.
+                in_fence = not in_fence
+                continue
+            if in_fence:
+                exc["fenced_lines"] += 1
                 continue
             seen = set()
             if in_fm:
@@ -209,8 +236,12 @@ def quotations(paths):
                 if not m:
                     continue
                 inner, pats = m.group(1), _QUOTE_PATTERNS[1:]   # nested quotes only
+                shorts = _SHORT_PATTERNS[1:]
             else:
                 inner, pats = line, _QUOTE_PATTERNS
+                shorts = _SHORT_PATTERNS
+            for pat in shorts:
+                exc["short"] += sum(1 for _ in pat.finditer(inner))
             for pat in pats:
                 for m in pat.finditer(inner):
                     q = m.group(1).strip()
@@ -218,18 +249,28 @@ def quotations(paths):
                         continue
                     # A quoted stretch that is mostly code or path is not prose.
                     if q.count("`") > 2 or q.startswith("http"):
+                        exc["code"] += 1
                         continue
                     seen.add(q)
                     cid = nearest_citation(line, lines[:i - 1])
                     yield p, i, cid, q
 
 
-def check(cache: Path | None, only: str | None = None):
-    docs = [p for p in REFS.glob("*.md")]
+def check(cache: Path | None, only: str | None = None, docs=None):
+    """Locate every quotation in `docs` inside its artefact.
+
+    `docs` exists so this function can be RUN BY THE SELFTEST. Before it, the corpus path was
+    hard-coded here, so `--selftest` exercised `normalise` and a pair of string fixtures and
+    never called `check` at all -- gutting the whole function to `return [], 0, 0, 0, 0` left
+    the selftest green, which is the exact shape of "an assertion defined and never invoked"
+    this repository records elsewhere. It defaults to the corpus, so nothing else changes.
+    """
+    docs = sorted(REFS.glob("*.md")) if docs is None else sorted(docs)
     match = altered = unfetched = nocite = 0
     findings = []
+    excluded: dict[str, int] = {}
     texts: dict[str, str | None] = {}
-    for path, lineno, cid, q in quotations(docs):
+    for path, lineno, cid, q in quotations(docs, excluded):
         if only and cid != only:
             continue
         if cid is None:
@@ -262,7 +303,8 @@ def check(cache: Path | None, only: str | None = None):
             idx, end = spine[si], spine[min(si + len(sq), len(spine) - 1)]
         match += 1
         findings.append(("MATCH", path, lineno, cid, q, body[end: end + TAIL]))
-    return findings, match, altered, unfetched, nocite
+    excluded["nocite"] = nocite
+    return findings, match, altered, unfetched, nocite, excluded
 
 
 # ---------------------------------------------------------------- fixtures
@@ -282,6 +324,101 @@ NORMALISE_FIXTURES = [
     ("multiple   spaces\tand\ttabs", "multiple spaces and tabs"),
     ("smart ’quotes’ and – dashes", "smart 'quotes' and - dashes"),
 ]
+
+# A CORPUS THE SELFTEST OWNS, so `check()` itself is exercised rather than only its helpers.
+# One document carrying one of each verdict, plus one of each silent exclusion. It is written
+# out to a tmpdir per run: a fixture that lives in the real corpus would be a document nobody
+# planned, and check.py would (correctly) fail it.
+FIXTURE_DOC = '''---
+type: Technique
+title: Requote fixture
+status: draft
+sources:
+  - { id: fetched_paper, tier: P, locator: "§2, which states 'the exponent is fixed at one half for the whole reach'" }
+  - { id: uncached_paper, tier: P, locator: "§4, the cost table" }
+---
+# Requote fixture
+
+[fetched_paper] The artefact says "the recommended threshold is one half of the cell size"
+and the document stops there.
+
+[fetched_paper] It also claims "this sentence appears nowhere in the artefact, not one word"
+which is a misquotation and nothing else.
+
+[uncached_paper] "a quotation long enough to be checked whose artefact was never fetched"
+cannot be re-read by anyone.
+
+
+
+A line whose quotation "carries no citation id on it or on the three lines above it" here.
+
+Somebody said "too short" and moved on.
+
+The block "sets the `a`, `b` and `c` fields from the driver" is code, not prose.
+
+```
+inside a fence: "a quoted string in code is not a quotation of any paper at all"
+```
+'''
+
+# The MATCHed sentences, each with the continuation a reader needs in order to see the cut.
+FIXTURE_ARTEFACT = (
+    "The exponent is fixed at one half for the whole reach, except where the bed is armoured.\n"
+    "The recommended threshold is one half of the cell size, but only for grids coarser than "
+    "30 m; below that it must be re-derived.\n"
+)
+
+
+def _fixture_corpus(tmp: Path) -> tuple[Path, Path]:
+    """Write the fixture document and its one-artefact cache under `tmp`."""
+    docs = tmp / "references"
+    docs.mkdir(parents=True, exist_ok=True)
+    cache = tmp / "cache"
+    cache.mkdir(parents=True, exist_ok=True)
+    doc = docs / "requote-fixture.md"
+    doc.write_text(FIXTURE_DOC, encoding="utf-8")
+    (cache / "fetched_paper.txt").write_text(FIXTURE_ARTEFACT, encoding="utf-8")
+    return doc, cache
+
+
+# Four verdict counts, three exclusion counts, the ALTERED identity, the continuation, and the
+# "an unfetched citation yields no finding" rule. Named so the printed total is not a guess.
+CORPUS_ASSERTIONS = 10
+
+
+def _corpus_fixture_checks() -> list[str]:
+    """Run `check()` over the fixture corpus and return the failures, as strings.
+
+    Asserts all three verdicts AND the three exclusions, because the exclusions are the half
+    of this tool's output that decides whether its ratio means anything.
+    """
+    import tempfile
+
+    fails: list[str] = []
+    with tempfile.TemporaryDirectory() as td:
+        doc, cache = _fixture_corpus(Path(td))
+        findings, match, altered, unfetched, nocite, exc = check(cache, docs=[doc])
+        want = {"match": 2, "altered": 1, "unfetched": 1, "nocite": 1}
+        got = {"match": match, "altered": altered, "unfetched": unfetched, "nocite": nocite}
+        for k, v in want.items():
+            if got[k] != v:
+                fails.append(f"corpus fixture: {k} = {got[k]}, want {v}  ({got})")
+        for k in ("short", "code", "fenced_lines"):
+            if exc.get(k, 0) < 1:
+                fails.append(f"corpus fixture: exclusion `{k}` counted {exc.get(k, 0)}, want >= 1")
+        alt = [f for f in findings if f[0] == "ALTERED"]
+        if len(alt) != 1 or "appears nowhere" not in alt[0][4]:
+            fails.append(f"corpus fixture: ALTERED did not name the invented sentence: {alt}")
+        # A MATCH is only useful if it carries the artefact's NEXT words -- that is the whole
+        # instrument. A run that located the quotation and surfaced nothing is a green light
+        # over an unread continuation.
+        tails = [f[5].strip() for f in findings if f[0] == "MATCH"]
+        if not all(tails) or not any("30 m" in t for t in tails):
+            fails.append(f"corpus fixture: a MATCH surfaced no continuation: {tails}")
+        # And the UNFETCHED case must never be reported as anything else.
+        if any(f[3] == "uncached_paper" for f in findings):
+            fails.append("corpus fixture: an unfetched citation produced a finding")
+    return fails
 
 
 def selftest() -> int:
@@ -305,9 +442,15 @@ def selftest() -> int:
         if not surfaced.strip():
             print(f"  FAIL  cut fixture: no continuation surfaced for {quoted[:40]!r}")
             bad += 1
-    n = len(NORMALISE_FIXTURES) + len(CUT_FIXTURES)
+    corpus_fails = _corpus_fixture_checks()
+    for f in corpus_fails:
+        print(f"  FAIL  {f}")
+    bad += len(corpus_fails)
+    n = len(NORMALISE_FIXTURES) + len(CUT_FIXTURES) + CORPUS_ASSERTIONS
     print(f"requote: {n - bad}/{n} fixtures correct "
-          f"({len(NORMALISE_FIXTURES)} normalise, {len(CUT_FIXTURES)} cut)")
+          f"({len(NORMALISE_FIXTURES)} normalise, {len(CUT_FIXTURES)} cut, "
+          f"{CORPUS_ASSERTIONS} corpus assertions over a fixture directory: MATCH, ALTERED, "
+          f"UNFETCHED, and the three exclusion counts)")
     return 1 if bad else 0
 
 
@@ -316,6 +459,8 @@ def main() -> int:
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--id", help="check one citation id only")
     ap.add_argument("--cache", help="artefact cache directory")
+    ap.add_argument("--require-cache", action="store_true",
+                    help="exit non-zero when no cache is available, for CI")
     ap.add_argument("--show-matches", action="store_true",
                     help="print every MATCH with its continuation, not just the summary")
     args = ap.parse_args()
@@ -323,8 +468,9 @@ def main() -> int:
     if args.selftest:
         return selftest()
 
+    require_cache = args.require_cache
     cache = Path(args.cache) if args.cache else DEFAULT_CACHE
-    findings, match, altered, unfetched, nocite = check(cache, args.id)
+    findings, match, altered, unfetched, nocite, excluded = check(cache, args.id)
 
     for kind, path, lineno, cid, q, tail in findings:
         if kind == "ALTERED":
@@ -337,16 +483,36 @@ def main() -> int:
 
     total = match + altered + unfetched
     if cache is None:
+        # This used to print "that is not a pass" and then return 0 -- the sentence and the exit
+        # status disagreeing in the same breath. guard-proofs.tsv recorded the contradiction as
+        # fixed when the fix had landed only on the cache-present sibling: the same
+        # one-sibling-fixed shape okf.py records for _inline_list against _inline_map.
         print("requote: NO ARTEFACT CACHE. Set GAIA_ARTEFACT_CACHE or pass --cache. "
-              "Nothing was checked, and that is not a pass.")
-        return 0
+              "Nothing was attempted, so nothing is asserted either way.")
+        return 2 if require_cache else 0
     print(f"requote {match}/{total} quotations located in their artefact; "
           f"{altered} NOT FOUND (misquotation, or an extraction the normaliser cannot "
           f"reach); {unfetched} UNFETCHED because no artefact is cached for that citation. "
           f"{nocite} quotations carry no resolvable citation id and were skipped. "
+          f"EXCLUDED BEFORE ANY OF THAT: {excluded.get('short', 0)} quoted spans shorter than "
+          f"the {MIN_QUOTE}-character floor, {excluded.get('code', 0)} quoted spans that are "
+          f"code or a URL, and {excluded.get('fenced_lines', 0)} lines inside fenced blocks. "
+          f"Those are the denominators the ratio above is NOT taken over. "
           f"⚠️ A located quotation is NOT a verified one: this tool reports the artefact's "
           f"CONTINUATION so a reader can see a silent cut, and does not judge whether the "
           f"cut changes the claim. Run --show-matches to read them.")
+    # EXIT CODES. A cache was supplied, so a run that located and refuted nothing did not
+    # check the corpus -- it enumerated it. Returning 0 there is the "nothing was checked, and
+    # that is not a pass" sentence contradicted by the process's own exit status, which is what
+    # CI reads. An ALTERED verdict is the one finding here that is a defect on its own.
+    if match + altered == 0:
+        print("requote: FAIL -- a cache was given and NOT ONE quotation was located or "
+              "refuted. Every checkable quotation was UNFETCHED or unresolvable, so this run "
+              "establishes nothing about the corpus. Point --cache at the artefacts.")
+        return 1
+    if altered:
+        print(f"requote: FAIL -- {altered} quotation(s) do not appear in their artefact.")
+        return 1
     return 0
 
 

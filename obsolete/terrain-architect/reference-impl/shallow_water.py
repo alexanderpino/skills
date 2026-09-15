@@ -13,8 +13,17 @@ Simulation and Visualization on GPU"). Water is a real, mass-conserving volume �
 This is the grounded real-time hydraulics the pro tools use (and the base for pipe-model erosion). It
 time-steps; run it to near-steady-state for a river network with real discharge. Invariants in
 `tests/test_shallow_water.py`: depth ≥ 0, mass is conserved in a closed basin, discharge grows
-downstream.
+downstream, and the default step is the one the scheme's own stability condition allows.
+
+The step: this is a **constant-A** pipe model (``pipe`` below is ``A·g/l`` with Šťava's ``A = l²`` and
+``l = cellsize``, so ``A/l = cellsize``), and the linear two-pipe scheme propagates at
+``sqrt(2·g·A/l)`` — the water depth is not in it and neither is the bed. The 2-D leapfrog bound
+``1/sqrt(2)`` on that speed gives ``dt_crit = 0.50 · cellsize / sqrt(g · cellsize)``; the default
+below runs at ``C = 0.20``, a 2.5× margin. See `gaia/references/shallow-water.md`, "The stability
+limit".
 """
+import math
+
 import numpy as np
 
 G = 9.81
@@ -24,12 +33,23 @@ def simulate(bed, cellsize, *, rain=2.0e-6, iters=600, dt=None, sources=None, so
              drain_edges=True, damp=0.0):
     """Evolve water over `bed` (m). `rain` is a uniform rainfall source in m/s (2e-6 ≈ 7 mm/h);
     `source_field` is an optional per-cell source rate (m/s) added on top — e.g. **snowmelt**, so water
-    runs out from under the snow; `sources` is a list of (row, col, q_m3s) point springs. Returns a dict
-    with `depth` (m), `discharge` (m³/s per cell, the throughput), `speed` (m/s), and a `budget`."""
+    runs out from under the snow; `sources` is a list of (row, col, q_m3s) point springs. `dt` defaults
+    to this scheme's own CFL limit at `C = 0.20` (see the module docstring); the step actually used is
+    reported back in `budget["dt"]`. Returns a dict with `depth` (m), `discharge` (m³/s per cell, the
+    throughput), `speed` (m/s), and a `budget`."""
     bed = np.asarray(bed, dtype=np.float64)
     n0, n1 = bed.shape
-    if dt is None:                                                          # CFL-safe explicit step
-        dt = 0.20 * cellsize / np.sqrt(G * max(np.ptp(bed), 1.0))
+    if dt is None:
+        # CFL on the scheme's OWN signal speed. Constant-A pipe model: A/l = cellsize (see `pipe`
+        # below), the linear two-pipe scheme propagates at sqrt(2·g·A/l), and the 2-D leapfrog bound
+        # c·dt/dx <= 1/sqrt(2) gives dt_crit = 0.50·cellsize/sqrt(g·cellsize). C = 0.20 -> 2.5× margin,
+        # which pays for what the linearisation drops (the one-way max(0,·) pipes and the clamp `k`).
+        # Neither the water depth nor the bed relief appears in this bound — an earlier version of this
+        # line divided by sqrt(G·ptp(bed)), which is far too small on a mountain (0.02× the limit at
+        # 1 m cells over 500 m of relief -> ~50× the iterations) and ABOVE the limit on flat ground
+        # (2.2× at 30 m cells over 0.5 m of relief), where the clamp below holds positivity and hides
+        # the resulting grid-Nyquist sloshing behind a green smoke test.
+        dt = 0.20 * cellsize / math.sqrt(G * cellsize)
     area = cellsize * cellsize
     d = np.zeros_like(bed)
     fL = np.zeros_like(bed); fR = np.zeros_like(bed)
@@ -88,4 +108,5 @@ def simulate(bed, cellsize, *, rain=2.0e-6, iters=600, dt=None, sources=None, so
     # field physical, as pipe_erode already does. Dry cells (no discharge) read 0.
     speed = discharge / (np.maximum(d, 1e-3) * cellsize)
     return {"depth": d, "discharge": discharge, "speed": speed,
-            "budget": {"rain_in": rain_in, "out": out_vol, "stored": float(d.sum() * area)}}
+            "budget": {"rain_in": rain_in, "out": out_vol, "stored": float(d.sum() * area),
+                       "dt": float(dt)}}

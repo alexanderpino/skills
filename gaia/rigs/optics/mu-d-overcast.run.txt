@@ -1,0 +1,27 @@
+n = 1.335, Snell cone half-angle = 48.51 deg
+
+  mu_d  uniform (isotropic)        0.8388
+  mu_d  CIE standard overcast      0.8571
+
+  gap = +0.0183  (+2.18%)
+  rounded to 2 dp: uniform 0.84, standard overcast 0.86
+
+  convergence (uniform sky, Simpson m):
+    m =    2000  mu_d = 0.838818
+    m =   20000  mu_d = 0.838818
+    m =  200000  mu_d = 0.838818
+
+  sensitivity to n:
+    n = 1.330  uniform 0.8373   overcast 0.8557
+    n = 1.335  uniform 0.8388   overcast 0.8571
+    n = 1.340  uniform 0.8403   overcast 0.8584
+
+  against water-optics.md:
+    PASS  uniform: 0.8388 -> 0.84, page says 0.84
+    PASS  overcast: 0.8571 -> 0.86, page says 0.86
+    PASS  0.86 named as the CIE standard overcast sky
+    PASS  0.84 named as the uniform (isotropic) sky
+
+  no-Fresnel control (T = 1, refraction only):
+    uniform (isotropic)        0.8312
+    CIE standard overcast      0.8516
