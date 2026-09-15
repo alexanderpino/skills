@@ -1014,6 +1014,31 @@ def gate_rig_description():
 # :54 states the texel size.  That size is a rig constant, not a measurement -- gate 8 above
 # `_agree`s it exactly against this file's own S0 -- so it enters with no rounding band.
 # ═════════════════════════════════════════════════════════════════════════════════════════
+# The rounding band below is read off the digits the page prints, which is honest ONLY if the
+# page cannot buy itself a wider gate by printing fewer of them.  It could: an independent
+# attack on this file walked `±0.64 m` to `±0.7 m` -- the SAME claim, one digit coarser, 12%
+# away from what the law gives -- and gate 9 went green, because the band widened with the
+# string it was testing.  That is failure shape 3, a tolerance taken from the number under
+# test, in the gate written to close a different one.
+#
+# The repair is not a wider band or a narrower one.  It is that a figure too coarse to check
+# is a defect ON THE PAGE, not a free pass: this gate states the precision it needs, and a
+# page that prints less than that FAILS naming the coarsening.  MIN_SIGFIGS is this rig's
+# constant with its reason attached, not a value parsed from the document, so it is not the
+# typed-in expectation wearing a new hat.
+MIN_SIGFIGS = 2
+
+
+def _sigfigs(printed):
+    """Significant figures the page PRINTED: leading zeros are placeholders, the rest are not.
+
+    Trailing zeros are NOT stripped. `0.70` is two figures, not one -- a first version of this
+    stripped them and would have failed a page that printed `±0.70 m`, which is a perfectly
+    good two-figure measurement. An over-strict precision rule is still a wrong rule.
+    """
+    return len(printed.replace("-", "").replace(".", "").lstrip("0")) or 1
+
+
 def _half(printed):
     """The rounding half-width implied by how many digits the page printed."""
     dp = len(printed.split(".")[1]) if "." in printed else 0
@@ -1042,6 +1067,18 @@ def gate_residual_follows_span():
     if k_gen != k_col:
         return
 
+    coarse = [(w, t) for w, t in (("the per-texel residual", r_gen_s),
+                                  ("the column-locked residual", r_col_s),
+                                  ("the column-locked span", span_s))
+              if _sigfigs(t) < MIN_SIGFIGS]
+    for what, txt in coarse:
+        _fail(f"{what} is printed as {txt!r} -- {_sigfigs(txt)} significant figure(s), and this "
+              f"check needs {MIN_SIGFIGS}. At that precision the rounding band is wider than the "
+              f"error it is meant to catch, so the page would be buying itself a looser gate by "
+              f"printing fewer digits. Print {MIN_SIGFIGS} s.f. or drop the claim")
+    if coarse:
+        return
+
     r_gen, r_col, span = float(r_gen_s) / 1000.0, float(r_col_s), float(span_s)
     h_gen, h_col, h_span = _half(r_gen_s) / 1000.0, _half(r_col_s), _half(span_s)
     two_k = 2.0 ** k_gen
@@ -1056,6 +1093,14 @@ def gate_residual_follows_span():
           f"{texel / two_k * 1000:.3f} mm  ->  {lo_gen:.4f}..{hi_gen:.4f} of the bound")
     print(f"      column-locked: ±{r_col_s} m of a {span_s} m span/2^{k_col} = "
           f"{span / two_k:.4f} m  ->  {lo_col:.4f}..{hi_col:.4f} of the bound")
+
+    # State the discriminating power rather than assume it: how far off could the page's
+    # column-locked residual be and still overlap?  Printed, so a reader sees the gate's reach.
+    derived = r_gen * span / texel
+    widest = max(abs(hi_col / lo_gen), abs(hi_gen / lo_col)) - 1.0
+    print(f"      reach: the law gives ±{derived:.3f} m; the page's ±{r_col_s} m is "
+          f"{abs(r_col - derived) / derived * 100:.1f}% off, and the bands admit at most "
+          f"{widest * 100:.1f}%")
 
     global _ok
     good = lo_gen <= hi_col and lo_col <= hi_gen
