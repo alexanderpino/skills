@@ -17,19 +17,43 @@ sqrt(3) (the hexagonal bound's own definition, printed on the page as `2A/(sqrt3
 below is a `page(...)` result or arithmetic over `page(...)` results.
 A figure that has gone missing is a FAIL -- every `page()` miss exits non-zero.
 
-⚠️ FOUR TRAPS, and what is done about each:
+THREE TOLERANCE CONSTANTS ARE FIXED IN THIS FILE, each with its reason written beside it, and
+none of them is an expectation: MC_MIN_DRAWS and GLOB_MIN_DRAWS (the Monte-Carlo sample sizes
+every statistical band below is computed from -- see the comment at their definition) and
+FACT_TOL in §11. They exist because a band sized from a count the page prints is a band the page
+can widen by editing that count, and all three of this rig's Monte-Carlo bands used to be.
+
+⚠️ FOUR TRAPS, and what is done about each. All four had a LIVE instance in the first version of
+this rig; each is named at the gate that now closes it:
   1. TYPED-IN EXPECTATION -- no numeric literal below is an expectation. Grep this file for
-     `check(` and every `want` is a `page(...)` call or arithmetic over `page(...)` calls.
+     `check(` and every `want` is a `page(...)` call or arithmetic over `page(...)` calls. The
+     three constants above are tolerances and sample sizes, never expectations.
   2. ONE-SIDED ASSERTION -- the page's measurements are reproduced as MEASUREMENTS. The
      largest-first pass is asserted to give exactly the page's pair count, not "at most" it;
      the single-pass control is asserted to give MORE than zero only as proof that the
      detector detects, and that control is named below as NOT a gate on the page's 31.
+     Three one-sided gates were found and made two-sided: §8b's min separation (`>= 1` let the
+     page's 1.000328 walk to 1.900000 -- now also capped by the hexagonal bound its own N
+     column forces), §11's planning factor (a RANGE check let ~0.54 walk to ~0.60 -- now
+     derived as the LOWEST achieved fraction) and §12's per-sample cost band (both ends read
+     off the page let "107 and 134" widen to "1 and 900" -- now the band's own width and
+     ceiling are gated against the page's 61x range in N and its total run time).
   3. A PARAMETER FROM THE NUMBER UNDER TEST -- the patch is 10 m x 10 m from the PROSE, the
-     draw counts come from the PROSE, the class edges come from the FENCE, and the transform
-     size comes from the PROSE. No denominator is ever reconstructed from its own quotient.
+     class edges come from the FENCE, and the transform size comes from the PROSE. No
+     denominator is ever reconstructed from its own quotient. THE DRAW COUNTS NO LONGER SIZE
+     ANYTHING: §7 and §10/§10b take their bands from MC_MIN_DRAWS and GLOB_MIN_DRAWS above and
+     gate the page's counts against those, because taking them from the page was this rig's
+     worst hole -- "400,000 draws" -> "400" bought §7 a 0.080 band and let the page's own mean
+     radius walk to 1.5100 r. The sampler's own configuration had the same shape: k and the
+     5x5 neighbour scan were both re-derived from whatever the page printed, so §8 now gates k
+     at three ends (including the front-matter locator's quotation of [bridson2007b]) and
+     against the N its own five runs produce, and derives the scan width from step 0's
+     `r/sqrt(n)` cell rule rather than believing the page's "5x5".
   4. A GATE THAT CANNOT FAIL -- one claim is refused for exactly this reason (the first bullet
      below); the other three are refused because no rig can reproduce them, which is a
-     different reason and is stated as one.
+     different reason and is stated as one. §10's `1 - B_EQ == AREA_EXP` was one of these:
+     both sides were parsed from the same sentence, so `b = 3` with exponent `-2` satisfied
+     it. The equal-area exponent is now SOLVED from the octave integral instead.
 
 ⚠️ NOT GATED, deliberately:
   * `r_cls = d_max(cls)  # = 2 * a_max: a class cannot overlap itself` -- TRAP 4. With
@@ -44,6 +68,23 @@ A figure that has gone missing is a FAIL -- every `page()` miss exits non-zero.
     other coverages, 31 pairs, "buried 63%") -- the page names seed 11 but not the generator,
     so no rig can land on its counts. Every arithmetic RELATION between them is gated, and
     every figure printed at two ends of the page is asserted at both ends and against itself.
+  * GATED, BUT NOT TO THE LAST DIGIT -- the three places where the page states no number tight
+    enough to close the band, said here rather than left for a reader to discover:
+    - §8b's min separation is now two-sided, but its ceiling is the hexagonal bound its own N
+      column forces, which admits anything up to about 1.34 before N contradicts it (1.9 is
+      caught; 1.2 is not). Closing that gap needs the distribution of the minimum
+      nearest-neighbour distance of a Bridson set, which has no closed form and which the page
+      does not state; a guessed constant there would be exactly the kind of band this rig
+      refuses to invent.
+    - §12's per-sample band is gated on its WIDTH (< the 61x range in N it claims linearity
+      across) and on its CEILING (the bare passes are part of the 2,853 ms run), which pins the
+      ceiling to <= 177 us. Nothing on this page bounds the FLOOR from below except that width
+      test, so 107 could walk down to about 2.2 us unchallenged. The page prints no second
+      measurement of a bare pass to bracket it with.
+    - §8's k is gated at three ends and against the N this rig's own five runs produce, which
+      catches k <= 15 on the page's largest domain. A coordinated misquote to k = 20..29 moves
+      N by less than counting noise and would survive; it would also have to falsify the
+      front-matter locator's verbatim quotation of [bridson2007b] §2 to get there.
   * (WITHDRAWN 2026-09-15.) This list used to decline the measured AREA columns of the global
     size-law table (75.38% ... 93.21%) on the ground that "the Monte-Carlo error on a 200,000-
     draw area fraction is not a number this rig can state honestly". It is: the share is a
@@ -85,6 +126,20 @@ BODY = DOC.read_text(encoding="utf-8")
 
 MAX_CELLS = 1_000_000      # literal halting ceiling on the sampler grid
 MAX_DRAWS = 2_000_000      # literal halting ceiling on the Monte Carlo
+
+# ⚠️ THE TWO MONTE-CARLO SAMPLE SIZES ARE RIG CONSTANTS, NOT PAGE FIGURES -- trap 3 in its worst
+# form, and it was live here. Every Monte-Carlo band below is 4 sigma of a draw count, and the
+# first version of this rig took that count FROM THE PAGE IT WAS TESTING. Shrink "400,000 draws"
+# to "400" and §7's band opens from 0.0026 to 0.080, so the page's own "correct mean radius" can
+# walk to 1.5100 r and the rig still prints PASS. Shrink "Sampling 200,000 diameters" to "200"
+# and §10's band opens from 0.11 pp to 3.3 pp, and the b = 1.5 row walks 1.39% -> 4.00% with the
+# pebble column moved to keep the row summing to 100. A band the page can widen by editing a
+# number is not a band. These two constants are fixed HERE, they size every Monte-Carlo tolerance
+# below, and the page's stated counts are gated AGAINST them rather than sizing them. A page
+# claiming FEWER draws than the rig runs is failed by name, not accommodated: its own figure is
+# then noisier than the band being asserted and this rig will not certify it.
+MC_MIN_DRAWS = 400_000     # §7, the annulus mean radius
+GLOB_MIN_DRAWS = 200_000   # §10 / §10b, the size-law count and area shares
 ok = True
 
 
@@ -131,6 +186,11 @@ def agree(label, values):
     where = ", ".join(f"{w} {v:g}" for w, v in values)
     print(f"{'PASS' if good else 'FAIL'}  {label} agrees at {len(values)} ends: {where}")
     return vals[0]
+
+
+def pl_int(lo, hi, e):
+    """int_lo^hi d^e dd -- the log branch at e = -1 is the b = 2 case and must not be missed."""
+    return math.log(hi / lo) if abs(e + 1.0) < 1e-12 else (hi ** (e + 1) - lo ** (e + 1)) / (e + 1)
 
 
 print(f"=== {DOC.name} :: `## Use this` (:30-47) ===\n")
@@ -249,6 +309,25 @@ check("§3 (cand-kept)/cand", round((CAND_T - KEPT_T) / CAND_T * 100, 1), OF_PLA
 RATIO = page(r"\*\*(\d+) pebble candidates for every boulder candidate\*\*", "the 225:1 ratio")
 check("§3 pebble candidates / boulder candidates",
       round(f(LF[2][2]) / f(LF[0][2])), RATIO, 0.0)
+# ⚠️ SECOND PRINTINGS OF THE SAME TABLE. The sentence that states the 225:1 ratio prints both of
+# its terms again -- ":183 (15,075 against 67)" -- and the failure table prints all three
+# survival percentages again at :374. Neither copy was parsed: 15,075 could be walked to 25,075
+# and 87.4% to 97.4% at those ends alone, leaving the ratio and the table arithmetic intact.
+PAIR_PEB = page(r"pebble candidates for every boulder candidate\*\* \(([\d,]+) against \d+\)",
+                "the pebble candidate count quoted beside the ratio (:183)")
+PAIR_BOU = page(r"pebble candidates for every boulder candidate\*\* \([\d,]+ against (\d+)\)",
+                "the boulder candidate count quoted beside the ratio (:183)")
+agree("§3 the pebble candidate count", [("the table", f(LF[2][2])), ("beside the ratio", PAIR_PEB)])
+agree("§3 the boulder candidate count", [("the table", f(LF[0][2])), ("beside the ratio", PAIR_BOU)])
+SURV_FAIL = re.search(r"(\d+)% of boulders survive, ([\d.]+)% of cobbles, ([\d.]+)% of pebbles",
+                      BODY)
+if not SURV_FAIL:
+    gone("the three survival rates in the failure table (:374)",
+         "N% of boulders survive, N% of cobbles, N% of pebbles")
+for _i, _name in enumerate(("boulder", "cobble", "pebble")):
+    agree(f"§3 the {_name} survival rate",
+          [("the largest-first table", f(LF[_i][4])),
+           ("the failure table :374", f(SURV_FAIL.group(_i + 1)))])
 
 # ── §4 DENSITY AND MEMORY: KEPT COUNTS / PATCH AREA, x 24 BYTES ──────────────────────────
 print("\n-- §4 the instance-budget table, derived from the kept counts --")
@@ -269,8 +348,14 @@ for (name, per_m2, per_km2, mem, unit), (_, _, _, kept, _) in zip(MEM, LF):
           round(f(per_km2) * BPI / scale, dp), f(mem), 0.0)
 
 # the same three figures, printed again in the opening paragraph and in the failure table
+# ⚠️ THREE ends, not two. The grid section quotes this density a third time -- ":204 at the final
+# 133.38 clasts/m² there are ~1,259 clasts inside it" -- and that copy went unparsed, so it could
+# be walked to 933.38 on its own. It is the number the ~1,259 figure §6 checks is computed FROM,
+# and §6 was taking the table's copy instead of the one printed beside it.
 agree("§4 the pebble density", [
     ("table", f(MEM[2][1])),
+    ("the grid section", page(r"at the final ([\d.]+) clasts/m² there are",
+                              "the pebble density in the grid section (:204)")),
     ("failure table", page(r"(\d+\.\d+) clasts/m² is \d+ million per km", "it there"))])
 agree("§4 the pebble budget in GB", [
     ("table", f(MEM[2][3])),
@@ -358,6 +443,17 @@ check("§6 the scan's `r` against the fence's boulder d_max", CLS["boulder"][1] 
       SCAN, 0.0)
 check("§6 9 * r^2", round(9 * SCAN * SCAN, 2), SWEPT, 0.0)
 check("§6 swept area x the pebble density", round(SWEPT * f(MEM[2][1])), INSIDE, 0.0)
+# ⚠️ SECOND PRINTINGS. The cost section quotes both of these test counts again at :306 -- "it
+# measures 451.3 distance tests per candidate on one grid and 10.8 on per-class grids" -- and
+# neither copy was parsed, so 451.3/10.8 could be walked to 551.3/20.8 at that end alone.
+COST_ONE_GRID = page(r"it measures\s*\n?([\d.]+) distance tests per candidate on one grid and "
+                     r"[\d.]+ on per-class grids", "the one-grid test count at :306")
+COST_PER_CLS = page(r"it measures\s*\n?[\d.]+ distance tests per candidate on one grid and "
+                    r"([\d.]+) on per-class grids", "the per-class test count at :306")
+agree("§6 the one-grid tests per candidate", [("the grid section :205", ONE_GRID),
+                                              ("the cost section :306", COST_ONE_GRID)])
+agree("§6 the per-class tests per candidate", [("the grid section :208", PER_CLASS),
+                                               ("the cost section :306", COST_PER_CLS)])
 PER_SCAN = page(r"so the [\d.]+ tests per candidate is about ([\d.]+) per class",
                 "the per-class-scanned cost")
 check(f"§6 {PER_CLASS:g} tests spread over the fence's {len(CLS) - 1:g} instanced classes",
@@ -389,23 +485,46 @@ DRAWS = page(r"measured over\s*\n?([\d,]+) draws the correct mean radius", "the 
 MEASURED = page(r"the correct mean radius is \*\*([\d.]+) r\*\*", "the measured mean radius")
 if DRAWS > MAX_DRAWS:
     sys.exit(f"the page asks for {DRAWS:g} draws; this rig refuses above {MAX_DRAWS} (halting)")
+# ⚠️ TRAP 3, AND IT WAS LIVE ON THIS LINE. The band below used to be 4 sigma of DRAWS -- the
+# draw count parsed off the page under test -- so "400,000 draws" -> "400 draws" widened it from
+# 0.0026 to 0.080 and the page's "correct mean radius" could be walked to 1.5100 r with the rig
+# still green. The band is now 4 sigma of MC_MIN_DRAWS, a constant this file fixes, and the
+# page's own count is asserted AGAINST that constant instead of setting it.
+_enough = DRAWS >= MC_MIN_DRAWS
+ok = ok and _enough
+print(f"{'PASS' if _enough else 'FAIL'}  §7 the page's {DRAWS:g}-draw Monte Carlo against the "
+      f"{MC_MIN_DRAWS} this rig runs: a smaller count makes the page's own {MEASURED:.4f} r "
+      f"noisier than the band below, and does NOT widen it")
+n_run = int(max(DRAWS, MC_MIN_DRAWS))             # halting: a fixed constant, or a parsed
+if n_run > MAX_DRAWS:                             # integer already refused above MAX_DRAWS
+    sys.exit(f"{n_run} draws exceeds this rig's {MAX_DRAWS} (halting)")
 rnd = random.Random(20260915)
 s = 0.0
-for _ in range(int(DRAWS)):                       # halting: a parsed integer under MAX_DRAWS
+for _ in range(n_run):
     s += math.sqrt(rnd.uniform(inner * inner, outer * outer))
-mine = s / DRAWS
+mine = s / n_run
 # Var over the annulus = E[rho^2] - E[rho]^2 = (1/4)(16-1)/((1/2)(4-1)) - (14/9)^2.
 var = 0.25 * (outer ** 4 - inner ** 4) / (0.5 * (outer ** 2 - inner ** 2)) - closed ** 2
-sig = math.sqrt(var / DRAWS) * math.sqrt(2.0)     # two independent runs of the same size
-band = 4.0 * sig + 5e-5                           # 4 sigma + the page's own rounding half-width
-check(f"§7 an independent {DRAWS:g}-draw run against the page's measurement "
-      f"(band {band:.5f} = 4 sigma + rounding)", mine, MEASURED, band)
+sig = math.sqrt(var / MC_MIN_DRAWS) * math.sqrt(2.0)   # two independent runs of the rig's size
+band = 4.0 * sig + 5e-5                           # 4 sigma + a fixed rounding half-width
+check(f"§7 an independent {n_run:g}-draw run against the page's measurement "
+      f"(band {band:.5f} = 4 sigma of {MC_MIN_DRAWS} + rounding, neither from the page)",
+      mine, MEASURED, band)
 
 # ── §8 THE SAMPLER THE FENCE CALLS, TRANSCRIBED FROM §2 AND RUN ──────────────────────────
 print("\n-- §8 `poisson_disk(domain, r_cls, k=30)` [bridson2007b] §2, RUN --")
 K_FENCE = page(r"poisson_disk\(domain, r_cls, k=(\d+)\)", "the fence's k")
 K_PROSE = page(r"a rejection limit `k`, \"typically k=(\d+)\"", "the k the paper gives")
-agree("§8 the rejection limit k", [("the fence", K_FENCE), ("the Bridson summary", K_PROSE)])
+# ⚠️ TRAP 3 IN THE SAMPLER'S OWN CONFIGURATION. `agree()` over the fence and the body is two ends
+# of the same page: move BOTH to k = 5 and the rig re-runs its transcription at k = 5, where
+# every claim §8b makes (2N-1, one sample per cell, min separation >= 1) still holds -- so the
+# page could misquote [bridson2007b]'s "typically k=30" and stay green. Two things close that.
+# First, a THIRD end that is not body prose but the front-matter locator's verbatim quotation of
+# the source: moving that one is falsifying a citation, not editing a figure.
+K_SRC = page(r"before rejection in the algorithm \(typically k=(\d+)\)",
+             "the k inside the front-matter locator's quotation of [bridson2007b] §2")
+agree("§8 the rejection limit k", [("the fence", K_FENCE), ("the Bridson summary", K_PROSE),
+                                   ("the front-matter locator's quote", K_SRC)])
 # Step 0's two structural parameters, taken from the PROSE and fed into the transcription:
 # the cell divisor `sqrt(n)` and the width of the neighbour scan. Neither is a number under
 # test -- both are inputs the page states, and both change what the sampler DOES. Narrow the
@@ -424,6 +543,16 @@ HALF = int((SCAN_W - 1) // 2)
 RUNS = rows(r"^\| (\d+)×(\d+) \| ([\d.]+) \| ([\d,]+) \| ([\d,]+) \| ([\d,]+) \| (\d+) \| "
             r"([\d.]+) \|", "the five sampler runs", 5)
 NDIM = 2.0
+# ⚠️ TRAP 3 AGAIN, and it was live: HALF above is RE-DERIVED from whatever width the page prints,
+# so "a fixed 5×5 scan" could widen to 7×7 (or to any odd number) and the rig simply scanned that
+# many cells -- the widened scan was invisible because the rig had nothing to compare it with.
+# The width is not free: step 0's own rule, pinned as text five lines up, makes the cell side
+# `r/sqrt(n)`, so two samples less than `r` apart have cell indices differing by at most
+# ceil(r / (r/sqrt(n))) = ceil(sqrt(n)) in each axis. That makes 2*ceil(sqrt(n))+1 both
+# sufficient AND minimal, and it is arithmetic over the page's rule rather than a second reading
+# of the number under test.
+check(f"§8 the neighbour scan's width from step 0's own `r/sqrt(n)` cell rule at n = {NDIM:g} "
+      f"(2*ceil(sqrt(n))+1)", float(2 * math.ceil(math.sqrt(NDIM)) + 1), SCAN_W, 0.0)
 
 
 def poisson_disk(L, r, k, seed):
@@ -524,11 +653,36 @@ for L, L2, r, N, iters, twonm1, percell, minsep in RUNS:
           float(it), 0.0)
     check(f"§8b RUN {L:g}² r={r:g}: max samples per cell", float(percell_got),
           f(percell), 0.0)
-    good = minsep_got >= 1.0 and f(minsep) >= 1.0
+    # ⚠️ TRAP 2, and it was live on the next line: `>= 1` is one-sided, so the page's six-decimal
+    # measurement could be walked from 1.000328 to 1.900000 -- a sampler whose closest pair is
+    # 1.9r apart -- and this line still said PASS. The ceiling is not invented: it is the page's
+    # OWN hexagonal bound from §11. A point set whose closest pair is `s` apart packs disks of
+    # radius s/2, so it cannot have more than 2A/(sqrt3 s^2) points in area A. The page's own N
+    # column therefore caps its own min-separation column, at tolerance zero and with nothing
+    # read off the string under test.
+    cap_page = 2 * L * L / (math.sqrt(3.0) * (f(minsep) * r) ** 2)
+    cap_mine = 2 * L * L / (math.sqrt(3.0) * (minsep_got * r) ** 2)
+    good = (f(minsep) >= 1.0 and minsep_got >= 1.0 and N <= cap_page and n <= cap_mine)
     ok = ok and good
     print(f"{'PASS' if good else 'FAIL'}  §8b RUN {L:g}² r={r:g}: min separation/r "
-          f"{minsep_got:.6f}, and the page's own {f(minsep):.6f} (both must be >= 1)")
-    ratios.setdefault(round(L / r, 9), []).append((f"{L:g}² r={r:g}", N, n))
+          f"{minsep_got:.6f}, and the page's own {f(minsep):.6f} -- both >= 1, and both below "
+          f"the hexagonal ceiling their own N forces (page N={N:g} <= {cap_page:.1f}, "
+          f"mine N={n} <= {cap_mine:.1f})")
+    # ⚠️ AND THE OTHER HALF OF TRAP 3 HERE: k. Every claim above survives any k -- 2N-1, one
+    # sample per cell and min separation >= 1 hold at k = 5 exactly as at k = 30 -- so k was
+    # gated only by agreement between two printings of it. N is the thing k moves: at k = 5 this
+    # sampler loses ~18% of its samples. The band is 4*sqrt(n) of THIS RIG's own count, not of
+    # the page's: the count of a hard-core point process in a fixed window is under-dispersed
+    # relative to Poisson, so sqrt(n) is a conservative sd, and nothing in the band is read off
+    # the page. That is why N could not be gated on the page's unnamed generator but CAN be
+    # gated to within counting noise.
+    nband = 4.0 * math.sqrt(n)
+    good = abs(n - N) <= nband
+    ok = ok and good
+    print(f"{'PASS' if good else 'FAIL'}  §8b RUN {L:g}² r={r:g} at the page's k={K_FENCE:g}: "
+          f"N={n} against the page's {N:g} (band 4*sqrt(N_mine) = {nband:.1f}; a k the page "
+          f"misquotes moves N and nothing else in this table)")
+    ratios.setdefault(round(L / r, 9), []).append((f"{L:g}² r={r:g}", N, n, f(minsep)))
 
 # the span the page claims its timing held across, from the N column it prints
 SPAN_N = page(r"across a (\d+)\u00d7 range in N", "the range in N the cost held across")
@@ -544,10 +698,12 @@ for key, group in sorted(ratios.items()):
         continue
     pg = {g[1] for g in group}
     mine_n = {g[2] for g in group}
-    good = len(pg) == 1 and len(mine_n) == 1
+    pg_sep = {g[3] for g in group}          # "the same run" prints the same min separation too
+    good = len(pg) == 1 and len(mine_n) == 1 and len(pg_sep) == 1
     ok = ok and good
     print(f"{'PASS' if good else 'FAIL'}  §8c L/r = {key:g}: the page's rows "
-          f"{sorted(pg)} and this rig's {sorted(mine_n)} each collapse to one N "
+          f"{sorted(pg)} and this rig's {sorted(mine_n)} each collapse to one N, and the page's "
+          f"min separation/r {sorted(pg_sep)} to one value "
           f"({', '.join(g[0] for g in group)})")
 if not any(len(g) >= 2 for g in ratios.values()):
     ok = False
@@ -626,9 +782,41 @@ for name, want in zip(("boulder", "cobble", "pebble"), SPLIT.groups()):
     o = math.log2(CLS[name][1] / CLS[name][0])
     check(f"§10 equal area per octave -> {name}'s share", o / tot_oct * 100, f(want), 0.0)
 check("§10 the covered-area exponent d^(1-b) at that b", 1.0 - B_EQ, AREA_EXP, 0.0)
+# ⚠️ TRAP 4, AND IT WAS LIVE ON THE LINE ABOVE. `1 - B_EQ == AREA_EXP` reads b from "at **`b =
+# 2`**" and the exponent from "`−1`" four words later; move both together (b = 3, −2) and
+# 1 - 3 = -2 still holds, so the page could claim equal area per octave at b = 3 and stay green.
+# Nothing else in §10 touched B_EQ -- the 25:25:50 split is computed from octave counts alone.
+# The b at which the ground splits equally per octave is not a page figure: it is the b that
+# makes the covered area in [d, 2d] independent of d, and the integral of x^(1-b) over that
+# octave is d^(2-b) times a constant, flat in d only at b = 2. Solved here by bisection over the
+# page's own octave ratio (2 -- the scale's ratio, exempt as mathematics, not a measurement).
+_gap = lambda bv: pl_int(1.0, 2.0, 1.0 - bv) - pl_int(2.0, 4.0, 1.0 - bv)
+_lo_b, _hi_b = 0.5, 5.0
+if _gap(_lo_b) * _gap(_hi_b) > 0:
+    sys.exit("the octave-area integral does not change sign over b in [0.5, 5]; this rig cannot "
+             "solve for the equal-area exponent")
+for _ in range(200):                              # halting: a fixed 200-step bisection
+    _mid = 0.5 * (_lo_b + _hi_b)
+    if _gap(_lo_b) * _gap(_mid) <= 0:
+        _hi_b = _mid
+    else:
+        _lo_b = _mid
+B_FLAT = 0.5 * (_lo_b + _hi_b)
+check("§10 the b that makes the covered area flat per octave, solved from the octave integral "
+      "itself (the page's claim is that this b is the one it prints)", B_FLAT, B_EQ, 1e-6)
 
 # the count half of the global table, against the closed form for a truncated power law
 GLOB_N = page(r"Sampling ([\d,]+) diameters from a truncated power law", "the global draw count")
+# ⚠️ TRAP 3, the same one §7 had, and the load-bearing one on this page. Every band in §10 and
+# §10b below is 4 sigma of this count: parse it off the page and "200,000" -> "200" widens the
+# count-share band from 0.11 pp to 3.3 pp, enough for the b = 1.5 cobble share to walk 1.39% ->
+# 4.00% (with the pebble column moved to keep the row summing to 100) with the rig still green.
+# GLOB_MIN_DRAWS is fixed in this file; the page's count is gated against it and never sizes it.
+_enough = GLOB_N >= GLOB_MIN_DRAWS
+ok = ok and _enough
+print(f"{'PASS' if _enough else 'FAIL'}  §10 the page's {GLOB_N:g}-draw size-law sample against "
+      f"the {GLOB_MIN_DRAWS} every band below is sized from: a smaller count makes the page's "
+      f"own shares noisier than those bands, and does NOT widen them")
 GLOB = rows(r"^\| ([\d.]+) \| ([\d.]+)% \| ([\d.]+)% \| ([\d.]+)% \| \| ", "the global count table", 5)
 for b, *pcts in GLOB:
     b = f(b)
@@ -637,7 +825,7 @@ for b, *pcts in GLOB:
     for name, want in zip(("boulder", "cobble", "pebble"), pcts):
         lo, hi = CLS[name]
         frac = (lo ** -b - hi ** -b) / den
-        sig = math.sqrt(frac * (1 - frac) / GLOB_N) * 100
+        sig = math.sqrt(frac * (1 - frac) / GLOB_MIN_DRAWS) * 100   # the rig's constant, not
         half = 0.5 * 10 ** -(len(want.split(".")[1]) if "." in want else 0)
         check(f"§10 b={b:g} {name} count share (4 sigma + rounding = {4 * sig + half:.4f})",
               frac * 100, f(want), 4 * sig + half)
@@ -657,13 +845,6 @@ agree("§10 the b=3 pebble share", [("prose", PEB_HI), ("table", f(GLOB[-1][3]))
 # 4 sigma of the page's own 200,000 draws plus the rounding of the digits it printed -- both
 # read off the page, neither chosen to make the check pass.
 print("\n-- §10b the area half of the global table --")
-
-
-def pl_int(lo, hi, e):
-    """int_lo^hi d^e dd -- the log branch at e = -1 is the b = 2 case and must not be missed."""
-    return math.log(hi / lo) if abs(e + 1.0) < 1e-12 else (hi ** (e + 1) - lo ** (e + 1)) / (e + 1)
-
-
 GAREA = rows(r"^\| ([\d.]+) \| [\d.]+% \| [\d.]+% \| [\d.]+% \| \| \**([\d.]+)%\** \| "
             r"\**([\d.]+)%\** \| \**([\d.]+)%\** \|", "the global area table", 5)
 for bexp, *pcts in GAREA:
@@ -678,7 +859,7 @@ for bexp, *pcts in GAREA:
         Ex2 = pl_int(lo, hi, 3 - bexp) / Z          # E[d^4 . 1_class], and E[xy] too: xy = d^4 inside
         R = Ex / Ey
         var = (Ex2 - Ex * Ex) - 2 * R * (Ex2 - Ex * Ey) + R * R * (Ey2 - Ey * Ey)
-        sig = math.sqrt(max(var, 0.0) / GLOB_N) / Ey * 100
+        sig = math.sqrt(max(var, 0.0) / GLOB_MIN_DRAWS) / Ey * 100  # the rig's constant
         half = 0.5 * 10 ** -(len(want.split(".")[1]) if "." in want else 0)
         check(f"§10b b={bexp:g} {name} area share (4 sigma + rounding = {4 * sig + half:.4f})",
               R * 100, f(want), 4 * sig + half)
@@ -689,10 +870,12 @@ for bexp, *pcts in GAREA:
 # b = 2 it is +/-15 points on a 25-point figure, and the row prints that band so a reader can
 # see it. The page makes a tighter claim about the same cells, and it costs no tolerance at
 # all: "Below `b = 2` the weight moves to the largest class, above it to the smallest."
-DRIFT = re.search(r"Below (?:\*\*)?`b = 2`(?:\*\*)? the weight moves to the largest class, above it to "
-                  r"the\s*\nsmallest\.", BODY)
+DRIFT = re.search(r"Below (?:\*\*)?`b = ([\d.]+)`(?:\*\*)? the weight moves to the largest class, "
+                  r"above it to the\s*\nsmallest\.", BODY)
 if not DRIFT:
-    gone("which way the area moves with b", "Below `b = 2` the weight moves to the largest class")
+    gone("which way the area moves with b", "Below `b = N` the weight moves to the largest class")
+agree("§10b the equal-area exponent", [("the exponent sentence", B_EQ),
+                                       ("the drift sentence", f(DRIFT.group(1)))])
 _bs = [f(r[0]) for r in GAREA]
 if _bs != sorted(_bs):
     gone("the global table in ascending b", "| 1.0 | ... | 3.0 |")
@@ -707,9 +890,10 @@ MEAS = re.search(r"should split the ground \d+ : \d+ : \d+, and the measured row
                  r"reads ([\d.]+) : ([\d.]+) : ([\d.]+)\.", BODY)
 if not MEAS:
     gone("the prose restatement of the b = 2 area row", "... the measured row\nreads A : B : C.")
-B2 = [r for r in GAREA if f(r[0]) == 2.0]
+B2 = [r for r in GAREA if f(r[0]) == B_EQ]        # the row at the page's OWN equal-area b
 if len(B2) != 1:
-    gone(f"exactly one b = 2 row in the global area table (found {len(B2)})", "| 2.0 | ... |")
+    gone(f"exactly one b = {B_EQ:g} row in the global area table (found {len(B2)})",
+         "| 2.0 | ... |")
 for i, name in enumerate(("boulder", "cobble", "pebble")):
     agree(f"§10b the b=2 {name} area share",
           [("prose :261", f(MEAS.group(i + 1))), ("table :252", f(B2[0][i + 1]))])
@@ -769,6 +953,28 @@ for pct, r_s in zip(ACH.groups()[:3], ACH.groups()[3:]):
     check(f"§11 {counts[r_v]:g} clasts at r = {r_v:g} m against 2A/(sqrt3 r^2) = {bound:.1f}",
           counts[r_v] / bound * 100, f(pct), 0.1)
     lows.append(round((1 - counts[r_v] / bound) * 100))
+# ⚠️ THE SECOND PRINTINGS. The three achieved fractions are derived above at tolerance 0.1 pp
+# and then REPRINTED VERBATIM in the failure table -- ":373 Measured achievement 60.9% / 54.7% /
+# 53.8%" and ":372 Bridson achieved 53.8-60.9%" -- and neither copy was parsed, so 54.7 could be
+# walked to 74.7 at the failure-table end alone with this rig green. They are the same figures
+# the loop above already holds; both ends are asserted here, and the range is derived from the
+# three rather than believed as a fourth printing.
+ACH_TAB = re.search(r"Measured achievement ([\d.]+)% / ([\d.]+)% / ([\d.]+)% at three `r`", BODY)
+if not ACH_TAB:
+    gone("the achieved fractions in the failure table (:373)",
+         "Measured achievement P% / P% / P% at three `r`")
+for _i, _name in enumerate(("first", "second", "third")):
+    agree(f"§11 the {_name} achieved fraction",
+          [("body :145", f(ACH.group(_i + 1))), ("failure table :373", f(ACH_TAB.group(_i + 1)))])
+RANGE_LO = page(r"Bridson achieved ([\d.]+)-[\d.]+% of the hexagonal bound",
+                "the low end of the achieved range (:372)")
+RANGE_HI = page(r"Bridson achieved [\d.]+-([\d.]+)% of the hexagonal bound",
+                "the high end of the achieved range (:372)")
+_ach = sorted(f(x) for x in ACH.groups()[:3])
+check("§11 the achieved range's low end against the smallest of the three", _ach[0],
+      RANGE_LO, 0.0)
+check("§11 the achieved range's high end against the largest of the three", _ach[-1],
+      RANGE_HI, 0.0)
 LOW1 = page(r"the plan runs \*\*(\d+)–\d+% low\*\*", "the low end of the shortfall")
 LOW2 = page(r"the plan runs \*\*\d+–(\d+)% low\*\*", "the high end of the shortfall")
 BODY_LOW1 = page(r"comes out (\d+)–\d+% low", "the shortfall in the body")
@@ -777,12 +983,27 @@ agree("§11 the shortfall's low end", [("body", BODY_LOW1), ("failure table", LO
 agree("§11 the shortfall's high end", [("body", BODY_LOW2), ("failure table", LOW2)])
 check("§11 min(1 - achieved)", float(min(lows)), LOW1, 0.0)
 check("§11 max(1 - achieved)", float(max(lows)), LOW2, 0.0)
-FACTOR = page(r"check the achieved count against ~([\d.]+) × the bound", "the ~0.54 factor")
+FACTOR = page(r"check the achieved count against ~([\d.]+) × the bound",
+              "the planning factor in the failure table (:372)")
+FACT_BODY = page(r"Size `r` from the measured ~([\d.]+) factor",
+                 "the planning factor in the body (:147)")
+FACT_PLAN = page(r"plan off the ~([\d.]+) factor",
+                 "the planning factor in the failure table's fix column (:373)")
+agree("§11 the planning factor", [("body :147", FACT_BODY), ("failure table :372", FACTOR),
+                                  ("failure table :373", FACT_PLAN)])
 fracs = [counts[f(r_s)] / (2 * AREA / (math.sqrt(3) * f(r_s) ** 2)) for r_s in ACH.groups()[3:]]
-good = min(fracs) <= FACTOR <= max(fracs)
-ok = ok and good
-print(f"{'PASS' if good else 'FAIL'}  §11 the planning factor {FACTOR:g} lies inside the "
-      f"measured range [{min(fracs):.4f}, {max(fracs):.4f}]")
+# ⚠️ TRAP 2, and it was live: a RANGE check is one-sided twice over. `min <= FACTOR <= max` let
+# ~0.54 walk anywhere inside [0.5375, 0.6084], so "~0.60" passed -- a planning factor 13% above
+# the worst case the page itself measured, which is exactly the direction that under-plans. The
+# factor is not a free choice: it is what you SIZE `r` from, so it is the LOWEST achieved
+# fraction, and 0.5375 is the one the page's own failure table quotes as the low end of
+# "53.8-60.9%". FACT_TOL is a literal fixed here -- half a digit at the two decimals this factor
+# is written in -- and NOT read off the string under test, so printing "~0.5" cannot buy a
+# ten-times wider gate.
+FACT_TOL = 5e-3
+check(f"§11 the planning factor is the LOWEST of the three achieved fractions "
+      f"[{min(fracs):.4f}, {max(fracs):.4f}] (band {FACT_TOL:g}, a fixed half-digit)",
+      min(fracs), FACTOR, FACT_TOL)
 
 # ── §12 THE TIMING ARITHMETIC (the timings themselves are NOT gated; see the docstring) ──
 print("\n-- §12 the cost arithmetic --")
@@ -813,11 +1034,45 @@ S_TOTAL = page(r"roughly [\d.]+ s of the ([\d.]+) s", "the total, in seconds")
 COST_LO = page(r"Cost held between\s*\n?\*\*(\d+) and \d+ µs per sample\*\*", "the per-sample floor")
 COST_HI = page(r"\*\*\d+ and (\d+) µs per sample\*\*", "the per-sample ceiling")
 check("§12 the total in seconds against the total in ms", round(MS / 1000, 2), S_TOTAL, 0.0)
+# ⚠️ TRAP 2, AND IT WAS LIVE ON THE NEXT LINE. `COST_LO <= x <= COST_HI` reads BOTH ends of the
+# band off the page it is testing, so "107 and 134 µs per sample" could widen to "1 and 900" and
+# this line still said PASS while the whole linearity claim evaporated. Three things are asserted
+# now instead of one, and the third is what the band is FOR.
+CAND_TIMED = page(r"the three passes' ([\d,]+) candidates account for",
+                  "the candidate count in the timing sentence (:301)")
+agree("§12 the candidates the sampling time is spread over",
+      [("the largest-first total", CAND_T), ("the timing sentence :301", CAND_TIMED),
+       ("the pebble-floor sentence :219", FLOOR_CAND)])
 per_sample = S_POISSON * 1e6 / CAND_T
-good = COST_LO <= per_sample <= COST_HI
+# a second, independent route to the same per-sample cost: the whole run minus the placement
+# half the page times separately. It uses no figure the first route uses except the candidates.
+per_sample_alt = (MS * 1e3 - P_ONE * KEPT_T) / CAND_T
+for _what, _v in (("from the page's sampling share", per_sample),
+                  ("from total ms minus the timed placement half", per_sample_alt)):
+    good = COST_LO <= _v <= COST_HI
+    ok = ok and good
+    print(f"{'PASS' if good else 'FAIL'}  §12 {_v:.1f} µs/sample {_what}, inside the page's own "
+          f"{COST_LO:g}-{COST_HI:g} band")
+# and the band itself. The sentence it sits in claims LINEARITY across a SPAN_N-fold range in N.
+# A per-sample band whose ends differ by more than that range is equally consistent with a
+# per-sample cost that grows like N -- i.e. with a quadratic algorithm -- so it carries no
+# linearity evidence at all, and "1 to 900 µs" is exactly such a band. The ceiling is the page's
+# own 61× range, parsed for §8 above; nothing here is read off the two numbers under test.
+_width = COST_HI / COST_LO
+good = COST_LO > 0 and _width < SPAN_N
 ok = ok and good
-print(f"{'PASS' if good else 'FAIL'}  §12 {S_POISSON:g} s over {CAND_T:g} candidates is "
-      f"{per_sample:.1f} µs/sample, inside the page's own {COST_LO:g}-{COST_HI:g} band")
+print(f"{'PASS' if good else 'FAIL'}  §12 the per-sample band spans {_width:.2f}× "
+      f"({COST_LO:g}-{COST_HI:g} µs), which must be less than the {SPAN_N:g}× range in N it "
+      f"claims to hold linearly across -- a wider band is consistent with cost ∝ N")
+# and the ceiling has a hard upper bound on this page: the three bare passes are PART of the
+# 2,853 ms run, so the band's own ceiling applied to the candidates they drew cannot exceed that
+# run's total. Nothing here is read off COST_HI.
+_worst = COST_HI * CAND_T / 1e6
+good = _worst <= MS / 1e3
+ok = ok and good
+print(f"{'PASS' if good else 'FAIL'}  §12 the band's ceiling over {CAND_T:g} candidates is "
+      f"{_worst:.2f} s, which must fit inside the {MS / 1e3:.2f} s the whole run took -- the bare "
+      f"passes are part of that run, not additional to it")
 COMP = page(r"Composition costs about ([\d.]+)× a bare pass", "the composition factor")
 check("§12 total / sampling", round(S_TOTAL / S_POISSON, 1), COMP, 0.0)
 
@@ -843,6 +1098,62 @@ for pat, what in (
         ok = False
         print(f"FAIL  the fence no longer carries {what} -- §14's transcription is now of "
               f"something the page does not recommend")
+
+# ── §13b THE FENCE'S CLASS BLOCK SAYS WHICH CLASS THE INSTANCE PATH ENDS AT ──────────────
+# ⚠️ THE SEVEN STRINGS ABOVE PIN THE LOOP AND NOT THE DATA IT LOOPS OVER. The class block's own
+# two comments are the fence's whole recommendation -- "<- the instance path ends at or above
+# here" on one row, "granule is a MATERIAL, never a loop iteration" on the row below it, which is
+# commented out for that reason. Move the marker down one row and the fence recommends instancing
+# the 923 GB/km2 class; every number on the page is still correct, every string above still
+# matches, and this rig exited 0 on it. So the marker is located, and then checked against the
+# budget the fence itself prints: the class it sits on must cost LESS than the granule warning,
+# and the class carrying the material comment must be the one that costs the warning's figure.
+print("\n-- §13b the fence's class block: where the instance path ends --")
+BLOCK = rows(r"^(#?)(?:classes)?\s+(boulder|cobble|pebble|granule)\s+d\s+(\d+)\.\.(\d+) mm(.*)$",
+             "the fence's four class rows with their comments", 4)
+MARK_TXT = "<- the instance path ends at or above here"
+MAT_TXT = "is a MATERIAL, never a loop iteration"
+marked = [row for row in BLOCK if MARK_TXT in row[4]]
+material = [row for row in BLOCK if MAT_TXT in row[4]]
+if len(marked) != 1:
+    gone(f"exactly one class row carrying the instance-path marker (found {len(marked)})",
+         MARK_TXT)
+if len(material) != 1:
+    gone(f"exactly one class row carrying the material comment (found {len(material)})", MAT_TXT)
+_hash_m, _name_m, _lo_m, _hi_m, _ = marked[0]
+_hash_x, _name_x, _lo_x, _hi_x, _ = material[0]
+gb_of = {f(d): f(gb) for d, _c, gb in FINE}
+
+
+def _gb(d_mm, what):
+    if f(d_mm) not in gb_of:
+        gone(f"a {f(d_mm):g} mm row in the quadratic table to price {what}", "| N mm | ... |")
+    return gb_of[f(d_mm)]
+
+
+for _label, _cond, _why in (
+        ("the instance-path marker sits on a class the fence still LOOPS over",
+         _hash_m != "#", f"it is on the commented-out `{_name_m}` row"),
+        ("the material comment sits on the class the fence has commented OUT",
+         _hash_x == "#", f"`{_name_x}` is still a loop iteration"),
+        ("the marked class is the FINEST class the fence loops over",
+         all(f(r[3]) >= f(_hi_m) for r in BLOCK if r[0] != "#"),
+         "the fence loops over something finer than the class it marks"),
+        ("the material class is finer than the marked class",
+         f(_hi_x) < f(_hi_m), f"`{_name_x}` is not below `{_name_m}`")):
+    ok = ok and _cond
+    print(f"{'PASS' if _cond else 'FAIL'}  §13b {_label} (`{_name_m}` marked, `{_name_x}` "
+          f"material){'' if _cond else ' -- ' + _why}")
+check(f"§13b the material class' d_max against the `r` in the fence's own granule warning",
+      f(_hi_x), GRAN_FENCE, 0.0)
+check(f"§13b the material class ({_name_x}, d_max {f(_hi_x):g} mm) costs the fence's own warning",
+      round(_gb(_hi_x, "the material class")), GB_FENCE, 0.0)
+_afford = _gb(_hi_m, "the marked class") < GB_FENCE
+ok = ok and _afford
+print(f"{'PASS' if _afford else 'FAIL'}  §13b the marked class ({_name_m}, d_max {f(_hi_m):g} mm) "
+      f"costs {_gb(_hi_m, 'the marked class'):g} GB/km2, which must be BELOW the "
+      f"{GB_FENCE:g} GB/km2 the fence's stop rule cites as the reason it binds -- a marker on the "
+      f"warning's own class would make the fence recommend instancing what it warns about")
 
 # ── §14 THE FENCE'S LOOP, TRANSCRIBED AND RUN ON THE PAGE'S OWN PATCH ────────────────────
 print("\n-- §14 the largest-first loop, RUN --")
@@ -1023,6 +1334,26 @@ BUR_BODY = page(r"\*\*the worst is buried (\d+)% of the way into its neighbour\*
 BUR_TAB = page(r"worst buried (\d+)% of the contact radius", "the burial depth in the failure table")
 agree("§14 the worst burial depth", [("`## Use this`", BUR_TOP), ("body", BUR_BODY),
                                      ("failure table", BUR_TAB)])
+# ⚠️ THE SINGLE PASS'S OWN TWO FIGURES, AT EVERY END THAT PRINTS THEM. `31` and `15,153` are the
+# numerator and denominator of the 0.2-per-100 rate below, and the failure table reprints both at
+# :370 ("Measured 31 pairs in 15,153"). That copy went unparsed, so 31 could be walked to 77
+# there alone and the rate still closed against the table's copies. The page's 31 is still NOT
+# gated as a measurement -- seed 11, no generator named, see the docstring -- but a figure
+# printed at three ends is asserted at three ends.
+PAIRS_TABSP = page(r"\*\*(\d+)\*\* \(\d+\.\d+ per 100\)",
+                   "the single-pass pair count in the what-it-beats table (:163)")
+PAIRS_FAIL = page(r"Measured (\d+) pairs in [\d,]+, worst buried",
+                  "the single-pass pair count in the failure table (:370)")
+agree("§14 the single-pass pair count", [("`## Use this` :52", PAIRS_SP),
+                                         ("what-it-beats table :163", PAIRS_TABSP),
+                                         ("failure table :370", PAIRS_FAIL)])
+agree("§14 the single-pass clast count", [
+    ("`## Use this` :52", page(r"the pebble spacing places ([\d,]+) and leaves",
+                               "the single-pass clast count under `## Use this` (:52)")),
+    ("what-it-beats table :163", f(OP[1][1])),
+    ("the quadratic table :225", f(FINE[0][1])),
+    ("failure table :370", page(r"Measured \d+ pairs in ([\d,]+), worst buried",
+                                "the single-pass clast count in the failure table (:370)"))])
 RATE = page(r"\*\*\d+\*\* \((\d+\.\d+) per 100\)", "the pairs-per-100 rate")
 check("§14 pairs per 100 clasts in the single pass",
       round(PAIRS_SP / f(OP[1][1]) * 100, 1), RATE, 0.0)

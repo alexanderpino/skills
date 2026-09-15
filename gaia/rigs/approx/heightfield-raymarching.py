@@ -29,10 +29,10 @@ assigned this path, so it is merged instead of overwriting.  Splitting it out la
 one-line move.
 
 WHAT THE GATE ASSERTS, AND WHAT IT REFUSES TO.  The page's own measurements at :47-53 -- 515
-rays, 398 hits, ±21/±11/±2.6 mm, 57 m median, ±0.64 m -- are NOT gated and cannot be: :54
-gives the field's FORM, `h = a·sin(kx) + b·sin(k′z)`, and never a, b, k or k′, so no rig can
-rebuild that ray set, and the register records the printed millimetres as rounded UP from the
-run, i.e. as bounds.  Asserting a bound one-sidedly is precisely the shape this corpus keeps
+rays, 398 hits, ±21/±11/±2.6 mm, 57 m median, ±0.64 m -- are NOT gated AS ABSOLUTE VALUES
+and cannot be: :54 gives the field's FORM, `h = a·sin(kx) + b·sin(k′z)`, and never a, b, k
+or k′, so no rig can rebuild that ray set, and the register records the printed
+millimetres as rounded UP from the run, i.e. as bounds.  Asserting a bound one-sidedly is precisely the shape this corpus keeps
 catching: walk ±11 mm to ±110 mm and `worst < claimed` stays green.  What that same sentence
 states EXACTLY -- zero missed, zero spurious, written as words -- is reproduced on this rig's
 own field and gated at tolerance zero.  Everything else the gate declines to check is printed
@@ -394,6 +394,129 @@ def _exit_distance(o, d, t, level):
     return out
 
 
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# THE FENCE ITSELF, PINNED AS TEXT -- what the transcription below is a transcription OF.
+#
+# ⚠️ THE DEEPEST HOLE THIS RIG HAD, found by an independent attack and named rather than
+# hidden.  `_march` below transcribes the fence's ALGORITHM by hand, so an edit to the
+# fence's CODE never reached it.  Gutting five of the page's own lines -- dropping the
+# `min(…, tExit)` clamp at :66, flipping the descending-ray guard at :71, deleting the
+# `min(level+1, coarsestMip)` cap at :78, deleting the step-cap belt at :80 and turning
+# `level--` at :75 into `level++` -- left this rig at 64 PASS, exit 0.  It was measuring its
+# own remembered copy of the block, never the block on the page.
+#
+# The remedy is the one `rigs/approx/surface-and-scale-space.py` §0b uses: pin every
+# load-bearing line of the fence as TEXT and assert it, then DERIVE the knobs `_march`
+# actually turns from the parsed block, so the rig executes the page's form and not a
+# remembered one.  A line edited away then fails twice over -- its own text assertion, which
+# names the line, and the gate that line exists to hold up.
+#
+# Numbers inside the fence are deliberately NOT part of these text patterns: the relative
+# step's `2.38418579e-7f` and the refine range's `5-8` are parsed and checked as VALUES by
+# gates 2 and 6.  A text assertion that swallowed them would turn a legitimate correction
+# into a spurious failure, and would be the typed-in expectation wearing a new hat.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+_FENCE_BLOCK = _page(r"(?s)```\n(level = coarsestMip; t = tEnter; steps = 0.*?)\n```",
+                     "the `## Use this` fence at :61-82")
+
+
+def _fence(pattern, what, group=1):
+    """Parse one group out of the FENCE. A line that has gone is a FAIL, never a skip."""
+    m = re.search(pattern, _FENCE_BLOCK, re.M)
+    if not m:
+        sys.exit(f"ANCHOR GONE -- the fence at :61-82 no longer carries {what} "
+                 f"(pattern {pattern!r})")
+    return m.group(group)
+
+
+# Every line the transcription below depends on, with what it is load-bearing FOR.
+_FENCE_LINES = (
+    (r"^level = coarsestMip; t = tEnter; steps = 0\b",
+     "the entry state `level = coarsestMip; t = tEnter` (:62)"),
+    (r"// tEnter = max\(EPS, ·\) — NOT max\(0, ·\)",
+     "the STRICT `max(EPS, ·)` clamp on tEnter (:62) -- gate 4c's whole precondition"),
+    (r"tExit: ray ∩ \[mapMin, mapMax\]",
+     "what tExit is (:62) -- the slab entry gate 4c calls negative"),
+    (r"^ +// both FINITE and NON-NEGATIVE",
+     "that tEnter and tExit are BOTH FINITE AND NON-NEGATIVE (:63) -- an infinite tExit "
+     "puts the level-0 refine back on the unbounded interval :286 exists to remove"),
+    (r"^while \(t < tExit\) \{",
+     "the loop condition `while (t < tExit)` (:64)"),
+    (r"^  node      = texelAt\(rayPos\(t\), level\)",
+     "the explicit-LOD node fetch (:65)"),
+    (r"// explicit-LOD fetch: SampleLevel or Load, never Sample",
+     "`never Sample` on the texelAt line (:65) -- the language rule :84-92 spends a "
+     "paragraph on, and the reason a filtered tap breaks the skip test's bound"),
+    (r"^  tExitNode = min\(exitDistance\(node, ray\), tExit\)",
+     "the node exit CLAMPED to tExit (:66) -- without it a column-locked ray bisects an "
+     "unbounded interval (:118-123, :286)"),
+    (r"^  if \(min\(rayHeight\(t\), rayHeight\(tExitNode\)\) < node\.maxH\) \{",
+     "the INTERVAL predicate (:69) -- the asymmetry :94-105 is about"),
+    (r"^    if \(level == 0\) return refine\(t, tExitNode\)",
+     "the level-0 refine (:70)"),
+    (r"^    if \(rayDir\.y < 0\) \{",
+     "the DESCENDING-ray guard on the tCross advance (:71) -- 'Ascending and horizontal "
+     "rays simply enter the candidate span at `t`' (:105)"),
+    (r"^      tCross = tWhereRayHeightEquals\(node\.maxH, ray\)",
+     "the crossing solve (:72)"),
+    (r"^      t = max\(t, tCross\)",
+     "the `max` that keeps the tCross advance monotone (:73) -- the termination invariant "
+     "at :129-130 is 'each iteration strictly increases `t` or decreases `level`'"),
+    (r"^    level--",
+     "the DESCEND (:75) -- `level` must fall here or the invariant at :129-130 is false"),
+    (r"^    t     = max\(t, tExitNode\) \* \(1\.0f \+ ",
+     "the RELATIVE skip advance `max(t, tExitNode)·(1 + ε)` (:77) -- :107-117 and :285"),
+    (r"// RELATIVE step — never `\+ eps`",
+     "that the skip advance is RELATIVE and never `+ eps` (:77)"),
+    (r"^    level = min\(level\+1, coarsestMip\)",
+     "the pop-up CLAMPED to coarsestMip (:78) -- an unclamped `level+1` walks off the "
+     "pyramid the page just priced in gate 1"),
+    (r"^  if \(\+\+steps > stepCap\) return miss",
+     "the step-cap BELT (:80) -- ':285 a step cap only converts the hang into a slow "
+     "frame', so it is a belt and not the termination argument"),
+    (r"// a belt, NOT the termination argument",
+     "that the step cap is a belt and NOT the termination argument (:80)"),
+    (r"^return miss",
+     "the fall-through miss (:82)"),
+)
+
+# ── the knobs `_march` turns, DERIVED from the block above rather than remembered ────────
+# `_RHS` takes the right-hand side of a fence assignment, stopping at the line's `//`
+# comment, so what is compared below is the CODE the page publishes and nothing else.
+_RHS = r"\s*([^/\n]+?)\s*(?://|$)"
+_F_EXITNODE = _fence(r"^  tExitNode =" + _RHS, "the node-exit assignment (:66)")
+_F_GUARD_OP = _fence(r"^    if \(rayDir\.y (\S+) 0\) \{", "the tCross guard's comparison (:71)")
+_F_TCROSS = _fence(r"^      t =" + _RHS, "the tCross assignment (:73)")
+_F_DESCEND = _fence(r"^    level(--|\+\+)", "the descend step (:75)")
+_F_POPUP = _fence(r"^    level =" + _RHS, "the pop-up assignment (:78)")
+_F_CLAMP = _F_EXITNODE == "min(exitDistance(node, ray), tExit)"
+_F_BELT = re.search(r"^  if \(\+\+steps > stepCap\) return miss", _FENCE_BLOCK, re.M) is not None
+
+_GUARD_OPS = {"<": lambda v: v < 0.0, ">": lambda v: v > 0.0,
+              "<=": lambda v: v <= 0.0, ">=": lambda v: v >= 0.0}
+if _F_GUARD_OP not in _GUARD_OPS:
+    sys.exit(f"the fence guards the tCross advance with `rayDir.y {_F_GUARD_OP} 0`, which is "
+             f"not a comparison this rig can execute")
+_F_GUARD = _GUARD_OPS[_F_GUARD_OP]
+_F_DESCEND_DELTA = -1 if _F_DESCEND == "--" else +1
+_F_MIP_CLAMP = _F_POPUP.startswith("min(")
+_F_TCROSS_MAX = _F_TCROSS.startswith("max(")
+
+
+def gate_fence():
+    print("\n── 0. the fence at :61-82, pinned as TEXT ───────────────────────────────────")
+    for pat, what in _FENCE_LINES:
+        if re.search(pat, _FENCE_BLOCK, re.M):
+            print(f"PASS  the fence still carries {what}")
+        else:
+            _fail(f"the fence no longer carries {what} -- everything `_march` runs below is "
+                  f"a transcription of a block the page NO LONGER RECOMMENDS, so every "
+                  f"green line under it is measuring the wrong algorithm")
+    print(f"      knobs taken from the block, not remembered: clamp to tExit={_F_CLAMP}, "
+          f"tCross guard `rayDir.y {_F_GUARD_OP} 0`, tCross assign `{_F_TCROSS}`, "
+          f"descend `level{_F_DESCEND}`, pop-up `{_F_POPUP}`, belt={_F_BELT}")
+
+
 # ── the block at :61-82, transcribed ─────────────────────────────────────────────────────
 _SCAN = 8            # a literal
 
@@ -440,6 +563,11 @@ def _march(h, pyr, o, d, t_enter, t_exit, iters=6, *, advance="relative", nudge=
            descend="interval", fp32=False, literal_return=False):
     """The fence at :61-82.  `advance` and `descend` select the page's own counterfactuals.
 
+    The clamp, the tCross guard, the tCross assignment, the descend step and the pop-up cap
+    are NOT transcribed here: they are `_F_CLAMP`, `_F_GUARD`, `_F_TCROSS_MAX`,
+    `_F_DESCEND_DELTA` and `_F_MIP_CLAMP`, parsed out of the fence above.  Edit those lines
+    on the page and this function changes what it runs.
+
     Halting: the while loop is bounded by _STATE_CAP, a literal; a livelock is reported as a
     PROVEN CYCLE (a repeated (t, level) state), never as a timeout.
     """
@@ -456,7 +584,13 @@ def _march(h, pyr, o, d, t_enter, t_exit, iters=6, *, advance="relative", nudge=
             return ("CYCLE", steps, spans, invariant_broken)
         seen.add(key)
         node_max = _node_max(pyr, level, o[0] + d[0] * t, o[2] + d[2] * t)
-        t_exit_node = min(_exit_distance(o, d, t, level), t_exit)
+        t_exit_node = _exit_distance(o, d, t, level)
+        if _F_CLAMP:                    # `min(exitDistance(node, ray), tExit)` (:66), PARSED
+            t_exit_node = min(t_exit_node, t_exit)
+        if not math.isfinite(t_exit_node):
+            # :118-123 and :286: unclamped, a column-locked ray hands `refine` an UNBOUNDED
+            # interval.  Reported as such, never bisected -- the page's own defect, surfaced.
+            return ("UNBOUNDED", steps, spans, invariant_broken)
         h_t, h_e = o[1] + d[1] * t, o[1] + d[1] * t_exit_node
         if descend == "interval":
             candidate = min(h_t, h_e) < node_max
@@ -476,9 +610,13 @@ def _march(h, pyr, o, d, t_enter, t_exit, iters=6, *, advance="relative", nudge=
                     # `if (level == 0) return refine(t, tExitNode)` returns UNCONDITIONALLY.
                     return ("HIT-NO-BRACKET", t, spans, invariant_broken)
             else:
-                if d[1] < 0.0:
-                    t = max(t, (node_max - o[1]) / d[1])
-                level -= 1
+                if d[1] != 0.0 and _F_GUARD(d[1]):     # `if (rayDir.y < 0)` (:71), PARSED
+                    t_cross = (node_max - o[1]) / d[1]
+                    # `t = max(t, tCross)` (:73), PARSED -- or a bare `t = tCross`
+                    t = max(t, t_cross) if _F_TCROSS_MAX else t_cross
+                level += _F_DESCEND_DELTA             # `level--` (:75), PARSED
+                if not 0 <= level <= coarsest:
+                    return ("OFF-PYRAMID", steps, spans, invariant_broken)
         if (not candidate) or level == level_before:
             if advance == "relative":
                 t = max(t, t_exit_node) * (1.0 + 2.0 ** -22)
@@ -488,7 +626,10 @@ def _march(h, pyr, o, d, t_enter, t_exit, iters=6, *, advance="relative", nudge=
                 t = t_exit_node
             if fp32:
                 t = _f32(t)
-            level = min(level + 1, coarsest)
+            # `level = min(level+1, coarsestMip)` (:78), PARSED
+            level = min(level + 1, coarsest) if _F_MIP_CLAMP else level + 1
+            if level > coarsest:
+                return ("OFF-PYRAMID", steps, spans, invariant_broken)
         if not (t > t_before or level < level_before):
             invariant_broken = (t_before, level_before, t, level)
         if level > level_before and not t > t_before:
@@ -681,18 +822,34 @@ def gate_termination(h, pyr, rs):
     _require(r"each iteration strictly increases `t` or\s*\n?decreases `level`, and `level` "
           r"only rises on the branch that increases `t`",
           "the structural termination invariant (:129-130)")
-    cyc = broke = 0
+    cyc = broke = unbounded = off_pyr = 0
     for (o, d, t0, t1, _k) in rs:
         r = _march(h, pyr, o, d, t0, t1, fp32=True)
         if r[0] in ("CYCLE", "CAP"):
             cyc += 1
+        if r[0] == "UNBOUNDED":
+            unbounded += 1
+        if r[0] == "OFF-PYRAMID":
+            off_pyr += 1
         if r[3] is not None:
             broke += 1
     _check(f"rays of {len(rs)} that livelock under the fence as written, in fp32", cyc, 0)
     _check("iterations that violated the page's own invariant", broke, 0)
+    # the two outcomes the fence's OWN lines exist to prevent, run from the PARSED block
+    # (see gate 0): drop `min(…, tExit)` at :66 and a column-locked ray bisects an unbounded
+    # interval; drop `min(level+1, coarsestMip)` at :78, or write `level++` at :75, and the
+    # march walks off the top of the pyramid gate 1 just priced.
+    _check("rays handed an UNBOUNDED refine interval -- the fence's `min(exitDistance(node, "
+           "ray), tExit)` at :66", unbounded, 0)
+    _check("rays that marched off the pyramid -- the fence's `level--` at :75 and "
+           "`level = min(level+1, coarsestMip)` at :78", off_pyr, 0)
 
     # (a) `t = tExitNode`, the page's :108-110 and failure-table :285
     _require(r"`t = tExitNode` lands the ray exactly on a node boundary", "the bare-assign hang")
+    # the same fix cell, at its OTHER end: :285 says the belt CONVERTS the hang, never
+    # removes it, which is why :80's `stepCap` is a belt and not the termination argument.
+    _require(r"a step cap only converts the hang into a slow frame",
+             "that a step cap only CONVERTS the hang into a slow frame (:285)")
     bare = sum(1 for (o, d, t0, t1, _k) in rs
                if _march(h, pyr, o, d, t0, t1, advance="bare", fp32=True)[0] == "CYCLE")
     if bare > 0:
@@ -784,6 +941,18 @@ def gate_clamp(h, pyr, rs):
           "the column-locked ray's infinite exitDistance (:120-122)")
     _require(r"a \*\*column-locked picking\s*\n?ray never leaves its column\*\*, so its level-0 "
           r"span is the rest of the ray", "the level-0 span of a picking ray (:51-53)")
+    # The SAME claim at its other end, the failure table at :286.  Both halves of that cell
+    # are load-bearing and neither was anchored: an attack walked `+inf` to `-inf` and
+    # "unbounded" to "bounded" and this rig stayed green.
+    _require(r"`exitDistance` is `\+inf` for a column-locked ray, so `refine\(t, ∞\)` bisects "
+             r"an unbounded interval",
+             "the failure table's own `+inf` and its UNBOUNDED refine interval (:286)")
+    _require(r"`tExitNode = min\(exitDistance\(\.\.\.\), tExit\)` before the predicate — "
+             r"which makes the refine interval finite, not short",
+             "the failure table's own clamp prescription, and that it buys FINITE not SHORT "
+             "(:286)")
+    _require(r"a reciprocal-form DDA can make `exitDistance` NaN, which the clamp does not "
+             r"remove", "that the clamp does NOT remove the NaN (:286)")
     bad = checked = no_span = off = 0
     for (o, d, t0, t1, kind) in rs:
         if kind != "picking":
@@ -909,6 +1078,17 @@ def gate_predicate(h, pyr, rs):
            fence_lo, min(prose))
     _agree("the fence's refinement range and the prose's own counts (high)",
            fence_hi, max(prose))
+    # …and its THIRD end, the failure table at :286, which was unanchored: an attack moved
+    # `5–8` there to `40–90` and every gate stayed green.  A correction landing at one end
+    # only is this corpus's most-recorded defect.
+    fix_lo = _int(r"refine to a tolerance rather than to a fixed (\d+)–\d+ bisections",
+                  "the low refinement count in the failure table (:286)")
+    fix_hi = _int(r"refine to a tolerance rather than to a fixed \d+–(\d+) bisections",
+                  "the high refinement count in the failure table (:286)")
+    _agree("the refinement range in the fence (:70) and in the failure table (:286), low",
+           fence_lo, fix_lo)
+    _agree("the refinement range in the fence (:70) and in the failure table (:286), high",
+           fence_hi, fix_hi)
 
     ref = [_reference(h, o, d, t0, t1) for (o, d, t0, t1, _k) in rs]
     _reference_selfcheck(h, rs, ref)
@@ -998,17 +1178,18 @@ def gate_rig_description():
 
 
 # ═════════════════════════════════════════════════════════════════════════════════════════
-# GATE 9 -- the CONCLUSION the page draws from ±11 mm, at :49-53.
+# GATE 9 -- the CONCLUSIONS the page draws from its residuals, at :49-53.
 #
 # The absolute millimetres are not gated and cannot be (see the diagnostics below: the page
 # gives the FORM of its field and never a, b, k or k′, so no rig can rebuild that ray set).
 # But the page does not only print them -- it draws a claim from them: "That residual is
 # `span/2ᵏ` and nothing else, so it follows the *span*, not the terrain", and then applies
 # it to get ±0.64 m at a 57 m span.  That inference is checkable WITHOUT the field, because
-# it is a statement about the page's own four numbers: both residuals must sit at the SAME
-# fraction of their own span/2ᵏ.  They are printed to different precisions, so the test is
-# whether the two fractions' ROUNDING BANDS overlap -- a tolerance read off the page's own
-# digits, not chosen here to make the check pass.
+# it is a statement about the page's own numbers: the three residuals it prints at three
+# refinement counts of ONE span must sit at one r·2ᵏ, and the per-texel and column-locked
+# residuals must sit at the SAME fraction of their own span/2ᵏ.  They are printed to
+# different precisions, so the test is whether the ROUNDING BANDS overlap -- a tolerance
+# read off the page's own digits, not chosen here to make the check pass.
 #
 # The general-ray span is one texel: :52 says the column-locked span is "not one texel", and
 # :54 states the texel size.  That size is a rig constant, not a measurement -- gate 8 above
@@ -1067,9 +1248,23 @@ def gate_residual_follows_span():
     if k_gen != k_col:
         return
 
-    coarse = [(w, t) for w, t in (("the per-texel residual", r_gen_s),
-                                  ("the column-locked residual", r_col_s),
-                                  ("the column-locked span", span_s))
+    # The SAME sentence prints the same residual at two more refinement counts -- "(±21 mm
+    # at 5, ±2.6 mm at 8)" -- for the SAME ray set at the SAME span: "for primary, ascending
+    # and grazing rays" is one clause covering all three.  So the page's own `span/2ᵏ` law
+    # says r(k)·2ᵏ is ONE constant across the three, and that is an arithmetic claim about
+    # the page's own numbers, needing no field.  It was not checked: an independent attack
+    # moved ±2.6 mm at 8 to ±9.9 mm and ±21 mm at 5 to ±40 mm and every gate stayed green.
+    other = re.search(r"\(±([\d.]+) mm at (\d+), ±([\d.]+) mm at (\d+)\)", _BODY)
+    if not other:
+        sys.exit("ANCHOR GONE -- the page no longer states its two other residuals at :50 "
+                 "(pattern '(±N mm at k, ±N mm at k)')")
+    trio = [(r_gen_s, k_gen), (other.group(1), int(other.group(2))),
+            (other.group(3), int(other.group(4)))]
+
+    coarse = [(w, t) for w, t in ([("the per-texel residual", r_gen_s),
+                                   ("the column-locked residual", r_col_s),
+                                   ("the column-locked span", span_s)]
+                                 + [(f"the residual at {k} bisections", v) for v, k in trio])
               if _sigfigs(t) < MIN_SIGFIGS]
     for what, txt in coarse:
         _fail(f"{what} is printed as {txt!r} -- {_sigfigs(txt)} significant figure(s), and this "
@@ -1078,6 +1273,27 @@ def gate_residual_follows_span():
               f"printing fewer digits. Print {MIN_SIGFIGS} s.f. or drop the claim")
     if coarse:
         return
+
+    # r(k)·2ᵏ, one constant across the three counts, each widened by its own printed
+    # precision.  The bands must have a COMMON point -- pairwise overlap is not enough.
+    lo_c = max((float(v) - _half(v)) * 2.0 ** k for v, k in trio)
+    hi_c = min((float(v) + _half(v)) * 2.0 ** k for v, k in trio)
+    for v, k in trio:
+        print(f"      ±{v} mm at {k} bisections -> r·2^{k} = {float(v) * 2.0 ** k:7.1f} mm, "
+              f"band [{(float(v) - _half(v)) * 2.0 ** k:.1f}, "
+              f"{(float(v) + _half(v)) * 2.0 ** k:.1f}]")
+    if lo_c <= hi_c:
+        print(f"PASS  the page's three residuals sit at ONE r·2^k within their own printed "
+              f"precision ([{lo_c:.1f}, {hi_c:.1f}] mm) -- ':51 that residual is span/2\u1d4f "
+              f"and nothing else', across the counts the page itself instantiates")
+    else:
+        bands = [(v, k, round((float(v) - _half(v)) * 2.0 ** k, 1),
+                  round((float(v) + _half(v)) * 2.0 ** k, 1)) for v, k in trio]
+        _fail(f"the page's three residuals at :49-50 do not follow ONE `span/2\u1d4f` law: "
+              f"r·2^k bands {bands} "
+              f"have no common point ({lo_c:.1f} > {hi_c:.1f} mm), so at least one of "
+              f"±{trio[0][0]} mm at {trio[0][1]}, ±{trio[1][0]} mm at {trio[1][1]} and "
+              f"±{trio[2][0]} mm at {trio[2][1]} contradicts the other two")
 
     r_gen, r_col, span = float(r_gen_s) / 1000.0, float(r_col_s), float(span_s)
     h_gen, h_col, h_span = _half(r_gen_s) / 1000.0, _half(r_col_s), _half(span_s)
@@ -1127,9 +1343,11 @@ def diagnostics(h, pyr, rs):
     print("              ±11 mm to ±110 mm and `worst < claimed` stays green.  The counts")
     print("              the same sentence states as WORDS -- zero missed, zero spurious --")
     print("              are exact and ARE gated above, on this rig's own field.")
-    print("              So is the RATIO between the two residuals: gate 9 above checks that\n"
-          "              ±0.64 m at 57 m and ±11 mm at one texel sit at the same fraction of\n"
-          "              their own span/2\u1d4f, which is the page's inference and needs no field.")
+    print("              So is every RATIO among them: gate 9 above checks that ±21 mm at 5,\n"
+          "              ±11 mm at 6 and ±2.6 mm at 8 sit at ONE r·2\u1d4f, and that ±0.64 m at\n"
+          "              57 m and ±11 mm at one texel sit at the same fraction of their own\n"
+          "              span/2\u1d4f.  That is the page's own inference and needs no field.\n"
+          "              Only the ABSOLUTE millimetres stay ungated.")
     ref = [_reference(h, o, d, t0, t1) for (o, d, t0, t1, _k) in rs]
     worst = 0.0
     for (o, d, t0, t1, _k), rt in zip(rs, ref):
@@ -1190,6 +1408,7 @@ def run_gate():
           f"at run time.  Field: {_NG}² at {_S0:g} m texels, h = a·sin(kx) + b·sin(k′z) with "
           f"a={_AMP_X:g}, k=2π/{2 * math.pi / _KX:g}, b={_AMP_Z:g}, k′=2π/{2 * math.pi / _KZ:g} "
           f"-- this rig's own constants, which the page does not state.")
+    gate_fence()
     gate_cost()
     gate_fp32()
     h = _samples()
