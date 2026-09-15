@@ -56,7 +56,7 @@ hand-written:
 | | |
 |---|---|
 | Adversarially audited | **40 of 40** — a judgement about coverage, not a count |
-| Guards | `check.py` exit 0 · `--selftest` green · `index --check` current · `requote --selftest` green · CI `bites` **46 red + 7 green**, every mutation biting for the reason its row names. ⚠️ Not generated, because these are properties of a RUN and not of the tree — but the `bites` job asserts this row against what it actually observed, so the authority sits with the thing that knows |
+| Guards | `check.py` exit 0 · `--selftest` green · `index --check` current · `requote --selftest` green · CI `bites` **47 red + 7 green**, every mutation biting for the reason its row names. ⚠️ Not generated, because these are properties of a RUN and not of the tree — but the `bites` job asserts this row against what it actually observed, so the authority sits with the thing that knows |
 | Phase 0 | **closed** 2026-09-07 — the guard layer, verified by mutation under `bash -e` |
 
 ⚠️ **Read the stamp row's second number, not its first.** `4 of 40` is the count a reader

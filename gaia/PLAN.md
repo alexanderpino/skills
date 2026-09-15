@@ -375,6 +375,17 @@ entries; 37 tier lines; 1 simulation re-run (time-boxed); 6 human source-reads.
 
 ## Target: 9+ / 10
 
+⚠️ **The `Now` column is AUTHOR-SCORED, and until 2026-09-15 no guard read this file at all.** A
+re-rating panel called it *"the least instrumented text in the corpus, raised on the day it was
+being rated"*, and it was right: five dimensions were moved up by the same hand being rated, in a
+file `check.py` mentions only in two comments. `check.py` now checks the one claim here a matcher
+can judge without reading intent — a sentence denying the `verified:` stamps while the tree holds
+them. It does **not** check the numbers, and that is deliberate: this is a PLAN, so most of its
+figures are deliberately frozen *before*-states (`:91` and `:93` say *37 documents* because that
+is what there were), and a matcher cannot tell a historical count from a stale one. Read every
+score below as a claim by its author, cross-checked against `STATE.md`'s generated block — which
+is computed — and against nothing else.
+
 | Dimension | Then | **Now, 2026-09-15** | 9 means | Reached by |
 |---|---|---|---|---|
 | Stated constants | 9 | **9** — holds. The two the panel and its successors found since were a *label* on a right number (`mu_d = 0.86` is the CIE standard overcast, not a uniform sky) and a stale *docstring* (`4 of 36`), not a wrong constant | hold | Phase 3's rule 7 |

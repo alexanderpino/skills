@@ -1027,6 +1027,28 @@ jobs:
             "matches nothing in" prose_count_liveness
           cp /tmp/bk_live scripts/check.py
 
+          # PLAN.md, which until 2026-09-15 no guard read at all -- which is how its Now
+          # column came to be raised on five dimensions by the hand being rated. Only the
+          # stamp-denial rule applies there: its NUMBERS are deliberately frozen before-states
+          # ("37 documents" at :91 because that is what there were), and no matcher can tell a
+          # historical count from a stale one. The denial is different -- false the moment a
+          # stamp exists, whenever it was written -- and it is written WRAPPED here, because
+          # that is the shape that defeated the first implementation of this rule.
+          cp PLAN.md /tmp/bk_plan
+          python3 - <<'PYPL'
+          import pathlib
+          p = pathlib.Path("PLAN.md"); s = p.read_text(encoding="utf-8")
+          anchor = "## Target: 9+ / 10\n"
+          assert anchor in s, "the Target heading moved"
+          p.write_text(s.replace(
+              anchor,
+              anchor + "\nNothing here is signed: **no document carries\nthis yet**, so read the "
+              "scores as hearsay.\n", 1), encoding="utf-8")
+          PYPL
+          red_check "a stamp denial in PLAN.md, the file nothing used to read" \
+            "says 'no document carries this yet'" selfdescription
+          cp /tmp/bk_plan PLAN.md
+
           # ── the decoys ───────────────────────────────────────────────────────────────
           # Reworded prose OUTSIDE both anchors, and it ASSERTS that: the old form of this
           # decoy ran a global `the bed -> the pool floor` over caustics.md, which edits

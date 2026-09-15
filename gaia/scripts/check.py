@@ -3159,10 +3159,17 @@ def selfdescription_problems() -> list[str]:
     truth = selfdescription_truth()
     problems: list[str] = []
 
-    for name in ("SKILL.md", "STATE.md"):
+    # PLAN.md is read for the stamp-denial rule ONLY. Its numbers are mostly deliberately
+    # frozen before-states -- `:91` says "37 documents" because that is what there were when the
+    # plan was written -- and no matcher can tell a historical count from a stale one. A denial
+    # that the corpus holds any stamp is different: it is false the moment a stamp exists,
+    # whenever it was written. Until 2026-09-15 nothing read this file at all, which is how its
+    # Now column came to be raised on five dimensions by the hand being rated.
+    for name in ("SKILL.md", "STATE.md", "PLAN.md"):
         f = ROOT / name
         if not f.exists():
             continue
+        prose_and_stamp_of_n = name != "PLAN.md"
         raw = f.read_text(encoding="utf-8")
         # The generated region belongs to `generated_block_problems()`. Blanking it (rather than
         # deleting it) keeps every later line number right, and stops the two rules disagreeing:
@@ -3186,7 +3193,7 @@ def selfdescription_problems() -> list[str]:
                         f"itself wrongly in a file a reader opens first.")
 
         # 2. prose counts, against the computed truth
-        for pattern, key, what in PROSE_COUNTS:
+        for pattern, key, what in (PROSE_COUNTS if prose_and_stamp_of_n else ()):
             for m in re.finditer(pattern, flat, re.I):
                 raw = m.group(1)
                 got = WORD_NUMBERS.get(raw.lower()) if not raw.isdigit() else int(raw)
@@ -3200,7 +3207,7 @@ def selfdescription_problems() -> list[str]:
                         f"{truth[key]}.")
 
         # 3. "N of M" about the stamp, anywhere, wrapped or not
-        for m in re.finditer(r"(\d+)\s*(?:of|/)\s*(\d+)", flat):
+        for m in re.finditer(r"(\d+)\s*(?:of|/)\s*(\d+)", flat if prose_and_stamp_of_n else ""):
             window = low[max(0, m.start() - 120):m.end() + 60]
             if "stamp" not in window and "verified:" not in window:
                 continue
