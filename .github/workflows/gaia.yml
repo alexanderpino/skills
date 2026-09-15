@@ -240,6 +240,10 @@ jobs:
               # prove the GENERATOR rather than some other rule that happens to notice.
               "generated_block": [("check.py",
                   "    problems.extend(generated_block_problems())", "    pass")],
+              # The liveness assertion on the prose-count rules. Stubbing it lets a rule that
+              # matches nothing pass, which is what the coverage-rows rule did on arrival.
+              "prose_count_liveness": [("check.py",
+                  "    dead = prose_count_coverage()", "    dead = []")],
 
               # --- citations ------------------------------------------------------------
               "source_key_unknown": [("check.py", '            if extra:', '            if False:')],
@@ -990,6 +994,38 @@ jobs:
           fi
           cp /tmp/bk_corr2 registers/corrections.tsv
           cp /tmp/bk_gen STATE.md
+
+          # ── the prose counts outside the generated markers ───────────────────────────
+          # Seven of the nine falsehoods a rating panel found by hand lived in prose, not in the
+          # table the generator owns. And the FIRST version of one of these rules matched
+          # nothing at all -- it anchored on `**` while the sentence reads "**6. 13 coverage
+          # rows" -- so it passed its own tamper test by never firing. Both are asserted.
+          cp STATE.md /tmp/bk_prose
+          python3 - <<'PYP1'
+          import pathlib
+          p = pathlib.Path("STATE.md"); s = p.read_text(encoding="utf-8")
+          assert "documents on four axes" in s, "the opening sentence moved"
+          import re
+          p.write_text(re.sub(r"(\d+)(\s+documents on four axes)", r"37\2", s, count=1),
+                       encoding="utf-8")
+          PYP1
+          red_check "a prose count disagreeing with the tree" \
+            "documents on four axes; the tree has" selfdescription
+          cp /tmp/bk_prose STATE.md
+
+          # A rule that has quietly stopped matching. --selftest owns this one, not check.py.
+          cp scripts/check.py /tmp/bk_live
+          python3 - <<'PYP2'
+          import pathlib
+          p = pathlib.Path("scripts/check.py"); s = p.read_text(encoding="utf-8")
+          old = '(r"(\\d+) coverage rows are planned"'
+          assert s.count(old) == 1, "the coverage-rows prose rule moved"
+          p.write_text(s.replace(old, '(r"(\\d+) coverage rowz are planned"', 1), encoding="utf-8")
+          PYP2
+          expect_red "python3 scripts/check.py --selftest" \
+            "a prose-count rule that matches nothing" \
+            "matches nothing in" prose_count_liveness
+          cp /tmp/bk_live scripts/check.py
 
           # ── the decoys ───────────────────────────────────────────────────────────────
           # Reworded prose OUTSIDE both anchors, and it ASSERTS that: the old form of this

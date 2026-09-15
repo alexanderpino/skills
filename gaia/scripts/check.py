@@ -673,6 +673,11 @@ def selftest() -> int:
     for t, want in ubad:
         print(f"  FAIL  not-opened fixture: {t!r} should be "
               f"{'COUNTED as unread' if want else 'not counted'}")
+    dead = prose_count_coverage()
+    for pattern, where in dead:
+        print(f"  FAIL  prose-count rule {pattern!r} matches nothing in {where}. A rule that "
+              f"cannot fire is green for the wrong reason.")
+
     xdbad = [(t, want) for t, want in DATED_CROSSOVER_FIXTURES
              if bool(CROSSOVER_YEAR.search(_scrub_years(t))) != want]
     for t, want in xdbad:
@@ -719,7 +724,7 @@ def selftest() -> int:
     for msg in gbad:
         print(f"  FAIL  execution register: {msg}")
     xbad += xpbad + xrbad
-    if bad or nbad or ubad or ebad or cbad or xdbad or rbad or pbad or xbad or xcbad or gbad \
+    if dead or bad or nbad or ubad or ebad or cbad or xdbad or rbad or pbad or xbad or xcbad or gbad \
             or dbad or bbad:
         # `ebad` used to gate the exit code and not appear in this sentence, so a run with
         # only entry-tag failures printed "0 ... 0 ... 0 misclassified" above a non-zero exit.
@@ -2802,7 +2807,29 @@ def selfdescription_truth() -> dict[str, int]:
         "rigs": len(rig_files),
         "runs": len(list(rigs.rglob("*.run.txt"))) if rigs.exists() else 0,
         "rigs_asserting": sum(1 for f in rig_files if rig_asserts(f)),
+        # Documents the PRE-AUDIT tiering in STATE.md never named. Not "unaudited" -- every
+        # document has since been through an implementer and an independent verifier -- but the
+        # tiering is what that sentence is about, and it read 21 for nine days after three
+        # documents were written that it had never heard of.
+        "unexamined": len(docs) - _tiered_documents(docs),
     }
+
+
+def _tiered_documents(docs: list[Path]) -> int:
+    """How many documents STATE.md's audit-state tiering actually names."""
+    state = ROOT / "STATE.md"
+    if not state.exists():
+        return 0
+    text = state.read_text(encoding="utf-8")
+    head = "## Audit state, per document"
+    if head not in text:
+        return 0
+    section = text[text.index(head):]
+    cut = section.find("**Never examined")
+    if cut > 0:
+        section = section[:cut]
+    named = set(re.findall(r"`([a-z][a-z0-9-]+)`", section))
+    return sum(1 for d in docs if d.stem in named)
 
 
 def rig_asserts(path: Path) -> bool:
@@ -2825,6 +2852,39 @@ def rig_asserts(path: Path) -> bool:
     reads = "references" in src and ("read_text" in src or "open(" in src)
     return reads and "sys.exit" in src
 
+
+# Prose counts OUTSIDE the generated markers, checked against the computed truth.
+#
+# The generator owns the Status table. This owns the sentences a human writes about the corpus
+# in their own words, which is where SEVEN of the nine falsehoods a rating panel found by hand
+# actually lived -- "37 documents", "six bibliographies", "16 of 37", "21 unexamined",
+# "11 coverage rows". Each entry is (a regex with ONE capturing group for the number, the
+# truth key, and what to call it in the message).
+#
+# Deliberately anchored on the WORDS around the number rather than on a bare count, and each
+# pattern is written against the sentence that exists today. A rule that guesses at sentences
+# cries wolf; a rule that matches a bare integer would fire on every figure in the file.
+PROSE_COUNTS: tuple[tuple[str, str, str], ...] = (
+    (r"(\d+) documents on four axes", "documents", "documents on four axes"),
+    (r"plus (\w+) bibliographies", "bibliographies", "bibliographies"),
+    (r"covers \d+ of (\d+) documents", "documents", "the audit-table denominator"),
+    (r"The (\d+) documents this tiering never examined", "unexamined",
+     "documents the pre-audit tiering never examined"),
+    (r"(\d+) coverage rows are planned", "planned", "planned coverage rows"),
+)
+
+# ⚠️ EVERY PATTERN ABOVE IS ASSERTED TO MATCH SOMETHING. The coverage-rows rule was written as
+# `\*\*(\d+) coverage rows are planned` and matched NOTHING, because the sentence reads
+# "**6. 13 coverage rows are planned" -- a list number sits between the bold marker and the
+# count. It passed its own tamper test by never firing, which is the same defect as a fixture
+# set that cannot fail and a mutation that cannot go red. `prose_count_coverage()` below is run
+# by --selftest so a rule that has quietly stopped matching is a failure, not a silent pass.
+
+# Number words, because English prose writes small counts out and "plus six bibliographies" is
+# exactly the falsehood this rule exists to have caught.
+WORD_NUMBERS = {"zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+                "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+                "thirteen": 13}
 
 # Sentences that are FALSE while the tree holds a stamp. Matched against the whitespace-normalised
 # whole text, never line by line -- see the docstring of selfdescription_problems().
@@ -3037,6 +3097,29 @@ def generated_block_problems() -> list[str]:
     return out
 
 
+def prose_count_coverage() -> list[tuple[str, str]]:
+    """Every PROSE_COUNTS pattern must match somewhere, or it is checking nothing.
+
+    Written after the coverage-rows rule shipped matching nothing at all and passed its own
+    tamper test by never firing. A rule that cannot fire is the same defect as a mutation that
+    cannot go red, and this corpus has now committed that defect at four different levels:
+    a fixture set with no case at its boundary, a CI stub that patched the wrong anchor, a rig
+    whose expectations were its own transcript, and this.
+    """
+    dead: list[tuple[str, str]] = []
+    joined = []
+    for name in ("SKILL.md", "STATE.md"):
+        f = ROOT / name
+        if f.exists():
+            joined.append((name, _normalised(f.read_text(encoding="utf-8"))[0]))
+    if not joined:
+        return dead
+    for pattern, _key, _what in PROSE_COUNTS:
+        if not any(re.search(pattern, flat, re.I) for _n, flat in joined):
+            dead.append((pattern, " or ".join(n for n, _ in joined)))
+    return dead
+
+
 def selfdescription_problems() -> list[str]:
     """SKILL.md and STATE.md describe this corpus. This file can COMPUTE what they describe.
 
@@ -3102,7 +3185,21 @@ def selfdescription_problems() -> list[str]:
                         f"{truth['stamps']} document(s) carry one. The corpus is describing "
                         f"itself wrongly in a file a reader opens first.")
 
-        # 2. "N of M" about the stamp, anywhere, wrapped or not
+        # 2. prose counts, against the computed truth
+        for pattern, key, what in PROSE_COUNTS:
+            for m in re.finditer(pattern, flat, re.I):
+                raw = m.group(1)
+                got = WORD_NUMBERS.get(raw.lower()) if not raw.isdigit() else int(raw)
+                if got is None:
+                    problems.append(
+                        f"{name}:{lines[m.start()]}: states {raw!r} {what}, which is not a number "
+                        f"this check knows. Write the digit, or add the word to WORD_NUMBERS.")
+                elif got != truth[key]:
+                    problems.append(
+                        f"{name}:{lines[m.start()]}: states {raw} {what}; the tree has "
+                        f"{truth[key]}.")
+
+        # 3. "N of M" about the stamp, anywhere, wrapped or not
         for m in re.finditer(r"(\d+)\s*(?:of|/)\s*(\d+)", flat):
             window = low[max(0, m.start() - 120):m.end() + 60]
             if "stamp" not in window and "verified:" not in window:
