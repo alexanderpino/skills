@@ -1,0 +1,29 @@
+{
+  "skill_name": "straight-answer",
+  "invocation": "model-invocable: the description decides when Claude loads it on its own; the user can also force it with /straight, with or without a request",
+  "_howto": "Trigger cases (`invoked`: null) ask whether Claude should load the skill unprompted for this request. The risk profile is asymmetric and both directions are graded: a miss on a closed question costs a bloated answer, but a false fire on 'explain this to me' costs a truncated one, which is worse. Cases with `invoked`: \"/straight\" test what the skill must still refuse to do once forced. Grade against `expectations`.",
+  "expectations": {
+    "load": "Load the skill and apply it: match the answer's shape to the question, run the changed-action test, keep the floor.",
+    "do not load": "Do not load the skill. Answer the request at whatever length it genuinely calls for.",
+    "load, then give depth anyway": "Loading is defensible from the surface signal, but the request asked for depth. Say so in one line and give the depth; do not compress.",
+    "load, mode on": "The user switched the mode on with no request attached. Confirm in one line and apply it to everything following. Do not summarise the skill back."
+  },
+  "cases": [
+    { "invoked": null, "request": "Is `SELECT *` slower than naming the columns?", "expected": "load" },
+    { "invoked": null, "request": "yes or no — does this need a migration?", "expected": "load" },
+    { "invoked": null, "request": "just tell me the port number", "expected": "load" },
+    { "invoked": null, "request": "That answer was way too long. Which one should I pick?", "expected": "load" },
+    { "invoked": null, "request": "Stop adding things I didn't ask for. Just change the timeout.", "expected": "load" },
+    { "invoked": null, "request": "Fix the typo in the button label. Don't touch anything else.", "expected": "load" },
+    { "invoked": null, "request": "Which file has the feature flags?", "expected": "load" },
+    { "invoked": null, "request": "Explain how our event sourcing setup works.", "expected": "do not load" },
+    { "invoked": null, "request": "Walk me through the trade-offs between optimistic and pessimistic locking here.", "expected": "do not load" },
+    { "invoked": null, "request": "Write the design doc for the new billing service.", "expected": "do not load" },
+    { "invoked": null, "request": "Review this PR and tell me everything that's wrong with it.", "expected": "do not load" },
+    { "invoked": null, "request": "Teach me how Rust's borrow checker decides this is invalid.", "expected": "do not load" },
+    { "invoked": null, "request": "Refactor this module — it's grown unmanageable. Take whatever liberties you need.", "expected": "do not load" },
+    { "invoked": "/straight", "request": "explain the whole auth flow to me", "expected": "load, then give depth anyway" },
+    { "invoked": "/straight", "request": "", "expected": "load, mode on" },
+    { "invoked": "/straight", "request": "did the deploy succeed? (it failed on the smoke test)", "expected": "load" }
+  ]
+}

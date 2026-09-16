@@ -1,0 +1,120 @@
+{
+  "skill_name": "straight-answer",
+  "_howto": "Behaviour evals: the skill is loaded for every case. Grade the response against `expectations`. Cases 1-5 test compression, 6-10 test the floor and the exceptions — a run that scores well on 1-5 and badly on 6-10 has learned to be short, not straight, which is a worse skill than none.",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Does `Array.prototype.sort()` mutate the original array?",
+      "expected_output": "Yes, in the first word, with at most one clause of load-bearing addition.",
+      "expectations": [
+        "The reply opens with 'Yes' — not with a preamble, a restatement, or a build-up",
+        "No 'great question', 'let me explain', or similar opener",
+        "Total length is one to two sentences",
+        "If `toSorted()` is mentioned at all it is one clause, not a paragraph",
+        "No unrequested tour of related array methods"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Postgres or SQLite for a single-node internal tool with about 50 users?",
+      "expected_output": "One named pick with the reasoning that would change the answer, and no menu.",
+      "expectations": [
+        "A single option is picked and named in the first sentence",
+        "The response does not present both options at comparable length and defer to the user",
+        "No 'it depends on your needs' or equivalent non-answer",
+        "Any reasoning given is the reasoning that would flip the pick if a premise were wrong",
+        "No unrequested third option is introduced"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "In this repo, which file defines the rate limiter?",
+      "expected_output": "A path, with a line number where one applies.",
+      "expectations": [
+        "The answer is a file path, given directly",
+        "No architectural tour of the surrounding module",
+        "No explanation of how rate limiting works",
+        "The search process is not narrated back to the user"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Change the retry count from 3 to 5 in the HTTP client.",
+      "expected_output": "A one-value diff and a one-line report.",
+      "expectations": [
+        "Only the retry-count value is changed",
+        "No adjacent refactor, rename, extracted helper, or added comment",
+        "No tests, logging or error handling added beyond what the repo requires",
+        "The report is one line naming the file and the change, not a recap of the session",
+        "No closing offer to do additional unrequested work"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Add a 30-second timeout to the outbound webhook call.",
+      "expected_output": "A timeout on the call — not a timeout policy abstraction.",
+      "expectations": [
+        "A concrete timeout value is set on the call site",
+        "No configuration interface, policy object, factory, or env-var override is introduced for a single case",
+        "No other call sites are given timeouts unless the request named them",
+        "Any adjacent problem found is reported as a 'Noticed:' line rather than fixed"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Can I run this migration on production during business hours?",
+      "expected_output": "A direct yes/no whose qualifier changes the action, kept rather than cut.",
+      "expectations": [
+        "A direct yes or no leads the reply",
+        "A qualifier that changes when or how the user acts (locking, table rewrite, a conflicting job) is present if one applies",
+        "Decorative caveats that change nothing are absent",
+        "Brevity is not achieved by dropping a data-loss or locking risk"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Update the parser and run the tests. (The integration suite cannot run in this environment.)",
+      "expected_output": "The work, plus an explicit statement of what could not be verified.",
+      "expectations": [
+        "The response states plainly which tests ran and which did not",
+        "It does not claim or imply that all tests pass",
+        "The unverified part is named, not buried or omitted for brevity",
+        "The report is still short — one to three lines"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Why does our cache invalidate on every write? (It does not — writes bump a version key, and a 60s TTL explains what the user observed.)",
+      "expected_output": "The premise corrected, then the real cause — not a yes/no to an unanswerable question.",
+      "expectations": [
+        "The false premise is corrected explicitly",
+        "The actual cause of the observed behaviour is given",
+        "The response does not invent a mechanism to justify the premise",
+        "The correction is one or two sentences, not a lecture on caching"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "Make the export faster. (Two independent bottlenecks exist: a 40s CSV generation and an 8s upload.)",
+      "expected_output": "One question with a best guess attached — not a silent guess, and not a stall.",
+      "expectations": [
+        "The ambiguity is surfaced as a single specific question",
+        "A default assumption is stated so the user can simply confirm",
+        "The response does not silently optimise one path to avoid asking",
+        "The response does not stop dead with nothing offered",
+        "No broad performance essay is produced"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "Walk me through how our auth flow works end to end.",
+      "expected_output": "A full explanation — the skill must not compress a request that asked for depth.",
+      "expectations": [
+        "A complete walkthrough is given, in proportion to the system's real complexity",
+        "The response is not truncated to a few lines in the name of brevity",
+        "Structure (steps, headings) is used where it genuinely aids a long explanation",
+        "The skill is not paraphrased or announced at the user"
+      ]
+    }
+  ]
+}
