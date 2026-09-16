@@ -2,6 +2,7 @@
 
     python gaia/scripts/check.py            # report and exit non-zero on any problem
     python gaia/scripts/check.py --list     # what is checked, and what is NOT
+    python gaia/scripts/check.py --digest references/caustics.md   # the two digests a stamp needs
 
 WHAT THIS CAN AND CANNOT ESTABLISH -- read this before quoting a green run.
 
@@ -11,9 +12,68 @@ graded unverifiable. It CANNOT check that a cited paper says what the document c
 one step is human, and `verified:` in a document's front matter is where a human records
 having done it.
 
+Since 2026-09-15 it also checks what the corpus SAYS ABOUT ITSELF, in the two places that were
+found to have gone stale where nothing could see them. `selfdescription_problems()` compares
+`SKILL.md` and `STATE.md`'s stamp count, document count and "no document carries this yet"
+sentence against the tree -- all three were wrong on its first run, including a bolded claim
+that no document carried a `verified:` stamp while four did. `notopened_inline_problems()`
+requires a document that declares a source NOT OPENED in its front matter to say so in its body
+too, above the first bare `[id]` citation of it: 67 such citations across 10 documents were bare
+when the rule was written, including four in a `status: stable` document under a human stamp.
+Neither rule reads prose for meaning. They pin counts and position, which is what rots.
+
 In this repo's vocabulary a green run here is an `attestation` channel, not an `independent`
 one: the same kind of author writes the claim, the citation and this guard. Saying "grounded"
 because this passes would be the exact overstatement Gaia exists to avoid.
+
+THREE SURFACES NO MUTATION CAN PROVE. `registers/guard-proofs.tsv` carries these as `OPEN` rows
+and `PLAN.md`'s criterion 1 requires them to be named here, in the list a reader actually runs.
+An honest mutation for each would go GREEN by design, which is the finding rather than a bug:
+
+  T3 -- FABRICATION, as a whole. No guard can tell a quotation that was read from one that was
+      invented. `requote.py` is the only instrument aimed at it and can only compare against
+      artefacts already in a cache; with no cache present it asserts nothing either way and
+      says so (`--require-cache` exits 2 for CI). The surface is open by construction and is
+      closed only by a human reading the source. That human's signature is `verified:`.
+
+  T4 -- `[background]` as an exit from the orphan check. Any bibliography entry escapes
+      `check_orphans` by carrying the tag, and nothing audits the tag, so an entry cited by
+      nobody is indistinguishable from one deliberately kept for context. 1 entry carries it.
+      The honest mutation -- tag a genuinely orphaned entry -- passes, which is the point.
+
+  T8 -- coverage-row floors measure LENGTH, not content. `check_coverage` wants 25 characters
+      for a `planned` row and 60 for `out-of-scope`. 60 characters of padding passes exactly as
+      well as 60 characters of reason. A mutation proving this would have to assert that
+      padding passes. The floor is a nudge; the review that catches a shrug is human.
+
+Two structural facts about a document are checked against each other rather than reported. A
+`**Tier:` line's budget regime must agree with the budget tag in `tags:`, in BOTH directions:
+a regime named on the page must be a tag, and a tag must be named on the page. It CANNOT check
+that the regime is true -- a real-time claim over a 400 ms recommendation is agreement, not
+correctness -- and a document with no Tier line at all is an ALLOWED state, counted and named,
+because the 450-line cap refuses the insertion in the documents nearest it, which the run
+names. And every
+`document.md` a body names in a code span must be a document that exists: that is a FAILURE,
+not a metric, because the same dangling reference in coverage.md's `→ target` column has always
+been one. Its reach is gaia's own naming shape; a bare `.md` name belonging to another
+repository is NAMED in the output rather than checked, and the corpus now has none -- the five
+that motivated the report, `19-fluid-simulation.md` among them, all carry their directory inside
+the span, so the residue is empty and the clause is not printed. `.py` and `.tsv` paths are not
+read at all.
+
+It also checks the SHAPE of `registers/pseudocode-execution.tsv`: seven fields, the header that
+names them, and a `termination` token from a closed vocabulary, so that no row can be silent
+about whether its block halts. It cannot check that the token is TRUE -- `halts-proven` is worth
+exactly the argument written beside it. The `unknown` count and the count of documents holding a
+fenced block that no row names are REPORTED, never enforced.
+
+One idiom in that register is enforced too: a cell may not name another row of the same file by
+line number. Rows have no stable lines -- the edit that added the `termination` column inserted
+55 lines of header and left seven cells pointing 55 lines short, into the comment block, every
+one of them still well-formed and none of them caught. References INTO reference documents
+(`flow-routing.md:239`) are the correct idiom and are deliberately not checked: those files are
+edited daily by other hands, and a guard over them would be permanently red on other people's
+work.
 """
 from __future__ import annotations
 
@@ -23,6 +83,7 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -32,6 +93,14 @@ ROOT = Path(__file__).resolve().parents[1]
 INDEX = ROOT / "references" / "index.md"
 COVERAGE = ROOT / "references" / "coverage.md"
 TRIGGERS = ROOT / "evals" / "trigger-evals.json"
+PSEUDOCODE = ROOT / "registers" / "pseudocode-execution.tsv"
+CORRECTIONS = ROOT / "registers" / "corrections.tsv"
+
+
+# One spelling of the bibliography glob, used by `paper_files()` and by the error text that
+# names it. They disagreed for a whole rename: the files became `papers-*.md` and the guard went
+# on telling readers a citation was "absent from papers.md", a file that no longer existed.
+PAPERS_GLOB = "papers*.md"
 
 
 def paper_files() -> list[Path]:
@@ -41,11 +110,23 @@ def paper_files() -> list[Path]:
     already organises itself, and splitting lets documents and their sources land together.
     Globbed from disk, never listed by hand -- a hand-kept list is the thing that goes stale.
     """
-    return sorted((ROOT / "references").glob("papers*.md"))
+    return sorted((ROOT / "references").glob(PAPERS_GLOB))
 
 MAX_LINES = 450          # per the plan: a document at the cap is two topics wanting a split
+# A bibliography is a LIST, not a topic, and it grows with the corpus by design -- so the
+# "it is two topics" reading of the cap does not apply to it. It was exempt from the cap
+# altogether, by two conditions that could never fire (the paths were already excluded from
+# the loop), which is not a decision, it is a leftover: papers-rendering.md reached 411 lines
+# with no ceiling at all. They get a looser cap of their own instead of none. Past it, a family
+# file wants splitting the way `papers.md` itself already was.
+BIB_MAX_LINES = 600
 TIERS = {"P", "F", "L", "N", "?"}
 STATUS = {"draft", "stable", "deprecated"}
+# The only keys a `sources:` row may carry. `Tier:`, `teir:` and `locater:` all used to pass
+# in silence, and a misspelled `tier:` is worse than an absent one: the tier-agreement check
+# reads `if "tier" in s`, so the row loses its comparison while still LOOKING graded on the
+# page. An unknown key here is either a typo or a field nothing reads.
+SOURCE_KEYS = {"id", "tier", "locator"}
 
 # `- **id** `T` — Reference text.`  with optional trailing ` [background]` and ` [no-artefact]`.
 # [no-artefact] is a STRUCTURED declaration, not prose: it is what lets a locator opt out of the
@@ -149,6 +230,42 @@ def sources_digest(fm: dict) -> str:
     return hashlib.sha256("\n".join(f"{i}|{l}" for i, l in rows).encode()).hexdigest()[:12]
 
 
+_EMPTY_BODY_DIGEST = hashlib.sha256(b"").hexdigest()[:12]
+
+
+def body_digest(body: str) -> str:
+    """A fingerprint of the two sections a reader actually lands on.
+
+    `sources_digest` scopes a stamp to a CITATION SET, which is necessary and not sufficient.
+    Reproduced end to end before this existed: stamp a document, then replace EVERY prose
+    sentence in its body with an invention -- keeping headings, tables and citation markers --
+    and the guard exits 0 while the index goes on printing **checked**. The stamp certified
+    which papers were cited, and the claims are what a human actually read.
+
+    Hashing the whole body would make a stamp brittle against a typo fix, which is how a
+    digest gets routed around. `## Use this` and the failure table are the two places this
+    corpus's readers land (`SKILL.md:42` tells them to take the failure table as one packet)
+    and the two places its recorded corrections land. The text is whitespace-normalised, so a
+    re-wrap or a reflow is not a change; a word is.
+
+    ⚠️ WHAT THIS CANNOT SEE, stated so no one reads a valid stamp as a checked document. It is
+    a digest, not a reader: it detects that the anchors MOVED, never that they are wrong, and
+    the three defect shapes this audit records most often all sit outside its scope.
+      * X7 (`gpu-driven-culling.md:108`, an inverted consequence one bullet below its own
+        correct statement) lives in body prose. It is not hashed, and a stamp survives both the
+        defect and its fix untouched.
+      * X17 (`node-graph-runtime.md:232` vs `:386`, opposite prescriptions for one decision)
+        and X52 (`mask-to-material.md:296,300`, a retracted claim re-asserted in two failure
+        rows) sit INSIDE the anchors and are hashed -- but they shipped that way, so a human
+        stamping the document would digest the defect along with everything else.
+    A hash scopes a reading. It does not perform one.
+    """
+    parts = re.split(r"^## +(.+?)\s*$", body, flags=re.M)
+    chunks = [" ".join((h + " " + b).split())
+              for h, b in zip(parts[1::2], parts[2::2]) if _is_anchor(h.strip().lower())]
+    return hashlib.sha256("\n".join(chunks).encode()).hexdigest()[:12]
+
+
 def _unfenced(body: str) -> str:
     """Body with code blanked, so indexing is never read as a citation.
 
@@ -182,13 +299,9 @@ def check_documents(bib: dict[str, dict]) -> tuple[list[str], set[str]]:
     problems: list[str] = []
     used: set[str] = set()
 
-    skip = set(paper_files()) | {INDEX, COVERAGE}
+    papers = set(paper_files())
+    apparatus_paths = papers | {INDEX, COVERAGE}
     for path in documents(ROOT):
-        # Bibliographies, the index and the coverage map make no claims of their own -- they
-        # are apparatus, and each has its own check. Demanding `sources:` from them would be
-        # the guard misreading its own furniture as content.
-        if path in skip:
-            continue
         rel = path.relative_to(ROOT)
         try:
             fm, body = parse_front_matter(path)
@@ -196,35 +309,126 @@ def check_documents(bib: dict[str, dict]) -> tuple[list[str], set[str]]:
             problems.append(str(e))
             continue
 
-        # --- OKF conformance -------------------------------------------------------------
+        # Bibliographies, the index and the coverage map make no claims of their own -- they
+        # are apparatus. But `if path in skip: continue` at the top of this loop exempted them
+        # from the OKF conformance block as well, and that block is the FORMAT contract for
+        # every document in the bundle: a bibliography could lose its `type:`, take an illegal
+        # `status:`, grow an `okf_version:` or carry a `verified:` naming nobody, and nothing
+        # here looked. What apparatus is still exempt from is the whole CITATION block --
+        # not, as this comment once claimed, exactly two things. `if apparatus: continue`
+        # below skips the `sources:` requirement, the body-marker cross-check AND every
+        # per-entry check with them, so a `sources:` row on a bibliography with a dangling
+        # id and a misspelled key produces no failure at all. That is safe only while no
+        # apparatus file carries `sources:`; the day one does, this exemption has to narrow.
+        #
+        # The second half of that exemption is not cosmetic. `papers-flow.md:146` ends a prose
+        # sentence with the literal `[background]`, which `_MARKER` reads as a citation to an id
+        # that exists in no bibliography -- so running the cross-check over apparatus reports a
+        # fabricated citation in a clean corpus. Verified by running it; the marker is prose
+        # about the tag, not a citation.
+        apparatus = path in apparatus_paths
+
+        # --- OKF conformance, on EVERY document ------------------------------------------
         if "type" not in fm:
             problems.append(f"{rel}: no `type` -- the one always-required OKF key")
-        if fm.get("status", "stable") not in STATUS:
-            problems.append(f"{rel}: status `{fm.get('status')}` is not one of {sorted(STATUS)}")
+        # ABSENT `status:` is a failure, not a default. Three sites used to disagree about a
+        # missing key: this one validated it as `stable`, the "stable needs `verified:`" rule
+        # below read None and never fired, and index.py PRINTED stable -- so DELETING one line
+        # from a draft document advertised it as checked by a human, past both guards. The
+        # obvious repair, defaulting to `draft` here and in index.py, fixes the display and
+        # makes its own mutation a no-op: a draft with the line deleted is still a draft, so
+        # nothing could ever be seen going red. The key is required instead.
+        status = fm.get("status")
+        if status is None:
+            problems.append(f"{rel}: no `status:` -- required, not defaulted. An absent status "
+                            "read as `stable` in the index and as neither value in this guard, "
+                            "so deleting one line advertised a document as human-checked.")
+        elif not isinstance(status, str):
+            # `status:` with an empty value parses to a list, and `in STATUS` on an
+            # unhashable raised TypeError -- CI went red with a traceback instead of a
+            # FAIL line, breaking this module's promise that problems are returned,
+            # never raised.
+            problems.append(f"{rel}: status `{status!r}` is not a scalar. Write one of "
+                            f"{sorted(STATUS)} on the line, unquoted.")
+        elif status not in STATUS:
+            problems.append(f"{rel}: status `{status}` is not one of {sorted(STATUS)}")
         if "okf_version" in fm and path != INDEX:
             problems.append(f"{rel}: `okf_version` belongs in the bundle root only")
         # `generated` is not `verified`. A document may not claim a human checked it unless a
         # human is named -- this is the only line between attribution and verification.
         ver = fm.get("verified")
-        digest = sources_digest(fm)
+        digest, bdigest = sources_digest(fm), body_digest(body)
         for entry in (ver if isinstance(ver, list) else [ver] if ver else []):
             who = str(entry.get("by", "")) if isinstance(entry, dict) else ""
-            if not who.startswith("human:") or len(who) <= len("human:"):
+            # `len(who) > len("human:")` passed `by: "human: "` -- seven characters, naming
+            # nobody. What has to be non-empty is the ID, not the string.
+            if not (who.startswith("human:") and who[len("human:"):].strip()):
                 problems.append(f"{rel}: `verified:` needs a named `human:<id>` actor. "
-                                "`human:` alone names nobody, and a process can only generate.")
-            elif entry.get("covers") != digest:
+                                f"`{who}` names nobody -- `human:` with nothing after it is not "
+                                "an actor, and a process can only generate.")
+                continue
+            # A stamp over NO anchor section certifies nothing. Apparatus -- the
+            # bibliographies, index.md, coverage.md -- has neither `## Use this` nor a failure
+            # table, so `body_digest` hashes the empty string and every one of them digests to
+            # the same value. Proved end to end: stamp a bibliography, replace all 19 of its
+            # references with inventions attributed to nobody, and this guard stayed green while
+            # the index printed **checked**. One such stamp is valid on all nine files. Phase 0
+            # made these rules REACHABLE on apparatus; without this line it made them vacuous.
+            if bdigest == _EMPTY_BODY_DIGEST:
                 problems.append(
-                    f"{rel}: `verified:` covers `{entry.get('covers')}` but the sources now "
-                    f"digest to `{digest}`. The citations changed since {who} read them, so "
-                    "the verification is stale. Re-check and update `covers`, or drop to draft.")
-        if fm.get("status") == "stable" and not ver:
+                    f"{rel}: `verified:` on a document with neither `## Use this` nor a failure "
+                    f"table. `covers_body` is the digest of the empty string here, so the stamp "
+                    f"is identical on every such file and scopes to nothing. Stamp a Technique, "
+                    f"or give this document the two anchor sections first.")
+                continue
+            if not isinstance(entry, dict) or "covers" not in entry or "covers_body" not in entry:
+                missing = [k for k in ("covers", "covers_body")
+                           if not isinstance(entry, dict) or k not in entry]
+                problems.append(
+                    f"{rel}: `verified:` is missing {', '.join(f'`{k}`' for k in missing)}. A "
+                    f"stamp scopes to BOTH halves of what was read: `covers` is the citation "
+                    f"set (now `{digest}`), `covers_body` is `## Use this` and the failure "
+                    f"table (now `{bdigest}`). Without the second, every claim in the document "
+                    f"can be replaced and the stamp stays valid.")
+                continue
+            # Which half moved is the whole message. "The digest changed" sends a reader to
+            # re-read a document when all that happened was a new citation, or the reverse.
+            moved = []
+            if entry["covers"] != digest:
+                moved.append(f"the SOURCES changed -- `covers` says `{entry['covers']}`, they "
+                             f"now digest to `{digest}`")
+            if entry["covers_body"] != bdigest:
+                moved.append(f"the CLAIMS changed -- `covers_body` says "
+                             f"`{entry['covers_body']}`, `## Use this` and the failure table "
+                             f"now digest to `{bdigest}`")
+            if moved:
+                problems.append(f"{rel}: `verified:` is stale: " + "; and ".join(moved) +
+                                f". That happened after {who} read it, so the verification no "
+                                "longer covers the document. Re-check and update the digest, "
+                                "or drop to draft.")
+        if status == "stable" and not ver:
             problems.append(f"{rel}: status `stable` with no `verified:` entry -- stable claims "
                             "a human checked the citations. Use `draft` until one has.")
+        # And the other direction. index.py prints **checked** on the presence of `verified:`
+        # alone, so a draft carrying a stamp read as verified in the index while its own status
+        # line said otherwise. A stamp is what makes a document stable; the two must agree.
+        if ver and status != "stable":
+            problems.append(f"{rel}: `verified:` on a `{status}` document. The index prints "
+                            "**checked** for any document carrying a stamp, so this advertises "
+                            "a verification the status line denies. A stamp requires "
+                            "`status: stable`.")
 
         # --- size ------------------------------------------------------------------------
-        n = len(path.read_text(encoding="utf-8").splitlines())
-        if n > MAX_LINES and path not in paper_files() and path != INDEX:
-            problems.append(f"{rel}: {n} lines, over the {MAX_LINES} cap -- it is two topics")
+        # index.md is generated: its length is a function of how many documents exist, so a cap
+        # on it would report the corpus growing as a defect. Every other file has one.
+        if path != INDEX:
+            cap = BIB_MAX_LINES if path in papers else MAX_LINES
+            n = len(path.read_text(encoding="utf-8").splitlines())
+            if n > cap:
+                problems.append(f"{rel}: {n} lines, over the {cap} cap -- {'split the family' if cap == BIB_MAX_LINES else 'it is two topics'}")
+
+        if apparatus:
+            continue
 
         # --- citations, both directions --------------------------------------------------
         # A document with no `sources:` used to pass everything, because only DECLARED sources
@@ -240,8 +444,24 @@ def check_documents(bib: dict[str, dict]) -> tuple[list[str], set[str]]:
             if not isinstance(s, dict) or "id" not in s:
                 problems.append(f"{rel}: a `sources:` entry has no `id`")
                 continue
+            # Checked before the id is resolved, so a row that is BOTH misspelled and dangling
+            # still reports the misspelling.
+            extra = sorted(set(s) - SOURCE_KEYS)
+            if extra:
+                problems.append(f"{rel}: `{s['id']}` carries unknown `sources:` key(s) "
+                                f"{', '.join(f'`{k}`' for k in extra)}; only "
+                                f"{', '.join(f'`{k}`' for k in sorted(SOURCE_KEYS))} are read. "
+                                "A misspelled `tier:` is worse than an absent one -- the row "
+                                "still looks graded on the page and nothing compares it.")
+            # The bibliography was split into seven `papers-*.md` files and this message went on
+            # naming `papers.md`, which has not existed since. `guard-proofs.tsv:17` already
+            # records that rows naming it were a known post-rename problem -- the register was
+            # corrected and the guard's own error text was not, inside the tool that polices
+            # exactly that shape. Named from the glob so a future split cannot stale it again.
             if s["id"] not in bib:
-                problems.append(f"{rel}: cites `{s['id']}`, absent from papers.md")
+                problems.append(f"{rel}: cites `{s['id']}`, absent from every "
+                                f"references/{PAPERS_GLOB} "
+                                f"({', '.join(p.name for p in paper_files())})")
                 continue
             if bib[s["id"]]["tier"] == "?" and path != INDEX:
                 problems.append(f"{rel}: cites `{s['id']}`, graded `?` (claimed but "
@@ -316,6 +536,11 @@ LOCATOR_NO_ARTEFACT = "no artefact:"
 # not more honest, it is less useful. What matters is that the count is on screen every run.
 LOCATOR_NOT_OPENED = ("NOT OPENED", "NO LOCATOR")
 
+# The BODY-side spelling of the same declaration -- one line per document, placed inside the
+# opening paragraph so it is above every citation on the page. One literal, because a guard
+# that accepts three spellings of its own marker is a guard that will meet a fourth.
+NOTOPENED_BANNER = "Never opened here:"
+
 # The ENTRY side of the same claim. These assert the grammar accepts the tag where it belongs
 # and nowhere else -- a tag the regex silently dropped would turn the bidirectional check into a
 # one-directional one, and the corpus would drift back to a tier saying "read" beside a locator
@@ -327,8 +552,10 @@ ENTRY_TAG_FIXTURES = [
     ("- **burt1983** `P` — Burt, P.J. (1983). *The Laplacian Pyramid.* [background]", False),
     # An author writes the tag where the two SIBLING tags go -- at the END. There it used to be
     # swallowed silently by the `ref` group, with no format error, because the line still
-    # matched. 69 of 196 entries wrap onto a continuation line, so for those the visual end of
+    # matched. most entries wrap onto a continuation line (the absolute count moves with the corpus; an earlier version of this comment froze it and went stale twice), so for those the visual end of
     # the entry is a line this regex never reads, which is exactly where a hand would put it.
+    # (This comment said 69 of 196 while check_propagation's docstring said 88 of 214 -- one
+    # count, two places in this file, neither re-run. Measured 2026-09-06: 88 of 214.)
     ("- **horn1981** `P` — Horn, B.K.P. (1981). *Hill shading.* [not-opened]", True),
     ("- **horn1981** `P` — Horn, B. (1981). *Hill shading.* [background] [not-opened]", True),
 ]
@@ -446,6 +673,16 @@ def selftest() -> int:
     for t, want in ubad:
         print(f"  FAIL  not-opened fixture: {t!r} should be "
               f"{'COUNTED as unread' if want else 'not counted'}")
+    dead = prose_count_coverage()
+    for pattern, where in dead:
+        print(f"  FAIL  prose-count rule {pattern!r} matches nothing in {where}. A rule that "
+              f"cannot fire is green for the wrong reason.")
+
+    xdbad = [(t, want) for t, want in DATED_CROSSOVER_FIXTURES
+             if bool(CROSSOVER_YEAR.search(_scrub_years(t))) != want]
+    for t, want in xdbad:
+        print(f"  FAIL  dated-crossover fixture: {t!r} should be "
+              f"{'COUNTED as dated' if want else 'not counted'}")
     cbad = [(t, want) for t, want in COST_FIXTURES
             if bool(COST_UNIT.search(t)) != want]
     for t, want in cbad:
@@ -460,24 +697,72 @@ def selftest() -> int:
     for t, want in pbad:
         print(f"  FAIL  propagation fixture: {t!r} should yield {sorted(want)}, "
               f"got {sorted(section_tokens(t))}")
-    if bad or nbad or ubad or ebad or cbad or rbad or pbad:
+    xbad = [(t, want) for t, want in CROSSREF_FIXTURES if _x_formula(t) != want]
+    for t, want in xbad:
+        print(f"  FAIL  crossref fixture: {t!r} should yield {want}, got {_x_formula(t)}")
+    xpbad = [(t, want) for t, want in CROSSREF_PATH_FIXTURES if _x_is_path(t) != want]
+    for t, want in xpbad:
+        print(f"  FAIL  crossref path fixture: {t!r} should be "
+              f"{'a PATH' if want else 'a formula'}")
+    xrbad = [(t, want) for t, want in CROSSREF_RATIO_FIXTURES if _x_ratios(t) != want]
+    for t, want in xrbad:
+        print(f"  FAIL  crossref ratio fixture: {t!r} should yield {sorted(want)}, "
+              f"got {sorted(_x_ratios(t))}")
+    dbad = [(t, want) for t, want in DOC_NAME_FIXTURES
+            if bool(_DOC_NAME.match(t)) != want]
+    for t, want in dbad:
+        print(f"  FAIL  cross-reference fixture: {t!r} should be "
+              f"{'a document this corpus must have' if want else 'out of reach'}")
+    bbad = [(t, wc, we) for t, wc, we in BUDGET_FIXTURES if _budget_tokens(t) != (wc, we)]
+    for t, wc, we in bbad:
+        print(f"  FAIL  budget fixture: {t!r} should claim {sorted(wc)} and evidence "
+              f"{sorted(we)}, got {[sorted(s) for s in _budget_tokens(t)]}")
+    xcbad = crossref_corpus_selftest()
+    for msg in xcbad:
+        print(f"  FAIL  crossref corpus: {msg}")
+    gbad = register_selftest()
+    for msg in gbad:
+        print(f"  FAIL  execution register: {msg}")
+    xbad += xpbad + xrbad
+    if dead or bad or nbad or ubad or ebad or cbad or xdbad or rbad or pbad or xbad or xcbad or gbad \
+            or dbad or bbad:
         # `ebad` used to gate the exit code and not appear in this sentence, so a run with
         # only entry-tag failures printed "0 ... 0 ... 0 misclassified" above a non-zero exit.
         print(f"\n{len(bad)} of {len(LOCATOR_FIXTURES)} locator fixtures, "
               f"{len(nbad)} of {len(NO_ARTEFACT_FIXTURES)} no-artefact fixtures, "
               f"{len(ubad)} of {len(NOT_OPENED_FIXTURES)} not-opened fixtures and "
               f"{len(ebad)} of {len(ENTRY_TAG_FIXTURES)} entry-tag fixtures and "
+              f"{len(xdbad)} of {len(DATED_CROSSOVER_FIXTURES)} dated-crossover fixtures and "
               f"{len(cbad)} of {len(COST_FIXTURES)} cost fixtures and "
               f"{len(rbad)} of {len(ERROR_FIXTURES)} error fixtures and "
-              f"{len(pbad)} of {len(PROPAGATION_FIXTURES)} propagation fixtures misclassified.")
+              f"{len(pbad)} of {len(PROPAGATION_FIXTURES)} propagation fixtures and "
+              f"{len(xbad)} of "
+              f"{len(CROSSREF_FIXTURES) + len(CROSSREF_PATH_FIXTURES) + len(CROSSREF_RATIO_FIXTURES)}"
+              f" crossref fixtures misclassified, "
+              f"{len(dbad)} of {len(DOC_NAME_FIXTURES)} cross-reference fixtures and "
+              f"{len(bbad)} of {len(BUDGET_FIXTURES)} budget fixtures misclassified, "
+              f"and {len(xcbad)} crossref corpus "
+              f"assertion(s) and {len(gbad)} execution-register assertion(s) failed.")
         return 1
     print(f"locator pattern: {len(LOCATOR_FIXTURES)}/{len(LOCATOR_FIXTURES)} fixtures correct; "
           f"no-artefact marker: {len(NO_ARTEFACT_FIXTURES)}/{len(NO_ARTEFACT_FIXTURES)} correct; "
           f"not-opened marker: {len(NOT_OPENED_FIXTURES)}/{len(NOT_OPENED_FIXTURES)} correct; "
           f"entry tag: {len(ENTRY_TAG_FIXTURES)}/{len(ENTRY_TAG_FIXTURES)} correct; "
           f"cost unit: {len(COST_FIXTURES)}/{len(COST_FIXTURES)} correct; "
+          f"dated-crossover: {len(DATED_CROSSOVER_FIXTURES)}/{len(DATED_CROSSOVER_FIXTURES)} correct; "
           f"error: {len(ERROR_FIXTURES)}/{len(ERROR_FIXTURES)} correct; "
-          f"propagation: {len(PROPAGATION_FIXTURES)}/{len(PROPAGATION_FIXTURES)} correct.")
+          f"propagation: {len(PROPAGATION_FIXTURES)}/{len(PROPAGATION_FIXTURES)} correct; "
+          f"crossref: {len(CROSSREF_FIXTURES)}/{len(CROSSREF_FIXTURES)} formula, "
+          f"{len(CROSSREF_PATH_FIXTURES)}/{len(CROSSREF_PATH_FIXTURES)} path, "
+          f"{len(CROSSREF_RATIO_FIXTURES)}/{len(CROSSREF_RATIO_FIXTURES)} ratio correct; "
+          f"cross-reference shape: {len(DOC_NAME_FIXTURES)}/{len(DOC_NAME_FIXTURES)} correct; "
+          f"budget vocabulary: {len(BUDGET_FIXTURES)}/{len(BUDGET_FIXTURES)} correct, including "
+          f"the four cases that decide the `runtime` asymmetry; and "
+          f"check_crossrefs() itself reports {len(CROSSREF_CORPUS_EXPECTED)}/"
+          f"{len(CROSSREF_CORPUS_EXPECTED)} reconstructed instances on the fixture corpus and "
+          f"nothing once they are corrected; the execution-register check reports "
+          f"{len(PSEUDOCODE_FIXTURE_EXPECTED)}/{len(PSEUDOCODE_FIXTURE_EXPECTED)} malformed rows "
+          f"plus the dropped column name, and nothing once they are repaired.")
     return 0
 
 
@@ -533,7 +818,12 @@ def locator_quality() -> tuple[int, int, int, list[str]]:
 # this UNDER-counts, which is the safe direction for a number that is supposed to go up, and a
 # document that wants credit has to state the cost precisely enough to be actionable anyway.
 COST_UNIT = re.compile(r"(?<![\w.])\d[\d.,]*\s*(?:ms|\u00b5s|us|MB|GB|KB|TB|MiB|GiB|KiB|fps|FPS)\b"
-                       r"|bytes?\s*(?:per|/)\s*cell", re.I)
+                       r"|(?<![\w.])\d[\d.,]*\s*bytes?\s*(?:per|/)\s*cell", re.I)
+# The second branch carried NO DIGIT until 2026-09-15, so "cost in bytes/cell is unpriced"
+# matched -- in the same paragraph whose docstring congratulates this pattern for requiring
+# a number. Found by an independent rating panel, not by this file's own fixtures. Latent,
+# not live: the two documents credited through this branch alone say "2 bytes per cell" and
+# "8 bytes per cell", so the count is unchanged at 39/40. The fixtures below now pin it.
 
 # The other half of the engineer's question. Deliberately NOT matching a bare "N% of": that
 # catches "70% of the variance" and every other proportion in the corpus, and a metric that
@@ -561,6 +851,10 @@ ERROR_FIXTURES = [
 ]
 
 COST_FIXTURES = [
+    ("cost in bytes/cell is unpriced", False),   # the digitless hole, open until 2026-09-15
+    ("bytes per cell", False),                   # a unit is not a measurement
+    ("**8 bytes per cell**", True),              # and the real thing still counts
+
     ("the bake is 104 ms at 4k", True),
     ("32 MB per resident tile", True),
     ("4 bytes per cell, so 1.3 GB", True),
@@ -586,8 +880,13 @@ def approximation_coverage() -> tuple[int, int, int, int]:
     approximation carries, and the cost it incurs. Either alone is unactionable -- an error
     bound with no cost cannot be budgeted, a cost with no error cannot be justified.
 
-    Measured honestly: **4 of 36 documents state both**. 10 say how good and not what it costs;
-    4 say what it costs and not how good; 18 say neither.
+    Measured honestly: **39 of 40 documents state both** (2026-09-15). 1 says how good and not
+    what it costs; 0 say what it costs and not how good; 0 say neither. ⚠️ This docstring read
+    **4 of 36** for nine days after the count moved -- a sentence about the corpus, inside the
+    file that computes the corpus, that the file never read back. It is the same defect the
+    2026-09-15 `selfdescription_problems()` check was written for, and that check cannot see this
+    line: it reads `SKILL.md` and `STATE.md`, not its own source. The run line is generated; only
+    this prose was stale. Re-derive with `approximation_coverage()` before quoting it.
 
     It read 10/36 for half a day, and that was this metric committing the defect it exists to
     detect. `COST_UNIT` matched the bare phrases "per frame", "budget tier" and "offline bake", so
@@ -605,8 +904,7 @@ def approximation_coverage() -> tuple[int, int, int, int]:
     cannot see an error stated in cells or an asymptotic cost stated in O-notation. It is a
     floor on how many documents put both halves in front of the reader at all.
     """
-    docs = [p for p in documents(ROOT)
-            if p not in paper_files() and p not in (INDEX, COVERAGE)]
+    docs = content_documents()
     both = err = cost = neither = 0
     for d in docs:
         try:
@@ -725,8 +1023,7 @@ def check_section_reach() -> tuple[list[str], int, int]:
     result above so nobody rebuilds this and believes it works.
     """
     problems: list[str] = []
-    docs = [p for p in documents(ROOT)
-            if p not in paper_files() and p not in (INDEX, COVERAGE)]
+    docs = content_documents()
     unreachable = total = 0
     for d in docs:
         try:
@@ -759,6 +1056,542 @@ def check_section_reach() -> tuple[list[str], int, int]:
                     f"  ....  {d.relative_to(ROOT)}: section '{h}' reaches neither "
                     f"`## Use this` nor the failure table")
     return problems, unreachable, total
+
+
+# ── check_crossrefs: does a value agree at both ends of a link? ───────────────────────────────
+# Superscripts and `N × 10^M` are folded into ordinary floats BEFORE anything is compared. This
+# is not cosmetic. `U = 5×10⁻⁴ m/yr` and `U = 0.0005 m/yr` are the same measurement written two
+# ways, and without the fold the guard read them as {5, 10} against {0.0005} and reported three
+# corpus-wide disagreements that were all the same number. Folding removed all three.
+_SUPS = "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻"
+_SUP_MAP = str.maketrans(_SUPS, "0123456789+-")
+_SUP_RUN = re.compile(f"[{_SUPS}]+")
+_SCI = re.compile(r"(?<![A-Za-z0-9_.])(\d+(?:\.\d+)?)\s*\*\s*10\^(-?\d+)")
+# A number, exponent included. `1.2e-7` must be ONE token: reading it as `1.2` + an identifier
+# `e` + `7` invented a shared key `e|x` and reported planetary-precision.md against
+# shader-craft.md for two unrelated ULP figures.
+_XNUM = re.compile(r"(?<![A-Za-z0-9_.])\d+(?:\.\d+)?(?:[eE][+-]?\d+)?")
+_XIDENT = re.compile(r"[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)*")
+_XSPAN = re.compile(r"`([^`\n]+)`")
+_XSYM = r"[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)?"
+_XRATIO = re.compile(rf"^({_XSYM})\s*/\s*({_XSYM})$")
+# The same ratio with the slash OUTSIDE the code spans -- water-optics.md writes `c`/`K_d`.
+_XSPLIT_RATIO = re.compile(rf"`({_XSYM})`\s*/\s*`({_XSYM})`")
+# `c` typically runs 5–20× `K_d`  -- a multiplier magnitude standing between two named symbols.
+_XMULT = re.compile(rf"`(?P<s1>{_XSYM})`[^`]{{0,80}}?"
+                    r"\d+(?:\.\d+)?(?:\s*[–—-]\s*\d+(?:\.\d+)?)?\s*[×x]"
+                    rf"[^`]{{0,80}}?`(?P<s2>{_XSYM})`")
+_XPATHY = re.compile(r"://|\.(?:md|py|tsv|cs|json|glsl|hlsl)\b")
+_XSLUG = re.compile(r"[\w.-]+(?:/[\w.-]+)+")
+_XFAILS = re.compile(r"^## +(?:How this fails|When it fails).*$", re.M)
+_XOPS = "*/+^"
+
+
+def _x_norm(s: str) -> str:
+    """One spelling of arithmetic, so `·`, `×`, `⁻⁴` and `5×10⁻⁴` compare with `*`, `^-4`, `0.0005`."""
+    for a, b in (("·", "*"), ("×", "*"), ("−", "-"),
+                 ("≈", "="), ("≃", "=")):
+        s = s.replace(a, b)
+    s = _SUP_RUN.sub(lambda m: "^" + m.group(0).translate(_SUP_MAP), s)
+
+    def fold(m: re.Match) -> str:
+        try:
+            return repr(float(m.group(1)) * 10 ** int(m.group(2)))
+        except (OverflowError, ValueError):
+            return m.group(0)      # `10^400` overflows a float; leave it as written
+    return _SCI.sub(fold, s)
+
+
+def _x_is_path(span: str) -> bool:
+    """A file path or a branch name is not a formula, even though `/` is an operator.
+
+    The first version of this test was `[a-z]/[a-z]` anywhere in the span, which also ate
+    `dt <= 0.50·dx/sqrt(g·A/l)` -- a real formula -- and with it the 0.50 that the shallow-water
+    failure row is checked against. A path is now required to be path-SHAPED: no spaces, no
+    brackets, and either an extension, a scheme, two separators, or a hyphen or dot inside.
+    """
+    if _XPATHY.search(span):
+        return True
+    return ("/" in span and _XSLUG.fullmatch(span) is not None
+            and ("-" in span or "." in span or span.count("/") > 1))
+
+
+def _x_formula(span: str) -> tuple[str, tuple[float, ...]] | None:
+    """A code span -> (identifier-set key, the numeric constants it prints), or None.
+
+    The KEY is the set of identifiers, not the expression's shape, so `sqrt(2·g·A/l)` and
+    `sqrt(g·A/l)` land on the same key and their constants can be compared. Two identifiers and
+    one operator are required: a bare symbol names a quantity rather than asserting a value.
+    """
+    s = _x_norm(span)
+    if not any(c in _XOPS for c in s):
+        return None
+    vals = tuple(sorted({float(n) for n in _XNUM.findall(s)}))
+    ids = sorted(set(_XIDENT.findall(_XNUM.sub(" ", s))))
+    if len(ids) < 2:
+        return None
+    return "|".join(ids), vals
+
+
+def _x_ratios(block: str) -> set[str]:
+    """Ratio keys a block claims a magnitude for: `c/K_d`, or "`c` runs 5–20× `K_d`"."""
+    out: set[str] = set()
+    for m in _XSPAN.finditer(block):
+        r = _XRATIO.match(m.group(1).strip())
+        if r:
+            out.add(f"{r.group(1)}/{r.group(2)}")
+    if block.startswith("```"):
+        for m in re.finditer(rf"(?<![A-Za-z0-9_/])({_XSYM})\s*/\s*({_XSYM})(?![A-Za-z0-9_/])",
+                             block):
+            out.add(f"{m.group(1)}/{m.group(2)}")
+    for m in _XSPLIT_RATIO.finditer(block):
+        out.add(f"{m.group(1)}/{m.group(2)}")
+    for m in _XMULT.finditer(block):
+        out.add(f"{m['s1']}/{m['s2']}")
+    return out
+
+
+def _x_blocks(text: str, base: int = 1) -> list[tuple[int, str]]:
+    """(first line, text) per paragraph, fenced block, table row, or `- **id**` entry.
+
+    A table ROW and a bibliography ENTRY are their own blocks. Lumping the failure table into one
+    paragraph, or a bibliography into one list, pools every number in it -- and pooling is what
+    let the whole of papers-simulation.md's number set stand in for one entry's, which hid the
+    `iop_split` disagreement this guard exists to find.
+    """
+    out: list[tuple[int, str]] = []
+    buf: list[str] = []
+    start, fence = base, False
+    for i, line in enumerate(text.split("\n"), base):
+        if line.startswith("```"):
+            if not fence and buf:
+                out.append((start, "\n".join(buf)))
+                buf = []
+            fence = not fence
+            if fence:
+                start = i
+            buf.append(line)
+            if not fence:
+                out.append((start, "\n".join(buf)))
+                buf = []
+            continue
+        if fence:
+            buf.append(line)
+            continue
+        if line.startswith("|") or line.startswith("- **"):
+            if buf:
+                out.append((start, "\n".join(buf)))
+                buf = []
+            out.append((i, line))
+            continue
+        if not line.strip():
+            if buf:
+                out.append((start, "\n".join(buf)))
+                buf = []
+            continue
+        if not buf:
+            start = i
+        buf.append(line)
+    if buf:
+        out.append((start, "\n".join(buf)))
+    return out
+
+
+def _x_side(text: str, base: int = 1) -> tuple[dict, dict]:
+    """One end of a link, as two key -> (values, first line) tables: formulas and ratios.
+
+    A formula's value is the tuple of constants IN ITS OWN SPAN, and a side holds the SET of
+    those tuples -- not their union. The difference is load-bearing. shallow-water.md's body
+    prints both `2A/l` and `A/l` in one sentence ("`2A/l`, not `A/l`, is the effective depth"),
+    so under a union the body reads {2} against the table's {} and the guard cries wolf. As a set
+    of tuples the body holds {(2,), ()}, the table holds {()}, they intersect, and it stays
+    quiet. A ratio's value IS a flat set: the magnitude sits in the prose around the symbol, not
+    inside it.
+    """
+    f: dict[str, list] = {}
+    r: dict[str, list] = {}
+    for ln, block in _x_blocks(text, base):
+        clean = _XSPAN.sub(lambda m: " " if _x_is_path(m.group(1)) else m.group(0), block)
+        for m in _XSPAN.finditer(clean):
+            k = _x_formula(m.group(1).strip())
+            if k is None:
+                continue
+            slot = f.setdefault(k[0], [set(), ln])
+            slot[0].add(k[1])
+        nums = {float(n) for n in _XNUM.findall(_x_norm(clean))}
+        if not nums:
+            continue
+        for key in _x_ratios(clean):
+            slot = r.setdefault(key, [set(), ln])
+            slot[0] |= nums
+    return f, r
+
+
+# The two ends of each real instance this guard was built from, plus the normalisations that
+# had to exist before they compared at all. `--selftest` asserts every row.
+CROSSREF_FIXTURES = [
+    ("sqrt(2·g·A/l)", ("A|g|l|sqrt", (2.0,))),      # shallow-water.md's body
+    ("sqrt(g·A/l)", ("A|g|l|sqrt", ())),            # its failure table, before the fix
+    ("A ≈ h·lx/2", ("A|h|lx", (2.0,))),
+    ("A ≈ h·lx", ("A|h|lx", ())),
+    ("U = 5×10⁻⁴ m/yr", ("U|m|yr", (0.0005,))),     # folded, so it equals `U = 0.0005 m/yr`
+    ("Δt ≤ Δx²/(4D)", ("D|t|x", (2.0, 4.0))),       # a superscript is a constant, not decoration
+    ("x · 1.2e-7", None),                           # `e` is an exponent, never an identifier
+    ("K_d", None),                                  # a bare symbol names, it does not assert
+    ("1/(b − b_b)", ("b|b_b", (1.0,))),             # the clean corpus's one false positive,
+    ("b_b = b/2", ("b|b_b", (2.0,))),               # pinned: two formulas, one identifier pair
+]
+# A path is not a formula. The second row is the span the first version of `_x_is_path` ate.
+CROSSREF_PATH_FIXTURES = [
+    ("references/papers-flow.md", True),
+    ("dt <= 0.50·dx/sqrt(g·A/l)", False),
+    ("origin/claude/swimming-pool-voronoi-render-m22g6r", True),
+    ("terrain-architect/references/28-liquids.md", True),
+    ("c/K_d", False),
+    ("b_b/b", False),
+]
+CROSSREF_RATIO_FIXTURES = [
+    ("the observation that `c` typically runs 5–20× `K_d` because natural water "
+     "scatters strongly forward", {"c/K_d"}),       # papers-simulation.md's `iop_split`, as it was
+    ("A `c`/`K_d` ratio quoted without its `mu_d` is not a number", {"c/K_d"}),
+    ("their backscatter ratio `b_b/b` is about 0.018", {"b_b/b"}),
+    ("its signal speed is `sqrt(g·A/l)`, fixed by parameters", set()),
+]
+
+# A CORPUS, not a span. Four fixture documents and a fixture bibliography carrying two of the
+# five real instances this guard was built from, reconstructed in the shape they had on disk:
+#   * `fx-tide.md`  -- body `sqrt(2*g*A/l)` against its OWN failure table's `sqrt(g*A/l)`,
+#                      which is shallow-water.md at 1816b23^
+#   * `papers-fx.md` -- an entry keeping "5–20×" after the document derived 0.75–1.20, which is
+#                      papers-simulation.md's `iop_split` at dcc2f65^ (49d1b94^ is the
+#                      water-rendering end of the same correction, and had this one already)
+# plus a cross-document positive (`A = h*lx/3` against `A = h*lx/2`) and FOUR negative controls
+# that must stay quiet: a bare `sqrt(g*A/l)` mentioned in another document with no constant of
+# its own; every value once corrected; `fx-basin.md`, which is quiet only because of the
+# union-overlap escape (see CROSSREF_CORPUS_QUIET); and the FENCED entry in papers-fx.md, which
+# is quiet only because the entry scan skips fences. The last two exist because each guards a
+# decision in check_crossrefs that nothing else here can see: removing either leaves all three
+# extractor suites and all three positive pins green.
+# This exists because `--selftest` asserted only the three EXTRACTORS: gutting check_crossrefs()
+# to `return [], 0, 0, 0, 0` left it green, and check.py still exited 0 -- an assertion defined
+# and never invoked, which is the hole this register already records for check_not_opened and
+# for requote's `check()`.
+# The fixture entry is one over-long line ON PURPOSE: this guard reads only an entry's OPENER
+# line, so a wrapped fixture would test nothing. 41% of the real bibliography wraps.
+_FX_FM = "---\ntype: reference\ntitle: {t}\n---\n\n"
+CROSSREF_CORPUS = {
+    # The front-matter `description` carries a DECOY: `sqrt(7*g*A/l)` shares the body's key but
+    # is not body, and `_offset` is the only thing that keeps it out. Hardwiring `_offset` to
+    # `return 1` makes the first pin below read `fx-tide.md:1 ... constants [2.0, 7.0]` instead
+    # of `fx-tide.md:11 ... constants [2.0]`, and it fails. A LINE pin alone could never catch
+    # that -- see the note over CROSSREF_CORPUS_EXPECTED -- so the pinned CONSTANTS do it.
+    # It is also the guard's stated limit made testable: front matter is not read, which is why
+    # heightfield-raymarching.md's front-matter locator is one of the three instances it misses.
+    "fx-tide.md": "---\ntype: reference\ntitle: Fixture -- the constant-A pipe form\n"
+    "description: A fixture. Front matter is not body: `sqrt(7*g*A/l)` must never be read.\n"
+    "---\n\n" + """\
+# Fixture: the constant-`A` pipe form
+
+## Use this
+
+The pipe form's own signal speed is `sqrt(2*g*A/l)`, and with `A` and `l` held constant it does
+not move with depth at all. The cross-section one cell offers a face is `A = h*lx/2`.
+
+## How this fails, and what it looks like
+
+| Symptom | Mechanism | Fix |
+|---|---|---|
+| Reducing `dt` by the deepest cell changes nothing | its signal speed is `sqrt(g*A/l)` | Bound on `sqrt(g*A/l)` |
+""",
+    "fx-other.md": _FX_FM.format(t="Fixture -- the same section from another document") + """\
+# Fixture: the same cross-section, quoted from another document
+
+`fx-tide.md` derives the constant-`A` pipe form. The cross-section used here is `A = h*lx/3`,
+and the signal speed it quotes, `sqrt(g*A/l)`, is repeated with no constant of its own.
+""",
+    "fx-basin.md": _FX_FM.format(t="Fixture -- a formula, then the same formula evaluated")
+    + """\
+# Fixture: a formula stated, then the same formula with its value
+
+## Use this
+
+Compactness of a cell footprint is the isoperimetric ratio `4*Aw/P^2`, which is 1 for a disc and
+falls as the outline gets ragged. Its mean depth is `h = V/Aw`.
+
+## How this fails, and what it looks like
+
+| Symptom | Mechanism | Fix |
+|---|---|---|
+| Footprints read as ragged | Boundary noise applied after the partition | `4*Aw/P^2 = 0.817`, so they are compact |
+| Depth is read off the bounding box | The footprint is not its box | `h = V/Aw`, over the wetted area |
+""",
+    "fx-optics.md": _FX_FM.format(t="Fixture -- the two attenuation coefficients") + """\
+# Fixture: beam and diffuse attenuation
+
+Beam attenuation `c` and diffuse attenuation `K_d` are not interchangeable [fx_split]. In pure
+water the ratio between them runs:
+
+```
+mu_d    c/K_d at 450 / 500 nm
+1.00    1.20 / 1.07
+0.75    0.90 / 0.80
+```
+""",
+    "papers-fx.md": _FX_FM.format(t="Fixture bibliography") + """\
+# Fixture bibliography
+
+- **fx_split** `F` — No single canonical source. The split between beam attenuation `c` and diffuse attenuation `K_d`, and the observation that `c` typically runs 5–20× `K_d` because natural water scatters strongly forward. [no-artefact]
+
+An entry looks like this:
+
+```
+- **fx_split** `F` — the ratio `c`/`K_d` here runs 900–999× for illustration only.
+```
+""",
+}
+# The same corpus with both corrections landed at BOTH ends. Overlaid on the dict above.
+CROSSREF_CORPUS_FIXED = {
+    "fx-tide.md": CROSSREF_CORPUS["fx-tide.md"].replace(
+        "| its signal speed is `sqrt(g*A/l)` | Bound on `sqrt(g*A/l)` |",
+        "| its signal speed is `sqrt(2*g*A/l)` | Bound on `sqrt(2*g*A/l)` |"),
+    "fx-other.md": CROSSREF_CORPUS["fx-other.md"].replace("`A = h*lx/3`", "`A = h*lx/2`"),
+    "papers-fx.md": CROSSREF_CORPUS["papers-fx.md"].replace(
+        "the observation that `c` typically runs 5–20× `K_d` because natural water scatters "
+        "strongly forward",
+        "a `c`/`K_d` ratio of 0.75–1.20 in pure water, which crosses one"),
+}
+# The two `fx-basin.md` shared keys, which must appear in NO finding of EITHER corpus. Each is
+# held quiet by ONE HALF of `if (va & vb) or (ua & ub)` in check_crossrefs and by nothing else,
+# and that line is the tuning decision holding the corpus-wide count at 1. Both halves were
+# unasserted until these controls existed: either could be deleted with the whole fixture green.
+#   * `Aw|P` -- `4*Aw/P^2` in the body against `4*Aw/P^2 = 0.817` in the failure row, a formula
+#     stated against the SAME formula with its evaluated value. That is sea-ice.md:206 against
+#     sea-ice.md:356, and it is the commonest quiet shape in the corpus. The tuple sets are
+#     DISJOINT ({(2.0, 4.0)} against {(0.817, 2.0, 4.0)}); only the flattened unions overlap, so
+#     `or (ua & ub)` alone keeps it quiet. Dropping that half: real tree 1 finding -> 7.
+#   * `Aw|V|h` -- `h = V/Aw` at both ends, neither printing a constant. Both tuple sets are
+#     {()}, so they intersect while the unions are EMPTY and cannot: `va & vb` alone keeps it
+#     quiet. Dropping that half: real tree 1 finding -> 34. Within one document a missing
+#     constant is a finding by design, which is what makes this pair worth pinning.
+CROSSREF_CORPUS_QUIET = ("`Aw`, `P`", "`Aw`, `V`, `h`")
+# Each entry is the set of substrings ONE finding must contain, pinned to the LINE and to the
+# CONSTANTS, and the two pins assert different things.
+# The LINE asserts the BLOCK-START attribution: replacing `head = base + body[:cut].count("\n")`
+# with `head = base` moves the second end of the first pin from `fx-tide.md:18` to `:9`.
+# The LINE CANNOT assert `_offset`, and no line pin anywhere ever could: the body is sliced at
+# `base` and then numbered from that same `base`, so the two cancel exactly, and hardwiring
+# `_offset` to `return 1` (17 -> 1 on shallow-water.md) leaves every line number here and every
+# number the real corpus reports unchanged. What `_offset` decides is which lines are SCANNED,
+# not what they are called -- so it is the CONSTANTS that pin it, against the decoy planted in
+# fx-tide.md's front matter above.
+# The corrected corpus must produce none of them and no others: both counts are asserted.
+CROSSREF_CORPUS_EXPECTED = [
+    # the shallow-water shape: one document against its own failure table, factor dropped
+    ("references/fx-tide.md:11 and references/fx-tide.md:18", "`A`, `g`, `l`, `sqrt`",
+     "constants [2.0] at the first and none at the second"),
+    # the cross-document shape: a document against one it names in prose
+    ("references/fx-other.md:8 and references/fx-tide.md:11", "`A`, `h`, `lx`",
+     "constants [3.0] at the first and [2.0] at the second"),
+    # the iop_split shape: a document against the bibliography entry it cites
+    ("references/fx-optics.md:11 and references/papers-fx.md:8", "ratio `c/K_d`",
+     "against [5.0, 20.0]"),
+]
+
+
+def _crossref_corpus_run(files: dict[str, str]) -> list[str]:
+    """Write a fixture corpus to a temporary tree and return what check_crossrefs() says of it.
+
+    The tree is temporary on purpose: a fixture corpus living under `references/` would be read
+    by every other check in this file and would have to be a real document to pass them.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        refs = Path(tmp) / "references"
+        refs.mkdir()
+        for name, text in files.items():
+            (refs / name).write_text(text, encoding="utf-8")
+        return check_crossrefs(Path(tmp))[0]
+
+
+def crossref_corpus_selftest() -> list[str]:
+    """Assert check_crossrefs() itself -- not only its extractors -- on the reconstructed corpus."""
+    bad: list[str] = []
+    broken = _crossref_corpus_run(CROSSREF_CORPUS)
+    for want in CROSSREF_CORPUS_EXPECTED:
+        if not any(all(s in p for s in want) for p in broken):
+            bad.append("no finding matches the reconstructed instance "
+                       + " + ".join(repr(s) for s in want))
+    if len(broken) != len(CROSSREF_CORPUS_EXPECTED):
+        bad.append(f"{len(broken)} findings on the broken fixture corpus, expected "
+                   f"{len(CROSSREF_CORPUS_EXPECTED)}: {broken}")
+    for p in broken:
+        # Named, not left to the count above, so the failure says WHICH decision was removed.
+        for k in CROSSREF_CORPUS_QUIET:
+            if k in p:
+                bad.append(f"the quiet control over {k} is REPORTED, so one half of "
+                           f"`if (va & vb) or (ua & ub)` in check_crossrefs is gone: " + p.strip())
+    quiet = _crossref_corpus_run({**CROSSREF_CORPUS, **CROSSREF_CORPUS_FIXED})
+    if quiet:
+        bad.append(f"the corrected fixture corpus is not quiet: {quiet}")
+    return bad
+
+
+def check_crossrefs(root: Path | None = None) -> tuple[list[str], int, int, int, int]:
+    """Does a NUMBER agree at both ends of a link this corpus already draws?
+
+    WHY THIS EXISTS. A correction landing at one end only is this corpus's most-recorded defect;
+    it has been found BY HAND five times in two days. Every instance is the same shape -- one
+    site is rewritten and a second site that prints the same quantity is not:
+      * shallow-water.md's body said `sqrt(2·g·A/l)` while its own failure table said `sqrt(g·A/l)`
+      * papers-simulation.md's `iop_split` entry kept the "5–20×" that water-optics.md replaced
+      * water-rendering.md printed `exp(-K_d*z)` after water-optics.md derived `exp(-(K_d+c/mu_v)*z)`
+      * mask-to-material.md retracted a claim at :217 and restated it at :169
+      * heightfield-raymarching.md's front-matter locator still credited Dummer after the body moved
+    `check_propagation` already ties the two ends of a citation on WHICH SECTION. This ties two
+    ends on WHAT NUMBER.
+
+    HOW IT DECIDES. Both ends must be linked already, by one of three relations the corpus
+    writes for itself: a document's body against its own failure table; a document against
+    another it NAMES in prose (`water-optics.md`); a document against the BIBLIOGRAPHY ENTRY it
+    cites (`[iop_split]`). On each end it extracts *keyed magnitudes* -- a formula keyed by its
+    identifier set and valued by the constants in the span, and a ratio (`c/K_d`, or "`c` runs
+    5–20× `K_d`") valued by the numbers printed around it. A key present at both ends whose
+    values neither match nor overlap is reported. Across two documents both ends must actually
+    print a constant; within one document a MISSING constant counts, because a failure row
+    restates the body's own quantity and dropping the factor there is the shallow-water defect
+    exactly.
+
+    ⚠️ IT DOES NOT CATCH THREE OF THE FIVE INSTANCES ABOVE, AND ONE MISS IS MEASURED, NOT
+    SUSPECTED. Reconstruct water-rendering.md at 49d1b94^ -- `exp(-K_d * verticalDepth)` where
+    water-optics.md derives `exp(-(K_d + c/mu_v) * verticalDepth)` -- and this check reports
+    NOTHING. The correction added a TERM, so the identifier set changed from
+    `{exp, K_d, verticalDepth}` to `{exp, K_d, c, mu_v, verticalDepth}`, the two ends no longer
+    share a key, and nothing is ever compared. The instrument sees a constant that moved; a
+    correction that renames, rewords, adds or drops a term is invisible to it. mask-to-material's
+    retraction (prose, no number) and heightfield-raymarching's locator (an attribution, and in
+    front matter, which this does not read) are outside its reach for the same reason.
+
+    ⚠️ AND ITS REACH IS THE POINT. Measured 2026-09-06 on a 39-document tree: only 103 of 1101
+    linked side-pairs share a single keyed magnitude at all. For the other 91% there is nothing
+    to compare and a green line here says nothing whatever about them. The two numbers move with
+    the corpus; the run prints the current pair, and the ratio is what to read.
+
+    ⚠️ IT HAS FALSE POSITIVES, AND THE ONE ON THE CLEAN CORPUS IS NAMED SO NOBODY HUNTS IT
+    TWICE. caustics.md's scattering length `1/(b − b_b)` and water-optics.md's Rayleigh
+    backscatter `b_b = b/2` share the identifier pair `{b, b_b}` and print 1 against 2. They are
+    two different formulas, not two versions of one, and no lexical rule separates them --
+    the same number meaning different things is this instrument's characteristic error.
+
+    ⚠️ AND IT READS ONLY THE OPENER LINE OF A BIBLIOGRAPHY ENTRY. 92 of the 225 entries (41%,
+    measured 2026-09-06) wrap onto a continuation line, and for those the whole of the
+    continuation -- which is where a long entry does most of its arguing -- is not compared at
+    all. That is the same blind spot the `[not-opened]` tag was once lost in.
+
+    REPORTED, not enforced, like approximation / reach / locators / unread. Its output is
+    CANDIDATES for a human, it does not discharge the hand review, and an OPEN row in
+    registers/guard-proofs.tsv records the measured miss above.
+
+    `root` exists so `--selftest` can run this FUNCTION over the reconstructed fixture corpus
+    rather than only its extractors; see CROSSREF_CORPUS.
+    """
+    root = ROOT if root is None else root
+    refs = root / "references"
+    docs = [p for p in documents(root) if p not in (refs / "index.md", refs / "coverage.md")]
+    papers = {p for p in refs.glob(PAPERS_GLOB)}
+    techs = [p for p in docs if p not in papers]
+    names = {p.name for p in techs}
+
+    sides: dict[str, tuple[dict, dict, str]] = {}
+    for d in techs:
+        try:
+            text = d.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        base = _offset(d)
+        body = "\n".join(text.split("\n")[base - 1:])
+        m = _XFAILS.search(body)
+        cut = m.start() if m else len(body)
+        head = base + body[:cut].count("\n")
+        sides[f"{d.name}#body"] = _x_side(body[:cut], base) + (d.name,)
+        sides[f"{d.name}#fails"] = _x_side(body[cut:], head) + (d.name,)
+    entry_side: dict[str, str] = {}
+    for p in sorted(papers):
+        try:
+            lines = p.read_text(encoding="utf-8").split("\n")
+        except OSError:
+            continue
+        off, fence = _offset(p), False
+        for i, line in enumerate(lines[off - 1:], off):
+            # Skip fenced blocks, as `_scan` already does: papers-flow.md and
+            # papers-generation.md document the ENTRY FORMAT inside a fence, and one of those
+            # illustrations is a copy of a real entry (`beven1979`). Without this the example is
+            # registered as a side under the real id, and which of the two a citation is
+            # compared against is decided by filename order -- papers-flow sorts before
+            # papers-masks-and-filtering, so today the real entry happens to win. Luck is not a
+            # rule. Three phantom sides on the current tree; no reported number moves.
+            if line.lstrip().startswith("```"):
+                fence = not fence
+                continue
+            if not fence and _ID_OPENER.match(line):
+                cid = line.split("**")[1]
+                sides[f"{p.name}#{cid}"] = _x_side(line, i) + (p.name,)
+                entry_side[cid] = f"{p.name}#{cid}"
+
+    pairs: set[tuple[str, str]] = set()
+    for d in techs:
+        try:
+            text = d.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        pairs.add((f"{d.name}#body", f"{d.name}#fails"))
+        for m in re.finditer(r"([a-z0-9][a-z0-9-]*\.md)", text):
+            other = m.group(1)
+            if other in names and other != d.name:
+                for h in ("body", "fails"):
+                    for g in ("body", "fails"):
+                        pairs.add(tuple(sorted((f"{d.name}#{g}", f"{other}#{h}"))))
+        for m in _MARKER.finditer(text):
+            if m.group("id") in entry_side:
+                for g in ("body", "fails"):
+                    pairs.add(tuple(sorted((f"{d.name}#{g}", entry_side[m.group("id")]))))
+
+    problems: list[str] = []
+    seen: set[tuple] = set()
+    compared = reach = 0
+    for a, b in sorted(pairs):
+        if a not in sides or b not in sides:
+            continue
+        fa, ra, na = sides[a]
+        fb, rb, nb = sides[b]
+        shared_f = sorted(set(fa) & set(fb))
+        shared_r = sorted(set(ra) & set(rb))
+        compared += len(shared_f) + len(shared_r)
+        reach += 1 if (shared_f or shared_r) else 0
+        for k in shared_f:
+            va, vb = fa[k][0], fb[k][0]
+            ua = {x for tup in va for x in tup}
+            ub = {x for tup in vb for x in tup}
+            if (va & vb) or (ua & ub):
+                continue
+            if na != nb and not (ua and ub):
+                continue          # a bare mention in another document is normal usage
+            if (na, nb, "f", k) in seen:
+                continue
+            seen.add((na, nb, "f", k))
+            problems.append(
+                f"  ....  references/{na}:{fa[k][1]} and references/{nb}:{fb[k][1]} both print "
+                f"the expression over `{k.replace('|', '`, `')}`, with constants "
+                f"{sorted(ua) or 'none'} at the first and {sorted(ub) or 'none'} at the second. "
+                f"One end may have been corrected and the other not")
+        for k in shared_r:
+            va, vb = ra[k][0], rb[k][0]
+            if va & vb or (na, nb, "r", k) in seen:
+                continue
+            seen.add((na, nb, "r", k))
+            problems.append(
+                f"  ....  references/{na}:{ra[k][1]} and references/{nb}:{rb[k][1]} give the "
+                f"ratio `{k}` magnitudes that do not overlap: {sorted(va)[:6]} against "
+                f"{sorted(vb)[:6]}. One end may have been corrected and the other not")
+    return problems, len(problems), compared, reach, len(pairs)
 
 
 def check_orphans(bib: dict[str, dict], used: set[str]) -> list[str]:
@@ -857,6 +1690,256 @@ def check_not_opened(bib: dict[str, dict], cites: dict[str, list[tuple[Path, str
 
 AXIS_TAGS = ("generation", "simulation", "rendering", "architecture")
 
+# The closed budget vocabulary a `tags:` line may use. It is a MEASUREMENT of the corpus, not a
+# wish: over the 40 content documents the tag counts are authoring-time 27, real-time 19,
+# near-real-time 3 (re-counted 2026-09-15; it read "39 documents ... authoring-time 26" for nine
+# days after the fortieth landed), and `runtime` -- the fourth word the migration started from --
+# appears in no `tags:` line at all. It was collapsed into `real-time` and the collapse is
+# complete. ⚠️ Re-derive this comment rather than trusting it: nothing checks a sentence inside
+# this file, which is how it went stale, and `selfdescription_problems()` reads SKILL.md and
+# STATE.md, never its own source.
+BUDGET_TAGS = ("authoring-time", "near-real-time", "real-time")
+# `runtime` survives in ONE Tier line (simulation-time-budget.md: "the boundary between
+# authoring-time and runtime") as the pre-migration spelling of the real-time budget. It is
+# accepted as EVIDENCE that a page names the real-time budget, and never as a CLAIM that the
+# page carries a regime its tags do not -- because "the runtime" is also this corpus's word for
+# the host that consumes a baked field, and four authoring-time-only documents use it that way
+# (driver-fields, flow-routing, node-graph-runtime, sea-ice). Reading it symmetrically would
+# fail all four; refusing it entirely would fail simulation-time-budget. The asymmetry is the
+# whole design and it is why this is a pair of one-directional rules and not a set equality.
+BUDGET_ALIASES = {"runtime": "real-time"}
+# Hyphen is a word character on both sides here, so `near-real-time` does NOT also register
+# `real-time`, and `node-graph-runtime.md` -- a document NAME that appears in Tier prose -- does
+# not register `runtime`. Both were live in the corpus when this was written.
+_BUDGET_WORD = {w: re.compile(rf"(?<![a-z-]){re.escape(w)}(?![a-z-])")
+                for w in (*BUDGET_TAGS, *BUDGET_ALIASES)}
+TIER_PREFIX = "**Tier:"
+
+
+def content_documents() -> list[Path]:
+    """The documents a reader is routed to: everything but the bibliographies and apparatus.
+
+    Three call sites computed this by hand with the same comprehension, one of them re-globbing
+    `paper_files()` once per document. A denominator five call sites share is worth one spelling.
+    """
+    papers = set(paper_files())
+    return [p for p in documents(ROOT) if p not in papers and p not in (INDEX, COVERAGE)]
+
+
+def _budget_tokens(text: str) -> tuple[set[str], set[str]]:
+    """`(claimed, evidenced)` budget regimes named in `text`.
+
+    `claimed` is the canonical vocabulary only -- what the page asserts. `evidenced` adds the
+    pre-migration aliases -- what the page can be read as naming. See BUDGET_ALIASES for why
+    those are two sets and not one.
+    """
+    claimed = {w for w in BUDGET_TAGS if _BUDGET_WORD[w].search(text)}
+    return claimed, claimed | {canon for alias, canon in BUDGET_ALIASES.items()
+                               if _BUDGET_WORD[alias].search(text)}
+
+
+def check_budget_agreement() -> tuple[list[str], int, int, list[str]]:
+    """The `**Tier:` line on the page must agree with the budget tag in `tags:`.
+
+    Criterion 6 of the plan reads "37/37 carry a `**Tier:` line that agrees with one canonical
+    budget tag, CHECKED". The lines landed -- 38 of the 39 documents there were THEN, 40 of 40
+    today -- and for two days nothing compared them to anything. The fact was on the page 38 times and enforced zero
+    times, which is the same shape as the `tier:` field before check_documents grew a comparison
+    for it: a value that LOOKS graded, that a reader trusts, and that no run can contradict.
+
+    Two one-directional rules, because the vocabulary is asymmetric (see BUDGET_ALIASES):
+
+      * a regime NAMED on the page must be a tag -- otherwise the page advertises a budget the
+        machine-readable half denies, and `index.py`'s routing disagrees with the prose;
+      * a regime TAGGED in front matter must be named on the page -- otherwise the reader the
+        criterion is about cannot tell the regime from the page, which is the whole criterion.
+
+    NOT a failure, and deliberately: a document with NO `**Tier:` line at all. Ground rule 2
+    (subtract before you add) blocks a four-line insertion into a document already inside the
+    20-line no-add band, and river-networks.md at 430 lines is there on purpose -- the commit
+    that migrated the other 38 says so in its subject line. A guard that goes red on a decision
+    the corpus made deliberately is a guard that gets stubbed within a week, and this file has
+    the decoys to prove it takes that seriously. But silence is not the alternative: the count
+    is REPORTED with the missing documents NAMED, so the coverage can be seen to fall without
+    anyone being punished for a cap they cannot violate. What IS enforced for every content
+    document, Tier line or not, is that `tags:` carries at least one budget regime -- so the
+    regime is always machine-readable even where the page does not print it.
+
+    What it cannot see: whether the regime is TRUE. `**Tier: real-time rasteriser.**` on a
+    document whose one recommendation takes 400 ms is agreement, not correctness. It compares
+    two declarations to each other, exactly like check_axis_agreement, and the two are written
+    by the same hand on the same day.
+    """
+    problems: list[str] = []
+    stated = 0
+    missing: list[str] = []
+    for path in content_documents():
+        rel = path.relative_to(ROOT)
+        try:
+            fm, body = parse_front_matter(path)
+        except (OSError, Unparseable):
+            continue                      # reported by check_documents
+        tags = {str(t).strip().lower() for t in fm.get("tags", [])} & set(BUDGET_TAGS)
+        if not tags:
+            problems.append(f"{rel}: no budget tag in `tags:` -- one of "
+                            f"{', '.join(sorted(BUDGET_TAGS))} is required, so a reader who "
+                            f"never opens the page can still tell what budget it is written for")
+            continue
+        offset = _offset(path)
+        lines = body.split("\n")
+        start = next((i for i, ln in enumerate(lines) if ln.startswith(TIER_PREFIX)), None)
+        if start is None:
+            missing.append(rel.name)
+            continue
+        stated += 1
+        # The whole PARAGRAPH, not the line. wave-models.md's Tier sentence wraps, and its
+        # second regime -- "the shore band's travel-time solve is / authoring-time" -- is on the
+        # continuation line. Reading one line called that document a disagreement.
+        para: list[str] = []
+        for ln in lines[start:]:
+            if not ln.strip():
+                break
+            para.append(ln)
+        n = start + offset
+        claimed, evidenced = _budget_tokens("\n".join(para))
+        if extra := claimed - tags:
+            problems.append(
+                f"{rel}:{n}: the `{TIER_PREFIX}` line claims "
+                f"{', '.join(f'`{t}`' for t in sorted(extra))}, which `tags:` does not carry "
+                f"({', '.join(f'`{t}`' for t in sorted(tags))}). The page and the routing table "
+                f"name different budgets")
+        if unnamed := tags - evidenced:
+            problems.append(
+                f"{rel}:{n}: `tags:` carries {', '.join(f'`{t}`' for t in sorted(unnamed))} and "
+                f"the `{TIER_PREFIX}` line never names it, so a reader cannot tell that regime "
+                f"from the page -- which is the whole reason the line exists")
+    return problems, stated, stated + len(missing), sorted(missing)
+
+
+# A cross-reference into this corpus, as the corpus actually writes one: a code span whose
+# ENTIRE content is a document filename. That shape is what 560 of them look like today, across
+# all 48 files, and it is deliberately narrower than "anything ending in .md":
+#   - `→ file.md` and `→ document.md` in coverage.md's row-format legend are placeholders in a
+#     schema, not references, and the arrow inside the span is what says so;
+#   - `WorkGraphs.md`, `ResourceBinding.md`, `README.md` name files in other people's
+#     repositories -- CamelCase is not this corpus's naming shape;
+#   - `19-fluid-simulation.md`, `12-water-rendering.md` are files of the retired `terrain-*`
+#     skills, which numbered their documents; gaia never has.
+# The residue is REPORTED by name below rather than dropped in silence.
+_DOC_SPAN = re.compile(r"`([^`\n]+)`")
+_DOC_LINK = re.compile(r"\]\(([^)\s]+\.md)\)")
+_DOC_NAME = re.compile(r"^[a-z][a-z0-9-]*\.md$")
+_MD_BARE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*\.md$")
+
+# (span content, is it a cross-reference this guard must resolve?). None of these is invented:
+# every one was a live span when the pattern was written, and each is the reason it is not simply
+# `.*\.md`. Four are live still (`→ file.md` at coverage.md:32, `d3d/WorkLists.md` at
+# papers-architecture.md:120, `scripts/check.py`, the non-span form). The bare CamelCase and
+# numbered names are NOT live any more -- the corpus repaired them by moving the directory inside
+# the span -- and they stay here because the pattern must go on rejecting that shape.
+DOC_NAME_FIXTURES = [
+    ("shallow-water.md", True),
+    ("caustics.md", True),                 # no hyphen: the corpus has three such documents
+    ("papers-flow.md", True),
+    ("→ file.md", False),                  # coverage.md's row-format legend, not a reference
+    ("WorkGraphs.md", False),              # a Microsoft spec file
+    ("ResourceBinding.md", False),
+    ("19-fluid-simulation.md", False),     # the retired terrain-renderer numbered its documents
+    ("d3d/WorkLists.md", False),           # carries its directory: not a bare sibling name
+    ("scripts/check.py", False),
+    ("see `shallow-water.md`", False),     # a span is the whole reference or it is not one
+]
+
+# (text, claimed regimes, evidenced regimes). The first four are Tier paragraphs from the
+# corpus, verbatim in substance; they are the cases that decide the asymmetry.
+BUDGET_FIXTURES = [
+    ("**Tier: real-time rasteriser.**", {"real-time"}, {"real-time"}),
+    ("**Tier: real-time rasteriser and near-real-time ray-traced.**",
+     {"real-time", "near-real-time"}, {"real-time", "near-real-time"}),
+    # `near-real-time` must not also register `real-time`: the hyphen is a word character.
+    ("**Tier: near-real-time and ray-traced.**", {"near-real-time"}, {"near-real-time"}),
+    # The alias, evidencing a tag it may not claim on its own.
+    ("**Tier: the crossover document; both budgets.** the boundary between authoring-time\n"
+     "and runtime, so every section states the same step under each regime.",
+     {"authoring-time"}, {"authoring-time", "real-time"}),
+    # "the runtime" as a NOUN, on four authoring-time-only documents. Reading it as a claim
+    # would fail all four; it is evidence and nothing more.
+    ("**Tier: authoring-time; the runtime consumes the baked fields.**",
+     {"authoring-time"}, {"authoring-time", "real-time"}),
+    # A document NAME is not a budget word.
+    ("see `node-graph-runtime.md` for the scheduler", set(), set()),
+    ("nothing here states a budget at all", set(), set()),
+]
+
+
+def check_paths() -> tuple[list[str], int, int, list[str]]:
+    """A document this corpus names must be a document this corpus has.
+
+    Audit G#9. `check.py` was green on a dangling `.md` cross-reference: a reviewer renamed one
+    in caustics.md to a file that does not exist and the run exited 0. Nothing read them --
+    check_coverage validates coverage.md's `→ target` column and stops there, so the 560
+    references the BODIES and SKILL.md carry, which is how a reader actually moves through this
+    skill, were unwatched. A rename is the ordinary event that breaks them, and this corpus renames.
+
+    This is a FAILURE, not a metric, and the distinction is the point: a dangling `→ file.md`
+    in coverage.md has been a hard failure since the map existed, and the same sentence in a
+    document's prose was worth nothing. Two spellings of one defect cannot have two verdicts.
+
+    Read from the BODY only, outside fenced blocks. A `locator:` in front matter names a place
+    INSIDE a cited artefact -- "the front-to-back bullet in README.md" is a location in someone
+    else's repository, not a path in this one -- and a fenced block is code or a template.
+
+    ⚠️ What it does NOT check, named rather than implied. A bare `.md` name outside gaia's own
+    naming shape is out of reach of the shape test. The corpus held five such names at six sites
+    -- `19-fluid-simulation.md` (shallow-water.md, papers-simulation.md), `12-water-rendering.md`
+    and `12b-water-provenance.md` (papers-simulation.md), `WorkGraphs.md` (node-graph-runtime.md),
+    `ResourceBinding.md` (papers-rendering.md) -- among them the one PLAN.md named as G#9's live
+    instance, shallow-water.md's reference to the retired terrain-renderer's fluid document, which
+    resolved to no path a reader could open because the directory that would resolve it sat in a
+    DIFFERENT code span. All six sites are now REPAIRED by their owners, each with the directory
+    inside the span, so the residue is EMPTY and the run prints no residue clause at all.
+    The shape test is deliberately NOT widened to every bare `.md` name here: that is the next
+    owner's decision, not a side effect of the last repair. A new bare name would therefore be
+    named in the run's output again, and still not enforced.
+
+    Paths to `.py` harnesses and `.tsv` registers are also unread. Measured over this function's
+    own scope, the corpus names 14 harness scripts that were never committed, in 34 code spans
+    across 9 documents, so a check over them would be red on arrival. That figure is a count of
+    code spans in the DOCUMENTS, not of rows in the execution register -- an earlier form of this
+    sentence said "the execution register names 27 harness scripts" and was wrong at both ends.
+    """
+    problems: list[str] = []
+    existing = {p.name for p in documents(ROOT)}
+    refs = 0
+    residue: dict[str, list[str]] = {}
+    for path in [ROOT / "SKILL.md", *documents(ROOT)]:
+        if not path.exists():
+            continue
+        rel = path.relative_to(ROOT)
+        offset = _offset(path)
+        fenced = False
+        for n, line in enumerate(path.read_text(encoding="utf-8").split("\n")[offset - 1:],
+                                 offset):
+            if line.lstrip().startswith("```"):
+                fenced = not fenced
+                continue
+            if fenced:
+                continue
+            for span in _DOC_SPAN.findall(line) + _DOC_LINK.findall(line):
+                name = span.strip()
+                if not _DOC_NAME.match(name):
+                    if _MD_BARE.match(name):
+                        residue.setdefault(name, []).append(f"{rel}:{n}")
+                    continue
+                refs += 1
+                if name not in existing:
+                    problems.append(
+                        f"{rel}:{n}: names `{name}`, and references/{name} does not exist. A "
+                        f"cross-reference to a document nobody wrote sends the reader nowhere; "
+                        f"either the target was renamed and this end was not, or the document "
+                        f"was never written and belongs in coverage.md as `planned`")
+    return problems, refs, len(existing), [f"{k} ({', '.join(v)})" for k, v in sorted(residue.items())]
+
 
 def covered_documents() -> dict[str, str]:
     """`{document filename: topic id}` for every `covered` row in coverage.md.
@@ -878,7 +1961,14 @@ def covered_documents() -> dict[str, str]:
         if in_fence or not (m := _TOPIC.match(line.rstrip())):
             continue
         if m["state"] == "covered" and "\u2192" in m["rest"]:
-            out[m["rest"].split("\u2192")[-1].strip()] = m["id"]
+            target = m["rest"].split("\u2192")[-1].strip()
+            # A target that does not exist is check_coverage's finding and only its finding.
+            # Passing it on gave ONE defect two messages from two functions, and that is why
+            # the `bites` row for it was vacuous: it stayed red with check_coverage deleted,
+            # because check_trigger_coverage was reporting the same broken row in its own
+            # words. Same rule as this docstring already states for malformed rows.
+            if (ROOT / "references" / target).exists():
+                out[target] = m["id"]
     return out
 
 
@@ -949,6 +2039,12 @@ PROPAGATION_FIXTURES = [
     ("the paper `hnaidi2010` §4.2 borrows from", set()),      # a foreign section, not ours
     ("READ IN FULL, no section named", set()),
     ("p. 146 and Fig. 11", set()),                            # pages are not sections
+    # The text of a WRAPPED entry's continuation line -- where a section number sits for 88 of
+    # the 214 entries, and the half `check_propagation` deliberately does not read. It
+    # tokenises perfectly; the reason it is unread is the measured false-positive rate in that
+    # function's docstring, not an inability to parse it. Pinned here so the two claims stay
+    # distinguishable.
+    ("cross-section at `C = l²`, constant, and §4 writes the outflow", {"4"}),
 ]
 
 
@@ -970,6 +2066,21 @@ def check_propagation(bib: dict[str, dict],
     section at both ends; the rest name one at one end or neither, and nothing can be
     cross-checked there. This is a narrow instrument over a corpus-wide problem, and the ratio is
     reported so nobody mistakes a green check for a checked corpus.
+
+    ⚠️ **Why the bibliography side reads only the entry's first line.** This used to say
+    `f"{entry['ref']} {entry.get('note', '')}"`, and `_scan` builds no `note` key, so half the
+    text named in that expression was always `""`. The obvious repair -- populate `note` from the
+    88 entries that wrap onto continuation lines -- was BUILT AND MEASURED before being rejected:
+    it lifts the comparable pairs from 16/256 to 48/256 and reports **seven** corpus-wide hits,
+    every one of them correct prose. `mei2007`'s entry names §3 while three documents cite §3.2,
+    §3.2.1 and §3.2.2 (a parent section, read as disjoint by a token compare); `stava2008`'s
+    entry names §4 for the pipe cross-section while two documents cite §5, §7 and §8 for other
+    claims; `hillaire2020`'s entry names §7 and Table 2 for the cost figures while two documents
+    cite §5.3. That is the identical false-positive shape already recorded in
+    `guard-proofs.tsv` for the body-prose direction: a document legitimately cites different
+    sections of one paper for different claims, and an entry need not enumerate them all. So the
+    dead key is REMOVED rather than filled, and this paragraph is why -- the reach stays at
+    16/256 by choice, not by oversight.
     """
     problems: list[str] = []
     both = total = 0
@@ -977,7 +2088,7 @@ def check_propagation(bib: dict[str, dict],
         entry = bib.get(cid)
         if not entry:
             continue
-        btoks = section_tokens(f"{entry.get('ref', '')} {entry.get('note', '')}")
+        btoks = section_tokens(entry.get("ref", ""))
         for path, locator in uses:
             total += 1
             ltoks = section_tokens(locator)
@@ -1181,6 +2292,14 @@ def check_recommendation() -> tuple[list[str], int, int]:
     defines the phenomenon before recommending a tier, and hard-failing it would be the guard
     dictating prose order. But a corpus quietly drifting toward explain-then-maybe-recommend
     is the slide into a survey, so the count is visible.
+
+    THE FAILURE TABLE IS STRUCTURE TOO, and for a second reason. It is the other place a reader
+    lands (`SKILL.md:42` tells them to take it as one packet), and since `body_digest` it is
+    half of what a `verified:` stamp certifies. A digest keyed on a heading spelling is a digest
+    that can be emptied by renaming the heading -- so the two spellings the corpus uses are
+    named here, exactly one per document, rather than left to `_is_anchor` to find or not find.
+    Two spellings, not a pattern: matching a bare "fails" would swallow content sections like
+    "The priority function, and why FIFO fails", which is a section ABOUT a failure.
     """
     problems: list[str] = []
     skip = set(paper_files()) | {INDEX, COVERAGE}
@@ -1188,10 +2307,19 @@ def check_recommendation() -> tuple[list[str], int, int]:
     for path in documents(ROOT):
         if path in skip:
             continue
+        rel = path.relative_to(ROOT)
         body = path.read_text(encoding="utf-8")
         heads = [ln.strip() for ln in body.splitlines() if ln.startswith("## ")]
+        fails = [h for h in heads if h.lower().startswith("## how this fails")
+                 or h.lower().startswith("## when it fails")]
+        if len(fails) != 1:
+            problems.append(
+                f"{rel}: {len(fails)} heading(s) start `## How this fails` or `## When it "
+                f"fails`; exactly one is required. That heading is where a reader's second "
+                f"landing is, and half of what `covers_body` digests -- renaming it would "
+                f"empty that half of a stamp with nothing going red.")
         if not any(h.lower().startswith("## use this") for h in heads):
-            problems.append(f"{path.relative_to(ROOT)}: no `## Use this` section -- it "
+            problems.append(f"{rel}: no `## Use this` section -- it "
                             "surveys rather than recommends, or the recommendation is buried")
             continue
         total += 1
@@ -1264,6 +2392,246 @@ def check_coverage() -> list[str]:
     return problems
 
 
+# The execution register's columns, in order. Named here rather than counted, so that dropping
+# a column is a FAILURE with a name and not a silent re-interpretation of every row: the file is
+# tab-separated with prose in five of the seven fields, and a lost tab shifts `provenance` into
+# `termination` without changing a single character a reader would notice.
+PSEUDOCODE_COLUMNS = ("document", "block", "what was asserted", "what the run measured",
+                      "outcome", "provenance", "termination")
+# The `termination` vocabulary, documented at the head of the register itself. It is a CLOSED
+# set on purpose: the point of the column is that a row cannot be silent about halting, and a
+# free-text cell is silence with extra steps. `n/a` and `no-block` are not the same value --
+# the first says the code has no loop, the second says there is no code.
+TERMINATION_VALUES = {"n/a", "halts-proven", "halts-measured", "cap-bounded", "unknown",
+                      "no-block"}
+# A cell that names another row of the same file BY LINE NUMBER. A row has no stable line: every
+# row that lands above it moves it, and the header moves them all at once. The edit that added
+# the `termination` column is the proof and the reason this exists -- it inserted 55 lines of
+# header, and seven cells that had been written `row :52` went on saying :52, which by then was a
+# line of the comment block. Every one of them still parsed, still had seven fields and still
+# carried a legal token, so nothing in this file objected; a reviewer found them by hand. The
+# repair is an idiom (name the row by its document and block, which do not move) and this is the
+# gate that keeps it. Deliberately narrow: `\brows? :\d+` and nothing else, so it cannot fire on
+# `flow-routing.md:239` or on a bare `:42`, both of which are lines in a REFERENCE document and
+# are the normal, correct thing for a cell to carry.
+REGISTER_ROW_REF = re.compile(r"\brows?\s+:\d+")
+
+
+def check_pseudocode_register(path: Path | None = None) -> tuple[list[str], dict[str, int]]:
+    """The execution register's shape, and how many blocks nobody has checked for halting.
+
+    WHY THIS EXISTS. A row in that register says a block reproduces a NUMBER. It never said the
+    block STOPS. `heightfield-raymarching.md`'s row is the proof that those are two claims: it
+    measured missed hits, recorded SOUND, and the same block livelocked on 35.7% of 600 rays,
+    found by hand a fortnight later. SKILL.md:103 carries the sentence; this carries the column.
+
+    What it ENFORCES is shape -- seven fields, the header naming them, a termination token from
+    the closed vocabulary -- and one idiom: a cell may NOT name another row of this file by line
+    number (see REGISTER_ROW_REF). That is deliberately mechanical: nothing here can tell whether
+    `halts-proven` is true, any more than the citation checks can tell whether a paper says what
+    a document claims. What it REPORTS is the `unknown` count, in the style of the other reported
+    metrics: a number that has to go down, not a gate that can be gamed by writing `n/a`
+    everywhere. A reviewer still has to read the cell's argument.
+
+    ⚠️ It does NOT resolve the `document.md:NN` references the cells DO carry. Those point into
+    39 documents this repo edits daily, and an insertion anywhere above a fence moves it silently
+    -- four such references were stale the day this guard was written, every one of them because
+    another author had inserted a paragraph, none of them because the cell was wrong when
+    written. A guard over them would be permanently red on other people's work, which is a guard
+    nobody reads. Self-references are different in kind: this file moves them itself.
+    """
+    reg = path or PSEUDOCODE
+    problems: list[str] = []
+    counts: dict[str, int] = {v: 0 for v in TERMINATION_VALUES}
+    if not reg.exists():
+        return [f"{reg}: the pseudocode execution register is missing -- without it, no block "
+                f"in this corpus is recorded as having been run"], counts
+    text = reg.read_text(encoding="utf-8")
+    # Every line, comments included: one of the seven references this catches lived in the
+    # header comment block, and a comment that misdirects a reader is not a lesser defect.
+    for n, ln in enumerate(text.split("\n"), 1):
+        if m := REGISTER_ROW_REF.search(ln):
+            problems.append(
+                f"{reg.name}:{n}: {m.group(0)!r} names a row of THIS file by line number, and a "
+                f"row has no stable line -- adding the `termination` header moved every row 55 "
+                f"lines and seven such references followed it into the comment block. Name the "
+                f"row by its document and block, which do not move")
+    rows = [(n, ln) for n, ln in enumerate(text.split("\n"), 1)
+            if ln.strip() and not ln.lstrip().startswith("#")]
+    if not rows:
+        return problems + [f"{reg.name}: no header row and no rows"], counts
+    n, header = rows[0]
+    got = tuple(header.split("\t"))
+    if got != PSEUDOCODE_COLUMNS:
+        # Returned early: with the header wrong, every per-row message below would be noise
+        # about the same one defect. The line-reference findings are NOT noise about it -- they
+        # are independent of the column shape -- so they are carried out rather than dropped.
+        return (problems + [f"{reg.name}:{n}: columns are [{' | '.join(got)}]; expected "
+                            f"[{' | '.join(PSEUDOCODE_COLUMNS)}]"], counts)
+    for n, ln in rows[1:]:
+        f = ln.split("\t")
+        where = f"{reg.name}:{n}"
+        named = f"{f[0][:36]} / {f[1][:44]}" if len(f) > 1 else f[0][:36]
+        if len(f) != len(PSEUDOCODE_COLUMNS):
+            problems.append(f"{where}: {len(f)} fields, expected {len(PSEUDOCODE_COLUMNS)} "
+                            f"({', '.join(PSEUDOCODE_COLUMNS)})  ->  {named}")
+            continue
+        token = f[-1].split()[0] if f[-1].split() else ""
+        if token not in TERMINATION_VALUES:
+            problems.append(f"{where}: termination is {token or '(empty)'!r}, not one of "
+                            f"{sorted(TERMINATION_VALUES)}  ->  {named}")
+            continue
+        counts[token] += 1
+    return problems, counts
+
+
+def fenced_block_coverage() -> tuple[int, int, list[str]]:
+    """Fenced blocks in the corpus, and the documents holding one that NO register row names.
+
+    Criterion 2 has two halves. The register's own half -- every row says whether its block
+    halts -- is checked above. This is the other: a block with no row at all is untested by
+    construction, and the register cannot see it because the register only knows what it lists.
+
+    It counts DOCUMENTS, not blocks, and the difference matters. Rows are keyed by prose ("the
+    droplet loop, after adding the sediment writes"), never by line, so no mechanical map exists
+    from a row to the fence it ran; a row may cover several fences and several rows may cover
+    one. So a document appearing here is a certainty (nothing in it is registered) while its
+    absence proves nothing about its other fences. REPORTED, not enforced.
+    """
+    skip = {p.name for p in paper_files()} | {INDEX.name, COVERAGE.name}
+    fences: dict[str, int] = {}
+    for p in documents(ROOT):
+        if p.name in skip:
+            continue
+        n = inside = 0
+        for line in p.read_text(encoding="utf-8").split("\n"):
+            if line.lstrip().startswith("```"):
+                inside = not inside
+                n += inside          # count openers only, so ```lang and ``` are one block
+        fences[p.name] = n
+    # Tokenised, not a substring test: one document's name being a substring of another's
+    # would silently mark it registered. The document column holds `a.md, b.md` and `a.md:14`.
+    listed: set[str] = set()
+    if PSEUDOCODE.exists():
+        for ln in PSEUDOCODE.read_text(encoding="utf-8").split("\n"):
+            if not ln.strip() or ln.lstrip().startswith("#"):
+                continue
+            for tok in re.split(r"[,\s]+", ln.split("\t")[0]):
+                listed.add(tok.split(":")[0].strip())
+    total = sum(fences.values())
+    with_fences = sum(1 for v in fences.values() if v)
+    gap = sorted(name for name, v in fences.items() if v and name not in listed)
+    return total, with_fences, gap
+
+
+# A register with one defect of each shape the check exists to catch. Every row below is a real
+# failure mode, not a decoration: a dropped tab (the shape a hand edit produces), an extra tab
+# (the shape a note containing a tab produces), a plausible-but-unlisted token, an empty cell,
+# and -- in a data row AND in the header comment, because both happened -- a row named by line
+# number. The FIXED copy differs from it ONLY in those six places and must go quiet: a check
+# that cannot be made to fail is not a check, and two of this corpus's guards were exactly that.
+_REG_HEAD = "\t".join(PSEUDOCODE_COLUMNS)
+_REG_OK = ("a.md\tthe stack loop\tit halts\t3600 of 3600\tSOUND\tlead\t"
+           "halts-proven -- one for-each over a finite set")
+PSEUDOCODE_FIXTURE = "\n".join([
+    # the header comment block is scanned too, and a blank line is skipped
+    "# the driver every row here shares is row :4's",
+    "",
+    _REG_HEAD,
+    _REG_OK,
+    # a dropped tab: six fields, so `provenance` would be read as `termination`
+    "b.md\tthe droplet step\tit erodes\trelief 1.0 to 0.91\tDEFECT CONFIRMED\tagent",
+    # an extra tab inside the note
+    "c.md\tthe march\tit stops\t0/600\tSOUND\tagent\thalts-measured -- 0/600\tstepCap 1e9",
+    # a token that reads like a value and is not one
+    "d.md\tthe relaxation\tit converges\t155 passes\tSOUND\tlead\tterminates -- it finished",
+    # nothing at all in the cell
+    "e.md\tthe sweep\tit is exact\tzero drift\tSOUND\tlead\t",
+    # well-formed in every other way, and pointing at a line instead of at a row. Note the
+    # `f.md:12` beside it: a reference into a DOCUMENT is correct and must NOT be flagged.
+    "f.md\tthe second pass\tit repeats the first\t12 passes\tSOUND\tlead\t"
+    "halts-proven -- the fence at f.md:12 repeats row :4's pass",
+]) + "\n"
+PSEUDOCODE_FIXTURE_FIXED = "\n".join([
+    "# the driver every row here shares is the `a.md / the stack loop` row's",
+    "",
+    _REG_HEAD,
+    _REG_OK,
+    "b.md\tthe droplet step\tit erodes\trelief 1.0 to 0.91\tDEFECT CONFIRMED\tagent\t"
+    "n/a -- the fence is one step, straight-line",
+    "c.md\tthe march\tit stops\t0/600\tSOUND\tagent\thalts-measured -- 0/600, stepCap 1e9 unhit",
+    "d.md\tthe relaxation\tit converges\t155 passes\tSOUND\tlead\thalts-measured -- to tolerance",
+    "e.md\tthe sweep\tit is exact\tzero drift\tSOUND\tlead\tunknown",
+    "f.md\tthe second pass\tit repeats the first\t12 passes\tSOUND\tlead\t"
+    "halts-proven -- the fence at f.md:12 repeats the `a.md / the stack loop` row's pass",
+]) + "\n"
+# (line in the fixture, substring the message must carry)
+PSEUDOCODE_FIXTURE_EXPECTED = [
+    (":1", "'row :4' names a row of THIS file by line number"),
+    (":5", "6 fields, expected 7"),
+    (":6", "8 fields, expected 7"),
+    (":7", "termination is 'terminates'"),
+    (":8", "termination is '(empty)'"),
+    (":9", "'row :4' names a row of THIS file by line number"),
+]
+
+
+def _register_fixture_run(text: str) -> list[str]:
+    """What check_pseudocode_register() says of a fixture register written to a temp tree."""
+    with tempfile.TemporaryDirectory() as tmp:
+        p = Path(tmp) / "pseudocode-execution.tsv"
+        p.write_text(text, encoding="utf-8")
+        return check_pseudocode_register(p)[0]
+
+
+def register_selftest() -> list[str]:
+    """Assert the register check goes RED on each defect and GREEN once they are repaired."""
+    bad: list[str] = []
+    broken = _register_fixture_run(PSEUDOCODE_FIXTURE)
+    for line, want in PSEUDOCODE_FIXTURE_EXPECTED:
+        if not any(line in p and want in p for p in broken):
+            bad.append(f"no finding matches {line} + {want!r}: {broken}")
+    if len(broken) != len(PSEUDOCODE_FIXTURE_EXPECTED):
+        bad.append(f"{len(broken)} findings on the broken fixture register, expected "
+                   f"{len(PSEUDOCODE_FIXTURE_EXPECTED)}: {broken}")
+    with tempfile.TemporaryDirectory() as tmp:
+        absent = check_pseudocode_register(Path(tmp) / "absent.tsv")[0]
+    if not any("missing" in p for p in absent):
+        bad.append(f"an absent register is not reported as missing: {absent}")
+    with tempfile.TemporaryDirectory() as tmp:
+        p = Path(tmp) / "fixed.tsv"
+        p.write_text(PSEUDOCODE_FIXTURE_FIXED, encoding="utf-8")
+        fixed, counts = check_pseudocode_register(p)
+    if fixed:
+        bad.append(f"the repaired fixture register is not quiet: {fixed}")
+    if (counts["n/a"], counts["halts-measured"], counts["halts-proven"],
+            counts["unknown"]) != (1, 2, 2, 1):
+        bad.append(f"the repaired fixture register tallies {counts}, expected one each of "
+                   f"n/a and unknown and two each of halts-proven and halts-measured")
+    # The document reference in the repaired `f.md` row -- `f.md:12` -- must survive: a guard
+    # that also flagged those would make the correct idiom unwritable, and that is the shape of
+    # over-reach this repo's guard-proofs register exists to record.
+    if any("f.md:12" in p for p in fixed):
+        bad.append(f"a `document.md:NN` reference is being flagged as a row self-reference: "
+                   f"{fixed}")
+    # The header is the other half: drop the column name and every row below it is being read
+    # against a shape the file no longer has.
+    headless = _register_fixture_run(
+        PSEUDOCODE_FIXTURE_FIXED.replace("\ttermination\n", "\n", 1))
+    if not any("columns are" in p for p in headless):
+        bad.append(f"dropping the `termination` column name is not reported: {headless}")
+    # ...and the header check returns EARLY, which is a place findings can be silently dropped.
+    # A row self-reference has nothing to do with the column shape, so it must survive that
+    # return. Asserted because the first draft of this guard did not: with the header broken it
+    # reported the header and swallowed the reference, and the selftest went green anyway.
+    headless_ref = _register_fixture_run(
+        PSEUDOCODE_FIXTURE.replace("\ttermination\n", "\n", 1))
+    if not (any("columns are" in p for p in headless_ref)
+            and any("names a row of THIS file by line number" in p for p in headless_ref)):
+        bad.append(f"a broken header swallows the row self-reference findings: {headless_ref}")
+    return bad
+
+
 def coverage_summary() -> str:
     try:
         _, body = parse_front_matter(COVERAGE)
@@ -1287,31 +2655,683 @@ def check_index() -> list[str]:
             for ln in (r.stdout + r.stderr).splitlines() if ln.strip()][:8]
 
 
+# ── dated-crossover ──────────────────────────────────────────────────────────────────────
+# `SKILL.md`'s crossover bullet -- "a crossover stated without a year is a claim with a hidden
+# expiry ... Three documents in this corpus currently do it" -- was the ONE doctrine rule in this
+# skill with no instrument behind it, and its count was a hand-count. Audit S1. This is the
+# instrument.
+#
+# It is deliberately the TIGHT reading. A crossover is a recommendation with an expiry date, so
+# the date has to be where the recommendation is: inside the crossover paragraph itself, not
+# three paragraphs below in the same section. The loose section-scoped figure is reported
+# alongside, because the gap between the two IS the finding -- the corpus knows its dates and
+# writes them somewhere other than the claim that needs them.
+CROSSOVER_YEAR = re.compile(r"(?<![\w.\-/])(20[1-2]\d)(?![\w.\-/%])")
+
+# 2010-2029 only, because the doctrine asks WHEN THIS WAS TRUE, not when a paper was published:
+# a crossover paragraph whose only year is 1996 is dating its source, and that is what the
+# `sources:` block is for. ⚠️ The floor is a CHOICE and it has a cost -- a crossover honestly
+# dated "as of 2008" is not counted, and the corpus holds none today. The two fixtures at the
+# boundary exist because the first fixture set did not pin it at all: crippling this pattern to
+# `(20\d\d)` passed all nine, since no fixture lived in 2000-2009. A fixture set that cannot
+# fail is the same defect as a mutation that cannot go red.
+
+
+def _scrub_years(text: str) -> str:
+    """Strip every four-digit run that is NOT a statement about when something was true."""
+    text = re.sub(r"\[[^\]]*\]", " ", text)                                   # [burns2013]
+    text = re.sub(r"\b[A-Za-z_][A-Za-z0-9_]*\d{4}[a-z]?\b", " ", text)        # bare bib keys
+    text = re.sub(r"\(\s*\d{4}[a-z]?\s*\)", " ", text)                       # (2013)
+    text = re.sub(r"\d{3,5}\s*[x\u00d7]\s*\d{3,5}(\s*[x\u00d7]\s*\d{3,5})?", " ", text)  # 2048x2048x256
+    text = re.sub(r"\b\d{4}\s*(?:m|km|cells?|px|p|MB|GB|KB|ms|fps|Hz|kHz|tris?|bytes?)\b",
+                  " ", text, flags=re.I)                                        # unit suffix
+    return text
+
+
+DATED_CROSSOVER_FIXTURES = [
+    ("**Crossover — as of 2026, the visibility buffer wins above 2 M triangles.**", True),
+    ("**Crossover.** True in 2024 and moving toward mesh shaders.", True),
+    ("**Crossover — the fullscreen-triangle analytic plane** [burns2013].", False),
+    ("**Crossover.** Marching cubes, per Lorensen and Cline (1987).", False),
+    ("**Crossover** at a 2048\u00d72048\u00d7256 voxel grid.", False),
+    ("**Crossover** above 4096 px of virtual texture.", False),
+    ("**Crossover — mirror below 1996 cells of blend width.**", False),
+    ("**Crossover.** The 1993 result still holds.", False),
+    ("**Crossover.** The 2026 default everywhere.", True),
+    ("**Crossover.** True as of 2009 and unrevisited.", False),   # the floor, from below
+    ("**Crossover.** True as of 2010 and unrevisited.", True),    # and from above
+]
+
+
+def dated_crossover() -> tuple[int, int, int, int, int]:
+    """(documents dated, documents with a crossover, paragraphs dated, paragraphs, section-dated)."""
+    ddoc = doc = dpara = para = sdoc = 0
+    for d in content_documents():
+        try:
+            _, body = parse_front_matter(d)
+        except (OSError, Unparseable):
+            continue
+        lines = body.split("\n")
+        heads = [i for i, ln in enumerate(lines) if ln.startswith("#")]
+        marks = [i for i, ln in enumerate(lines) if "crossover" in ln.lower()]
+        if not marks:
+            continue
+        doc += 1
+        hit = sec_hit = False
+        seen: set[int] = set()
+        for i in marks:
+            if i in seen:
+                continue
+            j = i
+            while j < len(lines) and lines[j].strip():
+                seen.add(j)
+                j += 1
+            para += 1
+            if CROSSOVER_YEAR.search(_scrub_years(" ".join(lines[i:j]))):
+                dpara += 1
+                hit = True
+            a = max([h for h in heads if h <= i], default=0)
+            b = min([h for h in heads if h > i], default=len(lines))
+            if CROSSOVER_YEAR.search(_scrub_years(" ".join(lines[a:b]))):
+                sec_hit = True
+        ddoc += hit
+        sdoc += sec_hit
+    return ddoc, doc, dpara, para, sdoc
+
+
+def selfdescription_truth() -> dict[str, int]:
+    """Every number SKILL.md and STATE.md claim about this corpus, COMPUTED from the tree.
+
+    One place, so a rule cannot read a different truth from the rule beside it.
+    """
+    docs = content_documents()
+    papers = paper_files()
+    corr = CORRECTIONS.read_text(encoding="utf-8").split("\n") if CORRECTIONS.exists() else []
+    crows = [ln.split("\t") for ln in corr if len(ln.split("\t")) > 3]
+    entries = 0
+    for f in papers:
+        entries += len(re.findall(r"^- \*\*[a-z_][a-z0-9_]*\*\*", f.read_text(encoding="utf-8"), re.M))
+    stamps = 0
+    for d in docs:
+        try:
+            fm, _ = parse_front_matter(d)
+        except (OSError, Unparseable):
+            continue
+        if fm.get("verified"):
+            stamps += 1
+    # How much of the corpus a human has actually signed. The stamp covers `## Use this` plus
+    # the failure table and nothing else, so "4 of 40" overstates it by a factor of seven and
+    # the honest figure is a fraction of BODY LINES. Computed, so it cannot be rounded up.
+    body_total = signed = 0
+    for d in docs:
+        try:
+            fm, body = parse_front_matter(d)
+        except (OSError, Unparseable):
+            continue
+        lines = body.split("\n")
+        body_total += len(lines)
+        if not fm.get("verified"):
+            continue
+        i = 0
+        while i < len(lines):
+            ln = lines[i]
+            if ln.startswith("## ") and ("Use this" in ln or "fails" in ln.lower()):
+                j = i + 1
+                while j < len(lines) and not lines[j].startswith("## "):
+                    j += 1
+                signed += j - i
+                i = j
+            else:
+                i += 1
+
+    states: dict[str, int] = {}
+    if COVERAGE.exists():
+        for _, st in re.findall(r"^- \*\*([a-z0-9-]+)\*\*\s+`([a-z-]+)`",
+                                COVERAGE.read_text(encoding="utf-8"), re.M):
+            states[st] = states.get(st, 0) + 1
+
+    rigs = ROOT / "rigs"
+    rig_files = sorted(rigs.rglob("*.py")) if rigs.exists() else []
+    return {
+        "documents": len(docs),
+        "bibliographies": len(papers),
+        "entries": entries,
+        "corrections": len(crows),
+        "pending": sum(1 for f in crows if len(f) > 6 and "pending" in f[6]),
+        "stamps": stamps,
+        "signed_lines": signed,
+        "body_lines": body_total,
+        "covered": states.get("covered", 0),
+        "planned": states.get("planned", 0),
+        "out_of_scope": states.get("out-of-scope", 0),
+        "rigs": len(rig_files),
+        "runs": len(list(rigs.rglob("*.run.txt"))) if rigs.exists() else 0,
+        "rigs_asserting": sum(1 for f in rig_files if rig_asserts(f)),
+        # Documents the PRE-AUDIT tiering in STATE.md never named. Not "unaudited" -- every
+        # document has since been through an implementer and an independent verifier -- but the
+        # tiering is what that sentence is about, and it read 21 for nine days after three
+        # documents were written that it had never heard of.
+        "unexamined": len(docs) - _tiered_documents(docs),
+    }
+
+
+def _tiered_documents(docs: list[Path]) -> int:
+    """How many documents STATE.md's audit-state tiering actually names."""
+    state = ROOT / "STATE.md"
+    if not state.exists():
+        return 0
+    text = state.read_text(encoding="utf-8")
+    head = "## Audit state, per document"
+    if head not in text:
+        return 0
+    section = text[text.index(head):]
+    cut = section.find("**Never examined")
+    if cut > 0:
+        section = section[:cut]
+    named = set(re.findall(r"`([a-z][a-z0-9-]+)`", section))
+    return sum(1 for d in docs if d.stem in named)
+
+
+def rig_asserts(path: Path) -> bool:
+    """Does this rig check its DOCUMENT, or only its own memory?
+
+    The distinction is the one this corpus was caught on twice in a day: `heightfield-lod.py`
+    printed "document says 134" beside a 134 typed into its own source, and `mu-d-overcast.py`
+    shipped as the fix for a live physics error while computing two numbers and exiting 0
+    whatever the page said. A rig counts here only if it READS a file under `references/` and
+    can EXIT NON-ZERO. Both halves are required: reading without exiting is a report, and
+    exiting without reading is a self-test.
+
+    ⚠️ It reads source text, so it is fooled by a rig that reads its page and ignores what it
+    finds. That is a floor on the count, never the number of rigs that genuinely bite.
+    """
+    try:
+        src = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    reads = "references" in src and ("read_text" in src or "open(" in src)
+    return reads and "sys.exit" in src
+
+
+# Prose counts OUTSIDE the generated markers, checked against the computed truth.
+#
+# The generator owns the Status table. This owns the sentences a human writes about the corpus
+# in their own words, which is where SEVEN of the nine falsehoods a rating panel found by hand
+# actually lived -- "37 documents", "six bibliographies", "16 of 37", "21 unexamined",
+# "11 coverage rows". Each entry is (a regex with ONE capturing group for the number, the
+# truth key, and what to call it in the message).
+#
+# Deliberately anchored on the WORDS around the number rather than on a bare count, and each
+# pattern is written against the sentence that exists today. A rule that guesses at sentences
+# cries wolf; a rule that matches a bare integer would fire on every figure in the file.
+PROSE_COUNTS: tuple[tuple[str, str, str], ...] = (
+    (r"(\d+) documents on four axes", "documents", "documents on four axes"),
+    (r"plus (\w+) bibliographies", "bibliographies", "bibliographies"),
+    (r"covers \d+ of (\d+) documents", "documents", "the audit-table denominator"),
+    (r"The (\d+) documents this tiering never examined", "unexamined",
+     "documents the pre-audit tiering never examined"),
+    (r"(\d+) coverage rows are planned", "planned", "planned coverage rows"),
+)
+
+# ⚠️ EVERY PATTERN ABOVE IS ASSERTED TO MATCH SOMETHING. The coverage-rows rule was written as
+# `\*\*(\d+) coverage rows are planned` and matched NOTHING, because the sentence reads
+# "**6. 13 coverage rows are planned" -- a list number sits between the bold marker and the
+# count. It passed its own tamper test by never firing, which is the same defect as a fixture
+# set that cannot fail and a mutation that cannot go red. `prose_count_coverage()` below is run
+# by --selftest so a rule that has quietly stopped matching is a failure, not a silent pass.
+
+# Number words, because English prose writes small counts out and "plus six bibliographies" is
+# exactly the falsehood this rule exists to have caught.
+WORD_NUMBERS = {"zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+                "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+                "thirteen": 13}
+
+# Sentences that are FALSE while the tree holds a stamp. Matched against the whitespace-normalised
+# whole text, never line by line -- see the docstring of selfdescription_problems().
+STAMP_DENIALS = (
+    "no document carries this yet",
+    "no document carries the `verified:` header",
+    "none carries one yet",
+    "no document in the corpus carries one",
+    "nothing here is verified in the strong sense",
+)
+
+
+def _normalised(text: str) -> tuple[str, list[int]]:
+    """Collapse all whitespace to single spaces, and map each output char to its source line.
+
+    This is the whole point of the rewrite. The line-scoped version of this check could not see
+    a claim that had wrapped, and every falsehood it failed to catch was in one: STATE.md carried
+    "**no document carries the `verified:` header**" split across two lines, nineteen lines below
+    a row the same check had already corrected to "4 of 40", and exited 0 on it for a day.
+    """
+    out: list[str] = []
+    lines: list[int] = []
+    line = 1
+    prev_space = True
+    for ch in text:
+        if ch == "\n":
+            line += 1
+        if ch.isspace():
+            if not prev_space:
+                out.append(" ")
+                lines.append(line)
+                prev_space = True
+            continue
+        out.append(ch)
+        lines.append(line)
+        prev_space = False
+    return "".join(out), lines
+
+
+# ── the two things `approximation` counts and should not be read as counting ──────────────
+# `approximation 39/40` is this corpus's headline number and BOTH rating panels called it
+# oversold, for two different reasons that deserve two different metrics rather than a footnote.
+#
+# It asks only that a document state an error SOMEWHERE and a cost SOMEWHERE. It does not ask
+# that the two describe the same technique, and it does not ask that either be reproducible.
+# Neither of these replaces it -- a floor is still worth having, and 39/40 is a defensible floor.
+# They sit beside it so a reader can see what the floor is a floor OVER.
+#
+# Hardware named in a `P` locator, and a resolution. Deliberately coarse: this asks whether the
+# citation is the kind of artefact a cost could be read out of, never whether it was.
+APPROX_HARDWARE = re.compile(
+    r"\b(RTX|GTX|RX\s*\d|Radeon|GeForce|PS4|PS5|Xbox|M1|M2|M3|Ryzen|Core\s+i[3579]|Titan"
+    r"|A100|V100|Quadro|Adreno|Mali|CPU|GPU)\b", re.I)
+APPROX_RESOLUTION = re.compile(
+    r"\b(\d{3,4}\s*[x\u00d7]\s*\d{3,4}|1080p|720p|4k|1440p|2160p|\d+\u00b2)\b", re.I)
+
+# The band the colocated figure is reported at. 50 body lines is about a screen and a half --
+# far enough to allow a cost table under an error discussion, near enough that a reader meets
+# both without searching. Reported at three bands so the choice is visible rather than implied.
+APPROX_BANDS = (20, 50, 100)
+
+
+def approximation_quality() -> tuple[int, int, dict[int, int], list[tuple[str, int]]]:
+    """Of the documents `approximation` credits, how many are SOURCED and how many COLOCATED?
+
+    Returns (sourced, credited, {band: colocated}, widest gaps).
+
+    ⚠️ Gaps are measured from MATCH OFFSETS, not by scanning lines. The first version of this
+    scanned line by line and reported `surface-and-scale-space.md` as having no error statement
+    at all, because its sentence reads "lands **0.0050%\nlow** on Sigma-h" and the match spans
+    the line break. The document states its error perfectly well; the instrument could not see a
+    wrapped one. That is the same defect the self-description check was rewritten for on the
+    same day, committed here while measuring something else entirely.
+    """
+    reg_docs: set[str] = set()
+    if PSEUDOCODE.exists():
+        for ln in PSEUDOCODE.read_text(encoding="utf-8").split("\n"):
+            f = ln.split("\t")
+            if len(f) >= 7 and f[0].endswith(".md"):
+                reg_docs.add(f[0])
+
+    sourced = credited = 0
+    per_band = {b: 0 for b in APPROX_BANDS}
+    gaps: list[tuple[str, int]] = []
+    for d in content_documents():
+        try:
+            fm, body = parse_front_matter(d)
+        except (OSError, Unparseable):
+            continue
+        if not (ERROR_STATED.search(body) and COST_UNIT.search(body)):
+            continue
+        credited += 1
+
+        # (a) is there anything a second engineer could go and re-run or re-read?
+        by_register = d.name in reg_docs
+        by_locator = any(
+            s.get("tier") == "P"
+            and APPROX_HARDWARE.search(str(s.get("locator", "")))
+            and APPROX_RESOLUTION.search(str(s.get("locator", "")))
+            for s in (fm.get("sources") or []))
+        if by_register or by_locator:
+            sourced += 1
+
+        # (b) do the two halves sit where one reader meets both?
+        def line_of(off: int) -> int:
+            return body.count("\n", 0, off) + 1
+        cost_at = [line_of(m.start()) for m in COST_UNIT.finditer(body)]
+        err_at = [line_of(m.start()) for m in ERROR_STATED.finditer(body)]
+        gap = min(abs(a - b) for a in cost_at for b in err_at)
+        gaps.append((d.name, gap))
+        for band in APPROX_BANDS:
+            if gap <= band:
+                per_band[band] += 1
+
+    gaps.sort(key=lambda r: -r[1])
+    return sourced, credited, per_band, gaps[:4]
+
+
+# ── the generated Status block ───────────────────────────────────────────────────────────
+# WHY THIS IS GENERATED. Every falsehood two rating panels found by hand across 2026-09-14/15
+# was a hand-written claim about this corpus: a stamp count, a document count, a register row
+# count, a rig count. The matcher below catches the ones it has rules for; it cannot catch the
+# ones nobody thought to write a rule for, and it cannot tell a claim from a QUOTATION of one --
+# writing a retired falsehood into STATE.md to record it made STATE.md fail on its own
+# confession. A generator has neither problem, because it never has to recognise a sentence.
+#
+# Only exactly-computable facts go in here. The bites counts do NOT: they are a property of a
+# RUN, not of the tree, and a static count over the workflow misses rows that are plain shell
+# rather than a `red_check` call. That number stays hand-written in the Guards row and the
+# `bites` job itself asserts STATE.md agrees with what it observed -- the authority sits with
+# the thing that actually knows.
+STATE = ROOT / "STATE.md"
+GEN_OPEN = "<!-- generated: status -- `python3 gaia/scripts/check.py --emit-state` -->"
+GEN_CLOSE = "<!-- /generated: status -->"
+
+
+def render_status() -> str:
+    """The Status rows, from `selfdescription_truth()` and nothing else."""
+    n = selfdescription_truth()
+    pct = 100.0 * n["signed_lines"] / n["body_lines"] if n["body_lines"] else 0.0
+    return "\n".join([
+        GEN_OPEN,
+        "",
+        "| | |",
+        "|---|---|",
+        f"| Documents | **{n['documents']}** written \u00b7 {n['planned']} planned \u00b7 "
+        f"{n['out_of_scope']} out of scope "
+        f"({n['covered'] + n['planned'] + n['out_of_scope']} topics claimed in `coverage.md`) |",
+        f"| Bibliography | **{n['entries']}** entries across {n['bibliographies']} "
+        f"`papers-*.md` files |",
+        f"| Corrections | **{n['corrections']}** rows in `registers/corrections.tsv`, "
+        f"**{n['pending']}** still `verifier=pending` |",
+        f"| `verified:` stamps | **{n['stamps']} of {n['documents']}** documents \u2014 and "
+        f"**{n['signed_lines']} of {n['body_lines']:,} body lines, {pct:.2f}%**, because a stamp "
+        f"covers `## Use this` and the failure table and nothing else |",
+        f"| Measurement rigs | **{n['rigs']}** in `rigs/`, **{n['runs']}** with saved output, "
+        f"**{n['rigs_asserting']}** asserting against their own page |",
+        "",
+        GEN_CLOSE,
+    ])
+
+
+def emit_state() -> int:
+    """Write the generated block into STATE.md between its markers."""
+    if not STATE.exists():
+        print(f"  FAIL  {STATE} does not exist")
+        return 1
+    text = STATE.read_text(encoding="utf-8")
+    if GEN_OPEN not in text or GEN_CLOSE not in text:
+        print(f"  FAIL  STATE.md carries no generated region. Insert these two markers where the "
+              f"Status table belongs and re-run:\n    {GEN_OPEN}\n    {GEN_CLOSE}")
+        return 1
+    a = text.index(GEN_OPEN)
+    b = text.index(GEN_CLOSE) + len(GEN_CLOSE)
+    new = text[:a] + render_status() + text[b:]
+    if new == text:
+        print("STATE.md's status block is current.")
+        return 0
+    STATE.write_text(new, encoding="utf-8")
+    print("wrote STATE.md's status block.")
+    return 0
+
+
+def generated_block_problems() -> list[str]:
+    """The generated region must equal what `render_status()` emits right now.
+
+    A hand edit inside the markers, and a change to the tree that nobody regenerated for, are
+    the same failure and get the same message: regenerate.
+    """
+    if not STATE.exists():
+        return []
+    text = STATE.read_text(encoding="utf-8")
+    if GEN_OPEN not in text or GEN_CLOSE not in text:
+        return [f"STATE.md: the generated status block is missing its markers. "
+                f"Run `python3 gaia/scripts/check.py --emit-state`."]
+    a = text.index(GEN_OPEN)
+    b = text.index(GEN_CLOSE) + len(GEN_CLOSE)
+    have, want = text[a:b], render_status()
+    if have == want:
+        return []
+    out = [f"STATE.md:{text[:a].count(chr(10)) + 1}: the generated status block is out of date. "
+           f"Run `python3 gaia/scripts/check.py --emit-state`."]
+    hl, wl = have.split("\n"), want.split("\n")
+    for i in range(max(len(hl), len(wl))):
+        h = hl[i] if i < len(hl) else "(missing)"
+        w = wl[i] if i < len(wl) else "(deleted)"
+        if h != w:
+            out.append(f"    row {i}: file has {h.strip()[:96]!r}")
+            out.append(f"             tree says {w.strip()[:96]!r}")
+    return out
+
+
+def prose_count_coverage() -> list[tuple[str, str]]:
+    """Every PROSE_COUNTS pattern must match somewhere, or it is checking nothing.
+
+    Written after the coverage-rows rule shipped matching nothing at all and passed its own
+    tamper test by never firing. A rule that cannot fire is the same defect as a mutation that
+    cannot go red, and this corpus has now committed that defect at four different levels:
+    a fixture set with no case at its boundary, a CI stub that patched the wrong anchor, a rig
+    whose expectations were its own transcript, and this.
+    """
+    dead: list[tuple[str, str]] = []
+    joined = []
+    for name in ("SKILL.md", "STATE.md"):
+        f = ROOT / name
+        if f.exists():
+            joined.append((name, _normalised(f.read_text(encoding="utf-8"))[0]))
+    if not joined:
+        return dead
+    for pattern, _key, _what in PROSE_COUNTS:
+        if not any(re.search(pattern, flat, re.I) for _n, flat in joined):
+            dead.append((pattern, " or ".join(n for n, _ in joined)))
+    return dead
+
+
+def selfdescription_problems() -> list[str]:
+    """SKILL.md and STATE.md describe this corpus. This file can COMPUTE what they describe.
+
+    Added 2026-09-15 on a rating panel's finding, and REWRITTEN the same day when a second panel
+    showed the first version could not do its job. Two defects, both structural:
+
+    1. It scanned line by line, so any claim long enough to wrap was invisible to it whatever
+       phrases were listed. STATE.md's "**no document carries the `verified:` header**" wrapped
+       across two lines and survived, nineteen lines under a row this check had corrected.
+    2. It checked three phrases and one table cell. The numbers it did not read went stale
+       immediately: the commit that introduced it wrote "**233** rows" into STATE.md while the
+       register held 238, wrong on arrival, in the commit titled "the corpus described itself
+       wrongly in the two files a reader opens first".
+
+    Its table-cell half is GONE, not extended. Those rows are generated now
+    (`render_status()`), and it read the generated stamp row's "194 of 13,930 body lines" as a
+    claim that 194 of 13,930 documents were stamped -- failing a block the generator had just
+    written. Two rules owning one fact is the defect this corpus keeps rediscovering. What is
+    left here is the half a generator cannot do: prose, outside the markers, where a human
+    writes a sentence about the corpus in their own words.
+
+    Both are fixed by the same move: compute the truth ONCE (`selfdescription_truth()`), then
+    match against the whitespace-NORMALISED whole text.
+
+    THREE THINGS IT STILL CANNOT DO, and the third is why a generator is the honest successor:
+
+    1. It does not read prose for meaning. A claim phrased in a way no rule anticipates escapes.
+    2. It reads SKILL.md and STATE.md, never its own source, and never PLAN.md. Stale sentences
+       inside this file were found by hand twice on the day it was written.
+    3. **It cannot tell a claim from a QUOTATION of one.** Writing the old false sentence into
+       STATE.md to record it made STATE.md fail on its own confession -- observed, 2026-09-15.
+       A corpus whose whole method is recording where it was wrong cannot use a matcher that
+       punishes the recording, so the note there paraphrases where it would rather quote. A
+       generator emitting these rows does not have this problem, because it never has to
+       recognise a sentence in the first place.
+    """
+    truth = selfdescription_truth()
+    problems: list[str] = []
+
+    # PLAN.md is read for the stamp-denial rule ONLY. Its numbers are mostly deliberately
+    # frozen before-states -- `:91` says "37 documents" because that is what there were when the
+    # plan was written -- and no matcher can tell a historical count from a stale one. A denial
+    # that the corpus holds any stamp is different: it is false the moment a stamp exists,
+    # whenever it was written. Until 2026-09-15 nothing read this file at all, which is how its
+    # Now column came to be raised on five dimensions by the hand being rated.
+    for name in ("SKILL.md", "STATE.md", "PLAN.md"):
+        f = ROOT / name
+        if not f.exists():
+            continue
+        prose_and_stamp_of_n = name != "PLAN.md"
+        raw = f.read_text(encoding="utf-8")
+        # The generated region belongs to `generated_block_problems()`. Blanking it (rather than
+        # deleting it) keeps every later line number right, and stops the two rules disagreeing:
+        # the matcher read the generated stamp row's "194 of 13,930 body lines" as a claim that
+        # 194 of 13,930 documents were stamped, and failed a block the generator had just written.
+        # One fact, one owner.
+        if GEN_OPEN in raw and GEN_CLOSE in raw:
+            a, b = raw.index(GEN_OPEN), raw.index(GEN_CLOSE) + len(GEN_CLOSE)
+            raw = raw[:a] + "".join("\n" if c == "\n" else " " for c in raw[a:b]) + raw[b:]
+        flat, lines = _normalised(raw)
+        low = flat.lower()
+
+        # 1. a sentence denying the stamps, while the tree carries them
+        if truth["stamps"]:
+            for phrase in STAMP_DENIALS:
+                i = low.find(phrase.lower())
+                if i >= 0:
+                    problems.append(
+                        f"{name}:{lines[i]}: says {phrase!r} about `verified:`, but "
+                        f"{truth['stamps']} document(s) carry one. The corpus is describing "
+                        f"itself wrongly in a file a reader opens first.")
+
+        # 2. prose counts, against the computed truth
+        for pattern, key, what in (PROSE_COUNTS if prose_and_stamp_of_n else ()):
+            for m in re.finditer(pattern, flat, re.I):
+                raw = m.group(1)
+                got = WORD_NUMBERS.get(raw.lower()) if not raw.isdigit() else int(raw)
+                if got is None:
+                    problems.append(
+                        f"{name}:{lines[m.start()]}: states {raw!r} {what}, which is not a number "
+                        f"this check knows. Write the digit, or add the word to WORD_NUMBERS.")
+                elif got != truth[key]:
+                    problems.append(
+                        f"{name}:{lines[m.start()]}: states {raw} {what}; the tree has "
+                        f"{truth[key]}.")
+
+        # 3. "N of M" about the stamp, anywhere, wrapped or not
+        for m in re.finditer(r"(\d+)\s*(?:of|/)\s*(\d+)", flat if prose_and_stamp_of_n else ""):
+            window = low[max(0, m.start() - 120):m.end() + 60]
+            if "stamp" not in window and "verified:" not in window:
+                continue
+            claimed, over = int(m.group(1)), int(m.group(2))
+            if claimed != truth["stamps"] or over != truth["documents"]:
+                problems.append(
+                    f"{name}:{lines[m.start()]}: claims `{claimed} of {over}` `verified:` "
+                    f"stamps; the tree has {truth['stamps']} of {truth['documents']}.")
+
+    return problems
+
+
+def notopened_inline_problems() -> list[str]:
+    """A source declared NOT OPENED in the front matter must say so where the reader is.
+
+    Added 2026-09-15, on the second-ranked finding of an independent rating panel. The corpus's
+    handling of unread sources was already the best thing in it -- the locator says which
+    paywall, what was read in its place and what stays unverified -- but ALL of that lives in
+    the YAML. Measured when this was written: **67 inline `[id]` citations across 10 documents
+    named a source the same document declares it never opened**, every one of them bare.
+    `stream-power.md` was the worst case and is `status: stable` with a human `verified:` stamp:
+    it names `[braun2013]` under its `## Use this` headline and three more times, while line 11
+    says the paper was never obtained. A reader who starts at the recommendation -- which is what
+    `## Use this` is FOR -- meets a citation that looks read and is not.
+
+    The fix is one line of body text per affected document rather than 67 inline markers, which
+    would be unreadable and would also have voided two `verified:` stamps by editing `## Use
+    this`. This check enforces that line: for every not-opened id, some body line must both name
+    the id and be marked as the never-opened declaration, and it must come BEFORE the first bare
+    inline citation of that id.
+
+    What it does NOT do: read the banner's prose, or check that the ids it lists are the right
+    ones beyond set membership. A banner naming every id and saying something false about them
+    passes. It pins position and coverage, which is what rots.
+    """
+    problems: list[str] = []
+    for d in content_documents():
+        try:
+            fm, body = parse_front_matter(d)
+        except (OSError, Unparseable):
+            continue
+        ids = [str(s.get("id")) for s in (fm.get("sources") or [])
+               if any(m in str(s.get("locator", "")).upper() for m in LOCATOR_NOT_OPENED)]
+        if not ids:
+            continue
+        lines = body.split("\n")
+        # The banner is a PARAGRAPH, not a line: it starts at the marker and runs to the next
+        # blank line. Matching the marker line alone read only the first 100 characters of it,
+        # and this check failed on its own first run for three ids that had wrapped onto the
+        # second and third lines -- the guard's bug, not the corpus's.
+        banner: list[int] = []
+        for i, ln in enumerate(lines):
+            if NOTOPENED_BANNER not in ln:
+                continue
+            j = i
+            while j < len(lines) and lines[j].strip():
+                banner.append(j)
+                j += 1
+        for sid in ids:
+            cited = [i for i, ln in enumerate(lines) if f"[{sid}]" in ln]
+            if not cited:
+                continue                      # declared but never cited in prose: nothing to warn
+            named = [i for i in banner if f"`{sid}`" in lines[i]]
+            if not named:
+                problems.append(
+                    f"{d.name}: cites [{sid}] in the body {len(cited)} time(s) and declares in "
+                    f"its front matter that the source was never opened, but no "
+                    f"{NOTOPENED_BANNER!r} line names it. The reader meets a citation that looks "
+                    f"read.")
+                continue
+            if min(named) > min(cited):
+                problems.append(
+                    f"{d.name}: the {NOTOPENED_BANNER!r} line naming `{sid}` is below the first "
+                    f"bare citation of it (body line {min(named) + 1} against {min(cited) + 1}). "
+                    f"A declaration the reader reaches second is not a declaration.")
+    return problems
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--list", action="store_true", help="what is checked, and what is not")
+    ap.add_argument("--emit-state", action="store_true",
+                    help="write STATE.md's generated status block from the tree")
     ap.add_argument("--selftest", action="store_true",
                     help="assert the reported metrics classify their fixture sets correctly")
+    ap.add_argument("--digest", metavar="DOC",
+                    help="print the two digests a `verified:` stamp for DOC must carry")
     args = ap.parse_args()
     if args.selftest:
         return selftest()
+    if args.digest:
+        # A stamp has to be computable by the human writing it. Before this the only way to
+        # obtain `covers` was to read sources_digest and run it by hand, which is the kind of
+        # friction that ends with a guessed value and a permanently stale stamp.
+        p = Path(args.digest)
+        if not p.exists():
+            p = ROOT / args.digest
+        fm, body = parse_front_matter(p)
+        print(f"covers: {sources_digest(fm)}          # the citation set")
+        print(f"covers_body: {body_digest(body)}     # `## Use this` + the failure table")
+        return 0
     if args.list:
         print(__doc__)
         return 0
 
+    if args.emit_state:
+        return emit_state()
+
     bib, problems = bibliography()
     doc_problems, used = check_documents(bib)
     rec_problems, rec_first, rec_total = check_recommendation()
+    reg_problems, term = check_pseudocode_register()
+    bud_problems, bud_stated, bud_total, bud_missing = check_budget_agreement()
+    path_problems, path_refs, path_targets, path_residue = check_paths()
     problems += (doc_problems + check_orphans(bib, used) + check_duplication()
                  + check_coverage() + check_index() + rec_problems
                  + check_no_artefact(bib) + check_not_opened(bib, citations_by_id())
                  + check_headings() + check_axis_agreement()
-                 + check_trigger_coverage())
+                 + check_trigger_coverage() + reg_problems
+                 + bud_problems + path_problems)
     prop_problems, prop_both, prop_total = check_propagation(bib, citations_by_id())
     problems += prop_problems
 
-    docs = [p for p in documents(ROOT)
-            if p not in paper_files() and p not in (INDEX, COVERAGE)]
+    docs = content_documents()
     print(f"documents {len(docs)}   bibliography {len(bib)}   cited {len(used)}   "
           f"background {sum(1 for e in bib.values() if e['background'])}")
     if (summary := coverage_summary()):
@@ -1319,6 +3339,31 @@ def main() -> int:
     if rec_total:
         print(f"recommendation {rec_total}/{rec_total} documents name an approach to "
               f"implement; {rec_first} state it first, before any explanation.")
+
+    if bud_total:
+        print(f"budget {bud_stated}/{bud_total} documents print their budget regime on the page "
+              f"as a `{TIER_PREFIX}` line, and every one of those {bud_stated} is CHECKED against "
+              f"the budget tag in `tags:` -- both directions, so neither end can move alone. "
+              f"All {bud_total} carry a budget tag, which is ENFORCED. "
+              + (f"⚠️ Printing no Tier line is an ALLOWED state, not a pass: "
+                 f"{', '.join(bud_missing)} "
+                 f"{'sits' if len(bud_missing) == 1 else 'sit'} inside the 20-line no-add band "
+                 f"under the 450 cap, where ground rule 2 refuses the insertion. Named here so "
+                 f"the count can be seen to fall. " if bud_missing else "")
+              + f"⚠️ Agreement is not correctness: this compares two declarations written by the "
+                f"same hand, never the regime against a measured cost.")
+
+    if path_refs:
+        print(f"paths {path_refs} `document.md` cross-references across the corpus and SKILL.md "
+              f"all resolve to one of the {path_targets} documents on disk -- ENFORCED, because a "
+              f"reference to a document nobody wrote is a broken link, not a metric. "
+              + (f"⚠️ Its reach is gaia's own naming shape. {len(path_residue)} bare `.md` "
+                 f"name(s) in another shape are NOT checked: {'; '.join(path_residue)}. "
+                 f"The repair that clears one is to put its directory INSIDE the span. "
+                 if path_residue else "")
+              + f"⚠️ `.py` and `.tsv` paths are unread; documents in this corpus name harness "
+                f"scripts that were never committed, so a check over them would be red on "
+                f"arrival. See registers/guard-proofs.tsv.")
 
     if prop_total:
         print(f"propagation {prop_both}/{prop_total} ({100 * prop_both / prop_total:.0f}%) of "
@@ -1350,6 +3395,30 @@ def main() -> int:
               f"Reported, not enforced, and it does not discharge the hand review; see "
               f"registers/guard-proofs.tsv.")
 
+    _x_problems, xdis, xcmp, xreach, xpairs = check_crossrefs()
+    if xpairs:
+        print(f"crossrefs {xdis}/{xcmp} shared keyed magnitudes DISAGREE across the "
+              f"{xreach}/{xpairs} linked side-pairs that print one at both ends -- a document "
+              f"against its own failure table, against a document it names, or against the "
+              f"bibliography entry it cites. A correction landing at one end only is this "
+              f"corpus's most-recorded defect, found by hand five times in two days. "
+              f"⚠️ Its reach is {100 * xreach / xpairs:.0f}% of linked pairs: for the rest there "
+              f"is nothing to compare and this line says nothing about them. ⚠️ It DOES NOT "
+              f"catch three of the five instances that motivated it -- reconstructing "
+              f"water-rendering.md's `exp(-K_d*z)` against water-optics.md's "
+              f"`exp(-(K_d + c/mu_v)*z)` reports NOTHING, because the correction added a TERM "
+              f"and the two ends stop sharing a key. It sees a constant that moved, never a "
+              f"rewording. Output is CANDIDATES with TWO known false positives. (1) caustics.md's "
+              f"`1/(b − b_b)` against water-optics.md's `b_b = b/2`, two formulas over one "
+              f"identifier pair. (2) stream-power.md's D/K spacing result against its own "
+              f"failure row, where the `2` this check reads is the superscript of the "
+              f"Laplacian in `D·\u2207\u00b2h` -- the fixture at the `\u0394t \u2264 \u0394x\u00b2/(4D)` row pins that "
+              f"reading deliberately (a superscript IS a constant), so the cost of the "
+              f"rule is this candidate, not a parser bug to fix. Reported, not enforced; "
+              f"see registers/guard-proofs.tsv.")
+        for p in _x_problems:
+            print(p)
+
     sharp, tot, noart, _vague = locator_quality()
     if tot:
         print(f"locators {sharp}/{tot} ({100 * sharp / tot:.0f}%) of the FOLLOWABLE citations "
@@ -1357,6 +3426,26 @@ def main() -> int:
               f"cannot follow. A further {noart} cite doctrine or classical results with no "
               f"artefact to open — declared in the locator, and excluded from the ratio rather "
               f"than held against it. Reported, not enforced; see registers/guard-proofs.tsv.")
+
+    if (registered := sum(term.values())):
+        blocks = registered - term["no-block"]
+        fences, fdocs, fgap = fenced_block_coverage()
+        print(f"termination {term['unknown']}/{registered} register rows say NOTHING about "
+              f"whether their block halts (`unknown`); {term['n/a']} have no loop, "
+              f"{term['halts-proven']} carry an argument, {term['halts-measured']} rest on a run "
+              f"that finished with the cap unhit, {term['cap-bounded']} halt only because a cap "
+              f"stops them, and {term['no-block']} register a prose claim rather than a block. A "
+              f"row here proves a block reproduces a NUMBER, never that it STOPS: the "
+              f"raymarching row measured missed hits, recorded SOUND, and that block livelocked "
+              f"on 35.7% of 600 rays. ⚠️ The token is ENFORCED, its truth is not -- `halts-proven` "
+              f"is worth only the argument written beside it, and `halts-measured` says nothing "
+              f"about inputs outside the run. ⚠️ And the register cannot see criterion 2's other "
+              f"half: {fences} fenced blocks across {fdocs} documents against {blocks} rows that "
+              f"name a block, with {len(fgap)} document(s) holding a fence and no row at all"
+              + (f" ({', '.join(fgap)})" if fgap else "")
+              + ". Rows are keyed by prose, not by line, so that pair is two counts and NOT a "
+                "matching: it is a floor on the gap, never the size of it. Reported, not "
+                "enforced; see registers/guard-proofs.tsv.")
 
     unread, seen = not_opened_count()
     if seen:
@@ -1367,6 +3456,60 @@ def main() -> int:
               f"more honest. The tier vocabulary has no cell for 'peer-reviewed, not read', so "
               f"this counts the declaration instead. A writer who declines to declare is making "
               f"a claim in prose the guard will not repeat for them.")
+
+    xdoc, xdocs, xpara, xparas, xsec = dated_crossover()
+    if xdocs:
+        print(f"dated-crossover {xdoc}/{xdocs} documents state a year INSIDE a crossover "
+              f"paragraph -- {xpara} of {xparas} paragraphs. `SKILL.md`'s own doctrine says a "
+              f"crossover stated without a year is a claim with a hidden expiry, and this is the "
+              f"instrument behind it (audit S1); the bullet hand-counted THREE and the tight "
+              f"reading finds {xdoc}. ⚠️ Widen the scope to the crossover's whole SECTION and it "
+              f"is {xsec}/{xdocs} -- the gap IS the finding: this corpus knows its dates and "
+              f"writes them somewhere other than the claim that expires. ⚠️ It counts a year in "
+              f"2010-2029 only, because the doctrine asks when the claim was TRUE, not when its "
+              f"paper was published; a crossover whose only year is 1996 is dating its source. "
+              f"Citation keys, publication parens, resolutions and unit suffixes are rejected, "
+              f"and there are {len(DATED_CROSSOVER_FIXTURES)} fixtures pinning that. Reported, "
+              f"not enforced; see registers/guard-proofs.tsv.")
+
+    _s, _c, _bands, _worst = approximation_quality()
+    if _c:
+        _wide = ", ".join(f"{n} {g}" for n, g in _worst)
+        print(f"approximation-sourced {_s}/{_c} of the documents `approximation` credits have a "
+              f"`pseudocode-execution.tsv` row OR a `P` locator naming hardware AND a resolution "
+              f"-- something a second engineer could re-run or re-read. The other "
+              f"{_c - _s} state a cost that rests on nothing but the page. "
+              f"\u26a0\ufe0f This asks whether the citation is the KIND of artefact a cost could "
+              f"come out of, never whether it did. Reported, not enforced.")
+        print(f"approximation-colocated {_bands[50]}/{_c} put their error and their cost within 50 "
+              f"body lines of each other; {_bands[20]}/{_c} within 20 and {_bands[100]}/{_c} "
+              f"within 100. `approximation` itself requires only that both appear SOMEWHERE in "
+              f"the body, so it credits a document whose two halves describe different "
+              f"techniques. Widest gaps, in body lines: {_wide}. \u26a0\ufe0f Proximity is not "
+              f"relevance -- two figures ten lines apart can still be about different things, and "
+              f"this cannot tell. It bounds the overstatement; it does not remove it. Reported, "
+              f"not enforced; see registers/guard-proofs.tsv.")
+
+    _t = selfdescription_truth()
+    if _t["rigs"]:
+        print(f"rigs-asserting {_t['rigs_asserting']}/{_t['rigs']} measurement rigs both READ a "
+              f"document under `references/` and can exit non-zero on what they find. The rest "
+              f"compute a number that no page-side assertion ever reads back, so a figure they "
+              f"once reproduced can drift out of the document underneath them and nothing goes "
+              f"red. This corpus has been caught three times with a harness checking its own "
+              f"memory -- `heightfield-lod.py` printed \"document says 134\" beside a 134 typed "
+              f"into its own source, `mu-d-overcast.py` shipped as the fix for a live physics "
+              f"error while exiting 0 whatever the page said, and `node-graph-runtime.py` held a "
+              f"six-number transcript of a fence under a comment claiming it came from the "
+              f"document. All three are repaired and all three are in the numerator. "
+              f"\u26a0\ufe0f This reads SOURCE TEXT, so a rig that reads its page and ignores what "
+              f"it finds still counts: it is a FLOOR on the number that genuinely bite, never "
+              f"that number. \u26a0\ufe0f And CI runs only the asserting ones. "
+              f"Reported, not enforced; see registers/guard-proofs.tsv.")
+
+    problems.extend(generated_block_problems())
+    problems.extend(selfdescription_problems())
+    problems.extend(notopened_inline_problems())
 
     if problems:
         for p in problems:

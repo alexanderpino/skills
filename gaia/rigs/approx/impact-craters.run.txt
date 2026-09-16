@@ -1,0 +1,200 @@
+=== run 1 of 8 ===
+python 3.11.15  numpy 2.4.6  seed 20260914
+grid 2048x2048 float32, domain 40 km, cell 19.53 m, 1000 craters, D in [0.05, 8.0] km, eta=3.0
+
+-- error half, re-derived from the coefficients on the page --
+simple-branch exponents 1.010/1.014/1.011: max deviation from 1.0 = 1.40%
+depth/diameter over D in [0.1,15] km: 0.1915 .. 0.2014  spread 5.1%
+rim/depth over the same range: 0.1820 .. 0.1857  vs intercept ratio 0.1837
+
+-- cost half, measured here --
+stamp, 1000 craters: median 72.6 ms   runs 72.6 79.0 84.6 64.4 68.4   (discarded warm-up 164.8 165.2 ms, first touch of the array)
+stamp, per crater: 72.6 us
+sanity: 6.0% of cells written, relief -114.6 .. 25.8 m
+floored two-branch dimensions, per crater: median 0.591 us   runs 0.605 0.603 0.590 0.588 0.591
+constant-ratio shortcut,        per crater: median 0.091 us   runs 0.098 0.091 0.090 0.091 0.096
+one crater, D = 0.05 km:     45.2 us   (dimensions are 1.31% of it)
+one crater, D =  0.1 km:     64.7 us   (dimensions are 0.91% of it)
+one crater, D =  0.5 km:    423.5 us   (dimensions are 0.14% of it)
+one crater, D =  2.0 km:   5511.9 us   (dimensions are 0.01% of it)
+one crater, D =  8.0 km: 139807.1 us   (dimensions are 0.00% of it)
+law / raster share: 0.8144% of the per-crater stamp
+law - shortcut, per crater: 0.500 us  -> 0.6893% of the per-crater stamp saved by approximating
+crater list: 32 bytes per crater (D, x, y, age as float64), 32 KB for 1000 craters -- no per-cell state
+heightfield: 4 bytes per cell, 16.0 MiB at 2048^2 (16.8 MB), 64.0 MiB at 4096^2
+
+=== run 2 of 8 ===
+python 3.11.15  numpy 2.4.6  seed 20260914
+grid 2048x2048 float32, domain 40 km, cell 19.53 m, 1000 craters, D in [0.05, 8.0] km, eta=3.0
+
+-- error half, re-derived from the coefficients on the page --
+simple-branch exponents 1.010/1.014/1.011: max deviation from 1.0 = 1.40%
+depth/diameter over D in [0.1,15] km: 0.1915 .. 0.2014  spread 5.1%
+rim/depth over the same range: 0.1820 .. 0.1857  vs intercept ratio 0.1837
+
+-- cost half, measured here --
+stamp, 1000 craters: median 59.4 ms   runs 67.0 63.2 57.9 56.6 59.4   (discarded warm-up 61.9 71.7 ms, first touch of the array)
+stamp, per crater: 59.4 us
+sanity: 6.0% of cells written, relief -114.6 .. 25.8 m
+floored two-branch dimensions, per crater: median 0.589 us   runs 0.638 0.597 0.587 0.572 0.589
+constant-ratio shortcut,        per crater: median 0.092 us   runs 0.092 0.090 0.093 0.113 0.092
+one crater, D = 0.05 km:     47.1 us   (dimensions are 1.25% of it)
+one crater, D =  0.1 km:     60.6 us   (dimensions are 0.97% of it)
+one crater, D =  0.5 km:    381.6 us   (dimensions are 0.15% of it)
+one crater, D =  2.0 km:   5744.3 us   (dimensions are 0.01% of it)
+one crater, D =  8.0 km: 148816.4 us   (dimensions are 0.00% of it)
+law / raster share: 0.9914% of the per-crater stamp
+law - shortcut, per crater: 0.497 us  -> 0.8365% of the per-crater stamp saved by approximating
+crater list: 32 bytes per crater (D, x, y, age as float64), 32 KB for 1000 craters -- no per-cell state
+heightfield: 4 bytes per cell, 16.0 MiB at 2048^2 (16.8 MB), 64.0 MiB at 4096^2
+
+=== run 3 of 8 ===
+python 3.11.15  numpy 2.4.6  seed 20260914
+grid 2048x2048 float32, domain 40 km, cell 19.53 m, 1000 craters, D in [0.05, 8.0] km, eta=3.0
+
+-- error half, re-derived from the coefficients on the page --
+simple-branch exponents 1.010/1.014/1.011: max deviation from 1.0 = 1.40%
+depth/diameter over D in [0.1,15] km: 0.1915 .. 0.2014  spread 5.1%
+rim/depth over the same range: 0.1820 .. 0.1857  vs intercept ratio 0.1837
+
+-- cost half, measured here --
+stamp, 1000 craters: median 68.8 ms   runs 66.8 68.1 77.1 68.8 69.8   (discarded warm-up 79.1 68.5 ms, first touch of the array)
+stamp, per crater: 68.8 us
+sanity: 6.0% of cells written, relief -114.6 .. 25.8 m
+floored two-branch dimensions, per crater: median 0.613 us   runs 0.613 0.605 0.643 0.626 0.585
+constant-ratio shortcut,        per crater: median 0.092 us   runs 0.096 0.091 0.091 0.092 0.099
+one crater, D = 0.05 km:     51.4 us   (dimensions are 1.19% of it)
+one crater, D =  0.1 km:     55.9 us   (dimensions are 1.10% of it)
+one crater, D =  0.5 km:    409.5 us   (dimensions are 0.15% of it)
+one crater, D =  2.0 km:   5715.9 us   (dimensions are 0.01% of it)
+one crater, D =  8.0 km: 147527.5 us   (dimensions are 0.00% of it)
+law / raster share: 0.8912% of the per-crater stamp
+law - shortcut, per crater: 0.521 us  -> 0.7571% of the per-crater stamp saved by approximating
+crater list: 32 bytes per crater (D, x, y, age as float64), 32 KB for 1000 craters -- no per-cell state
+heightfield: 4 bytes per cell, 16.0 MiB at 2048^2 (16.8 MB), 64.0 MiB at 4096^2
+
+=== run 4 of 8 ===
+python 3.11.15  numpy 2.4.6  seed 20260914
+grid 2048x2048 float32, domain 40 km, cell 19.53 m, 1000 craters, D in [0.05, 8.0] km, eta=3.0
+
+-- error half, re-derived from the coefficients on the page --
+simple-branch exponents 1.010/1.014/1.011: max deviation from 1.0 = 1.40%
+depth/diameter over D in [0.1,15] km: 0.1915 .. 0.2014  spread 5.1%
+rim/depth over the same range: 0.1820 .. 0.1857  vs intercept ratio 0.1837
+
+-- cost half, measured here --
+stamp, 1000 craters: median 65.2 ms   runs 74.5 66.9 65.2 59.1 58.1   (discarded warm-up 64.8 67.4 ms, first touch of the array)
+stamp, per crater: 65.2 us
+sanity: 6.0% of cells written, relief -114.6 .. 25.8 m
+floored two-branch dimensions, per crater: median 0.612 us   runs 0.617 0.629 0.612 0.593 0.593
+constant-ratio shortcut,        per crater: median 0.101 us   runs 0.093 0.101 0.167 0.101 0.092
+one crater, D = 0.05 km:     44.4 us   (dimensions are 1.38% of it)
+one crater, D =  0.1 km:     55.9 us   (dimensions are 1.09% of it)
+one crater, D =  0.5 km:    384.9 us   (dimensions are 0.16% of it)
+one crater, D =  2.0 km:   6096.8 us   (dimensions are 0.01% of it)
+one crater, D =  8.0 km: 141670.5 us   (dimensions are 0.00% of it)
+law / raster share: 0.9386% of the per-crater stamp
+law - shortcut, per crater: 0.512 us  -> 0.7841% of the per-crater stamp saved by approximating
+crater list: 32 bytes per crater (D, x, y, age as float64), 32 KB for 1000 craters -- no per-cell state
+heightfield: 4 bytes per cell, 16.0 MiB at 2048^2 (16.8 MB), 64.0 MiB at 4096^2
+
+=== run 5 of 8 ===
+python 3.11.15  numpy 2.4.6  seed 20260914
+grid 2048x2048 float32, domain 40 km, cell 19.53 m, 1000 craters, D in [0.05, 8.0] km, eta=3.0
+
+-- error half, re-derived from the coefficients on the page --
+simple-branch exponents 1.010/1.014/1.011: max deviation from 1.0 = 1.40%
+depth/diameter over D in [0.1,15] km: 0.1915 .. 0.2014  spread 5.1%
+rim/depth over the same range: 0.1820 .. 0.1857  vs intercept ratio 0.1837
+
+-- cost half, measured here --
+stamp, 1000 craters: median 71.7 ms   runs 72.7 71.7 68.1 61.6 74.2   (discarded warm-up 73.2 80.1 ms, first touch of the array)
+stamp, per crater: 71.7 us
+sanity: 6.0% of cells written, relief -114.6 .. 25.8 m
+floored two-branch dimensions, per crater: median 0.582 us   runs 0.600 0.591 0.577 0.581 0.582
+constant-ratio shortcut,        per crater: median 0.090 us   runs 0.089 0.090 0.098 0.090 0.090
+one crater, D = 0.05 km:     51.6 us   (dimensions are 1.13% of it)
+one crater, D =  0.1 km:     65.9 us   (dimensions are 0.88% of it)
+one crater, D =  0.5 km:    394.0 us   (dimensions are 0.15% of it)
+one crater, D =  2.0 km:   5899.0 us   (dimensions are 0.01% of it)
+one crater, D =  8.0 km: 151391.9 us   (dimensions are 0.00% of it)
+law / raster share: 0.8118% of the per-crater stamp
+law - shortcut, per crater: 0.492 us  -> 0.6863% of the per-crater stamp saved by approximating
+crater list: 32 bytes per crater (D, x, y, age as float64), 32 KB for 1000 craters -- no per-cell state
+heightfield: 4 bytes per cell, 16.0 MiB at 2048^2 (16.8 MB), 64.0 MiB at 4096^2
+
+=== run 6 of 8 ===
+python 3.11.15  numpy 2.4.6  seed 20260914
+grid 2048x2048 float32, domain 40 km, cell 19.53 m, 1000 craters, D in [0.05, 8.0] km, eta=3.0
+
+-- error half, re-derived from the coefficients on the page --
+simple-branch exponents 1.010/1.014/1.011: max deviation from 1.0 = 1.40%
+depth/diameter over D in [0.1,15] km: 0.1915 .. 0.2014  spread 5.1%
+rim/depth over the same range: 0.1820 .. 0.1857  vs intercept ratio 0.1837
+
+-- cost half, measured here --
+stamp, 1000 craters: median 63.7 ms   runs 64.7 75.1 63.7 63.0 62.1   (discarded warm-up 65.0 79.8 ms, first touch of the array)
+stamp, per crater: 63.7 us
+sanity: 6.0% of cells written, relief -114.6 .. 25.8 m
+floored two-branch dimensions, per crater: median 0.573 us   runs 0.613 0.569 0.578 0.570 0.573
+constant-ratio shortcut,        per crater: median 0.090 us   runs 0.092 0.090 0.090 0.093 0.090
+one crater, D = 0.05 km:     44.4 us   (dimensions are 1.29% of it)
+one crater, D =  0.1 km:     54.6 us   (dimensions are 1.05% of it)
+one crater, D =  0.5 km:    400.6 us   (dimensions are 0.14% of it)
+one crater, D =  2.0 km:   5832.4 us   (dimensions are 0.01% of it)
+one crater, D =  8.0 km: 143337.7 us   (dimensions are 0.00% of it)
+law / raster share: 0.9007% of the per-crater stamp
+law - shortcut, per crater: 0.483 us  -> 0.7592% of the per-crater stamp saved by approximating
+crater list: 32 bytes per crater (D, x, y, age as float64), 32 KB for 1000 craters -- no per-cell state
+heightfield: 4 bytes per cell, 16.0 MiB at 2048^2 (16.8 MB), 64.0 MiB at 4096^2
+
+=== run 7 of 8 ===
+python 3.11.15  numpy 2.4.6  seed 20260914
+grid 2048x2048 float32, domain 40 km, cell 19.53 m, 1000 craters, D in [0.05, 8.0] km, eta=3.0
+
+-- error half, re-derived from the coefficients on the page --
+simple-branch exponents 1.010/1.014/1.011: max deviation from 1.0 = 1.40%
+depth/diameter over D in [0.1,15] km: 0.1915 .. 0.2014  spread 5.1%
+rim/depth over the same range: 0.1820 .. 0.1857  vs intercept ratio 0.1837
+
+-- cost half, measured here --
+stamp, 1000 craters: median 66.1 ms   runs 70.1 66.2 63.1 64.3 66.1   (discarded warm-up 77.5 77.1 ms, first touch of the array)
+stamp, per crater: 66.1 us
+sanity: 6.0% of cells written, relief -114.6 .. 25.8 m
+floored two-branch dimensions, per crater: median 0.575 us   runs 0.604 0.572 0.575 0.575 0.583
+constant-ratio shortcut,        per crater: median 0.092 us   runs 0.092 0.091 0.093 0.091 0.093
+one crater, D = 0.05 km:     43.0 us   (dimensions are 1.34% of it)
+one crater, D =  0.1 km:     63.1 us   (dimensions are 0.91% of it)
+one crater, D =  0.5 km:    418.4 us   (dimensions are 0.14% of it)
+one crater, D =  2.0 km:   5938.7 us   (dimensions are 0.01% of it)
+one crater, D =  8.0 km: 137478.1 us   (dimensions are 0.00% of it)
+law / raster share: 0.8702% of the per-crater stamp
+law - shortcut, per crater: 0.483 us  -> 0.7308% of the per-crater stamp saved by approximating
+crater list: 32 bytes per crater (D, x, y, age as float64), 32 KB for 1000 craters -- no per-cell state
+heightfield: 4 bytes per cell, 16.0 MiB at 2048^2 (16.8 MB), 64.0 MiB at 4096^2
+
+=== run 8 of 8 ===
+python 3.11.15  numpy 2.4.6  seed 20260914
+grid 2048x2048 float32, domain 40 km, cell 19.53 m, 1000 craters, D in [0.05, 8.0] km, eta=3.0
+
+-- error half, re-derived from the coefficients on the page --
+simple-branch exponents 1.010/1.014/1.011: max deviation from 1.0 = 1.40%
+depth/diameter over D in [0.1,15] km: 0.1915 .. 0.2014  spread 5.1%
+rim/depth over the same range: 0.1820 .. 0.1857  vs intercept ratio 0.1837
+
+-- cost half, measured here --
+stamp, 1000 craters: median 60.4 ms   runs 61.8 60.4 57.5 62.3 60.3   (discarded warm-up 76.7 63.0 ms, first touch of the array)
+stamp, per crater: 60.4 us
+sanity: 6.0% of cells written, relief -114.6 .. 25.8 m
+floored two-branch dimensions, per crater: median 0.570 us   runs 0.575 0.570 0.567 0.563 0.784
+constant-ratio shortcut,        per crater: median 0.145 us   runs 0.162 0.156 0.145 0.093 0.108
+one crater, D = 0.05 km:     45.2 us   (dimensions are 1.26% of it)
+one crater, D =  0.1 km:     74.6 us   (dimensions are 0.76% of it)
+one crater, D =  0.5 km:    401.6 us   (dimensions are 0.14% of it)
+one crater, D =  2.0 km:   5927.8 us   (dimensions are 0.01% of it)
+one crater, D =  8.0 km: 149395.1 us   (dimensions are 0.00% of it)
+law / raster share: 0.9431% of the per-crater stamp
+law - shortcut, per crater: 0.425 us  -> 0.7029% of the per-crater stamp saved by approximating
+crater list: 32 bytes per crater (D, x, y, age as float64), 32 KB for 1000 craters -- no per-cell state
+heightfield: 4 bytes per cell, 16.0 MiB at 2048^2 (16.8 MB), 64.0 MiB at 4096^2
+

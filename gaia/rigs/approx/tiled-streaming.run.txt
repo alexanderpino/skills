@@ -1,0 +1,22 @@
+A  exhaustive over every refinement shape with <= 7 internal nodes
+   max distinct-parents/cut = 7/22 = 31.82%   shape=((), (), (), ((), (), (), ((), (), (), ((), (), (), ((), (), (), ((), (), (), ((), (), (), ())))))))
+   min distinct-parents/cut = 1/4 = 25.00%
+   the page's claim is 25.00%; exceeded: True
+   shapes with a node MIXING leaf and refined children: 62038; their min ratio = 26.3158%
+   shapes at exactly 25% that contain a mixed node: 0 (expect 0 -- 1/4 holds iff no parent mixes)
+
+B  caterpillar family (refine one child per level): I internal, L=3I+1 leaves, P=I
+   I=1      L=4      P=1      overhead=25.000%
+   I=2      L=7      P=2      overhead=28.571%
+   I=3      L=10     P=3      overhead=30.000%
+   I=5      L=16     P=5      overhead=31.250%
+   I=10     L=31     P=10     overhead=32.258%
+   I=100    L=301    P=100    overhead=33.223%
+   I=10000  L=30001  P=10000  overhead=33.332%
+   limit = 1/3 = 33.333%
+
+C  distance-based camera-centred cuts (the shape this architecture produces)
+   126 cuts, cut sizes 49..6310 tiles
+   overhead  min=25.00%  median=26.51%  max=32.94%
+   cuts above the page's 25% bound: 108/126 = 85.7%
+   worst: k=0.9 depth=10 cam=(0.0,0.0) L=85 P=28 -> 32.94%

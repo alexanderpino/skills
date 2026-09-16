@@ -2,8 +2,10 @@
 type: Technique
 title: Flow routing — where the water goes
 description: "Routing flow over a heightfield: which receiver rule to use, and how to handle depressions."
-tags: [generation, hydrology, flow-routing, authoring-time, real-time]
-status: draft
+tags: [generation, hydrology, flow-routing, authoring-time]
+status: stable
+verified:
+  - { by: "human:alexander.pino", covers: f0b2884eaccd, covers_body: cffd1d66d806 }
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
   - { id: ocallaghan1984, tier: P, locator: "§3, the 8-neighbour steepest-descent rule" }
@@ -11,16 +13,18 @@ sources:
   - { id: quinn1991, tier: P, locator: "eq. 4, contour-length weighting" }
   - { id: tarboton1997, tier: P, locator: "§3, the 8-facet construction" }
   - { id: barnes2014, tier: P, locator: "§3 Algorithm 1 the base Priority-Flood and Algorithm 2 the Improved form that adds a plain queue; Algorithm 3 Priority-Flood+epsilon, whose line 1 requires a priority queue WITH TOTAL ORDER; §4 Ordering for why; §5 Analysis for the O(m log2 m), m <= n float bound" }
-  - { id: lindsay2016, tier: P, locator: "hybrid breach/fill with a depth limit; DEM-modification comparison" }
+  - { id: lindsay2016, tier: P, locator: "NOT OPENED -- hybrid breach/fill with a depth limit, and the DEM-modification comparison. The artefact was never obtained here; the block quote in the body is reproduced as received and is not a reading anyone in this corpus performed" }
   - { id: planchon2002, tier: P, locator: "the fill algorithm" }
   - { id: montgomery1992, tier: P, locator: "the area-slope channel-initiation threshold, A*S^2 = const" }
   - { id: braun2013, tier: P, locator: "the O(N) stack ordering and the unconditionally stable implicit discretisation. NOT OPENED — Geomorphology is paywalled at Elsevier and no open copy was reachable from here, so nothing inside it is named; the scheme is read instead in cordonnier2016 SECTION 5 eq. 2, which restates it and states the ordering requirement. NOTE section 5 CREDITS NOBODY: the attribution to BW13 sits in section 1 and section 4, per the checked retraction in stream-power.md. Section 5 is nonetheless the correct locator for the scheme and eq. 2, and an intermediate revision here wrongly deleted it along with the false attribution clause" }
 ---
 # Flow routing — where the water goes
 
-Every drainage network, river mask, wetness map and hydraulic-erosion step starts by deciding,
-for each cell, **where its water goes next**. Two decisions, in this order: what to do about
-depressions, and which receiver rule to use.
+**Tier: authoring-time; route once and cache — the runtime reads the baked arrays.** Every drainage
+network, river mask, wetness map and hydraulic-erosion step starts by deciding, for each cell,
+**where its water goes next**. Two decisions, in this order: depressions, then the receiver rule.
+⚠️ **Never opened here: `lindsay2016`, `braun2013`** — cited by name below; their front-matter
+locators say what was read instead, and what is left unverified.
 
 ## Use this
 
@@ -61,10 +65,16 @@ stops, so downstream contributing area is wrong everywhere below it.
   made to the DEM**, which is the defensible form of the argument. The rule of thumb that
   shallow pits tend to be artefacts and deep ones landforms is practitioner folklore, not
   Lindsay's claim — treat the depth limit as a parameter you tune against your own noise, not
-  as a physical boundary.
+  as a physical boundary — and re-tune it per resolution. ⚠️ `maxCut` is a depth in metres and
+  transfers, but the artefact population it separates does not: a noise pit's depth is a height
+  increment over one cell and goes as `Δx^H`, while a real basin's depth is set by the landform and
+  does not move at all (derived here, not in `resolution-independence.md`). A limit that carved
+  artefacts and spared basins at 8 m/px sits far above the artefact population at 1 m/px, where it
+  starts trenching the shallowest real depressions instead.
 
-**Why it wins — and read the source's own qualification before relying on it.** [lindsay2016]
-§"When to breach and when to fill?" reports, verbatim: "*Soille (2004a) and Lindsay and Creed
+**Why it wins — and read the source's own qualification before relying on it.** ⚠️ **The quote below is UNVERIFIED**: `lindsay2016` is `[not-opened]`, nobody here obtained the paper, and this
+passage appears nowhere else in the corpus. It is kept because the recommendation does not rest on it — `:221-222` derives the same default from the page's own definitions — and because deleting it would hide where the claim came from. [lindsay2016]
+§"When to breach and when to fill?" is said to report, verbatim: "*Soille (2004a) and Lindsay and Creed
 (2005) both compared the modifications to DEMs made by filling, breaching, and hybrid approaches.
 These studies showed that hybrid solutions offer the lowest impact on modelled flow paths but that
 the improvements are only marginally better than a breaching-only solution. Thus, when breaching
@@ -84,10 +94,6 @@ argument for the policy, not a property of every depression it meets.
 lose. *Breach alone* [lindsay2016] — correct only if every depression in your input is an
 artefact. *Planchon–Darboux fill* [planchon2002] — a different fill with the same consequence as
 priority-flood.
-
-⚠️ A common trap: applying the filled surface as the terrain. **Fill the copy you route on,
-not the heightmap you render.** The filled surface exists to give the router a downhill path;
-if it reaches the renderer, every basin in the world has been quietly levelled.
 
 ### The fill, and the epsilon that makes it routable
 
@@ -120,7 +126,12 @@ you want the `m ≤ n` bound that is the one to transcribe.
 ⚠️ **It does not produce the same fill, and an earlier version of this line said it did.** With
 both run on a total order, so tie-breaking is not the variable: Algorithm 3 differs from the block
 above on **171 of 441** cells and moves **187 of 441** receivers, and it is **strictly higher on
-all 171 and lower on none**. The reason is structural — the block above ramps by shortest path
+all 171 and lower on none**. ⚠️ **Those four figures are UNREGISTERED and this paragraph is not
+covered by the page's stamp.** No row in any register carries 171, 187, 342 or 355, and
+`source-findings.tsv:36` still records the opposite conclusion — that the fill is identical either
+way. `barnes2014` *is* obtained (arXiv 1511.04463), so re-transcribing Algorithm 3 settles both the
+figures and whether the diagnosis below describes the paper or our transcription of it. Until
+somebody does, read this paragraph as a claim, not a measurement. The reason is structural — the block above ramps by shortest path
 from the *nearest* outlet, while Algorithm 3 as printed ramps one way from a *single* outlet. On
 that input Algorithm 3 fails [barnes2014]'s own third criterion for a depression fill, "*W is the
 lowest surface allowed by properties (1) and (2)*", which the simpler block satisfies. **The
@@ -259,6 +270,17 @@ remove. `dist[]` is the array `stream-power.md` divides by; get it wrong and the
 coefficient is wrong with it. Because `s > best` starts at zero and the comparison is strict,
 `receivers[i]` is always *strictly* lower, so a receiver cycle cannot form.
 
+⚠️ **`dist[]` and `A[]` are already in world units — metres and m² — so neither needs a cell-size
+correction; what a resolution change breaks is the receiver that produced them, and no parameter
+reaches that.** The rule is a maximum over eight
+candidates, so a near-tie flips a whole basin from one trunk to another and drainage area at a
+point is a **discontinuous** function of the surface — not a discretisation error that refinement
+shrinks. On the refinement series in `resolution-independence.md`, 41.5% then 62.0% of channel
+cells disagree with the next finer grid's `A` by over 2×, and on resamplings of one real DEM the
+disagreement is not even monotonic: some coarser resolutions give a *better*-connected network
+than finer ones. The verdict for a network is **not available** — report the fraction of area
+affected, and keep authored content off divides rather than promising a divide will stay put.
+
 ```
 # MFD [freeman1991]: p = 1.1, and the normalisation the exponent exists for.
 mfdWeights(i at (x, y), p):                     # i interior, as above
@@ -323,14 +345,21 @@ not the routing an erosion *solver* runs on: stream power builds its stack from 
 array and keys incision on single-receiver accumulation, so it needs D8 (or D∞ collapsed to one
 neighbour) and cannot consume an MFD field at all (`stream-power.md`).
 
-Thresholding an MFD field to get a network produces a smeared, braided mask; smoothing a D8
-field to get a wetness map produces stripes. Route twice if you need both — it is cheaper than
-post-processing either into the other.
+Route twice if you need both — cheaper than post-processing either into the other, and the failure
+table names each symptom you get by not doing it.
 
-**Per-frame budget.** Both rules need a topological traversal to accumulate — that is not the
-difference, and saying so would be wrong. The difference is per cell: D8 stores one receiver
-and adds one contribution, MFD stores up to seven weights and accumulates a contribution from
-each, so its inner loop and its memory traffic are several times D8's on the same grid.
+**Per-frame budget, and what the arrays cost to hold.** Both rules need a topological traversal to
+accumulate — that is not the difference, and saying so would be wrong. The difference is per cell:
+D8 stores one receiver and adds one contribution, MFD stores up to seven weights and accumulates a
+contribution from each, so its inner loop and its memory traffic are several times D8's on the same
+grid. In *residency* they are closer than that suggests, and there the number is arithmetic rather
+than a benchmark: the output contract below is an int32 index and two fp32 fields,
+**12 bytes per cell**, **201 MB** at 4096², while the MFD block stores no weights at all —
+`mfdWeights` is called inside the accumulation loop and its result is consumed there. Neither is
+the peak. `priorityFlood` pushes every cell exactly once and the total-order requirement above puts
+a monotonic counter inside each entry, so the queue can reach one `(elevation, counter, index)`
+triple per cell — **12 bytes per cell** again — on top of the routing copy of `z`, and that is what
+has to fit.
 
 ⚠️ **No measured crossover is stated here, deliberately.** The honest answer is that it depends
 on grid size, memory layout and hardware, and this skill has no benchmark to cite — writing a
@@ -356,15 +385,15 @@ buildStack(receivers):                         # [braun2013] — O(N), no sort, 
     return stack                               # every cell appears AFTER its receiver
 ```
 ```
-A[:] = cellArea                                # or any per-cell input: rainfall, mm/step
+A[:] = cellArea                                # m², or P[m/yr]·cellArea[m²] for m³/yr discharge
 for i in REVERSE(stack):                       # donors before receivers
     if receivers[i] != i:  A[receivers[i]] += A[i]
 ```
 
-The stack is [braun2013]'s: base levels first, every cell after its receiver. The reverse pass
-over it is D8 accumulation; the **forward** pass over the same stack is the order
-`stream-power.md`'s solver walks. Both rules need this traversal — it is what the budget
-note above means by "topological".
+The stack is [braun2013]'s: base levels first, every cell after its receiver. The reverse pass over
+it is D8 accumulation; the **forward** pass over the same stack is the order `stream-power.md`'s
+solver walks. Both rules need this traversal — it is what the budget note above means by
+"topological". Seed discharge instead and that solver's `K` changes too — see `driver-fields.md`.
 
 MFD has no single-receiver stack to build, so it orders by elevation instead, which is why it
 needs a depression-free surface and not merely a receiver array:
@@ -386,12 +415,20 @@ and the symptom of a cycle is silently missing area rather than a crash.
 
 ## Where the network starts
 
-Flow accumulation gives contributing area for every cell, including hilltops. A river does not
-start at the drainage divide, so a threshold decides where the channel head is. The standard
-criterion combines area and slope rather than using area alone: in [montgomery1992] the
-critical source area falls as slope rises, in the form **A·S² ≈ constant** — *not* the product
-A·S. Using area alone puts channel heads at a constant contributing area regardless of
-steepness, which draws rivers straight over ridges in steep terrain.
+Flow accumulation gives contributing area for every cell, including hilltops. A river does not start
+at the drainage divide, so a threshold decides where the channel head is. The standard criterion
+combines area and slope rather than using area alone: in [montgomery1992] the critical source area
+falls as slope rises, in the form **A·S² ≈ constant** — *not* the product A·S.
+
+⚠️ **The constant is quoted in m² and is not a physical quantity — it moves with the cell size.**
+Only `S` carries a cell-size exponent: `A` is an area in m² on either grid, its own failure being
+the discontinuity above rather than a drift with `Δx`, while a finite-difference slope over lag
+`Δx` falls as `Δx^(H−1)` on a self-affine surface of Hurst exponent `H`. The *threshold* therefore
+has to scale as `Δx^(2H−2)` to select the same ground (`resolution-independence.md`). At `H = 0.5`
+that is `1/Δx`: coarsening by two **halves** it, the direction nobody guesses. And `H` is a
+property of the terrain, not of the tool, so no coefficient a router ships can carry it —
+[montgomery1992]'s 500–4000 m² is a measurement at *its* sampling density. State the resolution
+beside the threshold and re-tune per level. There is no unit conversion; that is the whole fix.
 
 ## How this fails, and what it looks like
 
@@ -408,4 +445,6 @@ steepness, which draws rivers straight over ridges in steep terrain.
 | Every lake basin has flattened | The filled surface was written back to the heightfield | Fill the routing copy only |
 | Canyons cut through basins that should hold water | Breaching with no depth limit | Set the limit; use the hybrid |
 | Channel heads march up over ridge lines | Area-only channel threshold | Threshold on `A·S²` [montgomery1992] |
+| An `A·S²` threshold tuned at 1 m/px puts channel heads in the wrong place at 8 | `S` is a finite difference over `Δx` and falls as `Δx^(H−1)`; the threshold carries it squared, `Δx^(2H−2)`, and `H` is the terrain's, not the tool's | No conversion exists — state the resolution beside the threshold and re-tune per level |
+| A basin drains to a different outlet at a coarser resolution, and a still coarser one agrees with the fine grid again | The receiver is a maximum over eight, so `A` is discontinuous in the surface; connectivity is non-monotonic in cell size | Not fixable — report the fraction of area affected, and keep divides away from authored content |
 | At a high MFD exponent, wetness pools on hillslope cells that plainly drain, and D8 on the same grid does not | `pow(s, p)` underflows on ε-filled flats, so `total == 0` fires on cells that DO have a lower neighbour and strands their water. The `p` at which this starts scales with your elevations — measured 21/25/27 at base 1 m/1000 m/8000 m | Normalise by the steepest slope before the power, `w[k] = (s[k]/s_max)^p`, keeping an explicit `s_max == 0` guard for real pits |

@@ -76,7 +76,13 @@ Four rules that decide most arguments before they start:
   reference. So a crossover stated without a year is a claim with a hidden expiry. Say when it
   was true, which way it is moving, and what would move it — that is more useful than the
   threshold itself, and it is the difference between a skill that ages and one that dates
-  itself honestly. Three documents in this corpus currently do it.
+  itself honestly. ⚠️ **One document does it.** This bullet said *three* from the day it was
+  written until 2026-09-15, hand-counted and never re-counted; `check.py`'s `dated-crossover`
+  line is the instrument behind the rule now, and on the tight reading — a year inside the
+  crossover paragraph itself — it finds **1 of 26** documents and **1 of 58** paragraphs. Widen
+  it to the crossover's whole section and it is 5 of 26. The gap between the two readings is the
+  real finding: this corpus knows its dates and writes them somewhere other than the claim that
+  expires. The rule stands; the corpus does not yet keep it.
 
 ## Provenance is the point
 
@@ -100,8 +106,8 @@ routinely confused:
 | Channel | What it proves | Where it lives |
 |---|---|---|
 | `scripts/check.py` green | every claim points at a real bibliography entry with a locator, nothing is orphaned, nothing cites an unverifiable source | the guard |
-| the block was **run** | the pseudocode, transcribed literally, produces the number printed beside it — it is implementable and self-consistent | `registers/pseudocode-execution.tsv` |
-| `verified:` in a header | a human read the cited work and it says what the document claims | **no document carries this yet** |
+| the block was **run** | the pseudocode, transcribed literally, produces the printed number for the property the register row names — and only that property. Soundness is not termination: a traversal block ran, its row measured missed hits, and the livelock in its skip branch was found later by hand | `registers/pseudocode-execution.tsv` — ⚠️ **4 of the 16 `## Use this` blocks**, and one of those four names a rig that is in neither the tree nor the history. Nothing in CI executes a recommendation block. This row was the only one of the three channels with no denominator until 2026-09-15, so a reader met *"the block was run"* and reasonably inferred it was the recommendation blocks that had been |
+| `verified:` in a header | a human read the cited work and it says what the document claims. The stamp's `covers` digest scopes it to the sources list as it stood when they read it — a change there voids the stamp; it is not a review of the prose | **4 of 40**, signed 2026-09-14. ⚠️ Each covers `## Use this` and the failure table only — 8–19% of its document — so it certifies the recommendation and the diagnoses, never the page |
 
 Only the third is what most readers hear in the word "grounded". The first cannot prove the
 cited paper says what the document claims; the second cannot either — a block can run
@@ -128,7 +134,7 @@ go stale as the corpus grows. The axes:
   shallow water, water optics, sea ice.
 - **Rendering** — heightfield LOD, tiled streaming, virtual texturing, GPU-driven culling,
   planetary precision, water rendering, caustics, heightfield ray-marching, offline mesh
-  extraction.
+  extraction, the atmosphere and aerial perspective, volumetric clouds.
 - **Architecture** — the machine that runs the graph: scheduling and caching, layering with
   filters and masks, and the driver fields the graph carries. Start at `node-graph-runtime.md`;
   it routes to the other two. (Making the output *tile* is `seamless-and-periodic.md`, on the
@@ -150,8 +156,32 @@ something**, and add a `planned` row before writing a new document.
 
 ## Related skills
 
-- **physically-based-rendering** — microfacet BRDFs, the rendering equation, material models.
-  Gaia cites it rather than restating it; anything about BRDF theory belongs there.
+- **physically-based-rendering** — microfacet BRDFs, the rendering equation, material models,
+  and the display transform: exposure, tonemapping and colour management. Gaia cites it rather
+  than restating it; anything about BRDF theory belongs there, and every Gaia rendering contract
+  stops at scene-referred linear radiance so that the transform is applied once, downstream.
+- **game-engine-guru** — the frame budget and its profiling, the frame graph, GPU-driven
+  rendering in general. Gaia's cost tables are checked against that skill's *Performance and
+  Profiling* breakdown; Gaia does not print a per-stage millisecond split of its own.
+
+⚠️ **Shader craft — what the rendering documents assume.** Gaia's eleven rendering documents are
+written for someone who already writes shaders: they say *which* fetch, *which* derivative,
+*which* depth convention, and they do not teach the craft around it. The general part of that
+craft belongs to the two skills above. The **heightfield-specific** part is
+`references/shader-craft.md` — screen-space derivatives across LOD seams and inside a divergent
+ray march, virtual-texture gradient scaling and feedback bias, explicit-LOD fetch semantics in a
+max-mip traversal, the depth-output direction under both depth conventions, and the fp16 hazards
+of `pow` and `normalize` on grazing terms.
+
+⚠️ **This paragraph said until 2026-09-15 that nothing pointed at that document.** **8 of the 11
+cite it back** — the sentence was written when the true count was 0 and never moved as the
+citations landed. It is kept, corrected, as an instance of the defect this skill names as its
+most-recorded: a correction landing at one end only. *(And the first correction of it, the same
+day, said "eleven" — `grep -l shader-craft gaia/references/*.md` says 8 technique documents plus
+`papers-rendering.md`. Recount, do not re-read.)* The three that still do not route are
+`atmosphere-and-aerial-perspective`, `caustics` and `mesh-extraction`; until they do, read the
+failure table of every rendering document you use, not only the one you opened. Closing that half
+is what finishes this item; the document existing is not the same as the corpus routing to it.
 - **terrain-architect**, **terrain-renderer** — the source skills Gaia is distilled from.
   ⚠️ **Both are RETIRED and now live under `obsolete/`, superseded by this skill.** Do not treat
   them as a live alternative: they were written to a weaker standard than Gaia, and

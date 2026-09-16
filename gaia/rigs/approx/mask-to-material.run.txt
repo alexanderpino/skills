@@ -1,0 +1,39 @@
+=== A. bytes per cell (exact: sum of channel bit widths / 8) ===
+  RGBA8 UNORM    32 bits = 4 bytes per cell   |      64.0 MiB at 4096^2  |   128 bytes for a 32-entry LUT
+  R11G11B10F     32 bits = 4 bytes per cell   |      64.0 MiB at 4096^2  |   128 bytes for a 32-entry LUT
+  RGBA16F        64 bits = 8 bytes per cell   |     128.0 MiB at 4096^2  |   256 bytes for a 32-entry LUT
+  R8 UNORM        8 bits = 1 bytes per cell   |      16.0 MiB at 4096^2  |    32 bytes for a 32-entry LUT
+
+=== A2. the deltas the page states ===
+  RGBA16F - RGBA8      = 4 bytes per cell  (ratio 2x)
+  R11G11B10F - RGBA8   = 0 bytes per cell  (ratio 1x)
+  32-entry LUT, RGBA16F - RGBA8 = 128 bytes total
+  32-entry LUT, R11G11B10F - RGBA8 = 0 bytes total
+
+=== B. representable levels at or below L* = 33 (Y <= 0.075373) ===
+  8-bit LINEAR  UNORM :     20 levels
+  8-bit sRGB    UNORM :     78 levels   (3.9x the linear count)
+  10-bit float (B10)  :    359 levels
+  11-bit float (R/G11):    718 levels
+  16-bit float (fp16) :  11476 levels
+  -> an 8-bit LINEAR buffer spends 20 codes on the dark third that terrain is made of;
+     the same 8 bits encoded sRGB spends 78. That is the whole of the banding story,
+     and it is why the linear rule forces a wider format wherever the result is STORED.
+
+=== C. DIAGNOSTIC ONLY (not printed on the page): additive-bias leak ===
+  Sum w = 1.0, depth = 0.1: 4.27% of texels give the w=0 material a share   (N = 4,000,000)
+  Sum w = 0.5, depth = 0.1: 18.94% of texels give the w=0 material a share   (N = 4,000,000)
+  body :240 states 4.3% / 18.9%; failure table :378 states 19.3% for the Sum w = 0.5 end.
+
+=== D. DIAGNOSTIC ONLY: seed sensitivity and depth sweep for section C ===
+  seed 1         depth 0.1 -> Sum w = 1: 4.286%   Sum w = 0.5: 18.924%
+  seed 2         depth 0.1 -> Sum w = 1: 4.291%   Sum w = 0.5: 18.939%
+  seed 3         depth 0.1 -> Sum w = 1: 4.292%   Sum w = 0.5: 18.922%
+  seed 20260914  depth 0.1 -> Sum w = 1: 4.276%   Sum w = 0.5: 18.917%
+  depth 0.09 -> 18.17% at Sum w = 0.5
+  depth 0.10 -> 18.85% at Sum w = 0.5
+  depth 0.11 -> 19.55% at Sum w = 0.5
+  depth 0.12 -> 20.26% at Sum w = 0.5
+  depth 0.20 -> 26.43% at Sum w = 0.5
+  CONCLUSION: the body's 4.3 / 18.9 / 26.5 all reproduce; 19.3% matches no depth and no
+  form in this document. The failure table end is the stale one.

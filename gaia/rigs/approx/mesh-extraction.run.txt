@@ -1,0 +1,25 @@
+# gaia/references/mesh-extraction.md -- machine-cost rig output
+# command: python3 mesh-extraction.py   (run 3x, byte-for-byte identical: diff clean)
+# date: 2026-09-14   rig: CPython 3.11.15 + numpy 2.4.6 + scipy 1.17.1, shared Linux container
+# NO wall-clock is measured here; every figure is an exact byte count.
+
+=== 1. QEM bake state: one quadric per initial vertex (= per source cell) ===
+  4096^2 cells, float64: 1342177280 B total, 80.0 B per cell, 1.2500 GiB, RSS delta 1280 MiB
+  4096^2 cells, float32: 671088640 B total, 40.0 B per cell, 0.6250 GiB, RSS delta 0 MiB
+  (ru_maxrss is a PEAK, so only the first and largest allocation shows a delta;
+   nbytes and B-per-cell are exact for every row and are the figures quoted.)
+  1024^2 cells, float64: 80.0 B per cell, 80.0 MiB  (rate is flat in grid size)
+  1024^2 cells, float32: 40.0 B per cell, 40.0 MiB  (rate is flat in grid size)
+=== 2. Exported mesh bytes per vertex (float32 xyz + uint32 indices) ===
+  grid 129^2: m=16641 verts, t=32768 tris, t/m=1.9691, Euler 2m-2-hull=32768 -> MATCH, 199692+393216 B = 35.629 B per vertex, 0.59 MB
+  grid 449^2: m=201601 verts, t=401408 tris, t/m=1.9911, Euler 2m-2-hull=401408 -> MATCH, 2419212+4816896 B = 35.893 B per vertex, 7.24 MB
+  grid 1000^2: m=1000000 verts, t=1996002 tris, t/m=1.9960, Euler 2m-2-hull=1996002 -> MATCH, 12000000+23952024 B = 35.952 B per vertex, 35.95 MB
+  grid 2049^2: m=4198401 verts, t=8388608 tris, t/m=1.9980, Euler 2m-2-hull=8388608 -> MATCH, 50380812+100663296 B = 35.977 B per vertex, 151.04 MB
+  random-point Delaunay TIN m=50000: t=99968, t/m=1.9994, hull=30, Euler 2m-2-hull=99968 -> MATCH, 35.992 B per vertex, 1.80 MB
+  random-point Delaunay TIN m=200000: t=399965, t/m=1.9998, hull=33, Euler 2m-2-hull=399965 -> MATCH, 35.998 B per vertex, 7.20 MB
+  random-point Delaunay TIN m=1000000: t=1999963, t/m=2.0000, hull=35, Euler 2m-2-hull=1999963 -> MATCH, 36.000 B per vertex, 36.00 MB
+=== 3. The error law in bytes ===
+  RMS ~ m^-0.7  =>  halving RMS needs 2^(1/0.7) = 2.6918x the vertices
+  at 36 B/vertex: m=1000000 is 36.0 MB; its half-RMS successor m=2691800 is 96.9 MB (ratio 2.6918 -- identical to the vertex ratio, the rate being flat)
+  attribute add-ons: float32 normal +12.0 B/vertex, float32 UV +8.0 B/vertex
+=== NO TIME IS MEASURED HERE. Bake wall-clock is deliberately unpriced. ===

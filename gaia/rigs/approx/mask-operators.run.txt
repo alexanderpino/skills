@@ -1,0 +1,130 @@
+rig: CPython 3.11.15 / numpy 2.4.6 / 4-core Intel Xeon @ 2.80GHz container. NOT a GPU cost, NOT a C throughput.
+seed: 20260914
+
+GATE 1 -- exact separable transform vs brute force (max abs difference, cells)
+  64x64, 40 seed(s)        0.000e+00
+  129x129, 1 seed(s)       0.000e+00
+
+GATE 2 -- chamfer max relative error, 201^2, single centre seed, cells beyond r=20
+          (hajdu2012 prints 0.0572 for 3-4 and 0.0198 for 5-7-11)
+  3-4      max|rel| 0.0572   most positive +0.0541   most negative -0.0572
+  5-7-11   max|rel| 0.0198   most positive +0.0198   most negative -0.0161
+
+GATE 3 -- float32 exactness of the squared-distance field on a 4096^2 grid
+  largest squared distance the grid holds: 33538050 (32.0 Mi)
+  of the 41 integers at or just below it, 20 are NOT exactly representable in float32
+  -> the field must be 8 bytes/cell (float64) or 4-byte INTEGER; a 4-byte FLOAT field is not exact at this size
+
+COST 1 -- peak-RSS slope over grid sizes (1536, 2048, 2560, 3072) = working set per cell
+  exact      8.54 bytes/cell   (baseline   25.8 MiB, max residual 0.76% of peak)
+            1536^2  peak RSS     44.6 MiB
+            2048^2  peak RSS     60.7 MiB
+            2560^2  peak RSS     78.7 MiB
+            3072^2  peak RSS    102.7 MiB
+           -> at 4096^2: 137 MB; at 16384^2: 2.14 GB
+  chamfer    8.53 bytes/cell   (baseline   25.7 MiB, max residual 0.64% of peak)
+            1536^2  peak RSS     44.6 MiB
+            2048^2  peak RSS     60.5 MiB
+            2560^2  peak RSS     78.7 MiB
+            3072^2  peak RSS    102.6 MiB
+           -> at 4096^2: 137 MB; at 16384^2: 2.13 GB
+  difference exact - chamfer: +0.01 bytes/cell (+0.2 MiB at 4096^2)
+  the array the chamfer does NOT need is the per-line envelope stack, which is
+  O(max(m,n)), not O(N):
+            1024^2  stack    24.0 KiB   field      8.0 MiB   stack/field 0.2931%
+            4096^2  stack    96.0 KiB   field    128.0 MiB   stack/field 0.0732%
+           16384^2  stack   384.0 KiB   field   2048.0 MiB   stack/field 0.0183%
+
+COST 2 -- wall clock. NOT COMPARABLE BETWEEN THE TWO and NOT PUT ON THE PAGE: the
+  exact transform here is a per-line CPython loop and the chamfer is vectorised numpy,
+  so the ratio below measures the interpreter, not the algorithms. Recorded only so a
+  later reader knows it was looked at and rejected as a figure to publish.
+  512^2  exact    1992.5 ms   chamfer     14.9 ms   interpreter ratio 134x
+  1024^2  exact    7744.8 ms   chamfer     39.4 ms   interpreter ratio 197x
+
+rig: CPython 3.11.15 / numpy 2.4.6 / 4-core Intel Xeon @ 2.80GHz container. NOT a GPU cost, NOT a C throughput.
+seed: 20260914
+
+GATE 1 -- exact separable transform vs brute force (max abs difference, cells)
+  64x64, 40 seed(s)        0.000e+00
+  129x129, 1 seed(s)       0.000e+00
+
+GATE 2 -- chamfer max relative error, 201^2, single centre seed, cells beyond r=20
+          (hajdu2012 prints 0.0572 for 3-4 and 0.0198 for 5-7-11)
+  3-4      max|rel| 0.0572   most positive +0.0541   most negative -0.0572
+  5-7-11   max|rel| 0.0198   most positive +0.0198   most negative -0.0161
+
+GATE 3 -- float32 exactness of the squared-distance field on a 4096^2 grid
+  largest squared distance the grid holds: 33538050 (32.0 Mi)
+  of the 41 integers at or just below it, 20 are NOT exactly representable in float32
+  -> the field must be 8 bytes/cell (float64) or 4-byte INTEGER; a 4-byte FLOAT field is not exact at this size
+
+COST 1 -- peak-RSS slope over grid sizes (1536, 2048, 2560, 3072) = working set per cell
+  exact      8.63 bytes/cell   (baseline   25.8 MiB, max residual 0.97% of peak)
+            1536^2  peak RSS     44.5 MiB
+            2048^2  peak RSS     60.7 MiB
+            2560^2  peak RSS     80.7 MiB
+            3072^2  peak RSS    102.8 MiB
+           -> at 4096^2: 138 MiB; at 16384^2: 2.16 GiB
+  chamfer    8.56 bytes/cell   (baseline   25.5 MiB, max residual 0.63% of peak)
+            1536^2  peak RSS     44.5 MiB
+            2048^2  peak RSS     60.4 MiB
+            2560^2  peak RSS     78.6 MiB
+            3072^2  peak RSS    102.6 MiB
+           -> at 4096^2: 137 MiB; at 16384^2: 2.14 GiB
+  difference exact - chamfer: +0.07 bytes/cell (+1.1 MiB at 4096^2)
+  the array the chamfer does NOT need is the per-line envelope stack, which is
+  O(max(m,n)), not O(N):
+            1024^2  stack    24.0 KiB   field      8.0 MiB   stack/field 0.2931%
+            4096^2  stack    96.0 KiB   field    128.0 MiB   stack/field 0.0732%
+           16384^2  stack   384.0 KiB   field   2048.0 MiB   stack/field 0.0183%
+
+COST 2 -- wall clock. NOT COMPARABLE BETWEEN THE TWO and NOT PUT ON THE PAGE: the
+  exact transform here is a per-line CPython loop and the chamfer is vectorised numpy,
+  so the ratio below measures the interpreter, not the algorithms. Recorded only so a
+  later reader knows it was looked at and rejected as a figure to publish.
+  512^2  exact    1976.2 ms   chamfer     17.0 ms   interpreter ratio 116x
+
+rig: CPython 3.11.15 / numpy 2.4.6 / 4-core Intel Xeon @ 2.80GHz container. NOT a GPU cost, NOT a C throughput.
+seed: 20260914
+
+GATE 1 -- exact separable transform vs brute force (max abs difference, cells)
+  64x64, 40 seed(s)        0.000e+00
+  129x129, 1 seed(s)       0.000e+00
+
+GATE 2 -- chamfer max relative error, 201^2, single centre seed, cells beyond r=20
+          (hajdu2012 prints 0.0572 for 3-4 and 0.0198 for 5-7-11)
+  3-4      max|rel| 0.0572   most positive +0.0541   most negative -0.0572
+  5-7-11   max|rel| 0.0198   most positive +0.0198   most negative -0.0161
+
+GATE 3 -- float32 exactness of the squared-distance field on a 4096^2 grid
+  largest squared distance the grid holds: 33538050 (32.0 Mi)
+  of the 41 integers at or just below it, 20 are NOT exactly representable in float32
+  -> the field must be 8 bytes/cell (float64) or 4-byte INTEGER; a 4-byte FLOAT field is not exact at this size
+
+COST 1 -- peak-RSS slope over grid sizes (1536, 2048, 2560, 3072) = working set per cell
+  exact      8.53 bytes/cell   (baseline   25.8 MiB, max residual 0.78% of peak)
+            1536^2  peak RSS     44.6 MiB
+            2048^2  peak RSS     60.7 MiB
+            2560^2  peak RSS     78.6 MiB
+            3072^2  peak RSS    102.6 MiB
+           -> at 4096^2: 136 MiB; at 16384^2: 2.13 GiB
+  chamfer    8.62 bytes/cell   (baseline   25.7 MiB, max residual 0.97% of peak)
+            1536^2  peak RSS     44.5 MiB
+            2048^2  peak RSS     60.5 MiB
+            2560^2  peak RSS     80.6 MiB
+            3072^2  peak RSS    102.6 MiB
+           -> at 4096^2: 138 MiB; at 16384^2: 2.16 GiB
+  difference exact - chamfer: -0.09 bytes/cell (-1.5 MiB at 4096^2)
+  the array the chamfer does NOT need is the per-line envelope stack, which is
+  O(max(m,n)), not O(N):
+            1024^2  stack    24.0 KiB   field      8.0 MiB   stack/field 0.2931%
+            4096^2  stack    96.0 KiB   field    128.0 MiB   stack/field 0.0732%
+           16384^2  stack   384.0 KiB   field   2048.0 MiB   stack/field 0.0183%
+
+COST 2 -- wall clock. NOT COMPARABLE BETWEEN THE TWO and NOT PUT ON THE PAGE: the
+  exact transform here is a per-line CPython loop and the chamfer is vectorised numpy,
+  so the ratio below measures the interpreter, not the algorithms. Recorded only so a
+  later reader knows it was looked at and rejected as a figure to publish.
+  512^2  exact    1941.0 ms   chamfer     14.7 ms   interpreter ratio 132x
+

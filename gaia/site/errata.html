@@ -1,0 +1,234 @@
+<title>Gaia Errata</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#EEF2F1; --surface:#FFFFFF; --sunk:#E4EAE8;
+  --ink:#10171A; --ink2:#3C4A50; --muted:#69797F; --rule:#D3DCDA;
+  --accent:#0E6E6B; --accent-soft:#0E6E6B1a;
+  --open:#A65200; --open-soft:#A652001a;
+  --ok:#2F6B4F; --ok-soft:#2F6B4F14;
+  --sans:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --cond:"IBM Plex Sans Condensed","IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --ground:#0C1113; --surface:#141B1E; --sunk:#101619;
+  --ink:#E7EDEB; --ink2:#B9C6C4; --muted:#839398; --rule:#25322F;
+  --accent:#3FC7B8; --accent-soft:#3FC7B81f;
+  --open:#E5A44A; --open-soft:#E5A44A1f;
+  --ok:#63C08E; --ok-soft:#63C08E18;
+}}
+:root[data-theme="dark"]{
+  --ground:#0C1113; --surface:#141B1E; --sunk:#101619;
+  --ink:#E7EDEB; --ink2:#B9C6C4; --muted:#839398; --rule:#25322F;
+  --accent:#3FC7B8; --accent-soft:#3FC7B81f;
+  --open:#E5A44A; --open-soft:#E5A44A1f;
+  --ok:#63C08E; --ok-soft:#63C08E18;
+}
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font-family:var(--sans);line-height:1.55;
+  -webkit-font-smoothing:antialiased}
+.wrap{max-width:60rem;margin:0 auto;padding-inline:20px;padding-block:0 5rem}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+
+header.top{padding-block:3.5rem 2rem;border-bottom:1px solid var(--rule)}
+.eyebrow{font-family:var(--mono);font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--accent);margin:0 0 1rem}
+h1{font-family:var(--cond);font-weight:700;font-size:clamp(2.4rem,7vw,4rem);line-height:1.02;
+  margin:0 0 .9rem;letter-spacing:-.01em;text-wrap:balance}
+.sub{font-size:1.06rem;color:var(--ink2);margin:0;max-width:44ch}
+
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:1px;
+  background:var(--rule);border:1px solid var(--rule);margin:2.5rem 0 0}
+.cell{background:var(--surface);padding:1.05rem 1rem}
+.cell .n{font-family:var(--mono);font-weight:600;font-size:1.65rem;font-variant-numeric:tabular-nums;
+  display:block;letter-spacing:-.02em}
+.cell .k{font-size:.76rem;color:var(--muted);display:block;margin-top:.2rem;line-height:1.35}
+.cell.warn .n{color:var(--open)}
+
+section{margin-block:3.5rem}
+h2{font-family:var(--cond);font-weight:700;font-size:clamp(1.45rem,3.6vw,2rem);margin:0 0 .5rem;
+  letter-spacing:-.005em;text-wrap:balance}
+.lede{color:var(--ink2);margin:0 0 1.6rem;max-width:62ch}
+
+.limit{background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--open);
+  padding:1.5rem 1.4rem}
+.limit h2{margin-bottom:.6rem}
+.limit p{margin:0 0 .8rem;max-width:64ch}
+.limit p:last-child{margin-bottom:0}
+.gauge{height:.5rem;background:var(--sunk);border:1px solid var(--rule);margin:1rem 0 .45rem;
+  position:relative;overflow:hidden}
+.gauge i{position:absolute;inset:0 auto 0 0;background:var(--open);display:block}
+.gnote{font-family:var(--mono);font-size:.74rem;color:var(--muted);display:flex;
+  justify-content:space-between;gap:1rem;flex-wrap:wrap}
+
+.chart{overflow-x:auto}
+.bar{display:grid;grid-template-columns:minmax(8rem,14rem) 1fr 2.5rem;gap:.7rem;align-items:center;
+  padding:.28rem 0}
+.bname{font-family:var(--mono);font-size:.76rem;color:var(--ink2);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.btrack{background:var(--sunk);height:.7rem;display:block}
+.bfill{background:var(--accent);height:100%;display:block}
+.bval{font-family:var(--mono);font-size:.76rem;color:var(--muted);text-align:right;
+  font-variant-numeric:tabular-nums}
+
+.rec{background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--rule);
+  padding:1.1rem 1.15rem;margin-bottom:.8rem}
+.rec.pending{border-left-color:var(--open)}
+.rec.verified{border-left-color:var(--ok)}
+.rec.source{border-left-color:var(--accent)}
+.rec header{display:flex;gap:.6rem;align-items:baseline;flex-wrap:wrap;margin-bottom:.6rem}
+.rid{font-family:var(--mono);font-size:.78rem;font-weight:600;color:var(--ink)}
+.rdoc{font-family:var(--mono);font-size:.74rem;color:var(--muted);overflow-wrap:anywhere}
+.rstate{margin-left:auto;font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;
+  text-transform:uppercase;padding:.16rem .5rem;border:1px solid var(--rule);white-space:nowrap}
+.pending .rstate{color:var(--open);background:var(--open-soft);border-color:transparent}
+.verified .rstate{color:var(--ok);background:var(--ok-soft);border-color:transparent}
+.source .rstate{color:var(--accent);background:var(--accent-soft);border-color:transparent}
+.rwhat{margin:0 0 .7rem;font-size:.93rem;color:var(--ink)}
+.rwhy{margin:0 0 .35rem;font-size:.85rem;color:var(--ink2)}
+.rwhy:last-child{margin-bottom:0}
+.lbl{font-family:var(--mono);font-size:.66rem;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--muted);display:block;margin-bottom:.15rem}
+
+.split{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:1rem}
+.tier{background:var(--surface);border:1px solid var(--rule);padding:1.15rem}
+.tier .n{font-family:var(--mono);font-size:1.5rem;font-weight:600;font-variant-numeric:tabular-nums}
+.tier .k{font-size:.82rem;color:var(--muted);margin-top:.25rem}
+
+footer{border-top:1px solid var(--rule);padding-top:1.5rem;color:var(--muted);font-size:.84rem}
+footer p{max-width:64ch}
+@media (max-width:480px){
+  .bar{grid-template-columns:minmax(6rem,9rem) 1fr 2.2rem}
+  .rec header{gap:.4rem}
+  .rstate{margin-left:0}
+}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <p class="eyebrow">Gaia · terrain corpus · corrections register</p>
+  <h1>Everything this corpus got wrong</h1>
+  <p class="sub">A terrain and water reference for engines and authoring tools, published
+  alongside its own errata. 254 corrections, each with both ends of the claim read.</p>
+  <div class="strip">
+    <div class="cell"><span class="n">254</span><span class="k">corrections recorded</span></div>
+    <div class="cell warn"><span class="n">53</span><span class="k">still awaiting a second hand</span></div>
+    <div class="cell"><span class="n">38</span><span class="k">defects found <em>in the sources</em></span></div>
+    <div class="cell"><span class="n">109</span><span class="k">proofs that a guard bites</span></div>
+    <div class="cell warn"><span class="n">1.39%</span><span class="k">of body lines checked by a human</span></div>
+  </div>
+</header>
+
+<section class="limit">
+  <h2>Read this before you trust anything below</h2>
+  <p>A <code>verified:</code> stamp means a named person read the cited works and confirmed the
+  page against them. <strong>4 of 40 documents carry one</strong>,
+  covering 194 of 13,937 body lines. No agent output substitutes for that stamp.</p>
+  <div class="gauge"><i style="width:1.39%"></i></div>
+  <p class="gnote"><span>194 lines stamped</span><span>13,743 lines unstamped</span></p>
+  <p>The machinery below — rigs that re-derive every printed figure from the page, guards that
+  fail when two ends of a claim disagree — establishes that this corpus <em>does not contradict
+  itself</em>. It does not establish that the physics is right. A page can be perfectly
+  self-consistent and wrong, and that distinction is the reason this register exists.</p>
+</section>
+
+<section>
+  <h2>Provenance, per claim</h2>
+  <p class="lede">Every citation carries a tier. <strong>P</strong> means peer-reviewed and
+  verified to contain the result attributed to it. <strong>F</strong> means a field source — a
+  talk, a thesis, an engine's documentation — load-bearing but not peer-reviewed. Sources that
+  could not be obtained are marked as unopened rather than quietly cited.</p>
+  <div class="split">
+    <div class="tier"><div class="n">173</div><div class="k">tier <strong>P</strong> — peer-reviewed, verified (60% of citations)</div></div>
+    <div class="tier"><div class="n">114</div><div class="k">tier <strong>F</strong> — field source, named as such</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>Which pages cost the most corrections</h2>
+  <p class="lede">Corrections per document. A high bar is not a bad page — it is a page that has
+  been looked at hard. The pages with no bar are the ones to be suspicious of.</p>
+  <div class="chart"><div class="bar"><span class="bname">node-graph-runtime</span><span class="btrack"><span class="bfill" style="width:100.0%"></span></span><span class="bval">16</span></div>
+<div class="bar"><span class="bname">shader-craft</span><span class="btrack"><span class="bfill" style="width:93.8%"></span></span><span class="bval">15</span></div>
+<div class="bar"><span class="bname">resolution-independence</span><span class="btrack"><span class="bfill" style="width:87.5%"></span></span><span class="bval">14</span></div>
+<div class="bar"><span class="bname">seamless-and-periodic</span><span class="btrack"><span class="bfill" style="width:81.2%"></span></span><span class="bval">13</span></div>
+<div class="bar"><span class="bname">wave-models</span><span class="btrack"><span class="bfill" style="width:68.8%"></span></span><span class="bval">11</span></div>
+<div class="bar"><span class="bname">water-rendering</span><span class="btrack"><span class="bfill" style="width:56.2%"></span></span><span class="bval">9</span></div>
+<div class="bar"><span class="bname">heightfield-raymarching</span><span class="btrack"><span class="bfill" style="width:50.0%"></span></span><span class="bval">8</span></div>
+<div class="bar"><span class="bname">heightfield-lod</span><span class="btrack"><span class="bfill" style="width:50.0%"></span></span><span class="bval">8</span></div>
+<div class="bar"><span class="bname">mask-to-material</span><span class="btrack"><span class="bfill" style="width:43.8%"></span></span><span class="bval">7</span></div>
+<div class="bar"><span class="bname">layering-filters-and-masks</span><span class="btrack"><span class="bfill" style="width:43.8%"></span></span><span class="bval">7</span></div>
+<div class="bar"><span class="bname">gpu-driven-culling</span><span class="btrack"><span class="bfill" style="width:37.5%"></span></span><span class="bval">6</span></div>
+<div class="bar"><span class="bname">simulation-time-budget</span><span class="btrack"><span class="bfill" style="width:37.5%"></span></span><span class="bval">6</span></div>
+<div class="bar"><span class="bname">driver-fields</span><span class="btrack"><span class="bfill" style="width:37.5%"></span></span><span class="bval">6</span></div>
+<div class="bar"><span class="bname">papers-simulation</span><span class="btrack"><span class="bfill" style="width:37.5%"></span></span><span class="bval">6</span></div></div>
+</section>
+
+<section>
+  <h2>Open questions</h2>
+  <p class="lede">53 corrections are recorded but not yet re-derived by a second,
+  independent hand. They are published in that state deliberately: a finding nobody has checked
+  is worth more visible than hidden. Showing the most recent.</p>
+  <article class="rec pending"><header><span class="rid">CAU-B-TWICE</span><span class="rdoc">caustics</span><span class="rstate">open</span></header><p class="rwhat">NOT APPLIED. `B` is stated twice with two values. :102&#x27;s `a + 58.9*b_b` encodes B = 0.016978, and Henyey-Greenstein at the page&#x27;s own phase_g = 0.924 gives 0.016989 — :102 is right. :277 calls the particulate B **0.018**, i.e. 1/B = 55.6, which HG reaches only at phase_g ≈ 0.9186. 0.018 is the Petzo…</p><p class="rwhy"><span class="lbl">why it is still open</span>no second hand has confirmed that :277&#x27;s 0.018 is Petzold&#x27;s ratio rather than a rounding of 0.0170. If it is the ratio, the fix is a symbol, not a number — which is a different edit from the one a numeric corr…</p></article>
+<article class="rec pending"><header><span class="rid">CAU-CITES-OVERCLAIM</span><span class="rdoc">caustics</span><span class="rstate">open</span></header><p class="rwhat">NOT APPLIED. :230 says &#x27;Every other row above cites a peer-reviewed paper&#x27;. The last crossover row (:222, real-time ray tracing) cites nothing at all: of 5 rows, 1 cites an F source, 3 cite P sources, 1 is uncited.</p><p class="rwhy"><span class="lbl">why it is still open</span>unverified. The fix could be the sentence or the missing citation, and which one is right depends on whether a source for the real-time ray-tracing row exists — which nobody has looked for.</p></article>
+<article class="rec pending"><header><span class="rid">CLD-HEX-6084</span><span class="rdoc">clastic-debris</span><span class="rstate">open</span></header><p class="rwhat">NOT APPLIED. :146, restated :372 and :373: 67 clasts against the hexagonal bound `2A/(√3·1.024²)` = 110.12 is **60.84%**, printed as **60.9%**. Its own rounding, missed by 0.06 pp. The other two rows (54.71→54.7, 53.75→53.8) are exact.</p><p class="rwhy"><span class="lbl">why it is still open</span>unverified by a second hand. 0.06 pp is inside one rounding step, so &#x27;the page rounded up&#x27; and &#x27;the underlying count differs&#x27; are both live.</p></article>
+<article class="rec pending"><header><span class="rid">CLD-HALVING-398</span><span class="rdoc">clastic-debris</span><span class="rstate">open</span></header><p class="rwhat">NOT APPLIED. :230 &#x27;Four halvings, each **4.00× the last**&#x27;: 60,260/15,153 = **3.977**, which rounds to 3.98, not 4.00. The other three are 3.993, 3.997, 3.999. The GB column those counts feed is exact in all five rows.</p><p class="rwhy"><span class="lbl">why it is still open</span>unverified. &#x27;4.00×&#x27; may be intended as the ideal a halving predicts rather than as the measured ratio, in which case the fix is a word and not a number.</p></article>
+<article class="rec pending"><header><span class="rid">HR-APRON-2L</span><span class="rdoc">heightfield-raymarching</span><span class="rstate">open</span></header><p class="rwhat">NOT APPLIED. :149-150 &#x27;aproning per level over-bounds by 2^L&#x27; is imprecise: the measured compounding reach of a per-level apron is 2^(L+1)−1 BASE texels, which matches &#x27;2^L&#x27; as neither a factor nor an offset above L = 1.</p><p class="rwhy"><span class="lbl">why it is still open</span>unverified, and the measurement is bounded — levels above those reported wrap this rig&#x27;s periodic field, so the reach is established for low L only.</p></article>
+<article class="rec pending"><header><span class="rid">SEAM-OPS-306</span><span class="rdoc">seamless-and-periodic</span><span class="rstate">open</span></header><p class="rwhat">NOT APPLIED. :145 &#x27;22 multiply/add-class operations each against 12, so about **2.8×**&#x27; — its own operands give 5·22 / 3·12 = **3.06×**. The same sentence&#x27;s 5/3 → &#x27;1.7×&#x27; is right. The 2.8 is restated at :72 and :437, so three places agree with each other and disagree with the numbers printed beside …</p><p class="rwhy"><span class="lbl">why it is still open</span>unverified. Three ends agreeing on 2.8 is weak evidence for 2.8 and strong evidence that one edit moved all three — but whether the operand counts or the ratio is wrong needs a reader, not a rig.</p></article>
+<article class="rec pending"><header><span class="rid">SEAM-221-TRUNC</span><span class="rdoc">seamless-and-periodic</span><span class="rstate">open</span></header><p class="rwhat">NOT APPLIED. :54 and :443 quote &#x27;221×&#x27; for a cell that reads 221.5 at :381 — truncated, not rounded, at both ends. This corpus has a recorded defect for exactly that shape.</p><p class="rwhy"><span class="lbl">why it is still open</span>unverified. Whether this corpus truncates or rounds at 3 s.f. is a convention question nobody has settled in writing.</p></article>
+<article class="rec pending"><header><span class="rid">SEAM-INT32-DOUBLED</span><span class="rdoc">seamless-and-periodic</span><span class="rstate">open</span></header><p class="rwhat">NOT APPLIED. :121-122 compares a DOUBLED int32 table (256 KB) against a PLAIN uint16 one (64 KB). The doubling is stated only for int32, so the 4× between them reads as a type saving when half of it is the wrap-around copy.</p><p class="rwhy"><span class="lbl">why it is still open</span>unverified. The fix is one clause saying whether the uint16 table is doubled too; nobody has checked which the implementation does.</p></article>
+<article class="rec pending"><header><span class="rid">STRAT-DTMAX-5000</span><span class="rdoc">stratigraphy-and-lithology</span><span class="rstate">open</span></header><p class="rwhat">NOT APPLIED. :404-410 is internally inconsistent. `Δt_max between 1800 and 4900 yr` does not follow from the page&#x27;s own `1.0·10⁻³` and `2.8·10⁻³ m/yr` through its own `0.2·min(bed thickness)/rate`: those give 1786 and **5000**, and the page&#x27;s own `10×` below `0.2` independently pins the upper end at…</p><p class="rwhy"><span class="lbl">why it is still open</span>unverified, and the choice matters: correcting 4900→5000 and correcting the rate endpoints to 3 s.f. are different edits with different consequences downstream.</p></article>
+<article class="rec pending"><header><span class="rid">STRAT-640-638</span><span class="rdoc">stratigraphy-and-lithology</span><span class="rstate">open</span></header><p class="rwhat">NOT APPLIED. :342 and :441 print `640 m` where the page&#x27;s own 1.998 − 1.360 gives 638 m, rounded to 2 s.f.</p><p class="rwhy"><span class="lbl">why it is still open</span>unverified. 2 s.f. on a difference of two 4-s.f. numbers throws away precision the page has; whether that is intended is a reader&#x27;s call.</p></article>
+<article class="rec pending"><header><span class="rid">STRAT-25-200</span><span class="rdoc">stratigraphy-and-lithology</span><span class="rstate">open</span></header><p class="rwhat">NOT APPLIED. :94&#x27;s `25–200 m measured below` claims a range whose upper end was not measured: only 25 and 100 appear in the table below.</p><p class="rwhy"><span class="lbl">why it is still open</span>unverified. This is the &#x27;measured&#x27; word doing work the table does not support — the same shape as the corpus&#x27;s other overclaim rows, and it wants the same treatment.</p></article>
+<article class="rec pending"><header><span class="rid">FR-ALG3-171</span><span class="rdoc">flow-routing</span><span class="rstate">open</span></header><p class="rwhat">NOT APPLIED. :123-137 states Algorithm 3 differs from the page&#x27;s own block on **171 of 441** cells, moves **187** receivers, and is **strictly higher on all 171 and lower on none**. A run of both algorithms finds them IDENTICAL on every DEM in a 10-seed sweep. The page&#x27;s paragraph already declares t…</p><p class="rwhy"><span class="lbl">why it is still open</span>nobody has re-derived either result on a second implementation, and the page&#x27;s own terrain has never been published. ⚠️ THE LEAD WORTH FOLLOWING: the direction the page reports (strictly higher, lower on none)…</p></article>
+<article class="rec pending"><header><span class="rid">HR-FP32-LIVELOCK</span><span class="rdoc">heightfield-raymarching</span><span class="rstate">open</span></header><p class="rwhat">NOT APPLIED. Proposed ADDITION (not a correction -- the existing :154-155 sentence about the unfixed registration&#x27;s fp32 range is untouched and still true): a real GLSL ES 3.00 shader implementing the CORRECT, fixed registration was run on SwiftShader (gaia/gpu/heightfield-raymarching/) and still sh…</p><p class="rwhy"><span class="lbl">why it is still open</span>untested on real GPU hardware. Whether an actual GPU (a different driver&#x27;s floor()/mod() rounding) reproduces, worsens, or entirely avoids this specific livelock is unknown; SwiftShader is one software impleme…</p></article>
+<article class="rec pending"><header><span class="rid">WR-POW-NONAN</span><span class="rdoc">water-rendering</span><span class="rstate">open</span></header><p class="rwhat">NOT APPLIED. Proposed ADDITION (not a correction -- the page&#x27;s engineering conclusion, that both clamps are load-bearing, is untouched and still right): :125-126 states that an unrenormalised blended normal drives 1-cosThetaV negative and that the resulting pow(negative, exponent) &#x27;goes NaN&#x27; / is Na…</p><p class="rwhy"><span class="lbl">why it is still open</span>untested on real GPU hardware and on any other software rasteriser; SwiftShader is one ANGLE backend, not evidence about drivers in general. Also unverified by a second hand.</p></article>
+</section>
+
+<section>
+  <h2>Defects found in the source material</h2>
+  <p class="lede">Distilling a source reads it closely enough to find things a normal reader
+  would not. These are errors located in the papers and reference material this corpus draws
+  from — recorded here rather than silently corrected.</p>
+  <article class="rec source"><header><span class="rdoc">terrain-architect/references/12-glacial-coastal.md:92 and :1721</span><span class="rstate">source defect</span></header><p class="rwhat">2-D explicit diffusion bound stated as the 1-D one</p><p class="rwhy"><span class="lbl">what is actually correct</span>The von Neumann limit for explicit diffusion is Δx²/(2·D) in ONE dimension and Δx²/(4·D) in TWO. The prose permits a timestep twice the stable one for a 2-D grid.</p><p class="rwhy"><span class="lbl">outcome</span>confirmed; Gaia carries the correct general form in simulation-time-budget.md</p></article>
+<article class="rec source"><header><span class="rdoc">water-physics/references/12b-water-provenance.md (on origin/claude/swimming-pool-voronoi-r…</span><span class="rstate">source defect</span></header><p class="rwhat">Elfouhaily et al. 1997 is cited without having been read</p><p class="rwhy"><span class="lbl">what is actually correct</span>PARTLY FALSE PREMISE, and the 2026-09 &#x27;correction&#x27; of it was FALSE TOO -- both re-checked with git and Unpaywall on 2026-09-03. What that correction got right: ONLY that the path first given for the record was wrong. THE FOUR-RESTATEMENT &#x27;AGREED INTERSECTION&#x27; IS IN THE ARTEFACT -- 12b line 103 verbatim, &#x27;the equations …</p><p class="rwhy"><span class="lbl">outcome</span>the non-citation stands but is now argued from the unread state alone, in papers-simulation.md and wave-models.md; the paper is obtainable, so citing it properly is outstanding work rather than a closed question</p></article>
+<article class="rec source"><header><span class="rdoc">terrain-renderer source material</span><span class="rstate">source defect</span></header><p class="rwhat">capillary-gravity minimum pair is internally inconsistent</p><p class="rwhy"><span class="lbl">what is actually correct</span>The two halves do not agree: reconstructing σ from each gives values 2.5% apart.</p><p class="rwhy"><span class="lbl">outcome</span>carried with the inconsistency stated</p></article>
+<article class="rec source"><header><span class="rdoc">briefs sent to the simulation and rendering agents</span><span class="rstate">source defect</span></header><p class="rwhat">MY OWN BRIEFS gave the wrong path for the richest source</p><p class="rwhy"><span class="lbl">what is actually correct</span>WRONG IN BOTH DIRECTIONS, corrected 2026-09: the files are in terrain-renderer/, NOT water-physics/ -- no water-physics/ path exists on any ref. Re-measured with git ls-tree: terrain-renderer/references/12a-water-derivations.md is 1987 lines (not 3488), 12b-water-provenance.md is 887 (not 1299), and 12-water-physics.md…</p><p class="rwhy"><span class="lbl">outcome</span>SUPERSEDED. This row&#x27;s correction was itself wrong and its line counts were invented; the phantom water-physics/ prefix it introduced then spread to six places across two documents, SKILL.md and two registers before a cross-document audit caught it. A correcti…</p></article>
+<article class="rec source"><header><span class="rdoc">the approved plan, two agent briefs, and three commit messages</span><span class="rstate">source defect</span></header><p class="rwhat">MY OWN PLAN AND BRIEFS QUOTED A FILE SIZE THAT DOES NOT EXIST</p><p class="rwhy"><span class="lbl">what is actually correct</span>No .md file of 4177 lines exists on any branch. That file is 1524 lines on PR #41 and 1691 on main. The genuinely over-long files are water-physics/reference-impl/README-beach.md (5316), terrain-renderer/references/12-water-physics.md (5229) and 12a-water-derivations.md (3488).</p><p class="rwhy"><span class="lbl">outcome</span>corrected in the plan; the argument for a per-file cap stands, the evidence for it did not</p></article>
+<article class="rec source"><header><span class="rdoc">gaia/references/hydraulic-erosion.md sources, and the stava2008 bibliography note</span><span class="rstate">source defect</span></header><p class="rwhat">the lmax depth ramp on transport capacity is attributed to Stava et al. 2008 across this field, including by Gaia&#x27;s own first draft</p><p class="rwhy"><span class="lbl">what is actually correct</span>Stava&#x27;s capacity (eq. 2) is |v|*C_k*sin(alpha), UNRAMPED -- the string `lmax` does not occur in the paper. The ramp is Jako &amp; Toth 2011 eq. (10), lmax(x) = 0 below zero depth, linear, 1 at Kdmax.</p><p class="rwhy"><span class="lbl">outcome</span>corrected; jako2011 added, and its locator names the CESCG printing because that is the copy whose equation numbering was read</p></article>
+<article class="rec source"><header><span class="rdoc">gaia/references/shallow-water.md, the stability section</span><span class="rstate">source defect</span></header><p class="rwhat">the virtual-pipe model is described as having a depth-dependent signal speed, which is false for the constant cross-section every source actually specifies</p><p class="rwhy"><span class="lbl">what is actually correct</span>Mei eq. (2) gives A as a pipe cross-section parameter with no depth dependence, and Stava sec. 4 eq. (1) is decisive: &quot;In our simulation this area is always constant with profile C = l^2&quot;. Linearising gives signal speed sqrt(g*A/l) -- an EFFECTIVE depth set by A/l, not the water depth. With Stava&#x27;s A = l^2 the grid slo…</p><p class="rwhy"><span class="lbl">outcome</span>corrected; the document now says which bound governs which formulation rather than printing one bound for both ⚠️ SUPERSEDED 2026-09-06: the linearised two-pipe scheme carries the head difference TWICE, so the signal speed is sqrt(2*g*A/l) and the effective de…</p></article>
+<article class="rec source"><header><span class="rdoc">gaia/references/terrain-analysis-masks.md, the curvature coefficients</span><span class="rstate">source defect</span></header><p class="rwhat">Zevenbergen &amp; Thorne&#x27;s equation numbering could not be verified, and the locator was deliberately NOT sharpened</p><p class="rwhy"><span class="lbl">what is actually correct</span>Nothing is known to be wrong. The paper is paywalled, and the reproductions checked (RichDEM docs, RSAGA wiki, SAGA forums, an arXiv roughness paper) give the method without numbered equations.</p><p class="rwhy"><span class="lbl">outcome</span>OPEN -- writing &quot;eq. 15&quot; from memory would be a `?` wearing a P&#x27;s confidence, so the paraphrase stands until someone reads the paper</p></article>
+<article class="rec source"><header><span class="rdoc">gaia/references/noise-and-warping.md front matter and body (before this fix), and gaia/ref…</span><span class="rstate">source defect</span></header><p class="rwhat">Perlin 1985 does not contain the cubic fade 3t^2 - 2t^3 it is cited for</p><p class="rwhy"><span class="lbl">what is actually correct</span>The 1985 paper&#x27;s Noise section (p. 289) gives only: &quot;we compute a smooth (eg. cubic polynomial) interpolation between lattice equation coefficients&quot;. No polynomial appears anywhere in the paper. The formula s(t) = 3t^2-2t^3 and its second derivative 6-12t are written down in Perlin 2002 §2, which attributes the descrip…</p><p class="rwhy"><span class="lbl">outcome</span>fixed in noise-and-warping.md; papers-generation.md is another agent&#x27;s file and still carries the overstatement</p></article>
+<article class="rec source"><header><span class="rdoc">gaia/references/tectonic-uplift.md, &quot;When you do want plates&quot;</span><span class="rstate">source defect</span></header><p class="rwhat">A recipe the document calls &quot;no canonical source&quot; is published, in a paper the same document already cites</p><p class="rwhy"><span class="lbl">what is actually correct</span>Cortial et al. 2019 (already cited in the same document, tier P) contains the spherical form of steps 1-5: §3 seeds plate centroids and defines plates as spherical Voronoi cells, with &quot;warping the geodetic distances to the centroids using a simple noise function&quot; for irregular shapes; §4.1/§4.2/§4.4 branch on subductio…</p><p class="rwhy"><span class="lbl">outcome</span>fixed in tectonic-uplift.md: the planar recipe is now stated as a restatement of a cited method rather than as folklore</p></article>
+<article class="rec source"><header><span class="rdoc">Worley, A Cellular Texture Basis Function, §Computation of Fn(x)</span><span class="rstate">source defect</span></header><p class="rwhat">Worley 1996 states two different feature-point densities for the same parameter</p><p class="rwhy"><span class="lbl">what is actually correct</span>Both sentences describe the mean of the same Poisson distribution. The paper never reconciles them; either is defensible, but a reader taking one as the paper&#x27;s constant will disagree with a reader taking the other.</p><p class="rwhy"><span class="lbl">outcome</span>noted only; noise-and-warping.md now says &quot;a mean of about 4 per cube, clamped to 1-9&quot;, which is the figure given where the distribution is defined</p></article>
+<article class="rec source"><header><span class="rdoc">gaia/references/wave-models.md, the Wave particles bullet under What it beats</span><span class="rstate">source defect</span></header><p class="rwhat">Yuksel et al. 2007 is credited with refraction, dispersion and shoaling, none of which are in the paper</p><p class="rwhy"><span class="lbl">what is actually correct</span>Wave Particles solves the plain second-order wave equation at a CONSTANT speed (its eq. 1), so it has no dispersion at all; its dispersion angle is a wavefront-spreading geometry term, not frequency dispersion. It has no bathymetry -- boundaries are container walls that reflect -- and it names diffraction as future wor…</p><p class="rwhy"><span class="lbl">outcome</span>confirmed; wave-models.md now states what the paper does and does not do, and names the packet line as uncited</p></article>
+</section>
+
+<section>
+  <h2>Closed, with a verifier</h2>
+  <p class="lede">Corrections re-derived by someone other than whoever proposed them. The rule is
+  that a row with no verifier is not a finished correction.</p>
+  <article class="rec verified"><header><span class="rid">PD-RESO-APX</span><span class="rdoc">resolution-independence</span><span class="rstate">verified</span></header><p class="rwhat">resolution-independence.md stated an error with no cost: the droplet-count rule &quot;came back within +/-30% at four times the droplets&quot; told a reader how good the 1/dx^2 count rule is but never what paying for it costs. Added the machine half two lines below the +/-30%, measured this sitting rather tha…</p><p class="rwhy"><span class="lbl">verifier</span>agent-verify-waveB (independent, told to DISPROVE): CONFIRMED. Re-ran the row&#x27;s measurement script on a second container rather than re-reading its output, re-derived the arithmetic in python3, locate…</p></article>
+<article class="rec verified"><header><span class="rid">PD-RIVN-APX</span><span class="rdoc">river-networks</span><span class="rstate">verified</span></header><p class="rwhat">river-networks.md stated how good the authored-carve recommendation is but never what it costs: the monotone-fix table at :371-374 carries the only figure check.py&#x27;s ERROR pattern matches in the file, the +-3 cells of jitter on the along-valley path, beside 289 of 899 segments uphill (32.1%), 107.9 …</p><p class="rwhy"><span class="lbl">verifier</span>agent-verify-waveB disputed this row; agent-adjudicate-waveB independently UPHELD the dispute and the orchestrator applied the fix on 2026-09-14. The row as written overstated its own precision or car…</p></article>
+<article class="rec verified"><header><span class="rid">PD-SEAICE-APX</span><span class="rdoc">sea-ice</span><span class="rstate">verified</span></header><p class="rwhat">sea-ice.md stated an error with no cost -- the Denton target m = -1.79 +- 0.08 against which its Poisson-Voronoi measurement misses by the whole exponent -- and nowhere on the page said what the recommended alternative costs, so a reader could tell how wrong the cheap recipe is but not whether the c…</p><p class="rwhy"><span class="lbl">verifier</span>agent-verify-waveB disputed this row; agent-adjudicate-waveB independently UPHELD the dispute and the orchestrator applied the fix on 2026-09-14. The row as written overstated its own precision or car…</p></article>
+<article class="rec verified"><header><span class="rid">PD-SHADER-APX</span><span class="rdoc">shader-craft</span><span class="rstate">verified</span></header><p class="rwhat">PD-CONFIRM shader-craft.md -- Phase D re-entry, no edit made, the standing (c) confirmed. The document states an ERROR that check.py counts (&quot;an error of 4 LOD levels&quot;, :218, echoed at the failure-table end :444) and states its COST partner as an explicit (c) at :75-77 (&quot;none of the eight is priced …</p><p class="rwhy"><span class="lbl">verifier</span>agent-verify-waveB (independent, told to DISPROVE): CONFIRMED. Re-ran the row&#x27;s measurement script on a second container rather than re-reading its output, re-derived the arithmetic in python3, locate…</p></article>
+<article class="rec verified"><header><span class="rid">PD-TILED-APX</span><span class="rdoc">tiled-streaming</span><span class="rstate">verified</span></header><p class="rwhat">tiled-streaming.md gained the missing half of the approximation pair and lost a false cost bound in the same edit. The COST check.py already matched is 8-32 MB/frame at 60 Hz in the per-frame upload budget bullet; a new paragraph sits directly under that bullet naming it as the cost half and giving …</p><p class="rwhy"><span class="lbl">verifier</span>agent-verify-waveB (independent, told to DISPROVE): CONFIRMED. Re-ran the row&#x27;s measurement script on a second container rather than re-reading its output, re-derived the arithmetic in python3, locate…</p></article>
+<article class="rec verified"><header><span class="rid">PD-WATREND-APX</span><span class="rdoc">water-rendering</span><span class="rstate">verified</span></header><p class="rwhat">water-rendering.md stated an error for the offset-centred fp16 (A, A^2) foam-coverage pair (10x amplification at 3 sigma, ~0.2% in sigma_A; 101x at 10 sigma, 3.1%; 901x at 30 sigma, 23.5%) and then named its cost without pricing it (&quot;the pair goes in R32G32F; the memory is what the coverage being ri…</p><p class="rwhy"><span class="lbl">verifier</span>agent-verify-waveB (independent, told to DISPROVE): CONFIRMED. Re-ran the row&#x27;s measurement script on a second container rather than re-reading its output, re-derived the arithmetic in python3, locate…</p></article>
+<article class="rec verified"><header><span class="rid">SIGNOFF-STAMPS</span><span class="rdoc">flow-routing</span><span class="rstate">verified</span></header><p class="rwhat">THE FIRST FOUR `verified:` STAMPS IN THIS CORPUS. A human read four sign-off briefs on 2026-09-14, signed all four conditionally, and the conditions were applied in 7b392bf and 3210ab9. Each document goes `status: draft` -&gt; `status: stable` (the guard requires it: a stamp on a draft is red) and carr…</p><p class="rwhy"><span class="lbl">verifier</span>the stamp IS the verification channel for what it covers, and it was proved to bite. ⚠️ SCOPE: covers_body hashes ONLY `## Use this` and the failure table -- 8% of flow-routing, 12% of terrain-analysi…</p></article>
+<article class="rec verified"><header><span class="rid">WOPT-MUD</span><span class="rdoc">water-optics</span><span class="rstate">verified</span></header><p class="rwhat">The page labelled mu_d = 0.86 a &#x27;uniform overcast sky&#x27;, in two places. 0.86 is the CIE STANDARD overcast sky -- the cardioidal distribution L ~ (1 + 2*cos t)/3, three times brighter at the zenith than at the horizon. A genuinely uniform (isotropic) sky gives 0.84: dimmer overhead, so less of its lig…</p><p class="rwhy"><span class="lbl">verifier</span>verified</p></article>
+<article class="rec verified"><header><span class="rid">NOTOPENED-BODY</span><span class="rdoc">11 documents: clastic-debris, flow-routi…</span><span class="rstate">verified</span></header><p class="rwhat">The corpus&#x27;s handling of unread sources was its best feature and lived entirely in the YAML: the locator names the paywall, what was read in its place and what stays unverified. A reader never sees it. 67 inline `[id]` citations across 10 documents named a source the same document declares it never …</p><p class="rwhy"><span class="lbl">verifier</span>verified</p></article>
+<article class="rec verified"><header><span class="rid">SC-FP16-45</span><span class="rdoc">shader-craft</span><span class="rstate">verified</span></header><p class="rwhat">The page stated the flush-to-zero fp16 regime as `45x` worse than the best case, at three ends. Its own two printed thresholds give 7.8e-3 / 1.7e-4 = 45.882, which rounds to 46. 45 is truncation, in a corpus that rounds everywhere else, and the inputs are two significant figures so the ratio is 45.9…</p><p class="rwhy"><span class="lbl">verifier</span>verified</p></article>
+</section>
+
+<footer>
+  <p>Generated by <code>gaia/scripts/ledger.py</code> from the corpus's own registers —
+  <code>corrections.tsv</code>, <code>source-findings.tsv</code>, <code>guard-proofs.tsv</code>
+  — so this page cannot drift from the documents it describes. <code>--check</code> fails if it
+  does. Entry text is excerpted; the registers carry the full rows, each with the derivation and
+  the command that checks it.</p>
+</footer>
+</div>

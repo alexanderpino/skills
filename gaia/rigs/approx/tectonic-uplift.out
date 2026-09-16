@@ -1,0 +1,28 @@
+== rig ==
+python 3.11.15  numpy 2.4.6  x86_64
+
+== validation: alpha table against the document's printed row ==
+  Te=  5 km  alpha=   17.6 km
+  Te= 10 km  alpha=   29.6 km
+  Te= 20 km  alpha=   49.8 km
+  Te= 40 km  alpha=   83.8 km
+  Te= 80 km  alpha=  140.9 km
+
+== validation: k=0 limit ==
+  T(0)=0.8485  surface fraction 0.1515  x 6.6h = 1.0000 h
+
+== ERROR: idempotency, ten calls against one ==
+  512^2 x 2.0 km fp64: single-shot peak  1163.32 m, peak after 10  1163.32 m, max |h10-h1| = 2.274e-13 m
+  512^2 x 1.0 km fp64: single-shot peak  1163.25 m, peak after 10  1163.25 m, max |h10-h1| = 4.547e-13 m
+  512^2 x 2.0 km fp32: single-shot peak  1163.32 m, peak after 10  1163.32 m, max |h10-h1| = 1.221e-04 m
+
+== the naive form, same rig (document says 1163 -> ... -> 76 m) ==
+  peaks: ['1163.2', '609.8', '387.2', '273.6', '205.8', '161.4', '130.2', '107.4', '90.0', '76.3']
+
+== COST: one flexure update (two FFTs) ==
+  256^2 fp64: median    2.76 ms  (min 2.54, max 3.11, 11 runs)
+  512^2 fp64: median   11.74 ms  (min 11.64, max 20.15, 11 runs)
+  1024^2 fp64: median   56.53 ms  (min 53.85, max 61.44, 11 runs)
+
+== COST: the w_prev state ==
+  fp64 w_prev: 8 bytes per cell  (2.0 MB at 512^2, 128 MB at 4096^2)

@@ -1,0 +1,18 @@
+seed 20260914   domain 2000 m   relief 120 m   base droplets 2000   repeats 4
+  grid     dx m   count  life  r_cells  brush     steps     touches         ms    eroded m3
+ 128^2  15.6250    2000    30        3     25     56069      700602      209.4    4110183.2
+ 128^2  15.6250    2000    30        3     25     56069      700602      206.2    4110183.2
+ 128^2  15.6250    2000    30        3     25     56069      700602      221.1    4110183.2
+ 128^2  15.6250    2000    30        3     25     56069      700602      215.7    4110183.2
+ 256^2   7.8125    8000    60        6    109    448118    21651894     4076.1    2759059.2
+ 256^2   7.8125    8000    60        6    109    448118    21651894     4163.3    2759059.2
+ 256^2   7.8125    8000    60        6    109    448118    21651894     4132.8    2759059.2
+ 256^2   7.8125    8000    60        6    109    448118    21651894     4071.0    2759059.2
+
+128^2 206.2-221.1 ms over 4 runs, median 212.5
+256^2 4071.0-4163.3 ms over 4 runs, median 4104.4
+wall-clock ratio   19.31x   (predicted 1/dx^5 = 32x); worst/best case 18.41x-20.19x
+fitted exponent    4.27   (steps alone would give 3, brush-dominated 5)
+brush-touch ratio  30.90x
+step ratio         7.99x   (predicted 1/dx^3 = 8x)
+per-droplet cost   0.106 ms at 128^2, 0.513 ms at 256^2

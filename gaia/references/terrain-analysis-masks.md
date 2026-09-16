@@ -2,8 +2,10 @@
 type: Technique
 title: Terrain analysis and masks — deriving fields from height
 description: "Slope, curvature, occlusion and wetness computed the way that survives a resolution change, and the selector stack that turns them into materials."
-tags: [generation, analysis, masks, curvature, materials, real-time]
-status: draft
+tags: [generation, analysis, masks, curvature, materials, authoring-time, real-time]
+status: stable
+verified:
+  - { by: "human:alexander.pino", covers: 0f7a2772879a, covers_body: 0cdf2897c25d }
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
   - { id: zevenbergen1987, tier: P, locator: "the 3x3 partial-quartic fit, and the profile and plan curvature expressions. NOT OPENED — Earth Surface Processes and Landforms is paywalled at Wiley and no open copy was reachable from here, so no equation number is named. The five coefficients and the two curvature expressions this document writes out are the standard published form, but they have not been checked against Zevenbergen and Thorne's own numbering" }
@@ -17,6 +19,12 @@ sources:
   - { id: tomasi1998, tier: P, locator: "§2.1 Example: the Gaussian Case — the product of the CLOSENESS function c(xi,x) and the SIMILARITY function s(phi,f), both Gaussian. The paper's own axis pair is DOMAIN and RANGE, not spatial and range; search it for 'closeness' and 'similarity' to reach these two weights" }
 ---
 # Terrain analysis and masks — deriving fields from height
+
+**Tier: authoring-time and real-time.** §Time budget splits the page: slope, aspect, normals,
+Laplacian, curvature and the selectors over them are 3×3 stencils safe in a shader; horizon
+occlusion, insolation, TWI and anything consuming drainage area are bakes.
+⚠️ **Never opened here: `zevenbergen1987`, `horn1981`, `beven1979`, `he2010`** — cited by name
+below; their front-matter locators say what was read instead, and what is left unverified.
 
 Analysis describes a terrain. Masks turn that description into material coverage. Both are cheap;
 both are wrong in ways that look fine, which is what this document is about.
@@ -94,6 +102,19 @@ property of the operator: on a Gaussian hill at `r = 1.3` this test gives 2.4, 3
 significant digits at `L` = 0.4, 0.1 and 0.025. It catches a wrong sign or a dropped `L` at the
 first digit, which is all it is for.
 
+**Put a number on that, and budget the worst cell rather than the sampled one.** Measured here on
+that same Gaussian hill at `L` = 0.1, the **max relative error** of `plan/√p` against `−1/r` over the
+ring `0.5 ≤ r ≤ 3.0` is **2.16%** ⚠️ (this ring of error figures is the page's other unregistered
+cluster — no rig, no row, excluded from the stamp with the cost block above), and the worst cell
+sits on the OUTER edge at `r ≈ 2.97`, where the
+hill has flattened — not at the summit, where the curvature is largest. At the well-sloped `r = 1.3`
+the same quantity is out by **0.031%** at that `L`, about seventy times better. And it keeps climbing
+outward: median 0.72% over `2.5 ≤ r < 3.0`, 1.4% with a 5.2% worst cell over `3.0 ≤ r < 3.5`. ⚠️ **The
+ring bound is therefore part of the figure**, exactly as the surface and the sample point are above:
+a curvature error quoted without the slope range it was measured over means nothing. This is the
+`p < eps` guard below wearing a different hat — as `p` falls, both curvatures become a ratio of two
+vanishing quantities, and they degrade smoothly long before any `eps` fires.
+
 - **Profile** (along steepest descent) — negative where the slope steepens downhill (ridges, cliff
   lips), positive where it flattens (valley floors, slope bases). This is the erosion/deposition
   mask.
@@ -149,6 +170,11 @@ which is the `maxDist` falloff below rather than the angular weighting above.
 **`maxDist` is the parameter that matters.** A small radius gives a crevice map that reads as dirt;
 a large radius darkens valleys and lets mountains catch light, which is what actually sells
 terrain. Start at 2–5% of the domain extent, `N = 8–16` azimuths — the horizon varies smoothly.
+⚠️ **That `N = 8–16` is this corpus's own practice, not a published figure.** `driver-fields.md`
+grades it as folklore and names this file as the one that prints it bare; the direction counts that
+do come from a source are **32–64** for a view factor [dozier2022] — whose own timing run used 32 —
+and 137 then 580 for an urban solar cadaster. It is load-bearing here rather than decorative: both
+timing figures below are computed at the top of the range, `N = 16`, and halve at `N = 8`.
 Attenuate with distance rather than cutting off hard: [bavoil2008]'s `W(r) = 1 − r²` is the cheap
 choice and stops the bake showing a ring at the radius you picked.
 
@@ -170,10 +196,18 @@ amortised O(1) per cell. ⚠️ **An earlier
 version priced that difference as "seconds and hours"; the "hours" end was an order of magnitude
 out.** Naive marching at 4096² × 16 azimuths × 1000 steps is 2.68·10¹¹ samples, which is **4.5 to 45
 minutes on one core** at 10⁹ to 10⁸ samples/s. Neither figure had a source, a date or a machine
-attached, which is how it drifted. **Hours is reachable, but only at a far heavier configuration**:
-`driver-fields.md` prices a sourced per-point DDA bake at 1–2 hours per tile on a GPU for 46 Mcell
-across **580** directions — about a hundred times the work of the 4k × 16 case above. State the cell
-count, the direction count and the machine, or the figure means nothing. It is also the substrate for insolation —
+attached, which is how it drifted. ⚠️ **Hours does not need "a far heavier configuration", and the
+sentence that stood here said it did.** Hold grid, step count, algorithm and machine at the very
+baseline above and vary only the azimuth count: at 10⁸ samples/s one hour arrives at **N ≈ 21**,
+1.34× the 16-azimuth work, and N = 32 — the direction count of [dozier2022]'s own timing run, as
+`driver-fields.md` records it — takes **1.49 h** at exactly 2× it. At 10⁹ samples/s the same hour needs N ≈ 215, 13.4×. The "about a hundred times the
+work" that used to close this paragraph read `driver-fields.md`'s sourced per-point DDA bake — 1–2
+hours per tile on a GPU for 46 Mcell across **580** directions, 99× the cell-direction count of the
+4k × 16 case — as if it were a work multiple on this CPU baseline. It is not one: different
+algorithm, different machine, step count unstated, and `driver-fields.md` flags that cross-row
+reading as a trap in as many words. Carried onto this baseline anyway, 100× is **74.6 h** at 10⁸
+samples/s or **7.5 h** at 10⁹ — never the 1–2 hours it was pointing at. State the cell
+count, the direction count, the step count and the machine, or the figure means nothing. It is also the substrate for insolation —
 horizon angle depends on azimuth, not on the sun, so a precomputed per-azimuth horizon makes every
 sun sample a table lookup. **Insolation is not AO**: a pole-facing wall can be wide open to the sky
 and never see the sun, so substituting one for the other puts melt in shaded ravines.
@@ -199,6 +233,20 @@ heightSel(h, lo, hi, w) = smoothstep(lo-w, lo+w, h) * (1 - smoothstep(hi-w, hi+w
 slopeSel(s, lo, hi, w)  = ...                      # s is tan, not degrees
 aspectSel(a, dir, wid)  = smoothstep(cos(wid), 1, dot(aspectVec(a), dir))
 ```
+
+⚠️ **`lo` and `hi` are half-height points, not band edges, and `w` is the half-width of one edge,
+not the band.** Two consequences follow from the algebra and neither is obvious from the line
+above. The support is `lo-w` to `hi+w`, so a band authored in the world units this document
+demands passes material `w` outside each authored number, and the value *at* `lo` and at `hi` is
+exactly 1/2 whenever the band is at least `w` wide. And the mask reaches 1 only when the band is at
+least twice `w` — at exactly twice, at the single midpoint. Narrower and the peak falls short
+silently: at `w` = 0.6 of the band it is 0.961, at `w` equal to the band 0.712, and for lo 2000,
+hi 2050, w 100 the peak is 0.467 with both authored numbers sitting at 27/64 ≈ 0.422. The
+degradation is gradual, not a cliff — a band 1% short of twice `w` still peaks at 0.99985 — so the
+regime that bites is `w` comparable to the band, not every band narrower than twice `w`. Nothing
+downstream catches it: the `Σ ≤ 1` and `Σ = 1` assertions below both pass while the deficit is
+absorbed by the bare base material, which is the clause that licenses them. Size `w` against
+`hi - lo`, not against the terrain.
 
 Four rules make a selector correct rather than a tell:
 
@@ -238,7 +286,8 @@ smoothed on clean R32F; pick by input quality, not by habit. *Topographic positi
 [weiss2001] — no peer review; a multi-radius neighbourhood-mean difference that classifies
 ridge/slope/valley. ⚠️ **It is not the same signal as curvature, and an earlier version of this line
 said it was.** TPI is a band-pass at a chosen radius, and it degenerates to the Laplacian only as
-`r → 0`: `f − mean_ring_r(f) = (r²/4)·∇²f + O(r⁴)`. The poster's own worked scales are annuli of
+`r → 0`: `f − mean_ring_r(f) = −(r²/4)·∇²f + O(r⁴)` — note the sign, and check it against a peak,
+where `∇²f < 0` makes TPI positive as the convention requires. The poster's own worked scales are annuli of
 62 and 67 cells on a 30 m DEM — **1.86 and 2.01 km** — where no expansion in `r` survives, and its
 introduction exists to make exactly this point, that topographic position is "*an inherently
 scale-dependent phenomenon*": a point in Yosemite is a flat plain at 100 m and the bottom of a
@@ -258,6 +307,20 @@ Everything with a long baseline — horizon occlusion, insolation, TWI and anyth
 drainage area — is a bake: even the O(1) sweep is a whole-field sequential pass per azimuth, and
 the terrain is not changing per frame. The line is the baseline length, not the arithmetic.
 
+⚠️ **"Cheap" is not a budget, so here is a measured one — and here is what it is not.** The curvature
+block above, evaluated exactly as written over a 4096² R32F tile, takes **493 ms** (best of five;
+median 500 ms) and holds **36 bytes per cell** — its eight named intermediates plus the input,
+**603 MB** — in NumPy 2.4.6 under CPython 3.11 on one process, Xeon @ 2.10 GHz. ⚠️ **These three
+figures have no rig in `gaia/rigs/` and no register row carrying them**, unlike every other measured
+number in this corpus; they landed after the 2026-09-09 audit and the sign-off review of
+2026-09-14 explicitly excluded them from this page's stamp. Re-measurable in one sitting by anyone
+who wants them; until then, read them as reported rather than as reproduced. **That is an
+authoring-time CPU figure and nothing else: it is not a GPU frame cost and must never be quoted as
+one.** It is bandwidth, not arithmetic — NumPy materialises every intermediate as a full-tile array,
+where a shader holds all eight in registers and does nine loads per cell. The per-frame verdict
+above rests on that register form; evaluate curvature the way the block is written, on a CPU, and
+budget the half-second and the 603 MB per 4k tile.
+
 ## How this fails, and what it looks like
 
 | Symptom | Mechanism | Fix |
@@ -267,6 +330,7 @@ the terrain is not changing per frame. The line is the baseline length, not the 
 | A slope mask that was right at 1 m/px and wrong at 8 | Slope is resolution-dependent | State the resolution with the threshold; re-tune per LOD |
 | Factor of safety, TWI or wetness biased low | `tan(slope)` applied to a value that is already a tangent | Divide by `slope` bare |
 | Curvature mask is speckle, or shows concentric rings | Second derivative of a quantised field | Compute on R32F, pre-smooth σ ≈ 1 cell |
+| Curvature wild on near-flat ground, clean on the slopes | Both curvatures divide by `p`, so as the slope dies they are a ratio of two vanishing quantities — the error is worst where `p` is smallest, not where the curvature is largest | Raise the `p < eps` guard, emit zero curvature on flats, and budget the flat-tail error rather than a sampled-point one |
 | Curvature mask selects ridges where it should select valleys | Sign convention differs from the tool you learned it in | Render over a known ridge and document the convention |
 | AO reads as dirt in the crevices, mountains unlit | `maxDist` far too small | 2–5% of domain extent |
 | AO bake is far slower than it needs to be at 4k | Naive per-cell marching | The horizon sweep — Dozier's 1981 idea, [timonen2010] for the GPU formulation |

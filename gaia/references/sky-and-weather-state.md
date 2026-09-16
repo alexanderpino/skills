@@ -2,7 +2,7 @@
 type: Technique
 title: Sky and weather state
 description: "The atmospheric state a world carries: precomputing a scattering model as a solve rather than a lookup, and the one coverage field that clouds, their shadows and the rain they imply must all read."
-tags: [simulation, atmosphere, sky, weather, precomputation, driver-fields]
+tags: [simulation, atmosphere, sky, weather, precomputation, driver-fields, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-04T00:00:00Z }
 sources:
@@ -11,10 +11,15 @@ sources:
   - { id: hosekwilkie2012, tier: P, locator: "the analytic tier -- zero precompute, O(1) render -- and its RMSE of 41.5 as scored by bruneton2017 Table 2. Read in the authors' lowres preprint, every page stamped 'To appear in ACM TOG 31(4).' (nine of nine, checked), so it carries no article pagination against the record's 95:1-95:9. Its supplemental material, holding the fitted matrices, was not obtained here, so no coefficient from it is quoted anywhere in this corpus -- the paper itself WAS read" }
   - { id: preethamshirleysmits1999, tier: P, locator: "the analytic baseline, and bruneton2017 Table 2's worst performer at RMSE 88.1. Read in the ACM proceedings copy with folios 91-99 present. Cited for the ozone treatment -- a 0.0035 m NTP column absorber applied to the direct solar beam only, the sole ozone model among these five -- and for being the model everything since is measured against" }
   - { id: nishita1993, tier: P, locator: "the origin of the scale-height atmosphere in graphics and of the constants inherited since; scored 26.6 by bruneton2017 Table 2, ahead of two later models. READ AS PAGE IMAGES, not machine-readable: the author's raster scan at nishitalab.org has no text layer and its pages are stored vertically flipped, so it was read as page images and quotations are transcriptions; no proceedings folios were visible, so pp. 175-182 comes from the record and not from the artefact" }
-  - { id: hillaire2020, tier: P, locator: "cited here ONLY for the contrast in what a sun move costs: its Sky-View LUT is a 2D latitude/longitude texture built for the CURRENT sun -- Fig. 4 caption, 'The Sky-View LUT during daytime. The sun direction can be seen on the left side, where Mie scattering happens' -- so a sun move forces a rebuild there, at 0.05 ms per Table 2, where brunetonneyret2008 bakes every sun angle into a table axis and rebuilds nothing. Section 5.3 for why the LUT is resolution-independent. The pass itself is atmosphere-and-aerial-perspective.md's subject" }
+  - { id: hillaire2020, tier: P, locator: "cited here for three things and nothing else. FIRST, the contrast in what a sun move costs: its Sky-View LUT is a 2D latitude/longitude texture built for the CURRENT sun -- Fig. 4 caption, 'The Sky-View LUT during daytime. The sun direction can be seen on the left side, where Mie scattering happens' -- so a sun move forces a rebuild there, at 0.05 ms per Table 2, where brunetonneyret2008 bakes every sun angle into a table axis and rebuilds nothing. Section 5.3 for why the LUT is resolution-independent. SECOND, Table 2 for the four per-LUT times summing to 0.17 ms inside a 0.31 ms total render at 1280x720 -- transcribed in full in atmosphere-and-aerial-perspective.md, whose locator declares this artefact READ IN FULL -- and section 7 for the 250 ms it measures for updating the LUTs of Bruneton's 2017 code release -- the paper's own key Bru17b, not BN08 -- on a 2016 GPU. THIRD, Table 1 for the ozone coefficients and tent-shaped profile it carries; the row itself is printed in papers-rendering.md and is not quoted here. The pass itself is atmosphere-and-aerial-perspective.md's subject" }
   - { id: tr_lighting_shadows, tier: F, locator: "the volumetric-cloud bullets for the ONE SKY STATE rule, verbatim: 'the coverage field that shapes the clouds is the *same* map that drives the cloud-shadow term below and, where a weather system exists, `13`'s weather intensity', and for the cloud scroll vector being the wind vector. A practitioner chapter in a sibling skill, not peer review; cited for what a shipping renderer chose" }
 ---
 # Sky and weather state
+
+**Tier: real-time rasteriser.** Every render figure here is per-frame; the scattering tables are the
+only work this document names as a bake, and the 2020 row is that bake becoming a per-frame solve.
+The instantaneous cloud shadow is a **per-frame rendering term**, not a bake — what reaches a bake
+is the mean cloud fraction, and it travels as a scene parameter.
 
 ## Use this
 
@@ -139,17 +144,26 @@ moving, always the same way: **toward paying more up front and less per pixel.**
 - **1999** [preethamshirleysmits1999] — the analytic fit. Zero precompute, O(1) render, and
   [bruneton2017] later measures the price at 88.1 RMSE. This is the trade that defined a decade.
 - **2008** [brunetonneyret2008] — precompute the hard part into tables. Error drops to 11.3 and
-  render becomes O(1); the cost moves to an O(n⁶) bake and 8 MB. On 2008 hardware that bake was
-  **5 seconds** and the result ran at 125 fps at 1024×768.
+  render becomes O(1); the cost moves to an O(n⁶) bake and 8 MB. The result ran at **125 fps at
+  1024×768** on an 8800 GTS — §6, which is where this corpus's followable cost figures for the 2008
+  paper stop. ⚠️ **The bake's own wall-clock is not among them.** An earlier revision printed "5 seconds" here as
+  a bolded 2008 measurement. No locator in this corpus declares any precompute wall-clock for
+  [brunetonneyret2008]: §6 gives the frame costs (0.4 ms and 2.6 ms terms) and the 8 MB packing and
+  stops there. All that is provable from this page is the *shape* — five orders over a
+  32×128×32×8 = 1,048,576-texel inscattering table — which fixes no seconds. Treat any such figure as
+  unverified until the artefact is re-read for a precompute time; budget nothing from it.
 - **2012** [hosekwilkie2012] — the analytic branch answers back, fitted to a brute-force reference
   rather than to a simpler model, and lands at 41.5 with no bake.
 - **2017** [bruneton2017] — the branches are measured against each other and against physical
   ground truth for the first time, which is what makes the choice a calculation instead of a taste.
 - **2020** [hillaire2020] — and then the direction **reverses at the far end**. An O(1)
   multiple-scattering approximation is run *every frame* rather than baked, so the whole LUT set
-  rebuilds in 0.31 ms where the 2008 bake costs 250 ms on a 2016 GPU. Note that figure against
-  2008's own "5 orders in 5 seconds": the bake did not get slower, the standard for what may sit
-  off-frame got stricter.
+  rebuilds in **0.17 ms**, inside a **0.31 ms total** that also carries the 0.14 ms on-screen apply.
+  ⚠️ Do the subtraction before you compare: 0.31 is a total render time, and the figure it is
+  usually set against — **250 ms** — is for LUT *updating* alone. And that 250 ms is not the 2008
+  paper's own bake: [hillaire2020] §7 measures **Bruneton's 2017 code release `[Bru17b]`** on a
+  2016 GPU. Against 2008's five orders, the reading still holds: the bake did not get slower, the
+  standard for what may sit off-frame got stricter.
 
 **Which way it is still moving.** From 1993 to 2017 the direction was steady — push work off the
 frame, because bake time is spent once and pixels are paid 60 times a second. Since 2020 it has
@@ -195,10 +209,13 @@ revision of this document said "advected by that field", which is not a thing th
 do. Blowing snow and bending grass read the field; the cloud deck reads the parameter; both agree
 about the weather because the field is derived from the same prevailing wind.
 
-⚠️ **Keep the offset bounded.** `prevailingWind·t` grows without limit, and in fp32 a noise
-coordinate stops resolving detail after roughly 10⁵ metres of accumulated offset — the sky visibly
-freezes after some tens of minutes of simulated time. Wrap the offset into the noise's period, or
-carry `t` in double and reduce before the fetch. It reads the same on screen and buys three properties an integrated field cannot have — though not
+⚠️ **Keep the offset bounded.** `prevailingWind·t` grows without limit and in fp32 eventually stops
+resolving detail — later than an earlier draft of this line claimed, and by two different clocks.
+The ULP is `2⁻²³` of the magnitude: **7.8 mm at 10⁵ m**, which still over-resolves a metre-scale
+octave 128×, and it first reaches 1 m at `2²³ ≈ 8.4·10⁶ m`. Per-frame *motion* dies earlier and
+**independently of wind speed**, because `|W|` cancels — a step vanishes once `|W|·dt < |W|·t·2⁻²³`,
+i.e. at `t = dt·2²³`: **38.8 h at 60 fps**, 18.6 h at the 125 fps quoted above. Wrap the offset into
+the noise's period, or carry `t` in double and reduce before the fetch. It reads the same on screen and buys two properties an integrated field cannot have — though not
 necessarily more cheaply, since a cloud march pays N octaves of noise per sample where a buffer pays
 one fetch:
 
@@ -208,11 +225,16 @@ one fetch:
 - **Any frame evaluates without its predecessors**, so a render farm can split a shot. An advected
   buffer's inputs do not determine its output — the iteration history does — and
   `node-graph-runtime.md`'s cache key asserts exactly the opposite.
-- **It does not force a whole-domain pass.** `driver-fields.md` already worked this out for the
-  neighbouring case: "the horizon's dependence has a bounded search distance, and an advected
-  precipitation field's does not. Compute precipitation whole-domain at a coarse resolution and
-  upsample it, rather than trying to tile it." Advected coverage has the identical property, and an
-  analytic one has neither problem.
+
+⚠️ **Tiling is not a third property, and an earlier revision of this section claimed it was.** It
+read the advected form as forcing a whole-domain pass, quoting `driver-fields.md`'s neighbouring
+case — "the horizon's dependence has a bounded search distance, and an advected precipitation
+field's does not. Compute precipitation whole-domain at a coarse resolution and upsample it, rather
+than trying to tile it." That remedy is for **precipitation**, and it does not carry across: an
+advected *coverage* field's dependence over an interval `T` is `|W|·T`, which is bounded, so it
+tiles with a halo that size. The class declaration at the end of this document works that out and
+lands in the same place — the analytic form wins on reversibility and farm-splittability, **not on
+tiling**.
 
 Reach for a genuinely integrated buffer only when coverage must respond to the terrain — orographic
 cloud forming on a windward face. When you do, declare it global-ordered and accept that it is a
@@ -243,15 +265,16 @@ schedule it. Ground albedo in a terrain tool is **snow cover**. A snow line that
 changes `ᾱ`, and a changed `ᾱ` invalidates the scattering bake. ⚠️ But insolation depends on the
 sky, and snow depends on insolation, so wiring `ᾱ` back into the bake **closes a cycle**, which
 `node-graph-runtime.md` forbids outright. Hold `ᾱ` constant at a representative value. The effect is
-a second-order brightening, which is precisely the assessment that justifies cutting the edge rather
-than trying to schedule around it. Nothing else in Gaia connects `snow-and-weather-state` to the sky, and this does —
-weakly, since the effect is a second-order brightening rather than a visible colour shift, but it is
-the difference between a bake you can schedule and one that surprises you.
+a second-order brightening rather than a visible colour shift, and that assessment is precisely what
+justifies cutting the edge rather than trying to schedule around it. Nothing else in Gaia connects
+`snow-and-weather-state` to the sky, and this does — weakly, and the weakness is the point: it is
+what makes the edge safe to cut instead of something that has to be scheduled.
 
 ⚠️ **This is model-specific and does not carry to [hillaire2020].** Its sky-view LUT is a 2D
 latitude/longitude texture built *for the current sun* — Fig. 4's caption is "The Sky-View LUT
 during daytime. The sun direction can be seen on the left side" — so there a sun move **does**
-force a rebuild, and that is precisely why it costs 0.05 ms instead of 250 ms. The two designs
+force a rebuild, and that is precisely why it costs 0.05 ms instead of the 250 ms [hillaire2020] §7
+measures for updating Bruneton's 2017 code-release `[Bru17b]` LUTs on a 2016 GPU. The two designs
 answer the same question in opposite directions: bake every sun angle once and pay 8 MB, or bake
 one sun angle every frame and pay almost nothing. `atmosphere-and-aerial-perspective.md` uses the
 second.
@@ -283,10 +306,11 @@ second.
   from the cloud renderer into a bake.
 - **The tables are what the renderer samples.** `atmosphere-and-aerial-perspective.md` owns the
   pass; it consumes the three tables produced here and must not rebuild them.
-- **The coverage field is what the cloud march reads.** ⚠️ `volumetric-clouds.md` is `planned` and
-  **not yet written** — the coverage row exists, the document does not. This is a contract stated in
-  advance, deliberately, so that whoever writes it inherits the one-sky-state rule rather than
-  authoring a second coverage field. Until then the obligation is on the reader, not on a link.
+- **The coverage field is what the cloud march reads.** `volumetric-clouds.md` is **written**, and
+  it names this contract at its weather-texture bullet: the coverage channel is not that pass's to
+  author. The contract was stated here in advance, while that document was still `planned`, so that
+  whoever wrote it would inherit the one-sky-state rule rather than author a second coverage field —
+  and it did. Both ends now say so, which is the point; a contract with one end is a hope.
 
 **And the two graph-visible artefacts here must declare their class.** `node-graph-runtime.md` is
 explicit that "a node's class is part of its description, alongside its type and its parameters, and
@@ -317,15 +341,15 @@ integral (`terrain-analysis-masks.md`), or surface snow state, which is the sepa
 | Symptom | Mechanism | Fix |
 |---|---|---|
 | Sky is plausible at noon and wrong at sunset | An analytic model fitted mainly to high sun. ⚠️ [bruneton2017]'s 88.1 does **not** evidence this: its measurement window is 09h30–13h30 and its 06h00 cell is `n/a`, so the number describes midday. Table 2's `sunset sunrise` column does — Preetham and Hosek are both marked `no` | Move to a model whose row says `yes`, and do not cite an RMSE measured at noon for a sunset defect |
-| Sunsets are too yellow and no parameter fixes it | Ozone is absent from the model — it is absent from [brunetonneyret2008] entirely and appears in [preethamshirleysmits1999] only on the direct beam | Add an ozone absorption term — [hillaire2020] Table 1 supplies coefficients and a tent-shaped profile, crediting [bruneton2017]; the other four sources here will not |
+| Sunsets are too yellow and no parameter fixes it | Ozone is absent from the model — it is absent from [brunetonneyret2008] entirely and appears in [preethamshirleysmits1999] only on the direct beam | Add an ozone absorption term — [hillaire2020] Table 1 supplies coefficients and a tent-shaped profile; none of the five clear-sky models here puts ozone in the sky radiance |
 | The multiple-scattering bake never "converges" | There is no convergence test in [brunetonneyret2008] Algorithm 4.1 — it runs a fixed `norders` | Choose an order count, state it, and measure what the last order was worth |
-| The time slider is not reversible; scrubbing back gives a different sky | The coverage field is an advected buffer, so its value carries iteration history | Make it a pure function of time: `noise(p − windVec·t, t·evolutionRate)` |
+| The time slider is not reversible; scrubbing back gives a different sky | The coverage field is an advected buffer, so its value carries iteration history | Make it a pure function of time: `noise(p − prevailingWind·t, t·evolutionRate)` |
 | Two farm machines render different clouds for the same frame | Same cause: inputs do not determine the output, the history does, so the cache key is a lie | Same fix; declare a genuinely integrated field global-ordered and treat it as a bake |
 | The snow line jitters when the artist scrubs wind direction | An instantaneous cloud shadow multiplied into an authoring-time insolation bake | Pass **mean cloud fraction** over the simulated interval, as a scene parameter, not a per-frame edge |
 | An overcast scene has strong aspect contrast and looks wrong | `insolation × coverage` scales total energy and keeps the directionality | Move energy from the direct term into the diffuse term; overcast **flattens** aspect contrast |
 | Shadows fall where there is no cloud | Two coverage fields, one for shading and one for the cloud pass [tr_lighting_shadows] | One field, many readers |
 | Rain falls in clear sky | Weather intensity authored independently of coverage | Derive intensity from the same field |
-| Clouds and blowing snow drift apart | The cloud scroll vector is a private constant instead of the wind field [tr_lighting_shadows] | Advect coverage with `driver-fields.md`'s wind field |
+| Clouds and blowing snow drift apart | The cloud scroll vector is a private constant instead of the shared `prevailingWind` scene parameter [tr_lighting_shadows] | Scroll coverage with `prevailingWind` — the same parameter `driver-fields.md`'s wind field is derived from, and **not** that field itself, which is a per-cell near-surface terrain-shelter magnitude |
 | A time-of-day sweep rebuilds the scattering bake every step | Treating sun angle as a baked constant when it is an **axis** of the 4D table [brunetonneyret2008] §4 | Move the sun by changing `u_µs`; rebuild nothing. Only a change of medium — coefficients, scale heights, `g`, ground albedo `ᾱ` — invalidates the bake |
-| The sky bake re-runs when the snow line moves, and nobody knows why | `ᾱ` is ground reflectance and sits **inside** Algorithm 4.1's iteration, so surface albedo is a bake input | Expected, not a bug. Decide whether the second-order brightening is worth a rebake, and schedule it |
+| The sky bake re-runs when the snow line moves, and nobody knows why | `ᾱ` is ground reflectance and sits **inside** Algorithm 4.1's iteration, so surface albedo is a bake input | Expected, not a bug — and the response is to **cut the edge, not schedule it**: hold `ᾱ` constant at a representative value and accept the second-order brightening. Wiring `ᾱ` back into the bake closes a cycle `node-graph-runtime.md` forbids |
 | The sky bake blows the memory budget | The 4D inscattering table stored naively | Pack as eight 3D slices in one 32×128×256 RGBA texture, 8 MB at fp16 [brunetonneyret2008] §6 |
