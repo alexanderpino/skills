@@ -64,6 +64,12 @@ def infer_type(path, fm):
     for key in ("AD", "PRD", "HLD", "SAD", "EA"):
         if fid == key or fid.upper() == key:
             return key
+    # An uppercase ID-scheme prefix (SDM-payments, SDW-billing, LLD-core, ...)
+    # groups the whole family under one type — mirrors arch_lint.doc_kind, so
+    # detected house rules land on the kind the linter actually enforces.
+    m = re.match(r"^([A-Z]{2,5})-", fid)
+    if m:
+        return m.group(1)
     up = name.upper()
     for key in ("HLD", "PRD", "SAD", "ADR", "RFC"):
         if key in up:

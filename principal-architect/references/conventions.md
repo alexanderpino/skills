@@ -211,6 +211,10 @@ burying the fact in prose — prose is for humans, front-matter is for agents.
 
 ## 7. Style
 
+Structure and IDs live here; **prose, tone, and voice live in
+`references/writing-style.md`** — read it before writing any substantial text.
+The short version:
+
 - Imperative, concrete, short. A doc nobody updates is a liability.
 - Prefer linking by ID over restating. Single source of truth per fact.
 - Date everything you change (`date:` / `updated:`). When you *verify* a long-lived doc

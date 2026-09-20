@@ -53,6 +53,9 @@ Contracts are promises; breaking them breaks consumers. State the rules explicit
 ## Linkage
 - `F.xx` functional drivers are realised by named operations in the contract; the contract
   tests are their *means of verification* (ISO/IEC/IEEE 29148).
+- A published interface is threat-modelled with the **OWASP API Security Top 10:2023**
+  lens (BOLA/object-level authorization, broken authentication, unrestricted resource
+  consumption) in HLD/SAD §8 — the web Top 10 alone misses the API-specific classes.
 - A change to a published interface is **architecturally significant** (`significance.md`) and
   needs an **ADR** + a refreshed contract + a version bump.
 - The interface contract is a `view component` (ISO 42010) realising the functional/context

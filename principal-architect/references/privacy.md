@@ -81,6 +81,10 @@ the existing artifacts carry the AI obligations, and the skill's job is to make 
    interface contract — link it from the SD like an `api-spec:`. Model/prompt/eval-set
    versions are part of the SD's design, and a significant model or provider choice is an
    ADR (it's a build-vs-buy decision with quality, cost, and lock-in consequences).
+5. **The threat model switches lens**: in HLD/SAD §8, LLM components map STRIDE findings
+   to the **OWASP Top 10 for LLM Applications:2025** (prompt injection, insecure output
+   handling, training-data poisoning, excessive agency) — the web Top 10 doesn't name
+   these classes. Untrusted text reaching the model is a trust boundary like any other.
 
 ## Linkage
 - **PRD**: data-protection limits are quality/constraint drivers (`Q.xx` security→confidentiality,

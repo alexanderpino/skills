@@ -22,7 +22,8 @@ flowchart LR
   PR --> L3[Diagram render + link check]
   PR --> L4[Drift check: ARCH-REF ↔ docs]
   PR --> L5[Infracost: cloud cost diff]
-  L1 & L2 & L3 & L4 & L5 --> G{All pass?}
+  PR --> L6[SBOM + dependency scan]
+  L1 & L2 & L3 & L4 & L5 & L6 --> G{All pass?}
   G -->|no| Block[Block / comment on PR]
   G -->|yes| Merge[Allow merge]
 ```
@@ -71,6 +72,13 @@ viewpoint/view, ≥1 ADR) and fails on any unresolved ❌ in `conformance-checkl
   IaC (Terraform/CloudFormation/CDK/Bicep) to post a **cost diff on the PR** and, via policy,
   block changes that exceed a budget threshold. This "shifts FinOps left" so the cost
   estimate in `HLD`/`SAD` is checked against the actual infrastructure change before merge.
+
+### 6. Supply-chain gate (SBOM + SCA)
+The threat model mandates modelling **A03 Software Supply Chain Failures**; this gate
+produces the evidence. Generate an **SBOM** on every build — **SPDX** (ISO/IEC 5962:2021)
+or **CycloneDX** (OWASP; ECMA-424) — and run dependency scanning (SCA) against it, failing
+on known-exploited or policy-breaching dependencies. The SBOM is the §8 supply-chain
+table's machine-readable counterpart; link it from the HLD/SAD rather than restating it.
 
 ## The CI workflow (shipped)
 
