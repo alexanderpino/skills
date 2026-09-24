@@ -211,8 +211,9 @@ burying the fact in prose — prose is for humans, front-matter is for agents.
 
 ## 7. Style
 
+- **Write for humans, index for machines.** The YAML front-matter and IDs exist so agents can filter and find things. The document body itself **must** be written as natural, human-readable prose. Write exactly as a human Principal Architect would: use clear, accessible terminology, explain the *why* conversationally, and avoid robotic "AI-isms" or overly rigid jargon.
 - Imperative, concrete, short. A doc nobody updates is a liability.
-- Prefer linking by ID over restating. Single source of truth per fact.
+- Prefer linking by ID over restating (e.g., "This satisfies F.02"), but explain the concept in plain English. Single source of truth per fact.
 - Date everything you change (`date:` / `updated:`). When you *verify* a long-lived doc
   without changing it, stamp `last-reviewed:` — `arch_lint.py` warns when a `current`/
   `accepted` **living** doc (AD/PRD/HLD/SD/SAD/EA) has gone unreviewed too long (default

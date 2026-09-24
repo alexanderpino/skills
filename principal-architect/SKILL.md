@@ -1,18 +1,6 @@
 ---
 name: principal-architect
-description: >-
-  Master architecture & business-analysis skill (enterprise/solution/software). Consult and
-  maintain architecture docs as a gate around planning and code changes: use BEFORE a plan or
-  any change affecting structure, boundaries, interfaces, dependencies, data, security, or a
-  quality attribute — read first, then update. Also use when the user mentions architecture, a
-  PRD/HLD/SD/SAD/RFC/ADR, C4/ArchiMate/BPMN diagrams, capabilities, landscape, roadmap, migration,
-  threat modeling, SLOs, data models/ERDs, cloud cost, user stories, acceptance criteria, or
-  usability/interaction quality targets and the design decisions that meet them. The
-  agent acts as a master architect and business analyst: it picks the altitude, derives content
-  from evidence, writes user stories/acceptance criteria in the company's house format, and
-  triages so only needed artifacts are produced. Captures software with C4, records decisions via
-  RFC→ADR, and requires a STRIDE/OWASP threat model and FinOps cost estimate in every HLD/SAD. Conforms to
-  ISO/IEC/IEEE 42010, ISO/IEC 25010, ISO/IEC/IEEE 29148; uses TOGAF 10, ArchiMate 3.2, C4, arc42.
+description: "Master architecture & business-analysis skill. Use BEFORE planning or changing structure, boundaries, interfaces, data, or quality attributes. Use when user mentions architecture, PRD/HLD/SD/SAD/RFC/ADR, C4/ArchiMate diagrams, capabilities, roadmap, migration, threat modeling, SLOs, ERDs, cloud cost, user stories, or acceptance criteria. Acts as master architect: derives content from evidence, writes stories in house format, and triages artifacts. Captures software with C4, logs decisions via RFC→ADR, and requires threat models/FinOps in HLDs. Conforms to ISO 42010, ISO 25010; uses TOGAF, ArchiMate, C4, arc42. Output must be human-readable, pragmatic prose; no robotic AI-isms. Use IDs (e.g., F.02) for references."
 ---
 
 # Architecture Docs
@@ -40,18 +28,55 @@ precise questions for what can't be derived (usually business drivers, prioritie
 target SLAs), and record anything unresolved as a *visible* assumption or gap — never
 fabricate a stakeholder, driver, or number to make a template look complete.
 
+**Quantitative discipline:** You must not rely on adjectives like "scalable" or "fast".
+Use **quantitative methods** (Little's Law, queueing theory, Amdahl's Law, latency percentiles)
+to size systems, predict the latency cliff, set scaling thresholds, and justify FinOps costs.
+Every such number arrives with a model attached: **state the assumptions it rests on, say whether
+it is measured or derived, and treat an unvalidated assumption as a gap** (`methods.md` §10) —
+a confidently wrong number does more damage than an honest adjective, because it survives review.
+See **`references/quantitative-methods.md`** for the formulas, the assumptions each one needs,
+and where they break.
+
+## 2. The Pragmatism & Anti-Over-Engineering Mandate
+
+As a Principal Architect, your primary duty is to **ruthlessly defend simplicity**. Over-engineering is a critical risk. You must actively detect and dismantle accidental complexity, speculative future-proofing, and "Resume Driven Development" in any proposed design.
+
+**Before approving any Architecture Decision Record (ADR) or High-Level Design (HLD), you MUST verify:**
+1. **Rule of Three:** Are abstractions premature? (Duplication is cheaper than the wrong abstraction).
+2. **Metrics First:** Are performance optimizations (CQRS, Caching, Kafka) justified by actual APM metrics/load-tests, or are they speculative?
+3. **Modular Monolith First:** Are network boundaries (microservices) being introduced where logical boundaries (namespaces/assemblies) would suffice?
+4. **Boring Technology:** Is the team spending "Innovation Tokens" on trendy tech rather than the core business problem?
+
+*See `references/anti_over_engineering.md` and `references/enterprise-architecture-bingo.md` for the complete adversarial auditing framework.*
+
+
+**Visual Communication (Mermaid):** A picture is worth a thousand words, and decision-makers
+rely on them. Apply the industry best practice **"Whiteboard Test"**: if you would instinctively
+draw a concept on a whiteboard to explain it to a peer, you MUST generate a Mermaid diagram.
+Use diagrams strictly to manage cognitive load: showing non-linear dynamics (e.g., latency cliffs),
+structural relationships (C4 context/containers), or state transitions. If a concept can be
+clearly explained in a simple paragraph or list, do NOT generate a diagram.
+
 **How to actually arrive at the content** — stakeholders, concerns, drivers, quality
 scenarios, the architecture itself (by reverse-engineering an existing codebase), and
 recovered/forward decisions — is in **`references/methods.md`**. Read it whenever you
 need to *produce* facts rather than just record ones you already have; it is the
 architect's playbook that turns a blank template into a true description.
 
-These stances share a sensibility: **every structure you touch — codebase, screen,
-docs tree — is an inhabited space**, and its arrangement either serves or taxes the
-people who move through it. `references/feng-shui.md` makes that sensibility
-explicit and walkable — old placement-and-flow heuristics, kept only where a named
-modern source corroborates them. The lens guides *you*; the documents you produce
-speak the standards' language.
+## Tone & Writing Style (The "Human Engineer" Standard)
+
+When generating documentation, you must emulate the writing styles of industry leaders like Simon Brown, Martin Fowler, and Gregor Hohpe. Your writing must be pragmatic, explicit, and decision-focused.
+
+**DO NOT use common AI-isms or robotic filler.**
+
+- **Banned words/phrases:** "Delve into", "Robust and scalable", "It is crucial to note", "Fosters collaboration", "A testament to", "Seamlessly integrates", "In conclusion", "Here is the document you requested."
+- **Preferred vocabulary:** "Trade-offs", "Coupling", "Constraints", "Drivers", "Blast radius", "Because X, we chose Y", "Fails when".
+
+**Follow these style rules:**
+
+1. **Simon Brown's Clarity:** Write in full, explicit sentences organized into paragraphs. Avoid lazy, fragmented bullet points that strip away the logical "why" behind a decision. Keep the tone value-neutral and descriptive.
+2. **Martin Fowler's Pragmatism:** Write as an experienced peer sharing lessons, not an authoritarian. Focus heavily on the "why" (the code already explains the "what"). Avoid enterprise hype and buzzwords.
+3. **Gregor Hohpe's Strategy:** Be decision-first. Do not just document the final state; explicitly document the friction, the *forces* in tension, and the business trade-offs that led to the decision.
 
 ## Also a master business analyst
 
@@ -96,7 +121,7 @@ produce anything** — see `references/methods.md` §2 for the signals, `standar
 for the full mapping.
 
 | Altitude | Entity of interest | Frameworks | Produce |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **Enterprise** | the organisation / a capability / the landscape | TOGAF 10 (ADM, BDAT), ArchiMate 3.2, Zachman | `enterprise-architecture.md` (+ principles, capability map, roadmap) |
 | **Solution** | one solution, often spanning systems | TOGAF (Phase E/SBBs), ArchiMate/C4, integration patterns | `SAD.md` (Solution Architecture Document) |
 | **Software** | a single system / application | C4, arc42, UML | `AD.md`, `PRD.md`, `HLD.md`, `SD.md` |
@@ -115,7 +140,8 @@ bespoke format, and is built to **conform** (not merely allude) to ISO: the
 **ISO/IEC/IEEE 42010:2022** (whose *entity of interest* is what unifies the three
 altitudes), verified by **`conformance-checklist.md`**. On top of that: **TOGAF 10 +
 ArchiMate 3.2** for enterprise, **C4** + **arc42** for software, **ISO/IEC 25010:2023**
-+ **SEI/ATAM** for quality, **ISO/IEC/IEEE 29148** for requirement quality, and
+
+- **SEI/ATAM** for quality, **ISO/IEC/IEEE 29148** for requirement quality, and
 **Michael Nygård's ADR format** (MADR 4.0.0-compatible) for decisions at every level.
 The driver-based framing is adapted from the Cambridge *Managing Software Architecture*
 method. See `references/standards.md` for the full mapping and required-content lists;
@@ -133,7 +159,7 @@ code changes don't.
 **Enterprise / solution work** routes by what it changes:
 
 | Work | Produce |
-|---|---|
+| --- | --- |
 | New/changed **business capability**, portfolio standard, principle, or landscape/roadmap | `enterprise-architecture.md` (relevant section) + enterprise-level ADR |
 | New **solution** to a business problem, cross-system integration, technology selection, or build-vs-buy | `SAD.md` + solution-level ADR; then software changes per affected system |
 | New/changed **business process** — who does what, in what order, across roles/systems | process view (BPMN-style, `references/mermaid-guide.md`) in `enterprise-architecture.md` or `SAD.md` + ADR if a real choice was made; conform to the org's `.bpmn` where one is executed |
@@ -144,7 +170,7 @@ code changes don't.
 **Software-level changes** (the common case):
 
 | Change archetype | ADR | SD | HLD | PRD | AD.md + checklist | Diagrams |
-|---|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- | --- |
 | **Trivial** — typo, rename, formatting, comment, internal refactor; no change to structure, interface, dependency, data, or a quality attribute | — | only if a line is now wrong | — | — | — | — |
 | **Local** — behaviour change or small feature *inside* an existing component; no new contract | only if a real choice was made | update the affected section | — | — | — | only if the picture changed |
 | **New component / internal interface** within existing structure | if a choice was made | new or updated SD | add a components-table row | — | — | component view |
@@ -223,6 +249,7 @@ Naming, IDs, and front-matter conventions that keep everything greppable are in
 the user wants depends on consistent IDs and front-matter, not prose.
 
 ### Enterprise & solution documents (when at those altitudes)
+
 - **`enterprise-architecture.md`** *(enterprise)* — TOGAF-structured Architecture
   Definition Document: vision, principles (`PR.xx`), business capability map, the BDAT
   landscape (baseline → target → gap), roadmap, building blocks. ArchiMate-style views
@@ -247,6 +274,7 @@ views, correspondences, decisions) that makes the set conformant. Full required-
 list and the quality-characteristic catalogue are in `references/standards.md`.
 
 ### AD — Architecture Description (`AD.md`)  *(ISO/IEC/IEEE 42010:2022 root)*
+
 The conformant container. Every required-content clause must be addressed (briefly is
 fine; empty breaks conformance): identification, **stakeholders**, **concerns** (each
 framed by ≥ 1 viewpoint), the **viewpoint catalogue**, the **views** (each governed by
@@ -257,8 +285,10 @@ Whenever you add a stakeholder, concern, view, or significant decision, update `
 and re-run the checklist.
 
 ### PRD — Product Requirements Document (`PRD.md`)
+
 The *why* and *what* (covers arc42 §1–2 and §10). Captures drivers as stable,
 referenceable IDs:
+
 - **Business drivers** `B.xx`, **Functional drivers** `F.xx`, **Quality drivers**
   `Q.xx`. Use RFC 2119 keywords (MUST/SHOULD/MAY) so obligation level is exact
   (ISO/IEC/IEEE 29148). Quality drivers name the specific **ISO/IEC 25010:2023**
@@ -270,6 +300,7 @@ referenceable IDs:
 One PRD per project (or per bounded product area in a monorepo).
 
 ### HLD — High-Level Design (`HLD.md`)
+
 The system shape (arc42 §3–8). C4 **Context** + **Container** + **Deployment**
 views (mermaid), the major components and their responsibilities, the main runtime
 flows, cross-cutting concerns — including **operability** (SLOs over SLIs, RTO/RPO,
@@ -279,12 +310,14 @@ the key trade-offs. The container-level
 without it. Links to the ADRs that produced this shape. One HLD per system/service.
 
 ### SD — Software Design (`SD-<area>.md`)
+
 The detailed design of a component, module, or feature: C4 **Component** view,
 **sequence** diagrams for non-obvious interactions, data structures, interfaces,
 error/edge handling, and links to the ADRs and PRD drivers it satisfies. One SD
 per meaningful component or feature; keep them small and focused.
 
 ### ADR — Architecture Decision Record (`decisions/ADR-NNNN-slug.md`)
+
 **Nygård format** by default, one decision per file: *Title · Status · Context ·
 Decision · Consequences*, plus searchable front-matter (arc42 §9). This is the
 canonical format for all decisions. It is **MADR 4.0.0-compatible**: when a
@@ -298,6 +331,7 @@ indexes them. Full guidance, status transitions, and supersession rules are in
 `references/conventions.md`; standards background in `references/standards.md`.
 
 ### Security, privacy & cost are mandatory in HLD and SAD
+
 Every HLD and SAD carries a **threat model** (STRIDE mapped to OWASP Top 10:2025) and a
 **FinOps cost-estimate matrix** (provider calculators + Infracost). These are not optional
 sections — set `security-reviewed`/`cost-reviewed: true` when signed off. Where the system
@@ -306,6 +340,7 @@ processes **personal or regulated data**, §8 also carries a **DPIA** (`referenc
 privacy, or build-vs-buy cost risk becomes an ADR.
 
 ### Diagrams — C4 is mandatory; render from a model where possible
+
 Software structure **must** be captured with the **C4 model**: **L1 Context** and **L2
 Container** are always required (HLD), **L3 Component** for any significant container (SD),
 **L4 Code** only when truly needed and preferably generated. Embed mermaid in the relevant
@@ -320,7 +355,7 @@ Structurizr DSL pattern are in `references/mermaid-guide.md`.
 So the next reader (human or agent) finds the rationale without spelunking, leave
 a greppable breadcrumb at the relevant code site:
 
-```
+```text
 // ARCH-REF: ADR-0007 (docs/architecture/decisions/ADR-0007-event-bus.md)
 ```
 
@@ -333,6 +368,7 @@ Conventions for the marker are in `references/conventions.md`.
 ## Step 4 — Keep the index & AD current
 
 After any create/update:
+
 - Update `<root>/README.md` (the map) if a doc was added or its purpose changed.
 - Update `<root>/AD.md` if the change adds/alters a **stakeholder, concern, view, or
   viewpoint**, and re-run `<root>/conformance-checklist.md` — an unaddressed concern
@@ -357,7 +393,7 @@ Use the **universal, RAG-optimised structure** defined in
 a `decisions/` tree with `rfc/`, an optional `diagrams/workspace.dsl`, and a machine-readable
 manifest in the index README). Condensed:
 
-```
+```text
 <root>/                      # docs/architecture/ unless the repo says otherwise
 ├── README.md                # index / map + machine-readable manifest (RAG entrypoint)
 ├── AD.md  GLOSSARY.md  conformance-checklist.md
@@ -384,14 +420,6 @@ manifest in the index README). Condensed:
   component-dependency principles, and a forward **tactic→ISO 25010 quality** catalogue
   (cloud/distributed patterns, EIP) — each with its trade-offs. Companion to `methods.md`;
   the architectural home for DDD/SOLID/patterns (code-altitude ones stay pointers).
-- `references/feng-shui.md` — **placement & flow in inhabited structures**: one spatial
-  lens (form-school principles, each reduced to a corroborated invariant) applied to the
-  codebase (a second way to notice the `structure.md` §2 / smell findings), the **screen**
-  (the skill's home for interaction-arrangement guidance — ISO 25010 Interaction
-  capability as `Q.xx` scenarios, the tactic menu, when an interaction choice is
-  ADR-worthy), and the docs tree. Read when interaction quality needs specifying or an
-  arrangement decision needs recording, or to walk a structure for smells; its
-  vocabulary stays out of produced docs (§6).
 - `references/data-architecture.md` — **data as a structural concern**: ownership &
   boundaries (one owning context per dataset; shared writable stores are ADR-worthy),
   storage selection keyed to `Q.xx` (CAP/PACELC), schema evolution (expand–contract,
@@ -402,6 +430,11 @@ manifest in the index README). Condensed:
   reliability targets dictate topology (and are therefore ADRs), and the HLD §7
   operability table. Read when a quality driver concerns reliability/performance in
   operation, or the system runs as a service.
+- `references/quantitative-methods.md` — **sizing & statistical methods**: Little's Law and
+  Erlangs, M/M/1 and M/M/c queueing *with the assumptions that make them valid*, percentiles
+  vs averages, Amdahl/USL, availability and correlated-failure maths, quorums, probabilistic
+  data structures, telemetry sampling bias, and Monte Carlo forecasting. Read before quoting
+  any capacity, latency, availability, or cost number.
 - `references/reverse-engineering.md` — **legacy code-to-architecture at scale**: the SAR
   discipline (reflexion models, Ducasse & Pollet, SEI), AST tooling (Tree-sitter,
   Structurizr, CodeQL, jQAssistant), LLM-assisted/GraphRAG, polyglot pipeline. Read for any
@@ -414,10 +447,18 @@ manifest in the index README). Condensed:
   criteria (Connextra, INVEST, Gherkin, BABOK), the traceability chain, and the **protocol to
   detect & conform to the company's house format** (or create one if absent). Read before
   writing any story or acceptance criteria.
+- `references/house-formats/iplan-jira-stories.md` — **pre-detected house format for I-Plan
+  (RGN IT)**: Jira project key, title format, section structure, component→role table, and
+  the reusable story categories for x-one integration epics. Apply directly for any I-Plan
+  repo instead of re-running house-style detection; pairs with the `rgn-jira-wiki-formatting`
+  skill for the underlying markup/API mechanics.
 - `references/house-style.md` — **detect & conform to the org's conventions for every document
   type** (mandatory sections, front-matter, ID schemes, formats, tone), with the
   `detect_doc_conventions.py` tool and CI enforcement. Read on any existing project before
   producing docs.
+- `references/threat_modeling.md` — **Threat Modeling & Security**: Assume Breach, STRIDE applied to C4, Zero Trust, and OWASP Top 10 mitigations.
+- `references/anti_over_engineering.md` — **Pragmatism & Anti-Over-Engineering Mandate**: Heuristics for dismantling accidental complexity, YAGNI, and speculative design.
+- `references/enterprise-architecture-bingo.md` — **Enterprise Architecture Bingo & Over-Engineering Sanity Check**: 5x5 pattern matrix, Conway's law sanity checks, and buzzword index for ADR/HLD reviews.
 - `references/governance.md` — the **RFC → Architecture Board → ADR** lifecycle and roles.
 - `references/automation.md` — **Architecture-as-Code in CI/CD**: ADR/front-matter linter,
   conformance validation, diagram rendering, fitness functions, Infracost cost gate.
@@ -441,6 +482,7 @@ manifest in the index README). Condensed:
   (42010:2022, 25010:2023, 29148, TOGAF/ArchiMate, C4, STRIDE/OWASP, FinOps, SAR).
 - `references/mermaid-guide.md` — C4 L1–L4 copy-paste snippets, the mandate table,
   ArchiMate/TOGAF views, sequence/flowchart, and the Structurizr DSL pattern.
+- `references/bluebook.md` / `references/apigee.md` — pointers to the `iplan-developer` skill's Chrome CDP debugging bridge docs/scripts for the SSO-gated x-one Bluebook and Apigee Developer Portal (DTA + PRD) respectively — not duplicated here since the two skills are always installed together.
 
 ## Template files (in `assets/templates/`)
 

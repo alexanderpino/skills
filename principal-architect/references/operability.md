@@ -43,6 +43,13 @@ Rules:
 - **Derive the SLO from the driver, not from ambition.** The `Q.xx` says what the
   business needs; setting 99.99% when the driver justifies 99.9% buys nothing and
   costs a redundancy tier. The quality/utility tree (PRD §5) is where that gets argued.
+- **The driver picks the statistic, too.** Which indicator and which percentile follow
+  from what the business actually promises: availability is a success ratio, a batch
+  window is a deadline, an interactive path is a latency percentile. Where the target
+  *is* a latency percentile, state it as one (p95/p99/p99.9) rather than an average,
+  because latency is right-skewed and a mean hides the tail. Averages remain correct
+  where the maths needs them — capacity, cost per request, Little's Law. The sizing
+  models and the assumptions they depend on are in `quantitative-methods.md`.
 - **A reliability target that dictates topology is an ADR.** "99.95% availability ⇒
   multi-AZ, not multi-region" is a decision with a cost side — record it
   (`satisfies: [Q.xx]`), and let the FinOps matrix (HLD §9) carry its price.

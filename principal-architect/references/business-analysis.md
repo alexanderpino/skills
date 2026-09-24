@@ -10,7 +10,7 @@ and only generating a template when none exists. Grounding: **IIBA BABOK® Guide
 
 ## 1. Where BA sits in the hierarchy (traceability)
 
-```
+```text
 Business capability (EA §4)
   └─ Epic        (EP-NNN — large outcome, weeks–months)
       └─ Feature     (≈ a PRD functional driver F.xx — a coherent slice of value)
@@ -34,7 +34,7 @@ re-elicit what you've been handed.** Map each one onto the skill's structure, pr
 original wording and (where possible) the original IDs:
 
 | You're given | Maps to | Action |
-|---|---|---|
+| --- | --- | --- |
 | An **epic** / large outcome | `EP-NNN` (`epic.md`) | One epic record; link it up to a capability, down to its `F.xx`/stories. Keep the house ID if it has one. |
 | A **functional requirement** / feature | `F.xx` in the **PRD** §4 | One functional driver; phrase with RFC 2119 keywords; note the source. |
 | A **user story** | `US-NNN` (`user-story.md`) | One story, in the **house format** (detect it first, §2); set `epic:` and `satisfies:`. |
@@ -53,6 +53,12 @@ evidence discipline (`methods.md` §10). User-story/acceptance-criteria format i
 of the general **house-style** discipline that applies to *every* document type — see
 `references/house-style.md` and the `detect_doc_conventions.py` tool, which can infer the
 story format (Connextra/Gherkin) and mandatory sections automatically.
+
+**Known pre-detected format — I-Plan (RGN IT):** the house format lives in Jira, not repo
+files, so the detector tool can't find it. If the project is an I-Plan repo, skip detection
+and apply `references/house-formats/iplan-jira-stories.md` directly (project key, title
+format, section structure, component→role table, reusable story categories). For the wiki
+markup/REST mechanics underneath it, see the `rgn-jira-wiki-formatting` skill.
 
 1. **Find existing examples.** Search the repo and trackers for how the org already writes
    stories and acceptance criteria:
@@ -100,6 +106,7 @@ Acceptance criteria define the **minimum conditions for the story to be accepted
 **verifiable as true/false** (BABOK 10.1). Two common styles — use whichever the house uses:
 
 **a) Gherkin / Given–When–Then (scenario-based, BDD):**
+
 ```gherkin
 Scenario: <name>
   Given <initial context>
@@ -108,14 +115,17 @@ Scenario: <name>
   Then  <observable outcome>
   And   <another outcome>
 ```
+
 Good when behaviour is conditional or example-driven; maps directly to automated tests
 (Cucumber/SpecFlow/Behave). Cover the happy path **and** the key edge/negative cases.
 
 **b) Rule-oriented checklist:**
-```
+
+```text
 - [ ] <a single, testable condition that must hold>
 - [ ] <another condition, including an error/edge case>
 ```
+
 Good for simple, enumerable conditions. Each item is independently verifiable.
 
 Each criterion: testable, unambiguous, no implementation detail, and tied to the story's
@@ -132,6 +142,7 @@ benefit. Non-functional expectations (performance, security) reference the PRD q
 ## 6. Quality bar & anti-patterns
 
 A master BA refuses to ship:
+
 - Stories that are really tasks ("Add an index to the users table") — no user value → it's a
   task, not a story.
 - Acceptance criteria that aren't testable ("works well", "is fast" — quantify or point to a
