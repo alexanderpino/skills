@@ -708,7 +708,10 @@
   ],
   "2.5D games": [
    "RND.2D.lighting",
-   "RND.ARCH.pipeline"
+   "RND.2D.world-sprites",
+   "RND.ARCH.pipeline",
+   "RND.ARCH.submission-strategy",
+   "RND.POST.stylized"
   ],
   "modern 3D games": [
    "RND.ARCH.pipeline"
@@ -720,8 +723,11 @@
    "NET.ARCH.model"
   ],
   "large-scale simulation": [
-   "WLD.PART.sim-lod",
-   "GAM.AI.mass"
+   "GAM.AI.mass",
+   "GAM.SIM.fields",
+   "GAM.SIM.networks",
+   "GAM.SIM.time-accel",
+   "WLD.PART.sim-lod"
   ],
   "high-end PC games": [
    "PLAT.DESK.os-integration",
@@ -849,7 +855,13 @@
   ],
   "rhythm/latency calibration": [
    "AUD.ARCH.clock",
+   "AUD.CONTENT.music-clock",
    "INP.ACT.calibration"
+  ],
+  "live-service operations": [
+   "PLAT.LIVE.operations",
+   "NET.SRV.lifecycle",
+   "BLD.REL.server-artifacts"
   ]
  }
 }

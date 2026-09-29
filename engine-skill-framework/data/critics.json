@@ -40,7 +40,7 @@
    "name": "Rendering Critic",
    "mandate": "Graphics architecture and currency of rendering techniques; GPU-driven, bindless, explicit-API assumptions; scalability from 2D mobile to path tracing.",
    "checks": [
-    "no draw-call-centric or DX11-era assumptions",
+    "no draw-call-centric or DX11-era assumptions on capable tiers; CPU-batched submission on TBDR/lite3d follows RND.ARCH.submission-strategy",
     "render graph owns sync and aliasing",
     "technique maturity labels are honest",
     "scale-down path exists for each feature"
@@ -129,7 +129,8 @@
     "vfx-particles",
     "character-movement",
     "simulation-validation",
-    "voxel-worlds"
+    "voxel-worlds",
+    "systems-simulation"
    ],
    "stages": [
     "G1",
@@ -160,7 +161,20 @@
     "packaging-release-patching",
     "character-movement",
     "online-services-liveops",
-    "narrative-dialogue"
+    "narrative-dialogue",
+    "vehicle-physics",
+    "gameplay-systems-toolkit",
+    "animation-architect",
+    "animation-runtime",
+    "voxel-worlds",
+    "cinematics-sequencer",
+    "determinism-replay",
+    "input-system",
+    "editor-architect",
+    "functional-automation-soak",
+    "simulation-validation",
+    "net-session",
+    "server-scaleout-persistence"
    ],
    "stages": [
     "G1",
@@ -195,7 +209,8 @@
     "world-data-model",
     "subtree:build-release-architect",
     "owns-area:TOOL",
-    "kind:tool"
+    "kind:tool",
+    "api-lifecycle-migration"
    ],
    "stages": [
     "G1",
@@ -357,7 +372,9 @@
     "input-system",
     "input-devices-haptics",
     "character-physics",
-    "cinematics-sequencer"
+    "cinematics-sequencer",
+    "systems-simulation",
+    "gameplay-camera"
    ],
    "stages": [
     "G1",
@@ -423,7 +440,8 @@
     "ai-assisted-authoring",
     "ai-behavior-perception",
     "dedicated-server",
-    "asset-import-interchange"
+    "asset-import-interchange",
+    "privacy-data-protection"
    ],
    "stages": [
     "G1",

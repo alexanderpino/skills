@@ -7,21 +7,21 @@ G1 answers one question: **do we have everything, with the right boundaries?** I
 ```
 data/*.json ──render──▶ docs/01-05 (+ 00 rationale)
       ▲                         │
-      │                  14 blind critics (fresh context each round)
+      │                  15 blind critics (fresh context each round)
    revise                       │
       │                  findings (schema below)
       └──── dispositions ◀──────┘
 ```
 
 1. **Gate.** `python3 scripts/check.py` must be green and `check.py --selftest` must go red on every mutation before a round starts. Critics never re-derive what the gate proves: unique owners, closure, layering, reference integrity.
-2. **Critique.** Every critic in `data/critics.json` (stage G1) reviews the whole framework in a fresh context. Critics receive the artifact only: `data/`, `docs/00-05`, and from round 2 on `docs/06-07`. They never receive this log, prior findings, or the builder's dispositions. That is the blind rule.
+2. **Critique.** Every critic in `data/critics.json` (stage G1) reviews the whole framework in a fresh context. Critics receive the artifact only: `data/`, `docs/00-09` and `gauntlet/PROTOCOL.md`, in a seeded copy (see calibration). They never receive this log, prior findings, or the builder's dispositions. That is the blind rule.
 3. **Findings.** Each finding has:
    `id · critic · severity (blocker | major | minor) · type (omission | overlap | wrong-boundary | wrong-owner | obsolete-assumption | missing-contract | dependency-error | maturity-error | scale-down | other) · target (capability / skill / contract ids) · evidence · proposed change`.
    - **blocker**: the framework cannot coordinate agents correctly (e.g. two owners, a missing domain that many skills need).
    - **major**: a material omission or wrong boundary that would cause rework or silent legacy architecture.
    - **minor**: a wording, naming or small-placement issue.
    Stylistic preferences are not findings.
-4. **Disposition.** The builder assigns each finding one disposition: **accept** (change applied, commit referenced), **reject** (with a technical reason recorded), or **merge** (a duplicate of another finding). Dispositions are recorded in `gauntlet/round-N/dispositions.md`.
+4. **Disposition.** The builder assigns each finding one disposition: **accept** (change applied, commit referenced), **partial** (part applied, rest reasoned), **reject** (with a technical reason recorded), **merge** (a duplicate of another finding), or **seed** (it hit a planted seed; any real residual defect it also names is fixed and marked `seed+residual`). Severity is fixed by the critic: the builder may not downgrade it (added in round 2, K-TEST-9). Dispositions are recorded in `gauntlet/round-N/dispositions.md`.
 5. **Revise, re-gate, re-render.** Every accepted change that is structural is also expressed in data, so the next gate checks it. A missing brief term becomes a `seed-map.json` entry.
 
 ## Adjudication (added in round 1, K-QUALITY-4)
@@ -35,6 +35,14 @@ From round 2 on, critics review a **seeded copy** of the framework in the scratc
 - A round **counts toward convergence only if the union of critics finds at least 80% of the seeds**, and each scoped critic finds the seeds in its own mandate at least once over two consecutive rounds.
 - Findings that hit a seed are removed before dispositions. The real framework never contained the seed.
 - A critic that misses its own seed twice in a row is re-briefed or replaced.
+
+### Round-2 amendments (K-TEST-9)
+
+- **Adjudicated paths.** Besides `partial` and `reject`, the adjudicator also rules on every claim that a finding is a non-material re-raise, and on every `seed+residual` whose residual the builder declined.
+- **Precision as well as recall.** Calibration reports each critic's precision: the share of its findings that survive disposition and adjudication. A critic below the precision floor (50%) is re-briefed like one that misses its seed.
+- **Seed author independence.** From round 3, seeds are planted by a separate agent in a fresh context, not by the builder, and sealed before the critics start.
+- **Diversity.** Critics, adjudicators and seed authors use at least two model families or prompt lineages where available; when only one is available, that limitation is recorded in the round's `seeds.md`.
+- **Human audit.** A human samples adjudications at a fixed rate (`ARCH.ORG.human-audit`); the sample and its outcome are recorded per round.
 
 ## Convergence (stop rule)
 

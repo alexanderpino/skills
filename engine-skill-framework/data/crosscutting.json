@@ -24,7 +24,7 @@
   {
    "concern": "latency",
    "owner": "frame-orchestration",
-   "obligation": "Declare frame phase placement and latency contribution."
+   "obligation": "Declare frame phase placement and latency contribution; declare the network latency contribution (reviewed with network-architect)."
   },
   {
    "concern": "determinism",
@@ -114,7 +114,7 @@
   {
    "concern": "network authority & replication",
    "owner": "network-architect",
-   "obligation": "Declare replicated state, authority, prediction/rollback participation, cosmetic-vs-simulated split and server-target behavior."
+   "obligation": "Declare replicated state, authority, prediction/rollback participation, cosmetic-vs-simulated split and server-target behavior; declare what hidden state reaches clients."
   },
   {
    "concern": "testability seams",
@@ -128,8 +128,8 @@
   },
   {
    "concern": "agent operability",
-   "owner": "editor-architect",
-   "obligation": "Expose debug state and controls through the agent/automation API with structured results."
+   "owner": "visual-debugging-tools",
+   "obligation": "Expose debug state and controls through C-AUTOMATION with structured results; dev-only."
   },
   {
    "concern": "external requirements",
@@ -139,7 +139,44 @@
   {
    "concern": "authoring path",
    "owner": "editor-architect",
-   "obligation": "Every user-facing runtime feature has tool logic in a <DOMAIN>.TOOL capability owned by the domain skill, hosted via C-EDCMD/C-EDHOST."
+   "obligation": "Every user-facing runtime feature has tool logic in a <DOMAIN>.TOOL capability owned by the domain skill, hosted via C-EDCMD/C-EDHOST; ship creator-facing docs for every TOOL capability."
+  },
+  {
+   "concern": "localizability",
+   "owner": "localization-i18n",
+   "obligation": "Declare every player-visible text, audio and image output; use stable string IDs; support expansion, RTL and culturalized variants."
+  },
+  {
+   "concern": "live changeability",
+   "owner": "online-services-liveops",
+   "obligation": "Declare remote-tunable parameters, patch-stable data layout and behaviour under client/server/content version skew (with packaging-release-patching)."
   }
+ ],
+ "independence": [
+  [
+   "engine-architect",
+   "architecture-governance",
+   "decider vs governance reviewer"
+  ],
+  [
+   "program-orchestration",
+   "architecture-governance",
+   "builder/scheduler vs adjudicator"
+  ],
+  [
+   "program-orchestration",
+   "reference-games",
+   "milestone owner vs gate content"
+  ],
+  [
+   "security-engineering",
+   "owning-skill",
+   "security reviewer vs reviewed code"
+  ],
+  [
+   "test-architect",
+   "owning-skill",
+   "oracle author vs implementer"
+  ]
  ]
 }

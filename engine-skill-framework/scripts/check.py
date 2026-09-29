@@ -18,8 +18,27 @@ Machine-checks the structural parts of the definition of done:
   * leads own a contract; non-responsibilities route to real owners;
   * every skill has a domain critic; tool-logic owners reach the editor via contracts;
     ML/neural capability owners reach the shared inference runtime via contracts;
-  * every non-established capability is on the technology radar;
-  * every brief term maps to real capabilities.
+  * every non-established capability is on the technology radar, and M/X/S radar entries have a fallback;
+  * every code contract has a conformance suite; gated extension points (C-ML, C-MLGPU, C-RT, C-AIAGENT)
+    are only ever consumed optionally;
+  * every brief term maps to real capabilities;
+  (round 2)
+  * needs_implementer contracts are closed per platform; platform capabilities sit in skills tagged with that
+    platform; console-only skills carry an NDA access class;
+  * the module-level bootstrap graph is acyclic; skills without a module inherit their lead's layer as floor;
+  * radar classes equal capability maturity and radar owners own or lead the capabilities they list;
+    X/S capabilities are opt-in through the 'experimental' profile only;
+  * capability ids quoted in capability names exist; legacy patterns name existing stance capabilities
+    that their justification owner owns, contributes to or leads;
+  * tool-side capabilities and world tools reach tool contracts (C-COOK/C-EDCMD/C-EDHOST/C-EDVIEW);
+    user-facing runtime domains have an authoring path; UI.A11Y contributors reach C-A11YRT;
+  * every code contract has an oracle author other than its sole implementer; boundary contracts declare a
+    verified test double;
+  * the untrusted-input registry: one validating owner, registered parsers, a fuzz target (or red-team corpus
+    for agent inputs) and resource limits per input;
+  * milestones: claimed configurations closed by then, every configuration claimed once, every code contract
+    frozen once after its owner and a consumer and never before its requirements, gates exist;
+  * independence pairs never share a workstream; code-writing skills have an S3 domain critic.
 
 Usage: python3 scripts/check.py [--selftest] [--quiet]
 """
@@ -165,11 +184,16 @@ def run(m):
                 cid, _ = m.parse_dep(dep)
                 if cid in m.contracts and m.layer(cid) != "P" and m.layer(cid) >= TOOL_LAYER:
                     E(f"runtime skill {sid} consumes tool contract {cid} from runtime code (move to tool_consumes)")
-            provided = m.code_layers_provided(sid)
+            provided = m.floor_layers(sid)
+            anc = s["parent"]
+            while not provided and anc:            # no module of its own: inherit the lead's layer as floor
+                provided = m.code_layers_provided(anc)
+                provided = [max(provided)] if provided else provided
+                anc = m.skill(anc)["parent"]
             for dep in s["consumes"]:
                 cid, _ = m.parse_dep(dep)
                 mod = m.parse_for(dep)
-                if mod is not None and mod not in s["provides"]:
+                if mod is not None and mod not in s["provides"] + s.get("implements", []):
                     E(f"skill {sid} attributes {cid} to module {mod}, which it does not provide")
                     continue
                 if cid not in m.contracts or m.layer(cid) == "P" or not provided:
@@ -179,11 +203,13 @@ def run(m):
                     E(f"upward link: {sid} module L{floor} consumes {cid} (L{m.layer(cid)}); attribute it to a higher module with @")
 
     # -- foundation must be acyclic even counting universals (bootstrap proof)
-    code_edges = m.skill_edges(include_universal=True, include_optional=True, code_only=True)
-    foundation = {s for s in m.skill_order if m.code_layers_provided(s) and min(m.code_layers_provided(s)) < 2}
-    for comp in sccs(code_edges):
-        if foundation & set(comp):
-            E(f"foundation cycle (bootstrap impossible): {', '.join(comp)}")
+    # (module granularity: a skill's higher module may depend on skills that depend on its lower module)
+    mod_edges = m.module_edges()
+    for comp in sccs(mod_edges):
+        if len(comp) < 2 and comp[0] not in mod_edges.get(comp[0], ()):
+            continue
+        if any(mod != "_" and m.layer(mod) < 2 for _, mod in comp):
+            E(f"foundation cycle (bootstrap impossible): {', '.join(sorted({f'{s}[{mod}]' for s, mod in comp}))}")
     for comp in sccs(m.skill_edges(include_universal=False, include_optional=False, code_only=True)):
         I(f"runtime coupling cycle (must be a declared channel, not a direct call): {', '.join(comp)}")
 
@@ -199,6 +225,19 @@ def run(m):
         if not users:
             W(f"contract {cid} has no consumers")
 
+    # -- platform code sits in skills tagged with that platform; console-only skills carry an NDA access class
+    for sid in m.skill_order:
+        s = m.skill(sid)
+        for c in m.owned_caps(sid):
+            area = ".".join(c["id"].split(".")[:2])
+            need = PLATFORM_AREAS.get(area)
+            if need and need not in (s["platforms"] or []):
+                E(f"skill {sid} owns platform capability {c['id']} but is not tagged platform '{need}'")
+        if s["platforms"] == ["console"] and not str(s.get("access", "")).startswith("nda"):
+            E(f"console-only skill {sid} has no NDA access class")
+        if str(s.get("access", "")).startswith("nda") and s["platforms"] != ["console"]:
+            E(f"NDA skill {sid} is not confined to the console platform")
+
     # -- configuration closure (the scale-down proof)
     for name, cfg in m.configurations.items():
         profiles, target, platforms = cfg["profiles"], cfg["target"], cfg.get("platforms", [])
@@ -209,9 +248,11 @@ def run(m):
                 E(f"configuration '{name}' profile '{p}' unknown")
         if target not in TARGETS:
             E(f"configuration '{name}' target '{target}' invalid")
-        for p in platforms:
+        for p in platforms + cfg.get("target_platforms", []):
             if p not in PLATFORMS:
                 E(f"configuration '{name}' platform '{p}' invalid")
+        if cfg.get("target_platforms") and target != "tools":
+            E(f"configuration '{name}': target_platforms only apply to tools configurations")
         members = m.members(name)
         mset = set(members)
         tool = target == "tools"
@@ -225,42 +266,89 @@ def run(m):
                     continue
                 if owner not in mset:
                     E(f"configuration '{name}': {sid} requires {cid} but its owner {owner} is not in the configuration")
-                if c.get("needs_implementer") and not any(cid in m.skill(x)["implements"] for x in members):
-                    E(f"configuration '{name}': {cid} is required but no implementer is in the configuration")
+                if c.get("needs_implementer"):
+                    for p in m.platform_set(name):
+                        if c.get("platforms") and p not in c["platforms"]:
+                            continue
+                        if not any(cid in m.skill(x)["implements"] and (m.skill(x)["platforms"] is None
+                                   or p in m.skill(x)["platforms"]) for x in members):
+                            E(f"configuration '{name}': {cid} is required but no implementer for platform '{p}' "
+                              f"is in the configuration")
         ncap = sum(1 for cid in m.caps if m.cap_in_configuration(cid, name))
         I(f"configuration {name:34s} {len(members):3d} build skills, {ncap:3d} capabilities")
 
-    # -- milestones (walking-skeleton proof)
-    earlier = set()
-    for ms in m.milestone_doc["milestones"]:
+    # -- milestones (walking-skeleton proof, configuration claims, contract freeze order)
+    earlier, placed, claims, frozen_at, idx_of = set(), {}, {}, {}, {}
+    for idx, ms in enumerate(m.milestone_doc["milestones"]):
+        idx_of[ms["id"]] = idx
         sk = set(ms["skills"])
-        for s in sk:
-            if s not in m.skills:
-                E(f"milestone {ms['id']} names unknown skill {s}")
-        if ms.get("configuration") and ms["configuration"] not in m.configurations:
-            E(f"milestone {ms['id']} names unknown configuration {ms['configuration']}")
+        for s_ in sk:
+            if s_ not in m.skills:
+                E(f"milestone {ms['id']} names unknown skill {s_}")
+            placed.setdefault(s_, []).append(ms["id"])
         avail = sk | earlier
-        for s in sk & set(m.skills):
-            for cid, opt in m.deps(s, include_universal=True):
+        for s_ in sk & set(m.skills):
+            for cid, opt in m.deps(s_, include_universal=True):
                 if opt or cid not in m.contracts or m.layer(cid) == "P":
                     continue
                 if m.contract(cid)["owner"] not in avail:
-                    E(f"milestone {ms['id']}: {s} requires {cid} (owner {m.contract(cid)['owner']}) not built yet")
+                    E(f"milestone {ms['id']}: {s_} requires {cid} (owner {m.contract(cid)['owner']}) not built yet")
+        for claim in ms.get("configurations", []):
+            name, _, plats = claim.partition("@")
+            if name not in m.configurations:
+                E(f"milestone {ms['id']} claims unknown configuration {name}")
+                continue
+            cfg = m.configurations[name]
+            saved = cfg.get("platforms", [])
+            if plats:
+                cfg["platforms"] = plats.split("+")
+            try:
+                missing = sorted(set(m.members(name)) - avail)
+            finally:
+                cfg["platforms"] = saved
+            if missing:
+                E(f"milestone {ms['id']} claims {claim} but {len(missing)} member skills are not built by then "
+                  f"(e.g. {missing[0]})")
+            if not plats:
+                claims.setdefault(name, []).append(ms["id"])
         for cid in ms.get("contracts_frozen", []) + ms.get("contracts_draft", []):
             if cid not in m.contracts:
                 E(f"milestone {ms['id']} names unknown contract {cid}")
+        for cid in ms.get("contracts_frozen", []):
+            if cid in frozen_at:
+                E(f"contract {cid} frozen twice ({frozen_at[cid]} and {ms['id']})")
+            frozen_at[cid] = ms["id"]
+        for g in ms.get("gates", []):
+            if g not in m.caps:
+                E(f"milestone {ms['id']} gate names unknown capability {g}")
         earlier |= sk
-
     if m.milestone_doc["milestones"]:
-        placed = {}
-        for ms in m.milestone_doc["milestones"]:
-            for s_ in ms["skills"]:
-                placed.setdefault(s_, []).append(ms["id"])
         for sid in m.skill_order:
             if m.skill(sid).get("kind") in ("runtime", "tool"):
                 n = len(placed.get(sid, []))
                 if n != 1:
                     E(f"build skill {sid} appears in {n} milestones (expected exactly 1)")
+        for name in m.configurations:
+            if len(claims.get(name, [])) != 1:
+                E(f"configuration {name} is claimed in full by {len(claims.get(name, []))} milestones (expected 1)")
+        ms_of = {s_: idx_of[v[0]] for s_, v in placed.items() if len(v) == 1}
+        for cid in m.contracts:
+            if m.layer(cid) == "P":
+                continue
+            if cid not in frozen_at:
+                E(f"code contract {cid} is never frozen by a milestone")
+                continue
+            f = idx_of[frozen_at[cid]]
+            owner = m.contract(cid)["owner"]
+            if owner in ms_of and ms_of[owner] > f:
+                E(f"contract {cid} frozen at {frozen_at[cid]} before its owner {owner} is built")
+            cons = [ms_of[x] for x in m.skill_order if x in ms_of and x != owner
+                    and cid in {d for d, _ in m.deps(x, include_universal=True, include_tool=True)}]
+            if cons and min(cons) > f:
+                E(f"contract {cid} frozen at {frozen_at[cid]} before any consumer is built")
+            for r in m.contract(cid)["requires"]:
+                if r in frozen_at and idx_of[frozen_at[r]] > f:
+                    E(f"contract {cid} frozen at {frozen_at[cid]} before its requirement {r} ({frozen_at[r]})")
 
     # -- critics
     for k, c in m.critics.items():
@@ -278,6 +366,14 @@ def run(m):
                   if m.scope_matches([x for x in m.critics[k]["scope"] if x != "all"], sid)]
         if not domain:
             E(f"skill {sid} has no domain critic at stage G2")
+
+    for sid in m.skill_order:
+        sk_ = m.skill(sid)
+        if sk_.get("kind") in ("runtime", "tool") or sk_.get("writes_code"):
+            domain = [k for k in m.critics_for(sid, "S3")
+                      if m.scope_matches([x for x in m.critics[k]["scope"] if x != "all"], sid)]
+            if not domain:
+                E(f"code-writing skill {sid} has no domain critic at stage S3")
 
     # -- authoring paths and ML paths go through contracts
     for sid in m.skill_order:
@@ -307,9 +403,27 @@ def run(m):
             E(f"radar entry '{e.get('tech')}' owner unknown")
         if e.get("class") in ("M", "X", "S") and not e.get("non_goal") and not e.get("revisit"):
             E(f"radar entry '{e.get('tech')}' has no revisit/promotion trigger")
+        if e.get("class") in ("M", "X", "S") and not e.get("non_goal") and not e.get("fallback"):
+            E(f"radar entry '{e.get('tech')}' has no fallback")
     for cid in m.caps:
         if m.cap(cid)["maturity"] != "E" and cid not in radar_caps:
             E(f"non-established capability {cid} is not on the technology radar")
+
+    # -- code contracts carry a conformance suite; gated (non-established) extension points stay optional
+    for cid in m.contracts:
+        c = m.contract(cid)
+        if c["layer"] != "P" and not c.get("conformance"):
+            E(f"code contract {cid} has no conformance suite")
+    for sid in m.skill_order:
+        for dep in m.skill(sid).get("consumes", []):
+            base, optional = m.parse_dep(dep)
+            if base in m.contracts and m.contract(base).get("gated") and not optional \
+                    and m.contract(base)["owner"] != sid:
+                E(f"skill {sid} requires gated contract {base}; gated extension points must be optional (C-X?)")
+    for cid in m.contracts:
+        for r in m.contract(cid).get("requires", []):
+            if r in m.contracts and m.contract(r).get("gated") and not m.contract(cid).get("gated"):
+                E(f"contract {cid} requires gated contract {r}")
 
     # -- legacy pattern catalogue
     for p in m.legacy_doc["patterns"]:
@@ -328,12 +442,157 @@ def run(m):
                 if cid not in m.caps:
                     E(f"brief term '{term}' maps to unknown capability {cid}")
 
+    # -- radar entries agree with the capability map (class and owner lineage)
+    def lineage(sid):
+        out = []
+        while sid:
+            out.append(sid)
+            sid = m.skill(sid)["parent"] if sid in m.skills else None
+        return out
+    for e in m.radar_doc["entries"]:
+        for cid in e.get("capabilities", []):
+            if cid not in m.caps:
+                continue
+            if m.cap(cid)["maturity"] != e.get("class"):
+                E(f"radar entry '{e.get('tech')}' class {e.get('class')} but {cid} is {m.cap(cid)['maturity']}")
+            if e.get("owner") and e["owner"] not in lineage(m.cap(cid)["owner"]):
+                E(f"radar entry '{e.get('tech')}' owner {e['owner']} neither owns nor leads {cid}")
+
+    # -- capability ids quoted inside names exist
+    for cid in m.caps:
+        for ref in CAP_REF.findall(m.cap(cid)["name"]):
+            if ref not in m.caps:
+                E(f"capability {cid} refers to unknown capability {ref}")
+
+    # -- experimental (X/S) capabilities are opt-in only
+    for cid in m.caps:
+        c = m.cap(cid)
+        if c["maturity"] in ("X", "S") and (c["profiles"] or []) != ["experimental"]:
+            E(f"{c['maturity']} capability {cid} must carry exactly the 'experimental' profile")
+
+    # -- legacy patterns link to the capabilities that carry their stance
+    for p in m.legacy_doc["patterns"]:
+        caps_ = p.get("stance_capabilities") or []
+        if not caps_:
+            E(f"legacy pattern {p['id']} has no stance capabilities")
+        ok_owner = False
+        for cid in caps_:
+            if cid not in m.caps:
+                E(f"legacy pattern {p['id']} names unknown stance capability {cid}")
+                continue
+            c = m.cap(cid)
+            if p.get("justification_owner") in [c["owner"]] + c["contributors"] or \
+                    p.get("justification_owner") in lineage(c["owner"]):
+                ok_owner = True
+        if caps_ and not ok_owner:
+            E(f"legacy pattern {p['id']}: justification owner owns, contributes to or leads none of its stance caps")
+
+    # -- tool-side territory reaches the editor/cook through tool contracts
+    for cid in m.caps:
+        c = m.cap(cid)
+        if TOOL_SIDE.search(c["name"]) and c["area"] != "CNT.COOK":
+            s_ = m.skill(c["owner"])
+            if s_.get("kind") == "runtime" and not s_.get("tool_consumes"):
+                E(f"runtime skill {c['owner']} owns tool-side capability {cid} but consumes no tool contract")
+        if c["area"] == "WLD.TOOL" and "C-EDVIEW" not in {m.parse_dep(d)[0] for d in
+                                                         m.skill(c["owner"]).get("tool_consumes", [])} \
+                and c["owner"] != "world-editor-viewport":
+            E(f"{c['owner']} owns world tool {cid} but does not reach C-EDVIEW")
+
+    # -- accessibility runtime path
+    for cid in m.caps:
+        c = m.cap(cid)
+        if c["area"] == "UI.A11Y":
+            for co in c["contributors"]:
+                if co in m.skills and m.skill(co).get("kind") == "runtime" and \
+                        min(m.floor_layers(co) or [2]) >= 2 and \
+                        "C-A11YRT" not in {m.parse_dep(d)[0] for d in m.skill(co)["consumes"]} and \
+                        "C-A11YRT" not in m.skill(co)["provides"]:
+                    E(f"{co} contributes to {cid} but does not consume C-A11YRT")
+
+    # -- authoring path: user-facing runtime domains own or contribute tool logic, or say why not
+    for sid in m.skill_order:
+        s_ = m.skill(sid)
+        if s_.get("kind") != "runtime" or s_.get("workstream") not in AUTHORING_WORKSTREAMS or s_.get("authoring"):
+            continue
+        tool = [c for x in m.subtree(sid) for c in m.owned_caps(x) + m.contributed_caps(x)
+                if c["area"].endswith(".TOOL")]
+        if not tool:
+            E(f"runtime skill {sid} has no authoring path (owns/contributes no *.TOOL capability, no 'authoring' note)")
+
+    # -- oracle independence and verified test doubles
+    for cid in m.contracts:
+        c = m.contract(cid)
+        if c["layer"] == "P":
+            continue
+        oa = c.get("oracle_author")
+        if not oa or oa not in m.skills:
+            E(f"code contract {cid} has no valid oracle_author")
+        elif oa == c["owner"] and not any(cid in m.skill(x).get("implements", []) for x in m.skill_order):
+            E(f"code contract {cid}: its sole implementer {oa} is also its oracle author")
+        if c.get("boundary"):
+            td = c.get("test_double") or {}
+            if not td.get("kind") or td.get("owner") not in m.skills:
+                E(f"boundary contract {cid} declares no verified test double")
+
+    # -- untrusted-input registry: one validating owner, parsers registered, fuzz or red-team coverage
+    reg = {i["id"]: i for i in m.untrusted_doc["inputs"]}
+    fuzz = set()
+    for sid in m.skill_order:
+        fuzz |= set(m.skill(sid).get("fuzz_targets") or [])
+    for sid in m.skill_order:
+        for u in m.skill(sid).get("untrusted_inputs") or []:
+            if u not in reg:
+                E(f"skill {sid} declares untrusted input '{u}' missing from the registry")
+            elif sid != reg[u]["validating_owner"] and sid not in reg[u].get("parser_owners", []):
+                E(f"skill {sid} declares untrusted input '{u}' but is neither its validating nor a parser owner")
+    for u, i in reg.items():
+        for sid in [i["validating_owner"]] + i.get("parser_owners", []):
+            if sid not in m.skills:
+                E(f"untrusted input '{u}' names unknown skill {sid}")
+            elif u not in (m.skill(sid).get("untrusted_inputs") or []):
+                E(f"untrusted input '{u}': {sid} does not register it")
+        if i.get("mode") == "harness":
+            if u not in fuzz:
+                E(f"untrusted input '{u}' has no fuzz target")
+            if i["validating_owner"] in m.skills and m.skill(i["validating_owner"]).get("kind") == "process":
+                E(f"untrusted input '{u}' is validated by process skill {i['validating_owner']}")
+            if not i.get("limits"):
+                E(f"untrusted input '{u}' declares no resource limits")
+        elif i.get("mode") == "redteam":
+            if "XC.SEC.agent-redteam" not in m.caps:
+                E(f"agent input '{u}' has no red-team capability")
+        else:
+            E(f"untrusted input '{u}' mode must be harness or redteam")
+    for f_ in fuzz:
+        if f_ not in reg:
+            E(f"fuzz target '{f_}' is not a registered untrusted input")
+
+    # -- independence matrix
+    for a, b, why in m.cross_doc.get("independence", []):
+        for x in (a, b):
+            if x not in m.skills and x != "owning-skill":
+                E(f"independence pair ({a}, {b}) names unknown skill {x}")
+        if a in m.skills and b in m.skills and m.skill(a).get("workstream") == m.skill(b).get("workstream"):
+            E(f"independence pair ({a}, {b}) shares workstream '{m.skill(a).get('workstream')}': staffing must not "
+              f"co-host them")
+
     counts = {}
     for cid in m.caps:
         counts[m.cap(cid)["maturity"]] = counts.get(m.cap(cid)["maturity"], 0) + 1
     I(f"{len(m.caps)} capabilities ({', '.join(f'{k}={v}' for k, v in sorted(counts.items()))}), "
       f"{len(m.skills)} skills, {len(m.contracts)} contracts, {len(m.critics)} critics")
     return errors, warnings, info
+
+
+CAP_REF = re.compile(r"\b(?:ARCH|PLAT|CORE|RES|CNT|WLD|RND|ML|PHY|ANM|AUD|INP|NET|GAM|UI|ED|BLD|QA|PRF|OBS|XC)"
+                     r"\.[A-Z0-9]+\.[a-z0-9-]+[a-z0-9]\b")
+TOOL_SIDE = re.compile(r"cook step|authoring → runtime baking|bake pipeline|editor render features|"
+                       r"generation orchestration", re.I)
+AUTHORING_WORKSTREAMS = {"world", "simulation", "audio", "ui", "gameplay"}
+
+PLATFORM_AREAS = {"PLAT.CON": "console", "PLAT.MOB": "mobile", "PLAT.WEB": "web", "PLAT.DESK": "pc",
+                  "PLAT.SRV": "server-host"}
 
 
 def selftest():
@@ -357,7 +616,21 @@ def selftest():
         ("capability off the radar", lambda m: first_cap(m).__setitem__(3, "X"), "not on the technology radar"),
         ("lead without contract", lambda m: m.skill("audio-architect").__setitem__("provides", []), "provides no contract"),
         ("ML owner without inference path", lambda m: m.skill("motion-synthesis").__setitem__("consumes", ["C-ANIM"]) or m.skill("motion-synthesis").__setitem__("tool_consumes", []), "consumes no inference contract"),
-        ("milestone before its dependency", lambda m: m.milestone_doc["milestones"][0]["skills"].append("render-architect"), "not built yet"),
+        ("milestone before its dependency", lambda m: [ms["skills"].remove("server-scaleout-persistence") for ms in m.milestone_doc["milestones"] if "server-scaleout-persistence" in ms["skills"]] and m.milestone_doc["milestones"][0]["skills"].append("server-scaleout-persistence"), "not built yet"),
+        ("code contract without conformance", lambda m: m.contract("C-PAL").pop("conformance"), "no conformance suite"),
+        ("gated contract required", lambda m: m.skill("global-illumination")["consumes"].append("C-RT"), "requires gated contract"),
+        ("radar entry without fallback", lambda m: [e.pop("fallback", None) for e in m.radar_doc["entries"] if e["class"] == "X"], "has no fallback"),
+        ("console skill tagged pc", lambda m: m.skill("platform-console").__setitem__("platforms", ["pc"]), "is not tagged platform"),
+        ("per-platform implementer", lambda m: m.skill("rhi-webgpu").__setitem__("platforms", ["pc"]), "no implementer for platform 'web'"),
+        ("radar class mismatch", lambda m: [e.__setitem__("class", "E") for e in m.radar_doc["entries"] if "RND.GRAPH.work-graphs" in e.get("capabilities", [])], "but RND.GRAPH.work-graphs is X"),
+        ("dangling capability reference", lambda m: first_cap(m).__setitem__(1, first_cap(m)[1] + " (see RES.MGMT.nothing)"), "refers to unknown capability"),
+        ("experimental capability in a shipping profile", lambda m: [c.__setitem__(5, ["aaa"]) for d in m.cap_doc["domains"] for a in d["areas"] for c in a["caps"] if c[0] == "RND.GRAPH.work-graphs"], "must carry exactly the 'experimental' profile"),
+        ("legacy pattern without stance", lambda m: m.legacy_doc["patterns"][0].__setitem__("stance_capabilities", []), "has no stance capabilities"),
+        ("untrusted input not fuzzed", lambda m: [s["fuzz_targets"].remove("packets") for s in m.skill_doc["skills"] if s.get("fuzz_targets")], "has no fuzz target"),
+        ("implementer grades itself", lambda m: m.contract("C-NAV").__setitem__("oracle_author", "navigation-pathfinding"), "is also its oracle author"),
+        ("milestone claim not closed", lambda m: m.milestone_doc["milestones"][1]["configurations"].append("standard-3d-client@pc"), "member skills are not built by then"),
+        ("contract frozen before owner", lambda m: [ms["contracts_frozen"].remove("C-RT") or m.milestone_doc["milestones"][0]["contracts_frozen"].append("C-RT") for ms in m.milestone_doc["milestones"] if "C-RT" in ms["contracts_frozen"]], "before its owner"),
+        ("authoring path missing", lambda m: [c.__setitem__(2, "gameplay-camera") for d in m.cap_doc["domains"] for a in d["areas"] for c in a["caps"] if c[0] == "GAM.TOOL.camera"] and None or m.skill("gameplay-camera").__setitem__("workstream", "gameplay") or [c.__setitem__(2, "gameplay-architect") for d in m.cap_doc["domains"] for a in d["areas"] for c in a["caps"] if c[0] == "GAM.TOOL.camera"], "has no authoring path"),
         ("missing implementer", lambda m: [m.skill(s)["implements"].remove("C-RHI") for s in m.skill_order if "C-RHI" in m.skill(s)["implements"]], "no implementer"),
     ]
     ok = True

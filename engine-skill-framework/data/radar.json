@@ -49,8 +49,7 @@
    "tech": "Memory-safe language components",
    "class": "M",
    "capabilities": [
-    "CORE.LIFE.interop",
-    "XC.SEC.memory-safety"
+    "CORE.LIFE.interop"
    ],
    "owner": "core-runtime-architect",
    "evidence": "Android Rust adoption data; CISA/NSA roadmap guidance",
@@ -72,7 +71,6 @@
    "tech": "MaterialX / OpenPBR interchange & model",
    "class": "M",
    "capabilities": [
-    "CNT.IMP.materialx",
     "RND.MAT.openpbr"
    ],
    "owner": "material-system",
@@ -96,8 +94,7 @@
    "class": "M",
    "capabilities": [
     "WLD.MODEL.planetary",
-    "WLD.ENV.terrain-planetary",
-    "CNT.IMP.geospatial"
+    "WLD.ENV.terrain-planetary"
    ],
    "owner": "world-architect",
    "evidence": "MSFS; Cesium/3D Tiles integrations",
@@ -119,8 +116,7 @@
    "tech": "Work graphs & mesh nodes",
    "class": "X",
    "capabilities": [
-    "RND.GRAPH.work-graphs",
-    "RND.GEO.mesh-nodes"
+    "RND.GRAPH.work-graphs"
    ],
    "owner": "render-graph-scheduling",
    "evidence": "D3D12 Work Graphs 1.0 (2024); vendor samples; no shipped titles",
@@ -187,8 +183,7 @@
    "tech": "ReSTIR GI & path-traced GI",
    "class": "M",
    "capabilities": [
-    "RND.GI.restir",
-    "RND.PT.realtime"
+    "RND.GI.restir"
    ],
    "owner": "global-illumination",
    "evidence": "Ouyang et al. HPG 2021; shipped PT modes",
@@ -197,7 +192,7 @@
   },
   {
    "tech": "Neural radiance caching",
-   "class": "M",
+   "class": "X",
    "capabilities": [
     "RND.GI.neural-cache"
    ],
@@ -234,8 +229,7 @@
    "tech": "Strand hair simulation & rendering",
    "class": "M",
    "capabilities": [
-    "RND.CHAR.hair",
-    "PHY.SOFT.hair-sim"
+    "RND.CHAR.hair"
    ],
    "owner": "character-rendering",
    "evidence": "UE Groom; Frostbite strands",
@@ -288,10 +282,9 @@
   },
   {
    "tech": "In-shader neural evaluation & differentiable shaders",
-   "class": "M",
+   "class": "X",
    "capabilities": [
-    "RND.SHADER.neural",
-    "RND.SHADER.autodiff"
+    "RND.SHADER.neural"
    ],
    "owner": "shader-system",
    "evidence": "SM 6.9 cooperative vectors (preview); Slang autodiff",
@@ -302,21 +295,18 @@
    "tech": "WebGPU backend & web 3D",
    "class": "M",
    "capabilities": [
-    "RND.RHI.webgpu",
-    "PLAT.WEB.webgpu-target"
+    "RND.RHI.webgpu"
    ],
    "owner": "rhi-webgpu",
    "evidence": "WebGPU in Chrome/Edge/Safari/Firefox (2023–2025)",
    "revisit": "Bindless/timestamp features in WebGPU",
-   "fallback": "WebGL-class 2D only"
+   "fallback": "Web target limited to WebGPU-capable browsers (no WebGL backend; see non-goal)"
   },
   {
    "tech": "Gaussian splatting & radiance fields",
    "class": "X",
    "capabilities": [
-    "RND.GEO.splats",
-    "RND.GEO.splat-relight",
-    "CNT.IMP.splats"
+    "RND.GEO.splat-relight"
    ],
    "owner": "geometry-pipeline",
    "evidence": "Kerbl et al. 2023; 3DGRT 2024; glTF splat extension work",
@@ -332,10 +322,10 @@
     "ML.RT.scheduling",
     "ML.RT.training-boundary",
     "ML.RT.determinism",
-    "ML.RT.npu"
+    "ML.RT.validation"
    ],
    "owner": "ml-inference-runtime",
-   "evidence": "UE NNE; Windows ML; Core ML",
+   "evidence": "ONNX Runtime/LiteRT/Core ML in shipped apps; engine NNE still beta",
    "revisit": "Two engine features depend on it in shipped builds",
    "fallback": "No ML features"
   },
@@ -366,12 +356,13 @@
    "class": "M",
    "capabilities": [
     "PHY.FLUID.particles",
-    "PHY.FLUID.gpu"
+    "PHY.FLUID.gpu",
+    "PHY.FLUID.grid"
    ],
    "owner": "fluid-simulation",
    "evidence": "Niagara Fluids (beta); Flex titles",
    "revisit": "Gameplay-interactive shipped use",
-   "fallback": "Grid smoke / VFX-grade fluids"
+   "fallback": "Baked volume/flipbook playback (RND.VFX.volume-playback)"
   },
   {
    "tech": "ML cloth & learned deformables",
@@ -441,14 +432,14 @@
   },
   {
    "tech": "Seamless server meshing",
-   "class": "X",
+   "class": "M",
    "capabilities": [
     "NET.ARCH.meshing"
    ],
-   "owner": "network-architect",
-   "evidence": "Star Citizen (2024–25); SpatialOS withdrawn",
+   "owner": "server-scaleout-persistence",
+   "evidence": "Star Citizen server meshing live since late 2024; few technical postmortems",
    "revisit": "Two shipped-title technical postmortems",
-   "fallback": "Zoning/instancing"
+   "fallback": "Zoned/instanced servers (NET.SRV.zoning)"
   },
   {
    "tech": "QUIC/WebTransport game transport",
@@ -465,11 +456,10 @@
    "tech": "Learned & LLM-driven agents",
    "class": "M",
    "capabilities": [
-    "GAM.AI.learned",
-    "GAM.AI.llm"
+    "GAM.AI.learned"
    ],
    "owner": "ai-behavior-perception",
-   "evidence": "GT Sophy; inZOI/PUBG Ally/Where Winds Meet (2025)",
+   "evidence": "GT Sophy shipped in Gran Turismo 7 (2023)",
    "revisit": "Moderation, cost & rating requirements met per title",
    "fallback": "Authored behavior via C-AIAGENT fallback"
   },
@@ -479,8 +469,7 @@
    "capabilities": [
     "ED.AI.generative",
     "ED.AI.provenance",
-    "ED.AI.evaluation",
-    "CNT.COOK.ml-assisted"
+    "ED.AI.evaluation"
    ],
    "owner": "ai-assisted-authoring",
    "evidence": "Unity AI; Roblox Assistant",
@@ -491,8 +480,7 @@
    "tech": "Agent/automation control API (MCP class)",
    "class": "M",
    "capabilities": [
-    "ED.ARCH.agent-api",
-    "QA.FUNC.agent-exploration"
+    "ED.ARCH.llm-agent-frontend"
    ],
    "owner": "editor-architect",
    "evidence": "MCP integrations for major engines (2025); EA SEED RL testing",
@@ -514,8 +502,7 @@
    "tech": "Generative-AI service boundary & guardrails",
    "class": "M",
    "capabilities": [
-    "PLAT.SVC.genai-boundary",
-    "XC.SEC.genai"
+    "PLAT.SVC.genai-boundary"
    ],
    "owner": "online-services-liveops",
    "evidence": "OWASP LLM Top 10; Steam AI disclosure",
@@ -530,7 +517,8 @@
     "PLAT.XR.anchors",
     "PLAT.XR.depth-occlusion",
     "PLAT.XR.gaze-input",
-    "PLAT.XR.light-estimation"
+    "PLAT.XR.light-estimation",
+    "PLAT.XR.body-face"
    ],
    "owner": "xr-runtime",
    "evidence": "OpenXR 1.1 scene/anchor extensions; Quest 3 Depth API; visionOS",
@@ -551,7 +539,7 @@
    "tech": "Autostereo / light-field displays",
    "class": "M",
    "capabilities": [
-    "RND.ARCH.multiview"
+    "RND.ARCH.multiview-nview"
    ],
    "owner": "render-architect",
    "evidence": "Samsung Odyssey 3D, SpatialLabs SDKs",
@@ -586,7 +574,7 @@
    "non_goal": true
   },
   {
-   "tech": "Explicit multi-GPU",
+   "tech": "Linked/AFR multi-GPU rendering",
    "class": "S",
    "capabilities": [],
    "owner": "gpu-platform-architect",
@@ -602,6 +590,439 @@
    "evidence": "Scope decision",
    "revisit": "Engine becomes a service platform",
    "non_goal": true
+  },
+  {
+   "tech": "HW ray-traced curve primitives (LSS)",
+   "class": "X",
+   "capabilities": [
+    "RND.RT.curves"
+   ],
+   "owner": "ray-tracing-infrastructure",
+   "evidence": "Blackwell LSS; DXR/Vulkan extensions 2025",
+   "revisit": "Cross-vendor API support",
+   "fallback": "Hair cards or tube proxies in the BLAS"
+  },
+  {
+   "tech": "Hardware-decodable dense geometry (DGF)",
+   "class": "X",
+   "capabilities": [
+    "RND.LOD.dgf"
+   ],
+   "owner": "virtualized-geometry-lod",
+   "evidence": "AMD DGF (2025) specification",
+   "revisit": "Hardware decode on two vendors",
+   "fallback": "Engine cluster compression"
+  },
+  {
+   "tech": "Moving local physics frames (physics grids)",
+   "class": "M",
+   "capabilities": [
+    "PHY.ARCH.local-frames"
+   ],
+   "owner": "physics-architect",
+   "evidence": "Sea of Thieves ship interiors; Star Citizen physics grids",
+   "revisit": "Two shipped titles with published designs",
+   "fallback": "Kinematic platforms with controller riding (PHY.CTRL.platforms)"
+  },
+  {
+   "tech": "GLES / WebGL backends",
+   "class": "S",
+   "capabilities": [],
+   "owner": "gpu-platform-architect",
+   "non_goal": true,
+   "evidence": "Vulkan/WebGPU coverage of the target device base (device DB share)",
+   "revisit": "Device DB shows >10% of a shipping configuration's audience without Vulkan/WebGPU"
+  },
+  {
+   "tech": "L4S low-latency congestion signalling",
+   "class": "X",
+   "capabilities": [
+    "NET.TRANS.l4s"
+   ],
+   "owner": "network-transport",
+   "evidence": "RFC 9330–9332",
+   "revisit": "Deployed on two major access networks",
+   "fallback": "Standard congestion control"
+  },
+  {
+   "tech": "Media-over-QUIC spectator streams",
+   "class": "X",
+   "capabilities": [
+    "NET.REP.moq-spectator"
+   ],
+   "owner": "replication",
+   "evidence": "IETF MoQ drafts",
+   "revisit": "RFC + CDN support",
+   "fallback": "Delayed spectator replication"
+  },
+  {
+   "tech": "Behavioral / ML cheat detection",
+   "class": "M",
+   "capabilities": [
+    "XC.SEC.behavioral-detection"
+   ],
+   "owner": "anti-cheat-integrity",
+   "evidence": "Shipped server-side detection in major shooters",
+   "revisit": "Published false-positive rates",
+   "fallback": "Rule-based server validation"
+  },
+  {
+   "tech": "Conflict-free concurrent world editing",
+   "class": "M",
+   "capabilities": [
+    "ED.COLLAB.concurrent-world"
+   ],
+   "owner": "collaboration-version-control",
+   "evidence": "CRDT editing outside games (Figma, Omniverse live layers)",
+   "revisit": "Two engine postmortems at 100+ concurrent editors",
+   "fallback": "Cell/actor-granular locks + one-file-per-object"
+  },
+  {
+   "tech": "Post-quantum signatures",
+   "class": "M",
+   "capabilities": [
+    "XC.SEC.pqc-signatures"
+   ],
+   "owner": "security-runtime",
+   "evidence": "NIST FIPS 204/205 (2024); deprecation track 2030–2035",
+   "revisit": "Platform/store acceptance of PQC signatures",
+   "fallback": "Classical signatures with algorithm agility"
+  },
+  {
+   "tech": "User-mode & attestation-based anti-cheat",
+   "class": "M",
+   "capabilities": [
+    "XC.SEC.usermode-anticheat"
+   ],
+   "owner": "anti-cheat-integrity",
+   "evidence": "Windows Resiliency Initiative (2024–2025); Proton compatibility",
+   "revisit": "Windows kernel-access policy change",
+   "fallback": "Middleware kernel anti-cheat where platform permits"
+  },
+  {
+   "tech": "Validation of autonomous-agent development (test side)",
+   "class": "M",
+   "owner": "test-architect",
+   "capabilities": [
+    "QA.AGENT.oracle-independence",
+    "QA.AGENT.baseline-governance",
+    "QA.AGENT.test-integrity",
+    "QA.AGENT.mutation-gate"
+   ],
+   "evidence": "docs/06 A13; reward-hacking reports in agentic coding (2025)",
+   "revisit": "Measured seeded-defect escape rate below threshold across N milestones",
+   "fallback": "Mandatory human review sampling per tier (ARCH.ORG.human-gates) and frozen agent authority over oracles"
+  },
+  {
+   "tech": "Governance of autonomous-agent development (review side)",
+   "class": "M",
+   "owner": "architecture-governance",
+   "capabilities": [
+    "ARCH.ORG.critic-calibration",
+    "ARCH.ORG.adjudication"
+   ],
+   "evidence": "docs/06 A13; LLM-as-judge bias literature",
+   "revisit": "Calibrated critic recall and precision stable across three milestones",
+   "fallback": "Mandatory human review sampling per tier (ARCH.ORG.human-gates) and frozen agent authority over oracles"
+  },
+  {
+   "tech": "Agent provenance & boundaries",
+   "class": "M",
+   "owner": "program-orchestration",
+   "capabilities": [
+    "ARCH.ORG.provenance"
+   ],
+   "evidence": "SLSA provenance applied to agents (new)",
+   "revisit": "Industry provenance standard for AI-authored code",
+   "fallback": "Mandatory human review sampling per tier (ARCH.ORG.human-gates) and frozen agent authority over oracles"
+  },
+  {
+   "tech": "Development-agent security boundary",
+   "class": "M",
+   "owner": "security-engineering",
+   "capabilities": [
+    "XC.SEC.agent-boundary",
+    "XC.SEC.agent-redteam"
+   ],
+   "evidence": "OWASP LLM01; CVE-2025-53773, CVE-2025-54135",
+   "revisit": "Demonstrated robust prompt-injection defence",
+   "fallback": "Mandatory human review sampling per tier (ARCH.ORG.human-gates) and frozen agent authority over oracles"
+  },
+  {
+   "tech": "LLM-generated dialogue",
+   "class": "M",
+   "owner": "ai-behavior-perception",
+   "capabilities": [
+    "GAM.AI.llm-dialogue",
+    "GAM.AI.local-guardrails"
+   ],
+   "evidence": "Shipped 2025 titles with cloud/hybrid LLM companions",
+   "revisit": "Published rating/moderation/cost postmortems",
+   "fallback": "Authored dialogue"
+  },
+  {
+   "tech": "LLM decisions on authoritative state",
+   "class": "X",
+   "owner": "ai-behavior-perception",
+   "capabilities": [
+    "GAM.AI.llm-decision"
+   ],
+   "evidence": "Demos only",
+   "revisit": "Shipped title with replay/rollback-safe model decisions",
+   "fallback": "Authored AI"
+  },
+  {
+   "tech": "Generated-text localization",
+   "class": "M",
+   "owner": "localization-i18n",
+   "capabilities": [
+    "UI.LOC.generated"
+   ],
+   "evidence": "Follows LLM dialogue adoption",
+   "revisit": "As LLM dialogue",
+   "fallback": "Authored localized text"
+  },
+  {
+   "tech": "On-device sequence/generative models",
+   "class": "X",
+   "owner": "ml-inference-runtime",
+   "capabilities": [
+    "ML.RT.sequence-models"
+   ],
+   "evidence": "2025 on-device SLM demos in games",
+   "revisit": "Shipped title with on-device generation within budget",
+   "fallback": "Remote generation via C-LIVE"
+  },
+  {
+   "tech": "OS model APIs, weight residency & local/remote routing",
+   "class": "M",
+   "owner": "ml-inference-runtime",
+   "capabilities": [
+    "ML.RT.os-models",
+    "ML.RT.residency",
+    "ML.RT.local-remote"
+   ],
+   "evidence": "Windows ML GA, Apple Foundation Models, Android AICore (2025)",
+   "revisit": "Shipped title using an OS model API",
+   "fallback": "Engine-packaged models"
+  },
+  {
+   "tech": "NPU inference backends in games",
+   "class": "X",
+   "owner": "ml-inference-runtime",
+   "capabilities": [
+    "ML.RT.npu"
+   ],
+   "evidence": "NNAPI deprecated (Android 15); Windows ML GA 2025",
+   "revisit": "Shipped title offloads a frame-relevant network to an NPU on two platforms",
+   "fallback": "GPU/CPU backend"
+  },
+  {
+   "tech": "Heterogeneous adapter offload",
+   "class": "X",
+   "owner": "gpu-platform-architect",
+   "capabilities": [
+    "RND.GPU.hetero-offload"
+   ],
+   "evidence": "Vendor samples; no shipped titles",
+   "revisit": "Two shipped titles",
+   "fallback": "Single adapter"
+  },
+  {
+   "tech": "OS-composited spatial scenes (shared space)",
+   "class": "M",
+   "owner": "xr-runtime",
+   "capabilities": [
+    "PLAT.XR.scene-export"
+   ],
+   "evidence": "visionOS Shared Space/RealityKit; Unity PolySpatial",
+   "revisit": "Second platform with OS-composited app scenes",
+   "fallback": "Full/immersive space only"
+  },
+  {
+   "tech": "std3d on the web",
+   "class": "X",
+   "owner": "platform-web",
+   "capabilities": [
+    "PLAT.WEB.std3d"
+   ],
+   "evidence": "WebGPU subgroups (2025); bindless & memory64 in progress",
+   "revisit": "WebGPU bindless + memory64 in two browsers",
+   "fallback": "lite3d web tier"
+  },
+  {
+   "tech": "Player-prompted runtime asset generation",
+   "class": "M",
+   "owner": "modding-ugc",
+   "capabilities": [
+    "XC.EXT.generated-assets"
+   ],
+   "evidence": "Roblox Cube 3D (2025)",
+   "revisit": "Second platform shipping it",
+   "fallback": "Offline UGC only"
+  },
+  {
+   "tech": "Generative world models as renderer/simulator",
+   "class": "S",
+   "owner": "render-architect",
+   "capabilities": [],
+   "non_goal": true,
+   "evidence": "Genie 3, Muse/WHAM (2025) research",
+   "revisit": "Controllable, deterministic model at interactive rates on consumer hardware"
+  },
+  {
+   "tech": "Memory-safe language components (XC.SEC.memory-safety)",
+   "class": "M",
+   "capabilities": [
+    "XC.SEC.memory-safety"
+   ],
+   "owner": "security-engineering",
+   "evidence": "Android Rust adoption data; CISA/NSA roadmap guidance",
+   "revisit": "Console toolchain support for chosen language",
+   "fallback": "Hardened C++ subset + fuzzing"
+  },
+  {
+   "tech": "MaterialX / OpenPBR interchange & model (CNT.IMP.materialx)",
+   "class": "M",
+   "capabilities": [
+    "CNT.IMP.materialx"
+   ],
+   "owner": "asset-import-interchange",
+   "evidence": "OpenPBR 1.0 (ASWF 2024); UE Substrate production in 5.7",
+   "revisit": "Real-time OpenPBR evaluation cost within tier budgets",
+   "fallback": "Layered PBR model"
+  },
+  {
+   "tech": "Planetary & geospatial worlds (CNT.IMP.geospatial)",
+   "class": "M",
+   "capabilities": [
+    "CNT.IMP.geospatial"
+   ],
+   "owner": "asset-import-interchange",
+   "evidence": "MSFS; Cesium/3D Tiles integrations",
+   "revisit": "A reference game requires planet scale",
+   "fallback": "Planar partitioned worlds"
+  },
+  {
+   "tech": "Work graphs & mesh nodes (RND.GEO.mesh-nodes)",
+   "class": "X",
+   "capabilities": [
+    "RND.GEO.mesh-nodes"
+   ],
+   "owner": "geometry-pipeline",
+   "evidence": "D3D12 Work Graphs 1.0 (2024); vendor samples; no shipped titles",
+   "revisit": "Support on ≥2 console/desktop APIs and one shipped-title postmortem",
+   "fallback": "Indirect / device-generated commands"
+  },
+  {
+   "tech": "Work graphs & mesh nodes (RND.RHI.work-graph-programs)",
+   "class": "X",
+   "capabilities": [
+    "RND.RHI.work-graph-programs"
+   ],
+   "owner": "rhi-core",
+   "evidence": "D3D12 Work Graphs 1.0 (2024); vendor samples; no shipped titles",
+   "revisit": "Support on ≥2 console/desktop APIs and one shipped-title postmortem",
+   "fallback": "Indirect / device-generated commands"
+  },
+  {
+   "tech": "ReSTIR GI & path-traced GI (RND.PT.realtime)",
+   "class": "M",
+   "capabilities": [
+    "RND.PT.realtime"
+   ],
+   "owner": "path-tracing",
+   "evidence": "Ouyang et al. HPG 2021; shipped PT modes",
+   "revisit": "RT tier performance on console-class hardware",
+   "fallback": "Probe/radiance-cache GI"
+  },
+  {
+   "tech": "Strand hair simulation & rendering (PHY.SOFT.hair-sim)",
+   "class": "M",
+   "capabilities": [
+    "PHY.SOFT.hair-sim"
+   ],
+   "owner": "cloth-deformables",
+   "evidence": "UE Groom; Frostbite strands",
+   "revisit": "Budget fit at target character counts",
+   "fallback": "Hair cards"
+  },
+  {
+   "tech": "In-shader neural evaluation & differentiable shaders (RND.SHADER.autodiff)",
+   "class": "M",
+   "capabilities": [
+    "RND.SHADER.autodiff"
+   ],
+   "owner": "shader-system",
+   "evidence": "SM 6.9 cooperative vectors (preview); Slang autodiff",
+   "revisit": "Non-preview cross-vendor support",
+   "fallback": "Standalone inference dispatch"
+  },
+  {
+   "tech": "WebGPU backend & web 3D (PLAT.WEB.webgpu-target)",
+   "class": "M",
+   "capabilities": [
+    "PLAT.WEB.webgpu-target"
+   ],
+   "owner": "platform-web",
+   "evidence": "WebGPU in Chrome/Edge/Safari/Firefox (2023–2025)",
+   "revisit": "Bindless/timestamp features in WebGPU",
+   "fallback": "Web target limited to WebGPU-capable browsers (no WebGL backend; see non-goal)"
+  },
+  {
+   "tech": "Gaussian splatting & radiance fields (RND.GEO.splats)",
+   "class": "M",
+   "capabilities": [
+    "RND.GEO.splats"
+   ],
+   "owner": "geometry-pipeline",
+   "evidence": "Kerbl et al. 2023; 3DGRT 2024; glTF splat extension work",
+   "revisit": "Standard format + relighting + shipped game use",
+   "fallback": "Photogrammetry meshes"
+  },
+  {
+   "tech": "Gaussian splatting & radiance fields (CNT.IMP.splats)",
+   "class": "X",
+   "capabilities": [
+    "CNT.IMP.splats"
+   ],
+   "owner": "asset-import-interchange",
+   "evidence": "Kerbl et al. 2023; 3DGRT 2024; glTF splat extension work",
+   "revisit": "Standard format + relighting + shipped game use",
+   "fallback": "Photogrammetry meshes"
+  },
+  {
+   "tech": "Generative authoring tools (CNT.COOK.ml-assisted)",
+   "class": "M",
+   "capabilities": [
+    "CNT.COOK.ml-assisted"
+   ],
+   "owner": "asset-cook-processors",
+   "evidence": "Unity AI; Roblox Assistant",
+   "revisit": "Licensing/provenance clear for training data",
+   "fallback": "Manual authoring"
+  },
+  {
+   "tech": "Agent/automation control API (MCP class) (QA.FUNC.agent-exploration)",
+   "class": "M",
+   "capabilities": [
+    "QA.FUNC.agent-exploration"
+   ],
+   "owner": "functional-automation-soak",
+   "evidence": "MCP integrations for major engines (2025); EA SEED RL testing",
+   "revisit": "Stable protocol adoption",
+   "fallback": "CLI/commandlets"
+  },
+  {
+   "tech": "Generative-AI service boundary & guardrails (XC.SEC.genai)",
+   "class": "M",
+   "capabilities": [
+    "XC.SEC.genai"
+   ],
+   "owner": "security-engineering",
+   "evidence": "OWASP LLM Top 10; Steam AI disclosure",
+   "revisit": "Per-title policy approval",
+   "fallback": "No live-generated content"
   }
  ]
 }

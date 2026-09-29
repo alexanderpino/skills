@@ -78,7 +78,9 @@ def dep_graph(m):
         out.append(f"- **L{L}** ({len(ids)}): " + ", ".join(f"`{c}`" for c in ids) + "\n")
     out.append("\n## Contracts\n\nFan-in counts explicit consumers (universal contracts are consumed implicitly by every runtime skill or every skill). "
                "High fan-in contracts are the **critical architectural contracts**: they are designed first, versioned under `C-API`, and changed only through the change-request protocol in `C-ORCH`.\n\n")
-    out.append("| Contract | Layer | Owner | Requires | Fan-in | Summary |\n|---|---|---|---|---|---|\n")
+    out.append("`Oracle author` writes the contract's acceptance suite (`tests/acceptance/<contract>/`, read-only for "
+               "implementers). Implementers are backends registered for the contract (per platform where marked).\n\n")
+    out.append("| Contract | Layer | Owner | Implementers | Oracle author | Requires | Fan-in | Summary |\n|---|---|---|---|---|---|---|---|\n")
     rows = []
     for cid in m.contracts:
         c = m.contract(cid)
@@ -86,7 +88,9 @@ def dep_graph(m):
         fan = f"universal ({u})" if u else str(len(consumers[cid]))
         rows.append((0 if u else -len(consumers[cid]), cid, c, fan))
     for _, cid, c, fan in sorted(rows, key=lambda r: (r[0], r[1])):
-        out.append(f"| `{cid}` {c['name']} | {c['layer']} | {c['owner']} | {', '.join(c['requires']) or '—'} | {fan} | {c['summary']} |\n")
+        impl = ", ".join(x for x in m.skill_order if cid in m.skill(x).get("implements", [])) or "—"
+        out.append(f"| `{cid}` {c['name']} | {c['layer']} | {c['owner']} | {impl} | {c.get('oracle_author', '—')} | "
+                   f"{', '.join(c['requires']) or '—'} | {fan} | {c['summary']} |\n")
 
     out.append("\n## Critical contracts (top fan-in, excluding universals)\n\n")
     ranked = sorted((cid for cid in m.contracts if not m.contract(cid).get("universal")),
@@ -188,6 +192,11 @@ def crosscutting(m):
     out.append("| Concern | Owner | Obligation on every skill |\n|---|---|---|\n")
     for c in m.cross_doc["concerns"]:
         out.append(f"| {c['concern']} | {c['owner']} | {c['obligation']} |\n")
+    if m.cross_doc.get("independence"):
+        out.append("\n## Independence matrix\n\nThese pairs are never hosted by the same agent at any organization tier "
+                   "(`check.py` proves they sit in different workstreams, the co-hosting unit).\n\n| A | B | Why |\n|---|---|---|\n")
+        for a, b, why in m.cross_doc["independence"]:
+            out.append(f"| {a} | {b} | {why} |\n")
     out.append("\n## Cross-cutting and orchestration skills\n\n")
     for s in m.skill_order:
         sk = m.skill(s)
@@ -239,13 +248,21 @@ def radar_legacy_milestones(m):
         caps = "non-goal" if e.get("non_goal") else ", ".join(f"`{c}`" for c in e["capabilities"])
         out.append(f"| {e['tech']} | {MATURITY[e['class']]} | {e['owner']} | {caps} | {e['evidence']} | {e['revisit']} | {e.get('fallback','—')} |\n")
     out.append("\n## Anti-legacy pattern catalogue\n\nA pattern is not forbidden. If it appears, the justification owner must record an ADR. K-LEGACY checks this at G2 and S1–S4.\n\n")
-    out.append("| ID | Pattern | Detection hint | Default stance | Justification owner |\n|---|---|---|---|---|\n")
+    out.append("| ID | Pattern | Detection hint | Default stance | Justification owner | Stance capabilities |\n|---|---|---|---|---|---|\n")
     for p in m.legacy_doc["patterns"]:
-        out.append(f"| {p['id']} | {p['pattern']} | {p['detection']} | {p['default_stance']} | {p['justification_owner']} |\n")
-    out.append("\n## Milestones (walking skeleton → AAA)\n\n`check.py` proves each milestone closed over its own and earlier milestones' build skills, and places every build skill in exactly one milestone.\n\n")
+        sc = ", ".join(f"`{c}`" for c in p.get("stance_capabilities", []))
+        out.append(f"| {p['id']} | {p['pattern']} | {p['detection']} | {p['default_stance']} | {p['justification_owner']} | {sc} |\n")
+    out.append("\n## Untrusted-input registry\n\nEvery input class has exactly one validating owner; parser owners register it too. `harness` inputs are fuzz targets owned next to the parser (campaign policy in robustness-fuzzing); `redteam` inputs are text read by development agents, covered by the prompt-injection corpus (`XC.SEC.agent-redteam`). `check.py` enforces the registry.\n\n")
+    out.append("| Input | Validating owner | Parser owners | Trust tier | Coverage | Limits |\n|---|---|---|---|---|---|\n")
+    for i in m.untrusted_doc["inputs"]:
+        out.append(f"| {i['id']} | {i['validating_owner']} | {', '.join(i.get('parser_owners', [])) or '—'} | {i['trust']} | {i['mode']} | {i['limits']} |\n")
+    out.append("\n## Milestones (walking skeleton → engine 1.0)\n\n`check.py` proves: each milestone is closed over its own and earlier milestones' build skills; every configuration a milestone claims (optionally restricted to platforms, `name@pc`) has all its member skills built by then; every configuration is claimed in full exactly once; every build skill sits in exactly one milestone; every code contract is frozen exactly once, after its owner and at least one consumer exist and never before the contracts it requires; gates name existing capabilities.\n\n")
     for ms in m.milestone_doc["milestones"]:
-        out.append(f"### {ms['id']} · {ms['name']} ({len(ms['skills'])} skills; configuration `{ms['configuration']}`)\n\n")
+        claims = ", ".join(f"`{c}`" for c in ms.get("configurations", [])) or "— (skeleton / release)"
+        out.append(f"### {ms['id']} · {ms['name']} ({len(ms['skills'])} new build skills)\n\n**Configurations proven:** {claims}\n\n")
         out.append(f"**Exit criteria:** {ms['exit']}\n\n")
+        if ms.get("gates"):
+            out.append(f"**Gates (capabilities):** {', '.join(f'`{g}`' for g in ms['gates'])}\n\n")
         if ms.get("contracts_frozen"):
             out.append(f"**Contracts frozen:** {', '.join(ms['contracts_frozen'])}\n\n")
         if ms.get("contracts_draft"):

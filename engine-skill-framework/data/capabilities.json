@@ -11,7 +11,7 @@
      "caps": [
       [
        "ARCH.REQ.game-requirements",
-       "Capture target game requirements (genre, scale, platforms, online model) as engine requirements",
+       "Translate prioritized requirements (C-PROD) into profiles, tiers and non-goals",
        "engine-architect",
        "E"
       ],
@@ -23,7 +23,7 @@
       ],
       [
        "ARCH.REQ.hardware-tiers",
-       "Hardware tier definitions incl. server instance classes and refresh-rate classes",
+       "Hardware tier definitions (the only definition of tier names) incl. server instance classes and refresh-rate classes",
        "engine-architect",
        "E",
        [
@@ -108,12 +108,13 @@
       ],
       [
        "ARCH.STRUCT.registration",
-       "Declarative self-registration for phases, render features, services, cvars, codegen inputs (no central tables)",
+       "Registration policy: what must self-register (phases, render features, services, cvars, codegen inputs) and the ban on central tables (mechanism in C-MOD)",
        "engine-architect",
        "E",
        [
         "frame-orchestration",
-        "render-architect"
+        "render-architect",
+        "core-runtime-architect"
        ]
       ],
       [
@@ -196,6 +197,16 @@
        "E",
        [
         "perf-benchmarking"
+       ]
+      ],
+      [
+       "ARCH.EVID.source-policy",
+       "Source policy for agents: allowed, cite-only and forbidden source classes, clean-room separation of reading and implementing agents",
+       "research-evidence",
+       "E",
+       [
+        "security-engineering",
+        "program-orchestration"
        ]
       ]
      ]
@@ -283,12 +294,13 @@
       ],
       [
        "ARCH.ORG.human-gates",
-       "Register of decisions requiring human authorization (contracts, spend, NDA access, submissions, legal sign-off)",
+       "Register of decisions requiring human authorization (contracts, spend, NDA access, submissions, legal/source-policy sign-off, production signing, security exceptions & risk acceptance, CI permission/secret-scope changes, new third-party dependencies, vulnerability disclosure, telemetry scope, sampled audit of adjudications and S3/S4 verdicts)",
        "program-orchestration",
        "E",
        [
         "engine-architect",
-        "certification-compliance"
+        "certification-compliance",
+        "security-engineering"
        ]
       ],
       [
@@ -302,7 +314,7 @@
       ],
       [
        "ARCH.ORG.triage",
-       "Failure attribution, bisection, routing to owners, revert-first policy",
+       "Failure attribution & routing policy, revert-first (bisection engine in BLD.CI.bisection)",
        "program-orchestration",
        "E",
        [
@@ -312,22 +324,75 @@
       ],
       [
        "ARCH.ORG.critic-calibration",
-       "Critic calibration via seeded defects; rounds count only above recall threshold",
-       "program-orchestration",
-       "E",
+       "Critic calibration via seeded defects at every stage (G1, G2, S1–S4 canary defects in sampled changes); recall and precision tracked per critic; below-threshold critics stop counting as gates",
+       "architecture-governance",
+       "M",
        [
-        "test-architect"
+        "test-architect",
+        "program-orchestration"
        ]
       ],
       [
        "ARCH.ORG.adjudication",
        "Independent adjudication of rejected and partially accepted findings",
-       "program-orchestration",
-       "E"
+       "architecture-governance",
+       "M",
+       [
+        "program-orchestration"
+       ]
       ],
       [
        "ARCH.ORG.provenance",
        "Per-change agent/model/task attestation in the ledger",
+       "program-orchestration",
+       "M",
+       [
+        "security-engineering"
+       ]
+      ],
+      [
+       "ARCH.ORG.independence",
+       "Independence matrix: never-same-agent pairs (decider vs governance reviewer, implementer vs oracle author, builder vs adjudicator, security reviewer vs reviewed code, milestone owner vs gate owner) enforced by staffing at every organization tier; co-hosting capped by capability count",
+       "architecture-governance",
+       "E",
+       [
+        "program-orchestration",
+        "test-architect"
+       ]
+      ],
+      [
+       "ARCH.ORG.skill-lifecycle",
+       "Skill-library lifecycle during the build: territory re-bounding by ADR, check.py re-gate, SKILL.md regeneration, agent re-brief, library versioning tied to C-RELEASE; review at every milestone exit",
+       "program-orchestration",
+       "E",
+       [
+        "architecture-governance",
+        "engine-architect"
+       ]
+      ],
+      [
+       "ARCH.ORG.cost-ledger",
+       "Program cost ledger: agent compute per skill/milestone, CI/device-farm/cloud-cook cost, load-test hosting, server cost per CCU",
+       "program-orchestration",
+       "E",
+       [
+        "ci-cd-automation",
+        "performance-architect",
+        "dedicated-server"
+       ]
+      ],
+      [
+       "ARCH.ORG.human-audit",
+       "Human sampling of adjudications and S3/S4 pass verdicts at a fixed rate",
+       "architecture-governance",
+       "E",
+       [
+        "program-orchestration"
+       ]
+      ],
+      [
+       "ARCH.ORG.sensitive-paths",
+       "Sensitive write sets (registry parsers, crypto, auth, sandboxes, build & CI) require a K-SEC gate plus a second agent's approval",
        "program-orchestration",
        "E",
        [
@@ -350,7 +415,10 @@
        "ARCH.PROD.intake",
        "Game-team bug & feature intake and triage SLAs",
        "engine-product-management",
-       "E"
+       "E",
+       [
+        "engine-architect"
+       ]
       ],
       [
        "ARCH.PROD.release-notes",
@@ -376,6 +444,26 @@
        "Engine licensing & terms model for game teams",
        "engine-product-management",
        "E"
+      ],
+      [
+       "ARCH.PROD.field-feedback",
+       "Cross-title crash, performance and developer-experience metrics feeding the roadmap",
+       "engine-product-management",
+       "E",
+       [
+        "crash-diagnostics",
+        "performance-architect",
+        "developer-experience-docs"
+       ]
+      ],
+      [
+       "ARCH.PROD.upstreaming",
+       "Intake of licensee patches with IP terms",
+       "engine-product-management",
+       "E",
+       [
+        "certification-compliance"
+       ]
       ]
      ]
     }
@@ -417,12 +505,16 @@
        "E",
        [
         "platform-console",
-        "platform-mobile"
+        "platform-mobile",
+        "async-io-storage",
+        "rhi-core",
+        "frame-orchestration",
+        "network-transport"
        ]
       ],
       [
        "PLAT.PAL.capability-tiers",
-       "Platform capability tiers & feature query",
+       "Platform capability feature query (tier names from ARCH.REQ.hardware-tiers)",
        "platform-architect",
        "E"
       ],
@@ -535,7 +627,7 @@
       ],
       [
        "PLAT.PAL.device-db",
-       "Device capability database: hardware → tier mapping, deny-lists, remote updates",
+       "Device capability database (single store): device records, driver deny-lists, hardware → tier keys, remote updates",
        "platform-architect",
        "E",
        [
@@ -588,7 +680,11 @@
        "PLAT.PAL.cloud-hybrid",
        "Split client/cloud compute boundary",
        "platform-architect",
-       "X"
+       "X",
+       [],
+       [
+        "experimental"
+       ]
       ],
       [
        "PLAT.PAL.display",
@@ -599,6 +695,26 @@
         "platform-desktop",
         "platform-console",
         "platform-mobile"
+       ]
+      ],
+      [
+       "PLAT.PAL.event-injection",
+       "Lifecycle & system-event injection (suspend/resume, constrained mode, sign-out, controller disconnect, memory pressure, thermal)",
+       "platform-architect",
+       "E",
+       [
+        "test-runtime-harness",
+        "certification-compliance"
+       ]
+      ],
+      [
+       "PLAT.PAL.pointer-shell",
+       "Cursor management (hardware/software cursors, confinement, relative mode), clipboard, file dialogs, drag-and-drop",
+       "platform-architect",
+       "E",
+       [
+        "input-devices-haptics",
+        "platform-desktop"
        ]
       ]
      ]
@@ -636,6 +752,15 @@
        "Windows on ARM (ARM64EC, emulation interop, middleware availability)",
        "platform-desktop",
        "E"
+      ],
+      [
+       "PLAT.DESK.pal",
+       "PAL implementation for Windows/Linux/SteamOS/macOS (C-PAL backend: OS services, windowing, threads, clocks, IO, display, power, events)",
+       "platform-desktop",
+       "E",
+       [
+        "platform-architect"
+       ]
       ]
      ]
     },
@@ -651,7 +776,7 @@
       ],
       [
        "PLAT.CON.user-model",
-       "Console platform-user identity model",
+       "Console user-model implementation (C-SVC slot)",
        "platform-console",
        "E"
       ],
@@ -683,12 +808,25 @@
        "E"
       ],
       [
-       "PLAT.CON.rhi-backends",
-       "Console graphics API backends (confidential extensions implementing C-RHI)",
+       "PLAT.CON.pal",
+       "PAL implementation for console OS (C-PAL backend: OS services, windowing, threads, clocks, IO, display, power, events)",
        "platform-console",
        "E",
        [
-        "rhi-core"
+        "platform-architect"
+       ]
+      ],
+      [
+       "PLAT.CON.confidential-slots",
+       "Confidential implementations of registered slots (IO/decompression units, audio endpoints, save storage, crash upload, system keyboard, entitlement SDK) behind public interfaces owned by domain skills",
+       "platform-console",
+       "E",
+       [
+        "async-io-storage",
+        "audio-architect",
+        "persistence-save",
+        "crash-diagnostics",
+        "text-fonts"
        ]
       ]
      ]
@@ -714,11 +852,12 @@
       ],
       [
        "PLAT.MOB.thermal",
-       "Thermal & power adaptivity",
+       "Mobile thermal/power signal backends (ADPF thermal headroom, performance-hint sessions, iOS thermal state) feeding CORE.SCALE.governor; no independent control loop",
        "platform-mobile",
        "E",
        [
-        "performance-architect"
+        "performance-architect",
+        "runtime-scalability"
        ]
       ],
       [
@@ -744,6 +883,15 @@
        "Deep links & attribution boundary (ATT consent)",
        "platform-mobile",
        "E"
+      ],
+      [
+       "PLAT.MOB.pal",
+       "PAL implementation for iOS/Android/visionOS (C-PAL backend: OS services, windowing, threads, clocks, IO, display, power, events)",
+       "platform-mobile",
+       "E",
+       [
+        "platform-architect"
+       ]
       ]
      ]
     },
@@ -784,7 +932,9 @@
        "online-services-liveops",
        "E",
        [
-        "network-architect"
+        "network-architect",
+        "network-transport",
+        "net-session"
        ]
       ],
       [
@@ -856,13 +1006,14 @@
       ],
       [
        "PLAT.SVC.voice-text",
-       "Voice & text chat sessions, channels, mute/block enforcement",
+       "Voice & text chat end to end: path selection (service vs game transport), channels, privileges, mute/block",
        "online-services-liveops",
        "E",
        [
         "audio-dsp-mixing",
         "accessibility",
-        "certification-compliance"
+        "certification-compliance",
+        "privacy-data-protection"
        ]
       ],
       [
@@ -879,11 +1030,68 @@
       ],
       [
        "PLAT.SVC.emulation",
-       "Service test doubles & outage injection",
+       "Third-party/own-backend service emulation for C-LIVE",
        "online-services-liveops",
        "E",
        [
         "robustness-fuzzing"
+       ]
+      ],
+      [
+       "PLAT.SVC.user-model",
+       "Platform-user model: user handle, sign-in/out & user-change events, primary-user rules, guests (all platforms)",
+       "platform-services",
+       "E",
+       [
+        "platform-console",
+        "platform-desktop",
+        "platform-mobile",
+        "input-devices-haptics",
+        "persistence-save"
+       ]
+      ],
+      [
+       "PLAT.SVC.admission",
+       "Login queue & capacity admission boundary",
+       "online-services-liveops",
+       "E",
+       [
+        "net-session"
+       ]
+      ],
+      [
+       "PLAT.SVC.xplat-social",
+       "Cross-platform friends, parties, presence & invites via backend; reconciliation with first-party social, privileges and blocks",
+       "online-services-liveops",
+       "E",
+       [
+        "platform-services",
+        "certification-compliance"
+       ]
+      ],
+      [
+       "PLAT.SVC.voice-moderation",
+       "Voice reporting capture & retention for moderation",
+       "online-services-liveops",
+       "E",
+       [
+        "certification-compliance",
+        "security-engineering"
+       ]
+      ],
+      [
+       "PLAT.SVC.first-party-emulation",
+       "First-party service emulation for C-SVC (identity, entitlements, privileges, achievements)",
+       "platform-services",
+       "E"
+      ],
+      [
+       "PLAT.SVC.trials",
+       "Demo & time-limited trial SKUs with entitlement gating & save carry-over",
+       "platform-services",
+       "E",
+       [
+        "packaging-release-patching"
        ]
       ]
      ]
@@ -929,7 +1137,10 @@
        "PLAT.XR.passthrough",
        "Passthrough & MR compositing",
        "xr-runtime",
-       "E"
+       "E",
+       [
+        "privacy-data-protection"
+       ]
       ],
       [
        "PLAT.XR.scene",
@@ -938,7 +1149,8 @@
        "M",
        [
         "collision-detection",
-        "navigation-pathfinding"
+        "navigation-pathfinding",
+        "privacy-data-protection"
        ]
       ],
       [
@@ -948,7 +1160,8 @@
        "M",
        [
         "network-architect",
-        "persistence-save"
+        "persistence-save",
+        "privacy-data-protection"
        ]
       ],
       [
@@ -972,7 +1185,8 @@
        "xr-runtime",
        "M",
        [
-        "input-system"
+        "input-system",
+        "privacy-data-protection"
        ]
       ],
       [
@@ -989,6 +1203,35 @@
        "Phone/tablet AR sessions (ARKit/ARCore class)",
        "xr-runtime",
        "E"
+      ],
+      [
+       "PLAT.XR.runtime-backends",
+       "XR runtime backends: OpenXR, visionOS Compositor Services, console XR SDK (confidential slot)",
+       "xr-runtime",
+       "E",
+       [
+        "platform-mobile",
+        "platform-console",
+        "rhi-metal"
+       ]
+      ],
+      [
+       "PLAT.XR.scene-export",
+       "OS-composited shared-space scenes (engine exports a scene description via C-RSCENE change streams)",
+       "xr-runtime",
+       "M",
+       [
+        "render-architect"
+       ]
+      ],
+      [
+       "PLAT.XR.body-face",
+       "Body, face & eye-expression tracking inputs (OpenXR extensions) with biometric privacy class",
+       "xr-runtime",
+       "M",
+       [
+        "privacy-data-protection"
+       ]
       ]
      ]
     },
@@ -998,7 +1241,7 @@
      "caps": [
       [
        "PLAT.WEB.runtime",
-       "WASM threads, cross-origin isolation & memory limits",
+       "WASM threads, cross-origin isolation, no-threads fallback & memory limits",
        "platform-web",
        "E",
        [
@@ -1040,6 +1283,25 @@
        [
         "rhi-webgpu"
        ]
+      ],
+      [
+       "PLAT.WEB.pal",
+       "PAL implementation for browser (WASM) (C-PAL backend: OS services, windowing, threads, clocks, IO, display, power, events)",
+       "platform-web",
+       "E",
+       [
+        "platform-architect"
+       ]
+      ],
+      [
+       "PLAT.WEB.std3d",
+       "std3d-class web tier gated by C-GPUTIER (bindless, memory64)",
+       "platform-web",
+       "X",
+       [],
+       [
+        "experimental"
+       ]
       ]
      ]
     },
@@ -1061,6 +1323,27 @@
        "A/B assignment & exposure logging",
        "online-services-liveops",
        "E"
+      ],
+      [
+       "PLAT.LIVE.operations",
+       "Live-title SLOs over engine telemetry, alerting hooks, operational incident runbooks & launch-readiness review",
+       "online-services-liveops",
+       "E",
+       [
+        "observability-telemetry",
+        "crash-diagnostics",
+        "dedicated-server"
+       ]
+      ],
+      [
+       "PLAT.LIVE.support-tools",
+       "Player-support data inspection & restoration boundary over NET.SRV.persistence (audited)",
+       "online-services-liveops",
+       "E",
+       [
+        "persistence-save",
+        "security-engineering"
+       ]
       ]
      ]
     },
@@ -1076,12 +1359,14 @@
       ],
       [
        "PLAT.COMM.receipts",
-       "Receipt/entitlement validation boundary",
+       "Server-side receipt/entitlement verification boundary (client only forwards receipts; grants via NET.SRV.transactions)",
        "platform-services",
        "E",
        [
         "anti-cheat-integrity",
-        "security-engineering"
+        "security-engineering",
+        "dedicated-server",
+        "server-scaleout-persistence"
        ]
       ],
       [
@@ -1106,6 +1391,39 @@
        "E",
        [
         "observability-telemetry"
+       ]
+      ]
+     ]
+    },
+    {
+     "id": "PLAT.SRV",
+     "name": "Server host platform",
+     "caps": [
+      [
+       "PLAT.SRV.pal",
+       "PAL implementation for server hosts (C-PAL backend)",
+       "platform-server-host",
+       "E",
+       [
+        "platform-architect"
+       ]
+      ],
+      [
+       "PLAT.SRV.host-os",
+       "Server host OS & container specifics (Linux, ARM64 hosts, huge pages)",
+       "platform-server-host",
+       "E",
+       [
+        "dedicated-server"
+       ]
+      ],
+      [
+       "PLAT.SRV.container-topology",
+       "cgroup-aware CPU/memory discovery feeding PLAT.PAL.cpu-topology",
+       "platform-server-host",
+       "E",
+       [
+        "job-system-task-graph"
        ]
       ]
      ]
@@ -1150,7 +1468,7 @@
        "core-runtime-architect",
        "E",
        [
-        "platform-services"
+        "online-services-liveops"
        ]
       ],
       [
@@ -1189,7 +1507,7 @@
       ],
       [
        "CORE.LIFE.ownership-model",
-       "Engine-wide ownership, cross-thread reference rules & retirement service",
+       "Engine-wide ownership & cross-thread reference rules (policy; retirement service implemented in CORE.CONC.retirement)",
        "core-runtime-architect",
        "E",
        [
@@ -1228,6 +1546,15 @@
        [
         "security-engineering",
         "build-system-toolchains"
+       ]
+      ],
+      [
+       "CORE.LIFE.config-trust",
+       "Config trust tiers per layer & per-cvar settable-from allow-lists (no code loading or path cvars from command-line, intent or remote layers in shipping)",
+       "core-runtime-architect",
+       "E",
+       [
+        "security-engineering"
        ]
       ]
      ]
@@ -1280,7 +1607,7 @@
       ],
       [
        "CORE.MATH.random",
-       "Random numbers & noise functions",
+       "Random numbers (counter-based / per-stream for parallel determinism) & noise",
        "math-simd-numerics",
        "E"
       ],
@@ -1302,6 +1629,12 @@
       [
        "CORE.MATH.formats",
        "Half, packed & quantized numeric formats",
+       "math-simd-numerics",
+       "E"
+      ],
+      [
+       "CORE.MATH.bignum",
+       "Large-magnitude/arbitrary-precision numeric types with canonical serialization",
        "math-simd-numerics",
        "E"
       ]
@@ -1370,7 +1703,7 @@
       ],
       [
        "CORE.MEM.uma",
-       "Unified-memory CPU/GPU accounting",
+       "Unified-memory CPU/GPU accounting, reported into RES.MGMT.arbitration (no independent arbitration)",
        "memory-allocators",
        "E",
        [
@@ -1424,7 +1757,7 @@
       ],
       [
        "CORE.TYPES.codecs",
-       "General-purpose compression codec library for non-package users",
+       "Compression codec library for all users (package and non-package): vetted zstd/LZ4/Kraken-class decoders, SIMD tuning, fuzz registration",
        "containers-core-types",
        "E",
        [
@@ -1434,6 +1767,16 @@
       [
        "CORE.TYPES.crypto",
        "Vetted cryptographic primitives wrapper, CSPRNG, per-platform selection",
+       "security-runtime",
+       "E",
+       [
+        "security-engineering",
+        "containers-core-types"
+       ]
+      ],
+      [
+       "CORE.TYPES.hash-dos",
+       "Keyed hashing (SipHash class) mandated for containers keyed by untrusted data",
        "containers-core-types",
        "E",
        [
@@ -1477,6 +1820,17 @@
        "E",
        [
         "robustness-fuzzing"
+       ]
+      ],
+      [
+       "CORE.CONC.retirement",
+       "Retirement service (C-LIFETIME): completion-token, fence and epoch retire queues shared with safe memory reclamation",
+       "concurrency-primitives",
+       "E",
+       [
+        "core-runtime-architect",
+        "rhi-core",
+        "gpu-memory-resources"
        ]
       ]
      ]
@@ -1552,7 +1906,7 @@
       ],
       [
        "CORE.JOBS.thread-model",
-       "Engine thread inventory, core reservation, OS priority/QoS mapping, real-time thread rules, middleware pool adapters, oversubscription detection",
+       "Engine thread inventory (sole authority on which threads exist), core reservation, OS priority/QoS mapping, real-time thread rules, middleware pool adapters, oversubscription detection",
        "job-system-task-graph",
        "E",
        [
@@ -1596,6 +1950,16 @@
        [
         "robustness-fuzzing"
        ]
+      ],
+      [
+       "CORE.JOBS.degenerate",
+       "Shipping inline/cooperative mode: the same task graph on 0–2 workers, no blocking waits on host threads, yield to the host event loop",
+       "job-system-task-graph",
+       "E",
+       [
+        "platform-web",
+        "frame-orchestration"
+       ]
       ]
      ]
     },
@@ -1611,7 +1975,7 @@
       ],
       [
        "CORE.FRAME.phases",
-       "Tick phases, sync points & phase barriers",
+       "Tick phases & the minimal set of named global sync points (each justified by ADR); ordering otherwise derived from C-FRAME access declarations",
        "frame-orchestration",
        "E",
        [
@@ -1656,7 +2020,7 @@
       ],
       [
        "CORE.FRAME.access-model",
-       "Unified access declarations for all phase work (ECS and service resources) with derived ordering",
+       "Unified access declarations for all phase work (ECS systems and service resources); the single frame scheduler that compiles the per-frame graph and resolves conflicts across and inside phases",
        "frame-orchestration",
        "E",
        [
@@ -1673,13 +2037,15 @@
       ],
       [
        "CORE.FRAME.sim-schedule",
-       "Canonical simulation phase order (pre/post-physics, substeps, net snapshot, render extract)",
+       "Canonical simulation dependency order (partial order over declared access; total order only where C-DET requires it)",
        "frame-orchestration",
        "E",
        [
         "physics-architect",
         "animation-architect",
-        "network-architect"
+        "network-architect",
+        "character-movement",
+        "gameplay-architect"
        ]
       ],
       [
@@ -1723,6 +2089,17 @@
         "xr-runtime",
         "platform-desktop"
        ]
+      ],
+      [
+       "CORE.FRAME.host-loop",
+       "Host-driven frame entry (requestAnimationFrame, display link, Choreographer, xrWaitFrame) with a non-blocking cooperative frame step",
+       "frame-orchestration",
+       "E",
+       [
+        "platform-web",
+        "platform-mobile",
+        "xr-runtime"
+       ]
       ]
      ]
     },
@@ -1756,6 +2133,17 @@
        "Events & messaging: deferred, batched delivery at declared consumption points by default",
        "entity-object-model",
        "E"
+      ],
+      [
+       "CORE.OBJ.world-instances",
+       "Multiple isolated world instances per process; world-scoped state reachable only through a world handle; no current-world global",
+       "entity-object-model",
+       "E",
+       [
+        "ecs-runtime",
+        "world-architect",
+        "editor-architect"
+       ]
       ]
      ]
     },
@@ -1789,7 +2177,7 @@
       ],
       [
        "CORE.ECS.scheduling",
-       "Lowering ECS systems into the frame access model",
+       "Lowering ECS systems into the frame access model (no separate ECS scheduler)",
        "ecs-runtime",
        "E",
        [
@@ -1989,7 +2377,7 @@
       ],
       [
        "CORE.SCALE.governor",
-       "Closed-loop runtime performance/power governor",
+       "Closed-loop runtime performance/power governor (C-GOVERN module; shipping-grade inputs)",
        "runtime-scalability",
        "E",
        [
@@ -2000,12 +2388,15 @@
       ],
       [
        "CORE.SCALE.actuators",
-       "Actuator registration (dynres, significance, VFX, animation rate, workers)",
+       "Actuator registry (frame-rate cap/refresh selection, dynres, significance, VFX, animation rate, worker count & P/E placement)",
        "runtime-scalability",
        "E",
        [
         "reconstruction-upscaling",
-        "world-architect"
+        "world-architect",
+        "frame-orchestration",
+        "platform-mobile",
+        "job-system-task-graph"
        ]
       ],
       [
@@ -2064,7 +2455,7 @@
       ],
       [
        "RES.MGMT.no-stall",
-       "Fully asynchronous loading (no main-thread waits)",
+       "Fully asynchronous loading: no blocking waits on frame-critical tasks or host/OS-bound threads; completions via C-TASK tokens",
        "resource-streaming-architect",
        "E"
       ],
@@ -2106,6 +2497,15 @@
        [
         "async-io-storage",
         "gpu-memory-resources"
+       ]
+      ],
+      [
+       "RES.MGMT.validation",
+       "Streaming-correctness oracle: no required cell missing at traversal speed, residency invariants under arbitration",
+       "resource-streaming-architect",
+       "E",
+       [
+        "loading-streaming-performance"
        ]
       ]
      ]
@@ -2158,7 +2558,7 @@
       ],
       [
        "RES.IO.cpu-decompress",
-       "CPU decompression as an IO stage",
+       "CPU decompression as an IO stage (scheduling only; codecs in CORE.TYPES.codecs)",
        "async-io-storage",
        "E"
       ],
@@ -2195,7 +2595,7 @@
       ],
       [
        "RES.PKG.compression",
-       "Compression codec selection (Kraken/zstd/LZ4/GDeflate class)",
+       "Compression codec selection per package (implementations in CORE.TYPES.codecs)",
        "package-formats-vfs",
        "E"
       ],
@@ -2221,6 +2621,16 @@
        "E",
        [
         "packaging-release-patching"
+       ]
+      ],
+      [
+       "RES.PKG.ordering",
+       "Access-order package layout from load/stream traces (co-location, request coalescing), validated by PRF.LOAD.load-time",
+       "package-formats-vfs",
+       "E",
+       [
+        "loading-streaming-performance",
+        "content-pipeline-architect"
        ]
       ]
      ]
@@ -2291,7 +2701,12 @@
        "CNT.IMP.usd",
        "OpenUSD import & composition",
        "asset-import-interchange",
-       "M"
+       "M",
+       [],
+       [
+        "lite3d",
+        "std3d"
+       ]
       ],
       [
        "CNT.IMP.textures",
@@ -2315,6 +2730,10 @@
        "M",
        [
         "material-system"
+       ],
+       [
+        "lite3d",
+        "std3d"
        ]
       ],
       [
@@ -2333,19 +2752,34 @@
        "CNT.IMP.scans",
        "Photogrammetry & scan ingestion",
        "asset-import-interchange",
-       "E"
+       "E",
+       [],
+       [
+        "lite3d",
+        "std3d"
+       ]
       ],
       [
        "CNT.IMP.caches",
        "Geometry/point cache import",
        "asset-import-interchange",
-       "E"
+       "E",
+       [],
+       [
+        "lite3d",
+        "std3d"
+       ]
       ],
       [
        "CNT.IMP.procedural",
        "Procedural-asset (HDA-class) evaluation",
        "asset-import-interchange",
-       "E"
+       "E",
+       [],
+       [
+        "lite3d",
+        "std3d"
+       ]
       ],
       [
        "CNT.IMP.rules",
@@ -2363,13 +2797,21 @@
        "CNT.IMP.splats",
        "Splat/radiance-field import & compression",
        "asset-import-interchange",
-       "X"
+       "X",
+       [],
+       [
+        "experimental"
+       ]
       ],
       [
        "CNT.IMP.geospatial",
        "Geospatial data ingestion (DEM, 3D Tiles, OSM)",
        "asset-import-interchange",
-       "M"
+       "M",
+       [],
+       [
+        "openworld"
+       ]
       ]
      ]
     },
@@ -2504,6 +2946,12 @@
         "ai-assisted-authoring",
         "virtualized-geometry-lod"
        ]
+      ],
+      [
+       "CNT.COOK.incremental-equivalence",
+       "Incremental cook equals clean cook (bit/tolerance per determinism class)",
+       "content-pipeline-architect",
+       "E"
       ]
      ]
     },
@@ -2602,7 +3050,8 @@
        "world-architect",
        "E",
        [
-        "gameplay-architect"
+        "gameplay-architect",
+        "net-session"
        ]
       ],
       [
@@ -2615,6 +3064,15 @@
         "terrain",
         "atmosphere-weather"
        ]
+      ],
+      [
+       "WLD.MODEL.unit-load",
+       "Async non-blocking whole-unit load with loading-screen hand-off (minimal/2D default)",
+       "world-architect",
+       "E",
+       [
+        "resource-streaming-architect"
+       ]
       ]
      ]
     },
@@ -2626,7 +3084,12 @@
        "WLD.PART.grid",
        "World partition & streaming cells",
        "world-architect",
-       "E"
+       "E",
+       [],
+       [
+        "lite3d",
+        "std3d"
+       ]
       ],
       [
        "WLD.PART.sources",
@@ -2635,6 +3098,10 @@
        "E",
        [
         "resource-streaming-architect"
+       ],
+       [
+        "lite3d",
+        "std3d"
        ]
       ],
       [
@@ -2644,6 +3111,10 @@
        "E",
        [
         "virtualized-geometry-lod"
+       ],
+       [
+        "lite3d",
+        "std3d"
        ]
       ],
       [
@@ -2660,6 +3131,9 @@
        [
         "dedicated-server",
         "network-architect"
+       ],
+       [
+        "openworld"
        ]
       ],
       [
@@ -2692,12 +3166,16 @@
       ],
       [
        "WLD.PART.sim-tiers",
-       "Off-bubble simulation tiers (abstract/statistical sim, promotion/demotion, remote server regions)",
+       "Off-bubble simulation tiers (abstract/statistical sim, promotion/demotion)",
        "world-architect",
        "E",
        [
         "crowd-simulation",
         "dedicated-server"
+       ],
+       [
+        "openworld",
+        "massim"
        ]
       ]
      ]
@@ -2748,10 +3226,10 @@
        "spatial-transforms",
        "E",
        [
-        "gameplay-systems-toolkit",
         "cinematics-sequencer",
         "xr-runtime",
-        "render-architect"
+        "render-architect",
+        "gameplay-camera"
        ]
       ],
       [
@@ -2844,11 +3322,12 @@
       ],
       [
        "WLD.ENV.buoyancy",
-       "Water query service (C-ENV provider)",
+       "Water query service (C-ENV provider: height, velocity, depth, body id)",
        "water-ocean",
        "E",
        [
-        "character-physics"
+        "rigid-body-dynamics",
+        "vehicle-physics"
        ]
       ],
       [
@@ -2911,11 +3390,22 @@
       ],
       [
        "WLD.ENV.water-interaction",
-       "Local interactive water surface simulation",
+       "Interactive shallow-water / heightfield water simulation (local surface waves, wakes, flooding)",
        "water-ocean",
        "E",
        [
         "fluid-simulation"
+       ]
+      ],
+      [
+       "WLD.ENV.media-integrator",
+       "Single participating-media integrator: froxel/grid injection, heterogeneous sparse volumes, composition order with fog and translucency (vfx and fluids inject via C-ATMOS)",
+       "atmosphere-weather",
+       "E",
+       [
+        "vfx-particles",
+        "fluid-simulation",
+        "translucency-decals"
        ]
       ]
      ]
@@ -2940,7 +3430,12 @@
        "WLD.PCG.scatter",
        "Rule-based placement & scattering",
        "procedural-generation",
-       "E"
+       "E",
+       [],
+       [
+        "lite3d",
+        "std3d"
+       ]
       ],
       [
        "WLD.PCG.grammars",
@@ -2952,7 +3447,11 @@
        "WLD.PCG.ml",
        "ML-generated content",
        "procedural-generation",
-       "X"
+       "X",
+       [],
+       [
+        "experimental"
+       ]
       ]
      ]
     },
@@ -2987,6 +3486,15 @@
        "Block light propagation",
        "voxel-worlds",
        "E"
+      ],
+      [
+       "WLD.VOX.generation",
+       "Voxel world generation at chunk stream-in (via C-PCG)",
+       "voxel-worlds",
+       "E",
+       [
+        "procedural-generation"
+       ]
       ]
      ]
     },
@@ -3047,6 +3555,12 @@
        [
         "world-editor-viewport"
        ]
+      ],
+      [
+       "WLD.TOOL.voxel",
+       "Voxel brush editing & pre-generated structures",
+       "voxel-worlds",
+       "E"
       ]
      ]
     }
@@ -3099,7 +3613,7 @@
       ],
       [
        "RND.ARCH.multiview",
-       "Multi-view rendering: split-screen, PiP, captures, stereo/multiview and N-view (autostereo/light-field) outputs",
+       "Multi-view rendering: split-screen, PiP, captures, stereo/multiview",
        "render-architect",
        "E",
        [
@@ -3127,12 +3641,66 @@
       ],
       [
        "RND.ARCH.editor-rendering",
-       "Editor render features: GPU picking, selection outline, editor primitives, preview scenes & thumbnails",
+       "Editor render features: GPU picking, selection outline, editor primitives",
        "render-architect",
        "E",
        [
         "world-editor-viewport",
         "editor-ui-framework"
+       ]
+      ],
+      [
+       "RND.ARCH.multiview-nview",
+       "N-view outputs (autostereo / light-field displays)",
+       "render-architect",
+       "M",
+       [
+        "xr-runtime"
+       ]
+      ],
+      [
+       "RND.ARCH.scene-textures",
+       "Per-view scene-texture layout & producer phases per shading path (C-SCENETEX)",
+       "render-architect",
+       "E",
+       [
+        "geometry-pipeline",
+        "reconstruction-upscaling"
+       ]
+      ],
+      [
+       "RND.ARCH.lighting-env",
+       "Lighting-environment block & its early-phase publication (C-LIGHTENV; static default without atmosphere)",
+       "render-architect",
+       "E",
+       [
+        "atmosphere-weather",
+        "direct-lighting-shadows"
+       ]
+      ],
+      [
+       "RND.ARCH.invalidation",
+       "Render-cache invalidation channel: GPU-deforming instance flags, dirty-region/page invalidation (shadow pages, surface caches), BLAS update requests",
+       "render-architect",
+       "E",
+       [
+        "vegetation-foliage",
+        "terrain",
+        "deformation-skinning",
+        "water-ocean",
+        "direct-lighting-shadows",
+        "global-illumination",
+        "ray-tracing-infrastructure"
+       ]
+      ],
+      [
+       "RND.ARCH.portals",
+       "Portal views with recursive rendering and spatial-query transform through portals",
+       "render-architect",
+       "E",
+       [
+        "collision-detection",
+        "spatial-audio-acoustics"
        ]
       ]
      ]
@@ -3173,7 +3741,7 @@
       ],
       [
        "RND.RHI.caps",
-       "GPU capability tiers & feature detection",
+       "GPU capability detection feeding C-GPUTIER",
        "rhi-core",
        "E"
       ],
@@ -3221,7 +3789,7 @@
       ],
       [
        "RND.RHI.driver-policy",
-       "Driver version policy: minimum/known-bad drivers, deny-lists, user handling",
+       "Driver policy rules evaluated against C-PAL device records (no own deny-list)",
        "rhi-core",
        "E",
        [
@@ -3245,7 +3813,7 @@
       ],
       [
        "RND.RHI.gpu-work",
-       "GPU-generated work primitives (indirect, device-generated commands, work-graph programs, backing memory)",
+       "GPU-generated work primitives (indirect, device-generated commands, backing memory)",
        "rhi-core",
        "E",
        [
@@ -3357,6 +3925,52 @@
        [
         "rhi-core"
        ]
+      ],
+      [
+       "RND.RHI.work-graph-programs",
+       "Work-graph programs & mesh nodes (fallback: indirect dispatch)",
+       "rhi-core",
+       "X",
+       [
+        "render-graph-scheduling"
+       ],
+       [
+        "experimental"
+       ]
+      ],
+      [
+       "RND.RHI.console",
+       "Console graphics API backends (confidential, per platform holder)",
+       "rhi-console",
+       "E",
+       [
+        "rhi-core"
+       ]
+      ],
+      [
+       "RND.RHI.console-validation",
+       "Console backends: platform validation layers & conformance runs",
+       "rhi-console",
+       "E",
+       [
+        "render-validation"
+       ]
+      ],
+      [
+       "RND.RHI.console-quirks",
+       "Console backends: GPU crash tooling integration & quirk handling",
+       "rhi-console",
+       "E",
+       [
+        "rhi-core",
+        "crash-diagnostics"
+       ]
+      ],
+      [
+       "RND.RHI.adapter-selection",
+       "Adapter selection (high-performance vs low-power) & cross-adapter present on hybrid laptops",
+       "rhi-core",
+       "E"
       ]
      ]
     },
@@ -3378,7 +3992,7 @@
       ],
       [
        "RND.MEM.upload",
-       "Upload, readback & staging rings",
+       "Upload, staging & readback rings (readback latency contract in RND.GRAPH.readback)",
        "gpu-memory-resources",
        "E"
       ],
@@ -3453,9 +4067,13 @@
       ],
       [
        "RND.GRAPH.work-graphs",
-       "Scheduling, barriers & memory for GPU-generated work incl. work graphs",
+       "Work-graph scheduling, barriers & backing memory",
        "render-graph-scheduling",
-       "X"
+       "X",
+       [],
+       [
+        "experimental"
+       ]
       ],
       [
        "RND.GRAPH.compute",
@@ -3476,6 +4094,27 @@
        "E",
        [
         "render-validation"
+       ]
+      ],
+      [
+       "RND.GRAPH.external-work",
+       "External GPU work & transfer arbitration: streaming uploads, GPU decompression, scene deltas, AS builds and VT pages as registered producers with priority/deadline/byte budgets per tier; copy/async-queue placement; import of externally written resources, queue-ownership transfer & first-use acquire",
+       "render-graph-scheduling",
+       "E",
+       [
+        "async-io-storage",
+        "gpu-memory-resources",
+        "ray-tracing-infrastructure",
+        "resource-streaming-architect"
+       ]
+      ],
+      [
+       "RND.GRAPH.gpu-generated-work",
+       "Scheduling, barriers & memory for GPU-generated work (indirect, device-generated commands)",
+       "render-graph-scheduling",
+       "E",
+       [
+        "geometry-pipeline"
        ]
       ]
      ]
@@ -3575,11 +4214,14 @@
       ],
       [
        "RND.SHADER.neural",
-       "In-shader neural evaluation (cooperative-vector/tensor intrinsics, weight layout, fallbacks)",
+       "In-shader small-network evaluation (matrix-vector/tensor intrinsics tier; API-neutral; standalone-dispatch fallback via C-MLGPU)",
        "shader-system",
-       "M",
+       "X",
        [
         "ml-inference-runtime"
+       ],
+       [
+        "experimental"
        ]
       ],
       [
@@ -3655,11 +4297,14 @@
        "X",
        [
         "ml-inference-runtime"
+       ],
+       [
+        "experimental"
        ]
       ],
       [
        "RND.MAT.validation",
-       "Material validation (energy conservation, furnace tests)",
+       "Material furnace & energy-conservation scenes (pass thresholds owned by render-validation)",
        "material-system",
        "E",
        [
@@ -3695,7 +4340,7 @@
       ],
       [
        "RND.GEO.culling",
-       "GPU frustum & two-phase HZB occlusion culling",
+       "GPU frustum & two-phase HZB occlusion culling (GPU-driven tier)",
        "geometry-pipeline",
        "E",
        [],
@@ -3753,7 +4398,7 @@
        "X",
        [],
        [
-        "aaa"
+        "experimental"
        ]
       ],
       [
@@ -3768,9 +4413,9 @@
       ],
       [
        "RND.GEO.splats",
-       "Gaussian-splat / radiance-field rendering, sorting, LOD & compositing",
+       "Static Gaussian-splat / radiance-field rendering, sorting, LOD & compositing",
        "geometry-pipeline",
-       "X",
+       "M",
        [
         "ray-tracing-infrastructure",
         "asset-import-interchange"
@@ -3780,7 +4425,42 @@
        "RND.GEO.splat-relight",
        "Relightable/dynamic splats & hybrid raster/RT composition",
        "geometry-pipeline",
-       "X"
+       "X",
+       [],
+       [
+        "experimental"
+       ]
+      ],
+      [
+       "RND.GEO.material-resolve",
+       "Visibility-buffer material resolve (classification & shading bins, programmable raster variants)",
+       "geometry-pipeline",
+       "E",
+       [
+        "material-system"
+       ],
+       [
+        "std3d"
+       ]
+      ],
+      [
+       "RND.GEO.cpu-occlusion",
+       "CPU frustum & occlusion culling for the CPU-submitted tier (software occluder rasterization)",
+       "geometry-pipeline",
+       "E",
+       [
+        "render-architect"
+       ]
+      ],
+      [
+       "RND.GEO.precomputed-visibility",
+       "Precomputed visibility (portals/cells, baked PVS with cook step)",
+       "geometry-pipeline",
+       "E",
+       [
+        "world-data-model",
+        "world-architect"
+       ]
       ]
      ]
     },
@@ -3858,6 +4538,18 @@
        "Displacement / tessellation on virtualized geometry",
        "virtualized-geometry-lod",
        "M"
+      ],
+      [
+       "RND.LOD.dgf",
+       "Hardware-decodable dense geometry formats (DGF class)",
+       "virtualized-geometry-lod",
+       "X",
+       [
+        "ray-tracing-infrastructure"
+       ],
+       [
+        "experimental"
+       ]
       ]
      ]
     },
@@ -3906,7 +4598,7 @@
         "ml-inference-runtime"
        ],
        [
-        "aaa"
+        "experimental"
        ]
       ],
       [
@@ -3916,6 +4608,15 @@
        "E",
        [
         "asset-cook-processors"
+       ]
+      ],
+      [
+       "RND.TEX.runtime-decode",
+       "Runtime image decode for player-supplied images (avatars, sprays, UGC thumbnails)",
+       "texture-streaming-vt",
+       "E",
+       [
+        "security-engineering"
        ]
       ]
      ]
@@ -4085,14 +4786,20 @@
        "RND.GI.neural-cache",
        "Neural radiance caching with online training",
        "global-illumination",
-       "M",
+       "X",
        [
         "ml-inference-runtime",
         "path-tracing"
        ],
        [
-        "aaa"
+        "experimental"
        ]
+      ],
+      [
+       "RND.GI.planar",
+       "Planar reflections (clip-plane re-render, tier-scaled)",
+       "global-illumination",
+       "E"
       ]
      ]
     },
@@ -4171,6 +4878,18 @@
        [
         "global-illumination"
        ]
+      ],
+      [
+       "RND.RT.curves",
+       "Hardware ray-traced curve primitives (linear swept spheres) for strands",
+       "ray-tracing-infrastructure",
+       "X",
+       [
+        "character-rendering"
+       ],
+       [
+        "experimental"
+       ]
       ]
      ]
     },
@@ -4243,7 +4962,12 @@
        "RND.RECON.motion-vectors",
        "Motion vector, jitter & history contract",
        "reconstruction-upscaling",
-       "E"
+       "E",
+       [
+        "post-color-hdr",
+        "deformation-skinning",
+        "geometry-pipeline"
+       ]
       ],
       [
        "RND.RECON.denoise",
@@ -4275,8 +4999,11 @@
       [
        "RND.RECON.specular-aa",
        "Specular/geometric anti-aliasing",
-       "reconstruction-upscaling",
-       "E"
+       "material-system",
+       "E",
+       [
+        "reconstruction-upscaling"
+       ]
       ],
       [
        "RND.RECON.foveation",
@@ -4352,6 +5079,17 @@
        "Outline, edge & stylized post effects",
        "post-color-hdr",
        "E"
+      ],
+      [
+       "RND.POST.display-state",
+       "Exposure/pre-exposure & display-state publication (C-COLOR)",
+       "post-color-hdr",
+       "E",
+       [
+        "render-2d-vector",
+        "media-playback",
+        "xr-runtime"
+       ]
       ]
      ]
     },
@@ -4379,7 +5117,7 @@
       ],
       [
        "RND.TRANS.lighting",
-       "Translucent lighting & volumetric integration",
+       "Translucent-surface lighting, sampling media via C-ATMOS",
        "translucency-decals",
        "E",
        [
@@ -4479,6 +5217,17 @@
        [
         "asset-cook-processors"
        ]
+      ],
+      [
+       "RND.2D.world-sprites",
+       "World-space sprites, billboards & cutouts lit and shadowed in a 3D scene (2.5D)",
+       "render-2d-vector",
+       "E",
+       [],
+       [
+        "lite3d",
+        "std3d"
+       ]
       ]
      ]
     },
@@ -4524,13 +5273,19 @@
       ],
       [
        "RND.VFX.volumes",
-       "Sparse/heterogeneous volume rendering & lighting (NanoVDB class)",
+       "Volume emitters injecting heterogeneous sparse media (NanoVDB class) into the media integrator via C-ATMOS",
        "vfx-particles",
        "M",
        [
         "atmosphere-weather",
         "fluid-simulation"
        ]
+      ],
+      [
+       "RND.VFX.volume-playback",
+       "Baked/volume-cache smoke & fire playback (VDB/flipbook)",
+       "vfx-particles",
+       "E"
       ]
      ]
     },
@@ -4561,6 +5316,16 @@
        "E",
        [
         "rhi-core"
+       ]
+      ],
+      [
+       "RND.GPU.hetero-offload",
+       "Heterogeneous adapter offload (inference, encode, async work on the integrated GPU/NPU)",
+       "gpu-platform-architect",
+       "X",
+       [],
+       [
+        "experimental"
        ]
       ]
      ]
@@ -4656,6 +5421,52 @@
        [
         "world-editor-viewport"
        ]
+      ],
+      [
+       "RND.TOOL.color-post",
+       "Grading/LUT & post-volume authoring with color-managed HDR preview",
+       "post-color-hdr",
+       "E"
+      ],
+      [
+       "RND.TOOL.groom",
+       "Groom import, hair-card generation & digital-human preview",
+       "character-rendering",
+       "E",
+       [],
+       [
+        "aaa"
+       ]
+      ],
+      [
+       "RND.TOOL.texture-inspect",
+       "Texture/VT streaming inspection (residency heatmaps, mip bias, accuracy views)",
+       "texture-streaming-vt",
+       "E"
+      ],
+      [
+       "RND.TOOL.decals",
+       "Decal placement & projection tools",
+       "translucency-decals",
+       "E"
+      ],
+      [
+       "RND.TOOL.scalability-preview",
+       "Scalability/device-profile authoring & preview-on-tier",
+       "render-architect",
+       "E",
+       [
+        "runtime-scalability"
+       ]
+      ],
+      [
+       "RND.TOOL.frame-debugger",
+       "In-engine frame / render-graph debugger (passes, resources, per-pass timings)",
+       "render-graph-scheduling",
+       "E",
+       [
+        "visual-debugging-tools"
+       ]
       ]
      ]
     }
@@ -4709,9 +5520,52 @@
        "ML.RT.npu",
        "NPU backends via platform ML APIs",
        "ml-inference-runtime",
-       "M",
+       "X",
        [
         "platform-architect"
+       ],
+       [
+        "experimental"
+       ]
+      ],
+      [
+       "ML.RT.validation",
+       "Backend & quantization conformance with tolerance tables; model-version regression",
+       "ml-inference-runtime",
+       "M"
+      ],
+      [
+       "ML.RT.sequence-models",
+       "Autoregressive/diffusion execution: KV-cache budgets, token streaming, cancellation, constrained decoding",
+       "ml-inference-runtime",
+       "X",
+       [],
+       [
+        "experimental"
+       ]
+      ],
+      [
+       "ML.RT.os-models",
+       "OS-provided foundation-model APIs as a backend",
+       "ml-inference-runtime",
+       "M"
+      ],
+      [
+       "ML.RT.residency",
+       "Model-weight residency registered as a pool in RES.MGMT.arbitration",
+       "ml-inference-runtime",
+       "M",
+       [
+        "resource-streaming-architect"
+       ]
+      ],
+      [
+       "ML.RT.local-remote",
+       "Same model interface served locally or through the C-LIVE generative boundary (routing policy, fallback)",
+       "ml-inference-runtime",
+       "M",
+       [
+        "online-services-liveops"
        ]
       ]
      ]
@@ -4830,6 +5684,49 @@
        [
         "test-architect"
        ]
+      ],
+      [
+       "PHY.ARCH.multi-world",
+       "Multiple physics worlds per process (match instances, preview worlds, server density), handle scoping, per-world budgets",
+       "physics-architect",
+       "E",
+       [
+        "dedicated-server",
+        "world-data-model"
+       ]
+      ],
+      [
+       "PHY.ARCH.local-frames",
+       "Moving local simulation spaces (physics grids): body/controller transitions between frames, LWC interplay",
+       "physics-architect",
+       "M",
+       [
+        "vehicle-physics",
+        "character-physics",
+        "spatial-transforms",
+        "prediction-rollback"
+       ]
+      ],
+      [
+       "PHY.ARCH.tier-transitions",
+       "Physics participation in simulation-tier promotion/demotion",
+       "physics-architect",
+       "E",
+       [
+        "vehicle-physics",
+        "character-physics",
+        "crowd-simulation"
+       ]
+      ],
+      [
+       "PHY.ARCH.fields",
+       "Gravity & force fields (volumes, radial/non-uniform gravity, impulse/explosion fields) applied to bodies, controllers and cloth",
+       "physics-architect",
+       "E",
+       [
+        "character-physics",
+        "vehicle-physics"
+       ]
       ]
      ]
     },
@@ -4899,6 +5796,18 @@
        "Convex decomposition & simple-collision generation",
        "collision-detection",
        "E"
+      ],
+      [
+       "PHY.COL.runtime-build",
+       "Runtime/incremental collision generation for edited geometry (voxel chunks, deformed heightfields, debris, UGC), async and budgeted",
+       "collision-detection",
+       "E",
+       [
+        "voxel-worlds",
+        "terrain",
+        "destruction-fracture",
+        "modding-ugc"
+       ]
       ]
      ]
     },
@@ -4977,7 +5886,7 @@
      "caps": [
       [
        "PHY.CTRL.character",
-       "Character controllers (kinematic & dynamic)",
+       "Character controllers (kinematic & dynamic; arbitrary up-vector / non-uniform gravity)",
        "character-physics",
        "E"
       ],
@@ -5072,7 +5981,11 @@
        "PHY.SOFT.ml",
        "ML cloth & learned deformables",
        "cloth-deformables",
-       "X"
+       "X",
+       [],
+       [
+        "experimental"
+       ]
       ]
      ]
     },
@@ -5100,6 +6013,16 @@
        "Destruction → navigation / render / audio updates",
        "destruction-fracture",
        "E"
+      ],
+      [
+       "PHY.DEST.structural",
+       "Structural integrity / load-path evaluation & collapse",
+       "destruction-fracture",
+       "E",
+       [
+        "gameplay-systems-toolkit",
+        "voxel-worlds"
+       ]
       ]
      ]
     },
@@ -5115,24 +6038,24 @@
       ],
       [
        "PHY.FLUID.grid",
-       "Grid-based smoke & fire",
+       "Real-time interactive grid smoke & fire",
        "fluid-simulation",
-       "E"
-      ],
-      [
-       "PHY.FLUID.shallow",
-       "Shallow-water / heightfield water simulation",
-       "fluid-simulation",
-       "E",
-       [
-        "water-ocean"
-       ]
+       "M"
       ],
       [
        "PHY.FLUID.gpu",
        "GPU fluid solvers",
        "fluid-simulation",
        "M"
+      ],
+      [
+       "PHY.FLUID.cellular",
+       "Grid/cellular material & fluid simulation (falling sand, liquid/gas/heat grids), 2D-capable, deterministic",
+       "fluid-simulation",
+       "E",
+       [
+        "physics-2d"
+       ]
       ]
      ]
     },
@@ -5187,6 +6110,10 @@
        [
         "ik-procedural-animation",
         "rigid-body-dynamics"
+       ],
+       [
+        "lite3d",
+        "std3d"
        ]
       ],
       [
@@ -5209,29 +6136,47 @@
        ]
       ],
       [
-       "PHY.TOOL.tuning",
-       "Vehicle & controller tuning tools",
-       "physics-tools",
-       "E",
-       [
-        "vehicle-physics",
-        "character-physics"
-       ]
-      ],
-      [
        "PHY.TOOL.2d-shapes",
        "2D collision-shape editing",
-       "physics-tools",
-       "E",
-       [
-        "physics-2d"
-       ]
+       "physics-2d",
+       "E"
       ],
       [
        "PHY.TOOL.fracture",
        "Fracture authoring & precomputation",
        "destruction-fracture",
        "E"
+      ],
+      [
+       "PHY.TOOL.cloth",
+       "Cloth asset authoring & weight/max-distance painting",
+       "cloth-deformables",
+       "E"
+      ],
+      [
+       "PHY.TOOL.fluids",
+       "Fluid simulation setup & cache baking",
+       "fluid-simulation",
+       "E"
+      ],
+      [
+       "PHY.TOOL.vehicle-tuning",
+       "Vehicle tuning tools (telemetry graphs, tire/suspension editors)",
+       "vehicle-physics",
+       "E",
+       [],
+       [
+        "vehicles"
+       ]
+      ],
+      [
+       "PHY.TOOL.controller-tuning",
+       "Character-controller tuning tools",
+       "character-physics",
+       "E",
+       [
+        "character-movement"
+       ]
       ]
      ]
     }
@@ -5259,7 +6204,7 @@
       ],
       [
        "ANM.ARCH.sync",
-       "Animation-side obligations within the canonical simulation schedule; root-motion policy",
+       "Animation-side obligations within the canonical simulation schedule (root-motion deltas and trajectory via C-ANIM; authority in GAM.MOVE.root-motion)",
        "animation-architect",
        "E",
        [
@@ -5314,7 +6259,12 @@
        "ANM.RT.compression",
        "Animation compression (ACL class)",
        "animation-runtime",
-       "E"
+       "E",
+       [],
+       [
+        "lite3d",
+        "std3d"
+       ]
       ],
       [
        "ANM.RT.blending",
@@ -5350,6 +6300,10 @@
        "E",
        [
         "prediction-rollback"
+       ],
+       [
+        "lite3d",
+        "std3d"
        ]
       ],
       [
@@ -5421,6 +6375,16 @@
        [
         "asset-import-interchange"
        ]
+      ],
+      [
+       "ANM.DEF.modular-assembly",
+       "Modular character assembly, mesh merging & runtime material/texture baking",
+       "deformation-skinning",
+       "E",
+       [
+        "character-rendering",
+        "material-system"
+       ]
       ]
      ]
     },
@@ -5487,6 +6451,26 @@
        "Trajectory prediction & gameplay coupling",
        "motion-synthesis",
        "E"
+      ],
+      [
+       "ANM.SYN.motion-warping",
+       "Motion warping of root motion to gameplay targets (vault, mantle, attack alignment)",
+       "motion-synthesis",
+       "E",
+       [
+        "character-movement"
+       ]
+      ],
+      [
+       "ANM.SYN.multi-actor",
+       "Synchronized multi-actor animation scenes (paired/contextual; alignment, roles, predicted & replicated as one unit)",
+       "motion-synthesis",
+       "E",
+       [
+        "ik-procedural-animation",
+        "prediction-rollback",
+        "character-movement"
+       ]
       ]
      ]
     },
@@ -5526,6 +6510,17 @@
        "2D IK constraints",
        "ik-procedural-animation",
        "E"
+      ],
+      [
+       "ANM.IK.avatar-embodiment",
+       "Full-body avatar IK from sparse tracking & tracked-expression retargeting",
+       "ik-procedural-animation",
+       "E",
+       [
+        "facial-animation",
+        "replication",
+        "xr-runtime"
+       ]
       ]
      ]
     },
@@ -5667,6 +6662,31 @@
        "Facial rig & pose tools",
        "facial-animation",
        "E"
+      ],
+      [
+       "ANM.TOOL.sequencer-editor",
+       "Sequencer authoring: tracks, bindings, shots/sub-sequences, keyframing, preview & scrub",
+       "cinematics-sequencer",
+       "E",
+       [
+        "editor-ui-framework"
+       ]
+      ],
+      [
+       "ANM.TOOL.take-recorder",
+       "Take recording of gameplay, live-link body/face mocap and virtual cameras into sequences",
+       "cinematics-sequencer",
+       "E",
+       [
+        "asset-import-interchange",
+        "determinism-replay"
+       ]
+      ],
+      [
+       "ANM.TOOL.deformers",
+       "Deformer & modular-character setup tools",
+       "deformation-skinning",
+       "E"
       ]
      ]
     }
@@ -5803,6 +6823,15 @@
        "Panning & distance models",
        "audio-dsp-mixing",
        "E"
+      ],
+      [
+       "AUD.DSP.voice-jitter",
+       "Voice jitter buffer, packet-loss concealment & codec",
+       "audio-dsp-mixing",
+       "E",
+       [
+        "network-transport"
+       ]
       ]
      ]
     },
@@ -5848,6 +6877,16 @@
        "Reverb zones & environment modeling",
        "spatial-audio-acoustics",
        "E"
+      ],
+      [
+       "AUD.SPAT.proximity-voice",
+       "Positional/proximity voice",
+       "spatial-audio-acoustics",
+       "E",
+       [
+        "replication",
+        "online-services-liveops"
+       ]
       ]
      ]
     },
@@ -5909,6 +6948,15 @@
        [
         "ml-inference-runtime"
        ]
+      ],
+      [
+       "AUD.CONTENT.music-clock",
+       "Sample-accurate musical clock, quantized scheduling & beat events to gameplay",
+       "audio-content-runtime",
+       "E",
+       [
+        "frame-orchestration"
+       ]
       ]
      ]
     },
@@ -5923,6 +6971,21 @@
        "E",
        [
         "graph-editor-framework"
+       ]
+      ],
+      [
+       "AUD.TOOL.acoustics",
+       "Reverb-zone & occlusion authoring, acoustic propagation baking",
+       "spatial-audio-acoustics",
+       "E"
+      ],
+      [
+       "AUD.TOOL.profiler",
+       "Audio profiler/debugger (voices, buses, loudness)",
+       "audio-architect",
+       "E",
+       [
+        "audio-dsp-mixing"
        ]
       ]
      ]
@@ -6018,16 +7081,18 @@
        "input-devices-haptics",
        "E",
        [
-        "accessibility"
+        "accessibility",
+        "privacy-data-protection"
        ]
       ],
       [
-       "INP.DEV.injection",
-       "Virtual input device injection for bots & tests",
+       "INP.DEV.companion",
+       "Companion/second-screen devices as networked input devices",
        "input-devices-haptics",
        "E",
        [
-        "functional-automation-soak"
+        "network-transport",
+        "platform-web"
        ]
       ]
      ]
@@ -6110,6 +7175,53 @@
        [
         "audio-architect"
        ]
+      ],
+      [
+       "INP.ACT.platform-remap",
+       "Integration with OS/store input remapping layers (action-set APIs, system remap queries, origin → glyph resolution)",
+       "input-system",
+       "E",
+       [
+        "platform-desktop",
+        "platform-console"
+       ]
+      ],
+      [
+       "INP.ACT.sequences",
+       "Deterministic input-sequence & gesture recognition (motion/charge commands, leniency windows, negative edge)",
+       "input-system",
+       "E"
+      ],
+      [
+       "INP.ACT.touch-controls",
+       "On-screen touch controls (virtual sticks/buttons) feeding actions",
+       "input-system",
+       "E",
+       [
+        "ui-architect"
+       ]
+      ],
+      [
+       "INP.ACT.injection",
+       "Action-level input injection for bots & tests (headless-capable)",
+       "input-system",
+       "E",
+       [
+        "functional-automation-soak",
+        "input-devices-haptics"
+       ]
+      ]
+     ]
+    },
+    {
+     "id": "INP.TOOL",
+     "name": "Input tooling",
+     "caps": [
+      [
+       "INP.TOOL.actions",
+       "Action/context mapping editor & device preview",
+       "input-system",
+       "E"
       ]
      ]
     }
@@ -6163,10 +7275,10 @@
       [
        "NET.ARCH.async",
        "Asynchronous / turn-based backend-mediated play",
-       "network-architect",
+       "online-services-liveops",
        "E",
        [
-        "online-services-liveops"
+        "network-architect"
        ]
       ],
       [
@@ -6191,18 +7303,22 @@
       ],
       [
        "NET.ARCH.validation",
-       "Netcode oracle suite: deterministic net simulation, prediction/replication correctness metrics",
+       "Netcode oracle scenarios & acceptance thresholds (co-signed by simulation-validation per QA.AGENT.oracle-change-control)",
        "network-architect",
        "E",
        [
-        "functional-automation-soak"
+        "functional-automation-soak",
+        "simulation-validation"
        ]
       ],
       [
        "NET.ARCH.meshing",
        "Seamless dynamic server meshing / cross-server entity authority",
-       "network-architect",
-       "X"
+       "server-scaleout-persistence",
+       "M",
+       [
+        "network-architect"
+       ]
       ]
      ]
     },
@@ -6260,7 +7376,7 @@
       ],
       [
        "NET.TRANS.simulation",
-       "Network link simulation (latency, loss, jitter)",
+       "Network link conditioner seam (latency, loss, jitter)",
        "network-transport",
        "E"
       ],
@@ -6307,6 +7423,35 @@
         "platform-console",
         "platform-mobile"
        ]
+      ],
+      [
+       "NET.TRANS.web-server",
+       "Server-side browser transport endpoints & certificate handling",
+       "network-transport",
+       "E",
+       [
+        "dedicated-server"
+       ]
+      ],
+      [
+       "NET.TRANS.l4s",
+       "L4S low-latency congestion signalling",
+       "network-transport",
+       "X",
+       [],
+       [
+        "experimental"
+       ]
+      ],
+      [
+       "NET.TRANS.local-network",
+       "LAN/local-wireless session discovery & hosting without online services (broadcast/mDNS, console ad-hoc)",
+       "network-transport",
+       "E",
+       [
+        "platform-console",
+        "net-session"
+       ]
       ]
      ]
     },
@@ -6316,7 +7461,7 @@
      "caps": [
       [
        "NET.REP.state",
-       "Entity & property replication",
+       "Entity & property replication with push/dirty-tracked change detection (consuming C-ECS change versions and C-SPATIAL change sets), serialized once per object",
        "replication",
        "E"
       ],
@@ -6332,7 +7477,8 @@
        "replication",
        "E",
        [
-        "world-architect"
+        "world-architect",
+        "anti-cheat-integrity"
        ]
       ],
       [
@@ -6381,6 +7527,28 @@
        "E",
        [
         "prediction-rollback"
+       ]
+      ],
+      [
+       "NET.REP.change-tracking",
+       "Change-driven replication: dirty tracking at the write site, per-object serialized deltas shared across connections, batch-parallel filtering/prioritization; cost O(changes + relevant set per connection)",
+       "replication",
+       "E"
+      ],
+      [
+       "NET.REP.parallel",
+       "Parallel per-connection packet building with shared per-object serialization",
+       "replication",
+       "E"
+      ],
+      [
+       "NET.REP.moq-spectator",
+       "Media-over-QUIC spectator/broadcast streams",
+       "replication",
+       "X",
+       [],
+       [
+        "experimental"
        ]
       ]
      ]
@@ -6433,7 +7601,7 @@
       ],
       [
        "NET.PRED.input-commands",
-       "Tick-stamped networked input commands, redundancy, buffering, server-side validation hooks",
+       "Network delivery of C-INPUT command frames: redundancy, jitter buffering, server-side validation hooks (format owned by input-system)",
        "prediction-rollback",
        "E",
        [
@@ -6474,7 +7642,7 @@
        "dedicated-server",
        "E",
        [
-        "platform-services"
+        "online-services-liveops"
        ]
       ],
       [
@@ -6487,59 +7655,85 @@
        ]
       ],
       [
-       "NET.SRV.listen",
-       "Listen servers & host migration",
-       "dedicated-server",
-       "E",
-       [
-        "network-architect"
-       ]
-      ],
-      [
        "NET.SRV.persistence",
        "Server-authoritative persistent player/world data boundary (write-behind, leases, crash consistency, live schema migration)",
-       "dedicated-server",
+       "server-scaleout-persistence",
        "E",
        [
         "persistence-save",
-        "serialization-schema"
+        "serialization-schema",
+        "dedicated-server"
        ]
       ],
       [
        "NET.SRV.transactions",
        "Idempotent economy/inventory transaction boundary",
-       "dedicated-server",
+       "server-scaleout-persistence",
        "E",
        [
-        "anti-cheat-integrity"
-       ]
-      ],
-      [
-       "NET.SRV.auth",
-       "Server-side auth-ticket & service-identity validation",
-       "dedicated-server",
-       "E",
-       [
-        "network-transport"
+        "anti-cheat-integrity",
+        "dedicated-server"
        ]
       ],
       [
        "NET.SRV.zoning",
        "Zoned/instanced multi-server worlds & player handoff",
-       "dedicated-server",
+       "server-scaleout-persistence",
        "E",
        [
         "world-architect",
-        "replication"
+        "replication",
+        "dedicated-server"
        ]
       ],
       [
-       "NET.SRV.host-os",
-       "Server host OS & container specifics (Linux, ARM64 hosts)",
+       "NET.SRV.lifecycle",
+       "Server lifecycle for rolling deploys: health/readiness, graceful drain, session hand-off, fleet-version coexistence",
        "dedicated-server",
        "E",
        [
-        "platform-desktop"
+        "network-architect",
+        "online-services-liveops"
+       ]
+      ],
+      [
+       "NET.SRV.admin",
+       "Authenticated admin/GM command surface on shipping servers: RBAC, audit log, rate limits",
+       "dedicated-server",
+       "E",
+       [
+        "security-engineering",
+        "anti-cheat-integrity"
+       ]
+      ],
+      [
+       "NET.SRV.overload",
+       "Overload degradation (time dilation, adaptive tick, relevancy throttling)",
+       "dedicated-server",
+       "E",
+       [
+        "replication",
+        "frame-orchestration"
+       ]
+      ],
+      [
+       "NET.SRV.budgets",
+       "Per-connection memory/CPU/RPC quotas & limits on client-triggered work",
+       "dedicated-server",
+       "E",
+       [
+        "replication",
+        "anti-cheat-integrity"
+       ]
+      ],
+      [
+       "NET.SRV.cross-server",
+       "Cross-server messaging & entity/player hand-off",
+       "server-scaleout-persistence",
+       "E",
+       [
+        "replication",
+        "world-architect"
        ]
       ]
      ]
@@ -6576,6 +7770,83 @@
        "E",
        [
         "determinism-replay"
+       ]
+      ]
+     ]
+    },
+    {
+     "id": "NET.SESS",
+     "name": "Network sessions",
+     "caps": [
+      [
+       "NET.SESS.handshake",
+       "Connect handshake: compatibility/version check, auth token, capability negotiation",
+       "net-session",
+       "E",
+       [
+        "network-architect"
+       ]
+      ],
+      [
+       "NET.SESS.join",
+       "Load-gated join readiness & spawn hand-off",
+       "net-session",
+       "E",
+       [
+        "gameplay-architect"
+       ]
+      ],
+      [
+       "NET.SESS.baseline",
+       "Join-in-progress baseline snapshot",
+       "net-session",
+       "E",
+       [
+        "replication"
+       ]
+      ],
+      [
+       "NET.SESS.reconnect",
+       "Reconnect/rejoin with ownership & state restore in a grace window",
+       "net-session",
+       "E"
+      ],
+      [
+       "NET.SESS.travel",
+       "Server-driven travel with connected clients",
+       "net-session",
+       "E",
+       [
+        "world-architect"
+       ]
+      ],
+      [
+       "NET.SESS.disconnect",
+       "Disconnect/kick reasons & ban hook",
+       "net-session",
+       "E",
+       [
+        "anti-cheat-integrity"
+       ]
+      ],
+      [
+       "NET.SESS.host-mode",
+       "Hosting modes (dedicated, listen, P2P host, relay-hosted) & host migration",
+       "net-session",
+       "E",
+       [
+        "network-architect",
+        "dedicated-server"
+       ]
+      ],
+      [
+       "NET.SESS.auth",
+       "Auth-ticket & service-identity validation in every host mode",
+       "net-session",
+       "E",
+       [
+        "network-transport",
+        "dedicated-server"
        ]
       ]
      ]
@@ -6674,6 +7945,17 @@
        [
         "audio-content-runtime"
        ]
+      ],
+      [
+       "GAM.FW.customization-descriptor",
+       "Character customization descriptor with save/replication/streaming participation",
+       "gameplay-architect",
+       "E",
+       [
+        "persistence-save",
+        "replication",
+        "deformation-skinning"
+       ]
       ]
      ]
     },
@@ -6694,12 +7976,6 @@
        "E"
       ],
       [
-       "GAM.SYS.camera",
-       "Gameplay camera rigs, blending & collision (C-VIEW sources)",
-       "gameplay-systems-toolkit",
-       "E"
-      ],
-      [
        "GAM.SYS.spawning",
        "Spawning (batched, deferred structural changes); pooling only where measured",
        "gameplay-systems-toolkit",
@@ -6713,12 +7989,6 @@
        [
         "entity-object-model"
        ]
-      ],
-      [
-       "GAM.SYS.photo",
-       "Photo mode",
-       "gameplay-systems-toolkit",
-       "E"
       ],
       [
        "GAM.SYS.predicted-abilities",
@@ -6741,21 +8011,23 @@
       ],
       [
        "GAM.SYS.volumes",
-       "Trigger & gameplay volumes, gameplay markers, level-scoped logic wiring",
+       "Trigger & gameplay volumes, gameplay markers, cell/instance-scoped logic wiring (soft references via C-WORLD activation)",
        "gameplay-systems-toolkit",
        "E",
        [
         "collision-detection",
-        "scripting-runtime"
+        "scripting-runtime",
+        "world-architect"
        ]
       ],
       [
        "GAM.SYS.building",
-       "Player construction (snapping, sockets, structural integrity)",
+       "Player construction (snapping, sockets; stability via PHY.DEST.structural)",
        "gameplay-systems-toolkit",
        "E",
        [
-        "voxel-worlds"
+        "voxel-worlds",
+        "destruction-fracture"
        ]
       ],
       [
@@ -6767,6 +8039,28 @@
         "collision-detection",
         "animation-runtime",
         "prediction-rollback"
+       ]
+      ],
+      [
+       "GAM.SYS.projectiles",
+       "Projectile & ballistics simulation (batched sweeps, drag/gravity, penetration/ricochet by physics material, predicted projectiles, server-side rewind validation)",
+       "gameplay-systems-toolkit",
+       "E",
+       [
+        "collision-detection",
+        "prediction-rollback",
+        "physics-architect",
+        "anti-cheat-integrity"
+       ]
+      ],
+      [
+       "GAM.SYS.markers",
+       "POI/marker registry shared by gameplay, UI and map rendering",
+       "gameplay-systems-toolkit",
+       "E",
+       [
+        "ui-architect",
+        "render-architect"
        ]
       ]
      ]
@@ -6840,11 +8134,22 @@
       ],
       [
        "GAM.SCR.level-scripting",
-       "Level-bound script/event wiring",
+       "Script binding for world-, cell-, data-layer- or instance-scoped logic with streaming-safe references (soft IDs resolved on activation)",
        "scripting-runtime",
        "E",
        [
-        "world-data-model"
+        "world-data-model",
+        "world-architect"
+       ]
+      ],
+      [
+       "GAM.SCR.hotfix",
+       "Script/logic hotfix delivery within store policy (signed, versioned, rollback)",
+       "scripting-runtime",
+       "E",
+       [
+        "packaging-release-patching",
+        "certification-compliance"
        ]
       ]
      ]
@@ -6938,12 +8243,6 @@
        "M"
       ],
       [
-       "GAM.AI.llm",
-       "LLM-driven NPC dialogue & behavior (via C-AIAGENT; guardrails per XC.SEC.genai)",
-       "ai-behavior-perception",
-       "M"
-      ],
-      [
        "GAM.AI.local-avoidance",
        "Local avoidance (ORCA/RVO)",
        "navigation-pathfinding",
@@ -6970,6 +8269,64 @@
       [
        "GAM.AI.tactical",
        "Cover/tactical point generation & squad coordination",
+       "ai-behavior-perception",
+       "E"
+      ],
+      [
+       "GAM.AI.validation",
+       "Navigation/AI oracles: navmesh connectivity & coverage, path optimality vs exact A*, avoidance without interpenetration",
+       "navigation-pathfinding",
+       "E",
+       [
+        "simulation-validation"
+       ]
+      ],
+      [
+       "GAM.AI.llm-dialogue",
+       "LLM-generated barks & dialogue on non-authoritative state (via C-AIAGENT; guardrails per XC.SEC.genai; localized per UI.LOC.generated; conversational memory via C-SAVE with retention limits)",
+       "ai-behavior-perception",
+       "M",
+       [
+        "persistence-save",
+        "localization-i18n"
+       ]
+      ],
+      [
+       "GAM.AI.llm-decision",
+       "Model output that changes authoritative simulation state (recorded as external input)",
+       "ai-behavior-perception",
+       "X",
+       [
+        "determinism-replay"
+       ],
+       [
+        "experimental"
+       ]
+      ],
+      [
+       "GAM.AI.local-guardrails",
+       "On-device safety classification when no remote moderation is available",
+       "ai-behavior-perception",
+       "M",
+       [
+        "security-engineering"
+       ]
+      ],
+      [
+       "GAM.AI.team-visibility",
+       "Per-faction visibility fields & line-of-sight/FOV (grid/hex/navmesh, GPU variant), explored state, deterministic, feeding fog rendering, AI knowledge and replication relevancy",
+       "ai-behavior-perception",
+       "E",
+       [
+        "replication",
+        "anti-cheat-integrity",
+        "render-2d-vector",
+        "crowd-simulation"
+       ]
+      ],
+      [
+       "GAM.AI.search",
+       "Game-tree search AI (minimax, MCTS, information-set search) over clonable rule state",
        "ai-behavior-perception",
        "E"
       ]
@@ -7035,7 +8392,7 @@
       ],
       [
        "GAM.SAVE.settings",
-       "Player settings/options model, scopes (device/user/cloud) & first-boot availability",
+       "Persisted player-settings store per scope (device/user/cloud), first-boot availability; settings declared through C-CFG",
        "persistence-save",
        "E",
        [
@@ -7075,7 +8432,10 @@
        "GAM.MOVE.root-motion",
        "Root-motion vs capsule authority",
        "character-movement",
-       "E"
+       "E",
+       [
+        "animation-architect"
+       ]
       ],
       [
        "GAM.MOVE.transitions",
@@ -7243,6 +8603,100 @@
        [
         "graph-editor-framework"
        ]
+      ],
+      [
+       "GAM.TOOL.crowd-lanes",
+       "Crowd zone & lane-graph authoring, spawners",
+       "crowd-simulation",
+       "E"
+      ],
+      [
+       "GAM.TOOL.camera",
+       "Camera rig authoring & preview",
+       "gameplay-camera",
+       "E"
+      ],
+      [
+       "GAM.TOOL.sim-debug",
+       "Field/network simulation visualization & tuning",
+       "systems-simulation",
+       "E"
+      ],
+      [
+       "GAM.TOOL.script-debugger",
+       "Script & visual-script authoring integration and debugger",
+       "scripting-runtime",
+       "E"
+      ]
+     ]
+    },
+    {
+     "id": "GAM.SIM",
+     "name": "Systems simulation",
+     "caps": [
+      [
+       "GAM.SIM.fields",
+       "Grid/field simulation substrates (diffusion, influence, cellular spread), SIMD/GPU-capable, deterministic",
+       "systems-simulation",
+       "E"
+      ],
+      [
+       "GAM.SIM.networks",
+       "Flow networks (power, fluid, logistics, conveyors) with incremental solve",
+       "systems-simulation",
+       "E"
+      ],
+      [
+       "GAM.SIM.time-accel",
+       "Time acceleration with budgeted multi-tick catch-up",
+       "systems-simulation",
+       "E",
+       [
+        "frame-orchestration"
+       ]
+      ],
+      [
+       "GAM.SIM.scale-save",
+       "Large simulation-state snapshot & save",
+       "systems-simulation",
+       "E",
+       [
+        "persistence-save"
+       ]
+      ]
+     ]
+    },
+    {
+     "id": "GAM.CAM",
+     "name": "Gameplay camera",
+     "caps": [
+      [
+       "GAM.CAM.rigs",
+       "Gameplay camera rigs, blending & collision (C-VIEW sources)",
+       "gameplay-camera",
+       "E"
+      ],
+      [
+       "GAM.CAM.photo",
+       "Photo mode",
+       "gameplay-camera",
+       "E"
+      ],
+      [
+       "GAM.CAM.2d",
+       "2D cameras: dead zones, parallax, pixel snapping",
+       "gameplay-camera",
+       "E"
+      ],
+      [
+       "GAM.CAM.comfort",
+       "Camera comfort & accessibility motion options (shake, FOV, head-bob)",
+       "gameplay-camera",
+       "E",
+       [
+        "accessibility",
+        "xr-runtime"
+       ]
       ]
      ]
     }
@@ -7258,7 +8712,7 @@
      "caps": [
       [
        "UI.FW.architecture",
-       "Game UI architecture (retained + data binding)",
+       "Game UI architecture: retained UI with change-notified view models and compiled/resolved bindings (no per-frame polling)",
        "ui-architect",
        "E"
       ],
@@ -7360,7 +8814,7 @@
       ],
       [
        "UI.FW.logic",
-       "UI logic hosting via reflection-invoked handlers (script/visual script)",
+       "UI logic hosting: handlers resolved at load/compile time (script or visual script via C-SCRIPT); reflection only for authoring",
        "ui-architect",
        "E",
        [
@@ -7384,6 +8838,25 @@
        "E",
        [
         "accessibility"
+       ]
+      ],
+      [
+       "UI.FW.validation",
+       "UI layout/screenshot regression, focus-graph completeness, safe-area compliance",
+       "ui-architect",
+       "E",
+       [
+        "functional-automation-soak"
+       ]
+      ],
+      [
+       "UI.FW.maps",
+       "World map/minimap service (cooked map tiles, streamed markers, discovery overlay)",
+       "ui-architect",
+       "E",
+       [
+        "world-architect",
+        "gameplay-systems-toolkit"
        ]
       ]
      ]
@@ -7439,6 +8912,12 @@
        [
         "asset-cook-processors"
        ]
+      ],
+      [
+       "UI.TXT.locale-shaping",
+       "Locale-aware shaping & breaking (Han variant selection, dictionary breaking for Thai/Lao/Khmer, kinsoku)",
+       "text-fonts",
+       "E"
       ]
      ]
     },
@@ -7511,6 +8990,25 @@
        [
         "content-pipeline-architect"
        ]
+      ],
+      [
+       "UI.LOC.generated",
+       "Locale & culturalization of runtime-generated text (generative/templated output: target locale, plural/gender agreement, culturalization review hooks)",
+       "localization-i18n",
+       "M",
+       [
+        "ai-behavior-perception"
+       ]
+      ],
+      [
+       "UI.LOC.gather",
+       "Localizable-text value type in reflection & gather from reflected and cooked data",
+       "localization-i18n",
+       "E",
+       [
+        "reflection-metadata",
+        "gameplay-data"
+       ]
       ]
      ]
     },
@@ -7574,6 +9072,35 @@
        [
         "online-services-liveops"
        ]
+      ],
+      [
+       "UI.A11Y.sound-visualization",
+       "Non-speech captions & directional sound visualization (caption/direction metadata on audio events)",
+       "accessibility",
+       "E",
+       [
+        "audio-content-runtime"
+       ]
+      ],
+      [
+       "UI.A11Y.audio-description",
+       "Audio description for cinematics & gameplay narration mode",
+       "accessibility",
+       "E",
+       [
+        "cinematics-sequencer",
+        "narrative-dialogue"
+       ]
+      ],
+      [
+       "UI.A11Y.palettes",
+       "Semantic color tokens & redundant shape/icon palettes for UI and gameplay highlights",
+       "accessibility",
+       "E",
+       [
+        "ui-architect",
+        "post-color-hdr"
+       ]
       ]
      ]
     },
@@ -7589,6 +9116,33 @@
        [
         "editor-ui-framework"
        ]
+      ],
+      [
+       "UI.TOOL.localization",
+       "String-table editor, localization dashboard, in-context preview with pseudo-loc & overflow",
+       "localization-i18n",
+       "E"
+      ],
+      [
+       "UI.TOOL.preview",
+       "UI preview across resolution, safe area, locale & input device",
+       "ui-architect",
+       "E",
+       [
+        "text-fonts"
+       ]
+      ],
+      [
+       "UI.TOOL.binding-debug",
+       "UI data-binding debugger",
+       "ui-architect",
+       "E"
+      ],
+      [
+       "UI.TOOL.a11y-preview",
+       "Accessibility preview (colorblind simulation, caption preview, screen-reader tree inspector)",
+       "accessibility",
+       "E"
       ]
      ]
     }
@@ -7618,7 +9172,12 @@
        "ED.ARCH.transactions",
        "Command / transaction / undo-redo system",
        "editor-architect",
-       "E"
+       "E",
+       [
+        "modding-ugc",
+        "collaboration-version-control",
+        "serialization-schema"
+       ]
       ],
       [
        "ED.ARCH.selection",
@@ -7682,16 +9241,11 @@
        [
         "dedicated-server",
         "network-transport"
-       ]
-      ],
-      [
-       "ED.ARCH.agent-api",
-       "Agent/automation control & introspection protocol for editor and runtime",
-       "editor-architect",
-       "M",
+       ],
        [
-        "visual-debugging-tools",
-        "observability-telemetry"
+        "online",
+        "online-lockstep",
+        "online-rollback"
        ]
       ],
       [
@@ -7701,6 +9255,47 @@
        "E",
        [
         "hot-reload-iteration"
+       ]
+      ],
+      [
+       "ED.ARCH.telemetry",
+       "Studio tool telemetry: usage, slow tasks, crash and DDC/cook health dashboards",
+       "editor-architect",
+       "E",
+       [
+        "observability-telemetry",
+        "crash-diagnostics",
+        "loading-streaming-performance"
+       ],
+       [
+        "team-large"
+       ]
+      ],
+      [
+       "ED.ARCH.llm-agent-frontend",
+       "LLM/agent front end (MCP class) over C-AUTOMATION and editor commands",
+       "editor-architect",
+       "M",
+       [
+        "visual-debugging-tools"
+       ]
+      ],
+      [
+       "ED.ARCH.transaction-invariants",
+       "Property-based do→undo→redo equivalence incl. multi-user merges",
+       "editor-architect",
+       "E",
+       [
+        "functional-automation-soak"
+       ]
+      ],
+      [
+       "ED.ARCH.automation-security",
+       "Copilot/agent action security: capability-scoped tokens, per-command permission classes, confirmation for code-exec/destructive/network actions, workspace-trust gating",
+       "editor-architect",
+       "E",
+       [
+        "security-engineering"
        ]
       ]
      ]
@@ -7738,13 +9333,13 @@
       ],
       [
        "ED.UI.asset-editor-host",
-       "Generic asset-editor host (tabs, preview, viewers, inspection modes)",
+       "Generic asset-editor host (tabs, preview-panel embedding, viewers, inspection modes)",
        "editor-ui-framework",
        "E"
       ],
       [
        "ED.UI.thumbnails",
-       "Thumbnail generation & caching",
+       "Thumbnail caching & display",
        "editor-ui-framework",
        "E",
        [
@@ -7780,6 +9375,15 @@
        [
         "ui-architect"
        ]
+      ],
+      [
+       "ED.UI.localization",
+       "Editor & tool UI localization",
+       "editor-ui-framework",
+       "E",
+       [
+        "localization-i18n"
+       ]
       ]
      ]
     },
@@ -7812,6 +9416,9 @@
        "E",
        [
         "world-architect"
+       ],
+       [
+        "openworld"
        ]
       ],
       [
@@ -7831,7 +9438,7 @@
       ],
       [
        "ED.WORLD.preview-scenes",
-       "Isolated preview scenes & asset inspection viewports",
+       "Isolated preview-world creation & lifetime (exposed via C-EDVIEW)",
        "world-editor-viewport",
        "E"
       ],
@@ -7858,6 +9465,21 @@
        [
         "render-2d-vector"
        ]
+      ],
+      [
+       "ED.WORLD.color-management",
+       "Editor viewport/preview display transforms (OCIO views, HDR preview)",
+       "world-editor-viewport",
+       "E",
+       [
+        "post-color-hdr"
+       ]
+      ],
+      [
+       "ED.WORLD.mesh-paint",
+       "Mesh vertex-color & texture painting",
+       "world-editor-viewport",
+       "E"
       ]
      ]
     },
@@ -7911,15 +9533,11 @@
        "ED.COLLAB.locking",
        "Locking & checkout workflows",
        "collaboration-version-control",
-       "E",
-       [],
-       [
-        "team-large"
-       ]
+       "E"
       ],
       [
        "ED.COLLAB.multiuser",
-       "Multi-user concurrent editing",
+       "Session-based multi-user editing (small sessions)",
        "collaboration-version-control",
        "E",
        [],
@@ -7956,6 +9574,39 @@
        "Sparse/virtualized workspaces & on-demand payloads",
        "collaboration-version-control",
        "E"
+      ],
+      [
+       "ED.COLLAB.concurrent-world",
+       "Conflict-free concurrent world editing at studio scale (CRDT/OT class)",
+       "collaboration-version-control",
+       "M",
+       [],
+       [
+        "team-large"
+       ]
+      ],
+      [
+       "ED.COLLAB.codev",
+       "Co-development & outsourcing: partner-scoped workspaces and permissions, vendor delivery/acceptance via CNT.VAL.submit-gate and CNT.ID.rights, access revocation",
+       "collaboration-version-control",
+       "E",
+       [
+        "security-engineering",
+        "ci-cd-automation"
+       ],
+       [
+        "team-large"
+       ]
+      ],
+      [
+       "ED.COLLAB.production-tracking",
+       "Production-tracking integration (asset/shot status, task-tracker links)",
+       "collaboration-version-control",
+       "E",
+       [],
+       [
+        "team-large"
+       ]
       ]
      ]
     },
@@ -8006,6 +9657,16 @@
        "E",
        [
         "editor-ui-framework"
+       ]
+      ],
+      [
+       "ED.DEBUG.automation-protocol",
+       "Runtime automation & introspection protocol (C-AUTOMATION) for editor, clients, servers and devices",
+       "visual-debugging-tools",
+       "E",
+       [
+        "observability-telemetry",
+        "editor-architect"
        ]
       ]
      ]
@@ -8101,9 +9762,12 @@
       ],
       [
        "BLD.SYS.configs",
-       "Build configurations (debug, development, test, shipping)",
+       "Build configurations (debug, development, test, profile = shipping optimization with C-INSTR on, shipping)",
        "build-system-toolchains",
-       "E"
+       "E",
+       [
+        "perf-benchmarking"
+       ]
       ],
       [
        "BLD.SYS.platform-sdks",
@@ -8115,6 +9779,16 @@
         "platform-mobile",
         "platform-desktop",
         "certification-compliance"
+       ]
+      ],
+      [
+       "BLD.SYS.dev-surface-exclusion",
+       "Dev-surface manifest per skill, fitness function and binary scan proving shipping configurations contain none; allowed shipping surfaces authenticated via C-IPC",
+       "build-system-toolchains",
+       "E",
+       [
+        "security-engineering",
+        "architecture-governance"
        ]
       ]
      ]
@@ -8131,7 +9805,7 @@
       ],
       [
        "BLD.CI.farm",
-       "Build farm & artifact storage",
+       "Build farm (distributed builds & pooling)",
        "ci-cd-automation",
        "E",
        [],
@@ -8159,7 +9833,7 @@
       ],
       [
        "BLD.CI.devices",
-       "Device-farm orchestration",
+       "Device-farm fleet scheduling & pooling",
        "ci-cd-automation",
        "E",
        [
@@ -8236,6 +9910,35 @@
         "api-lifecycle-migration",
         "security-engineering"
        ]
+      ],
+      [
+       "BLD.CI.device-lanes",
+       "On-device test lanes on attached devkits/phones or cloud device labs",
+       "ci-cd-automation",
+       "E",
+       [
+        "functional-automation-soak",
+        "platform-console",
+        "platform-mobile"
+       ]
+      ],
+      [
+       "BLD.CI.artifacts",
+       "Build artifact retention (symbols, bisection, resubmission)",
+       "ci-cd-automation",
+       "E",
+       [
+        "crash-diagnostics"
+       ]
+      ],
+      [
+       "BLD.CI.bisection",
+       "Single bisection engine serving functional and performance regressions",
+       "ci-cd-automation",
+       "E",
+       [
+        "perf-benchmarking"
+       ]
       ]
      ]
     },
@@ -8260,7 +9963,7 @@
       ],
       [
        "BLD.REL.patching",
-       "Delta / chunk-based patching",
+       "Delta/chunk patching with patch-size budgets & layout stability across builds",
        "packaging-release-patching",
        "E",
        [
@@ -8351,6 +10054,26 @@
         "platform-console",
         "crash-diagnostics"
        ]
+      ],
+      [
+       "BLD.REL.server-artifacts",
+       "Server container images & deploy manifests with C-RELEASE compatibility keys",
+       "packaging-release-patching",
+       "E",
+       [
+        "dedicated-server"
+       ]
+      ],
+      [
+       "BLD.REL.preload-embargo",
+       "Pre-load of encrypted content with keys released at launch; per-event key delivery against datamining",
+       "packaging-release-patching",
+       "E",
+       [
+        "package-formats-vfs",
+        "online-services-liveops",
+        "security-engineering"
+       ]
       ]
      ]
     }
@@ -8372,7 +10095,7 @@
       ],
       [
        "QA.STRAT.frameworks",
-       "Unit & integration test frameworks",
+       "Unit & integration test framework policy (implementation in QA.HOST.framework)",
        "test-architect",
        "E"
       ],
@@ -8390,7 +10113,7 @@
       ],
       [
        "QA.STRAT.flaky",
-       "Flaky-test management",
+       "Flaky-test management: quarantine counts as a skip under QA.AGENT.test-integrity (governed approval, owner, mandatory expiry)",
        "test-architect",
        "E",
        [
@@ -8399,7 +10122,7 @@
       ],
       [
        "QA.STRAT.content",
-       "Test content & test maps",
+       "Minimal unit/integration test fixtures (representative content comes from QA.REF.content)",
        "test-architect",
        "E"
       ],
@@ -8436,7 +10159,7 @@
       ],
       [
        "QA.STRAT.contract-fakes",
-       "Contract-first fakes/mocks so consumers start before providers finish",
+       "Policy & verification of contract test doubles (doubles pass the contract's conformance suite)",
        "test-architect",
        "E",
        [
@@ -8481,6 +10204,15 @@
        [
         "rhi-core"
        ]
+      ],
+      [
+       "QA.RENDER.reference-validation",
+       "Reference path tracer validated against analytic furnace scenes and an external renderer before serving as a baseline",
+       "render-validation",
+       "E",
+       [
+        "path-tracing"
+       ]
       ]
      ]
     },
@@ -8514,7 +10246,7 @@
       ],
       [
        "QA.FUNC.network",
-       "Network test harnesses",
+       "Multi-client bot harness & scripted network sessions",
        "functional-automation-soak",
        "E",
        [
@@ -8564,6 +10296,28 @@
        [
         "observability-telemetry"
        ]
+      ],
+      [
+       "QA.FUNC.compat-corpus",
+       "Governed historical-artifact corpus (saves, patch chains, replays, packages, projects, mods) loaded on every release",
+       "functional-automation-soak",
+       "E",
+       [
+        "serialization-schema",
+        "persistence-save",
+        "determinism-replay",
+        "packaging-release-patching",
+        "modding-ugc"
+       ]
+      ],
+      [
+       "QA.FUNC.version-skew",
+       "Client/server/content version-skew matrix across the compatibility window",
+       "functional-automation-soak",
+       "E",
+       [
+        "network-architect"
+       ]
       ]
      ]
     },
@@ -8585,7 +10339,7 @@
       ],
       [
        "QA.ROBUST.faults",
-       "Fault injection (IO errors, OOM, device lost)",
+       "Fault-injection campaigns & policy (fault points in QA.HOST.fault-points)",
        "robustness-fuzzing",
        "E"
       ],
@@ -8712,6 +10466,26 @@
        [
         "ai-behavior-perception"
        ]
+      ],
+      [
+       "QA.CERT.code-provenance",
+       "Snippet-similarity scanning of agent output as a merge gate; licence contamination triage",
+       "certification-compliance",
+       "E",
+       [
+        "ci-cd-automation"
+       ]
+      ],
+      [
+       "QA.CERT.patents-codecs",
+       "Patent/encumbrance review as an ADR field; codec royalty register per shipped configuration",
+       "certification-compliance",
+       "E",
+       [
+        "media-playback",
+        "audio-dsp-mixing",
+        "architecture-governance"
+       ]
       ]
      ]
     },
@@ -8742,6 +10516,34 @@
        "Internal playtest & dogfood loop",
        "reference-games",
        "E"
+      ],
+      [
+       "QA.REF.game-code",
+       "Reference-game gameplay code written only against the public API (a build skill in each reference configuration)",
+       "reference-games",
+       "E",
+       [
+        "gameplay-architect"
+       ]
+      ],
+      [
+       "QA.REF.content-acquisition",
+       "Licensed, purchased, scanned, procedural and generated reference content with a rights manifest",
+       "reference-games",
+       "E",
+       [
+        "content-pipeline-architect",
+        "procedural-generation"
+       ]
+      ],
+      [
+       "QA.REF.upkeep",
+       "Reference-game migration on every engine release (feeds ARCH.PROD.customer-corpus)",
+       "reference-games",
+       "E",
+       [
+        "api-lifecycle-migration"
+       ]
       ]
      ]
     },
@@ -8751,9 +10553,9 @@
      "caps": [
       [
        "QA.AGENT.oracle-independence",
-       "Acceptance tests & oracles authored or approved by an agent other than the implementer",
+       "Acceptance suites authored by each contract's declared oracle_author; implementers propose additions by change request only",
        "test-architect",
-       "E",
+       "M",
        [
         "program-orchestration"
        ]
@@ -8762,7 +10564,7 @@
        "QA.AGENT.baseline-governance",
        "Governed changes to goldens, tolerances, perf thresholds, hashes & corpora",
        "test-architect",
-       "E",
+       "M",
        [
         "render-validation",
         "perf-benchmarking"
@@ -8772,7 +10574,7 @@
        "QA.AGENT.test-integrity",
        "Detection of weakened tests (deleted/skipped cases, loosened tolerances, assert-free tests, input special-casing) as a merge gate",
        "test-architect",
-       "E",
+       "M",
        [
         "ci-cd-automation"
        ]
@@ -8781,7 +10583,35 @@
        "QA.AGENT.mutation-gate",
        "Mutation-score thresholds per skill tier as part of the definition of done",
        "test-architect",
-       "E"
+       "M"
+      ],
+      [
+       "QA.AGENT.oracle-change-control",
+       "Changes to *.validation scene sets, metrics or thresholds need co-signature by the matching quality skill and are diffed by QA.AGENT.test-integrity",
+       "test-architect",
+       "E",
+       [
+        "simulation-validation",
+        "render-validation"
+       ]
+      ],
+      [
+       "QA.AGENT.gate-canaries",
+       "Every CI gate and oracle keeps a known-red case exercised periodically",
+       "test-architect",
+       "E",
+       [
+        "ci-cd-automation"
+       ]
+      ],
+      [
+       "QA.AGENT.holdout",
+       "Sealed holdout partitions of conformance/oracle suites plus gate-time seeded property & metamorphic cases",
+       "test-architect",
+       "E",
+       [
+        "program-orchestration"
+       ]
       ]
      ]
     },
@@ -8791,7 +10621,7 @@
      "caps": [
       [
        "QA.SIM.stability-suite",
-       "Physics stability regression suite (stacking, joints, mass ratios, CCD)",
+       "Physics stability runner, metrics (penetration, energy drift) & tolerance store",
        "simulation-validation",
        "E",
        [
@@ -8801,7 +10631,7 @@
       ],
       [
        "QA.SIM.golden-traces",
-       "Simulation golden-trace comparison",
+       "Simulation golden-trace comparison harness & baseline store",
        "simulation-validation",
        "E",
        [
@@ -8810,7 +10640,7 @@
       ],
       [
        "QA.SIM.netsim",
-       "Deterministic network simulation under link conditions",
+       "Deterministic single-process network-simulation runner, metrics & tolerance store",
        "simulation-validation",
        "E",
        [
@@ -8820,7 +10650,7 @@
       ],
       [
        "QA.SIM.animation",
-       "Animation error suites (compression, retarget, IK)",
+       "Animation error metrics (pose error, compression, retarget, IK) & tolerance store",
        "simulation-validation",
        "E",
        [
@@ -8829,11 +10659,82 @@
       ],
       [
        "QA.SIM.audio",
-       "Audio offline-render, loudness & glitch suites",
+       "Audio metric library (BS.1770 loudness, glitch detection) & offline-render comparison harness",
        "simulation-validation",
        "E",
        [
         "audio-architect"
+       ]
+      ],
+      [
+       "QA.SIM.vehicles",
+       "Vehicle-dynamics validation runs (reference manoeuvres, tire-model correlation)",
+       "simulation-validation",
+       "E",
+       [
+        "vehicle-physics"
+       ]
+      ],
+      [
+       "QA.SIM.deformables",
+       "Cloth & soft-body stability validation runs",
+       "simulation-validation",
+       "E",
+       [
+        "cloth-deformables"
+       ]
+      ],
+      [
+       "QA.SIM.mass-agents",
+       "Mass-agent throughput & determinism validation runs incl. desync-hash lanes on lockstep configurations",
+       "simulation-validation",
+       "E",
+       [
+        "crowd-simulation",
+        "determinism-replay"
+       ]
+      ],
+      [
+       "QA.SIM.controllers",
+       "Character-controller edge-case validation runs (step, slope, ledge, platforms)",
+       "simulation-validation",
+       "E",
+       [
+        "character-physics",
+        "character-movement"
+       ]
+      ]
+     ]
+    },
+    {
+     "id": "QA.HOST",
+     "name": "Test host runtime",
+     "caps": [
+      [
+       "QA.HOST.framework",
+       "Unit/integration test framework & fixtures (C-TESTHOST)",
+       "test-runtime-harness",
+       "E"
+      ],
+      [
+       "QA.HOST.runner",
+       "On-device test runner & result reporting for every platform",
+       "test-runtime-harness",
+       "E",
+       [
+        "platform-architect"
+       ]
+      ],
+      [
+       "QA.HOST.fault-points",
+       "Fault-point registry (IO errors, OOM, device lost) implemented by owners",
+       "test-runtime-harness",
+       "E",
+       [
+        "async-io-storage",
+        "memory-allocators",
+        "rhi-core",
+        "robustness-fuzzing"
        ]
       ]
      ]
@@ -8862,7 +10763,7 @@
       ],
       [
        "PRF.METH.scalability",
-       "Scalability policy: tier definitions & knob budgets (mechanism in runtime-scalability)",
+       "Scalability policy: knob budgets per tier (tier names from ARCH.REQ.hardware-tiers; mechanism in runtime-scalability)",
        "performance-architect",
        "E"
       ],
@@ -8877,7 +10778,7 @@
       ],
       [
        "PRF.METH.model",
-       "Analytical performance & capacity model (unit costs × counts per tier/configuration, predicted scale limits, reconciliation)",
+       "Analytical performance, capacity & cost model (unit costs × counts per tier/configuration, cost per CCU and per build, predicted scale limits, reconciliation)",
        "performance-architect",
        "E",
        [
@@ -8888,7 +10789,7 @@
       ],
       [
        "PRF.METH.asymptotics",
-       "Declared asymptotic cost per world-scale dimension for every runtime skill",
+       "Declared asymptotic cost per world-scale dimension (incl. replicated entities and connections) for every runtime skill",
        "performance-architect",
        "E"
       ],
@@ -8929,7 +10830,7 @@
       ],
       [
        "PRF.BENCH.workloads",
-       "Representative workload scenes",
+       "Benchmark scenarios over QA.REF.content",
        "perf-benchmarking",
        "E",
        [
@@ -9128,11 +11029,22 @@
       ],
       [
        "PRF.LOAD.editor",
-       "Editor startup, asset-open, PIE-start & large-world viewport budgets & analysis",
+       "Editor startup, asset-open, PIE-start & large-world viewport analysis and hitch attribution (budgets in PRF.METH.pipeline-budgets)",
        "loading-streaming-performance",
        "E",
        [
         "editor-architect"
+       ]
+      ],
+      [
+       "PRF.LOAD.pacing-latency",
+       "Frame pacing & end-to-end latency analysis (percentile frame times, present jitter, input-to-photon by hardware/marker measurement) with a pacing gate",
+       "loading-streaming-performance",
+       "E",
+       [
+        "frame-orchestration",
+        "input-system",
+        "reconstruction-upscaling"
        ]
       ]
      ]
@@ -9175,6 +11087,50 @@
        "E",
        [
         "resource-streaming-architect"
+       ]
+      ]
+     ]
+    },
+    {
+     "id": "PRF.NET",
+     "name": "Online & server performance",
+     "caps": [
+      [
+       "PRF.NET.bandwidth",
+       "Per-connection/entity/property bandwidth analysis against NET.ARCH.budgets",
+       "online-performance",
+       "E",
+       [
+        "replication"
+       ]
+      ],
+      [
+       "PRF.NET.server-density",
+       "Server tick cost, instances per host and cost per CCU against server hardware classes",
+       "online-performance",
+       "E",
+       [
+        "dedicated-server"
+       ]
+      ],
+      [
+       "PRF.NET.load-analysis",
+       "Load-test analysis & capacity-model reconciliation with PRF.METH.model",
+       "online-performance",
+       "E",
+       [
+        "functional-automation-soak",
+        "performance-architect"
+       ]
+      ],
+      [
+       "PRF.NET.latency",
+       "End-to-end networked latency accounting (input → server tick → client display)",
+       "online-performance",
+       "E",
+       [
+        "network-architect",
+        "frame-orchestration"
        ]
       ]
      ]
@@ -9230,11 +11186,12 @@
       ],
       [
        "OBS.LOG.consent",
-       "Telemetry privacy & consent",
+       "Telemetry consent mechanism (policy in XC.SEC.privacy)",
        "observability-telemetry",
        "E",
        [
-        "security-engineering"
+        "security-engineering",
+        "privacy-data-protection"
        ]
       ],
       [
@@ -9274,6 +11231,18 @@
        [
         "security-engineering",
         "online-services-liveops"
+       ]
+      ],
+      [
+       "OBS.LOG.bench-runtime",
+       "In-process benchmark runner, capture triggers & memory-snapshot hooks (dev/profile builds on every target; registered via C-BENCH)",
+       "observability-telemetry",
+       "E",
+       [
+        "perf-benchmarking",
+        "memory-performance",
+        "gpu-performance",
+        "loading-streaming-performance"
        ]
       ]
      ]
@@ -9428,7 +11397,8 @@
        [
         "input-system",
         "replication",
-        "visual-debugging-tools"
+        "visual-debugging-tools",
+        "privacy-data-protection"
        ]
       ],
       [
@@ -9535,12 +11505,15 @@
       [
        "XC.SEC.privacy",
        "Privacy engineering",
-       "security-engineering",
-       "E"
+       "privacy-data-protection",
+       "E",
+       [
+        "security-engineering"
+       ]
       ],
       [
        "XC.SEC.sandbox",
-       "Mod / UGC sandbox policy",
+       "Mod / UGC sandbox policy (sandboxed by default; native mods only behind explicit opt-in, ADR)",
        "security-engineering",
        "E",
        [
@@ -9621,22 +11594,26 @@
        [
         "packaging-release-patching",
         "api-lifecycle-migration",
-        "build-release-architect"
+        "build-release-architect",
+        "engine-product-management",
+        "certification-compliance"
        ]
       ],
       [
        "XC.SEC.incident",
-       "Live incident-response runbooks for online titles",
+       "Security incident response for engine infrastructure and shipped/online titles (hand-off to PLAT.LIVE.operations for operational incidents)",
        "security-engineering",
        "E",
        [
         "online-services-liveops",
-        "anti-cheat-integrity"
+        "anti-cheat-integrity",
+        "ci-cd-automation",
+        "build-release-architect"
        ]
       ],
       [
        "XC.SEC.dev-trust",
-       "Project/workspace trust, plugin signing & permissions, sandboxed import of untrusted source assets",
+       "Project/workspace trust, partner access classes, plugin signing & permissions, sandboxed import of untrusted source assets",
        "security-engineering",
        "E",
        [
@@ -9649,7 +11626,7 @@
        "XC.SEC.agent-boundary",
        "Development-agent capability scoping, sandboxing, egress & prompt-injection threat model",
        "security-engineering",
-       "E",
+       "M",
        [
         "program-orchestration",
         "ci-cd-automation"
@@ -9657,12 +11634,15 @@
       ],
       [
        "XC.SEC.key-custody",
-       "Platform signing keys, devkit credentials, release-signing ceremony; no agent-held keys",
+       "Signing-key custody: key hierarchy, HSM/KMS, signing as a gated service with human approval for production keys, rotation, revocation, compromise drill; no agent-held keys",
        "security-engineering",
        "E",
        [
         "packaging-release-patching",
-        "platform-console"
+        "platform-console",
+        "ci-cd-automation",
+        "package-formats-vfs",
+        "persistence-save"
        ]
       ],
       [
@@ -9673,18 +11653,20 @@
        [
         "ai-behavior-perception",
         "ai-assisted-authoring",
-        "online-services-liveops"
+        "online-services-liveops",
+        "editor-architect"
        ]
       ],
       [
        "XC.SEC.data-rights",
-       "Data inventory, retention & data-subject request flow",
-       "security-engineering",
+       "Data inventory with sensitivity classes (biometric, spatial, voice, minors), per-class retention, on-device-only defaults & data-subject request flow",
+       "privacy-data-protection",
        "E",
        [
         "certification-compliance",
         "observability-telemetry",
-        "crash-diagnostics"
+        "crash-diagnostics",
+        "security-engineering"
        ]
       ],
       [
@@ -9696,6 +11678,84 @@
         "robustness-fuzzing",
         "ci-cd-automation",
         "visual-debugging-tools"
+       ]
+      ],
+      [
+       "XC.SEC.behavioral-detection",
+       "Server-side behavioral / ML cheat detection from telemetry",
+       "anti-cheat-integrity",
+       "M",
+       [
+        "observability-telemetry",
+        "ml-inference-runtime"
+       ]
+      ],
+      [
+       "XC.SEC.agent-redteam",
+       "Prompt-injection corpus run against each agent role; agent-input registry entries",
+       "security-engineering",
+       "M",
+       [
+        "program-orchestration"
+       ]
+      ],
+      [
+       "XC.SEC.signed-artifacts",
+       "Signed-artifact envelope, trust roots, rotation/revocation, version floors, algorithm agility",
+       "security-runtime",
+       "E",
+       [
+        "security-engineering"
+       ]
+      ],
+      [
+       "XC.SEC.pqc-signatures",
+       "Post-quantum signature migration",
+       "security-runtime",
+       "M"
+      ],
+      [
+       "XC.SEC.attestation",
+       "Device/app attestation tokens (Play Integrity, App Attest, platform-signed tokens), server verification, graceful degradation",
+       "anti-cheat-integrity",
+       "E",
+       [
+        "platform-mobile",
+        "platform-desktop",
+        "platform-console",
+        "platform-services"
+       ]
+      ],
+      [
+       "XC.SEC.usermode-anticheat",
+       "User-mode & attestation-based anti-cheat posture (kernel-driver deprecation pressure, Proton/ARM)",
+       "anti-cheat-integrity",
+       "M"
+      ],
+      [
+       "XC.SEC.info-hiding",
+       "Information hiding: server-side visibility/fog culling, delayed reveal, per-netcode-model information-leak & host-trust assessment",
+       "anti-cheat-integrity",
+       "E",
+       [
+        "replication",
+        "prediction-rollback"
+       ]
+      ],
+      [
+       "XC.SEC.privacy-review",
+       "Privacy review of every skill handling personal data (data classes, minimization, on-device defaults)",
+       "privacy-data-protection",
+       "E"
+      ],
+      [
+       "XC.SEC.childrens-data",
+       "Children's data & age-appropriate design (COPPA, AADC, parental consent flows)",
+       "privacy-data-protection",
+       "E",
+       [
+        "platform-services",
+        "certification-compliance"
        ]
       ]
      ]
@@ -9793,6 +11853,68 @@
        "Plugin signature & permission manifest fields",
        "plugin-system",
        "E"
+      ],
+      [
+       "XC.EXT.player-creation",
+       "Player-facing in-game creation mode (runtime editing subset, gamepad/touch placement, budgets, undo, publish/versioning) in client targets",
+       "modding-ugc",
+       "E",
+       [
+        "world-editor-viewport",
+        "editor-architect"
+       ]
+      ],
+      [
+       "XC.EXT.ugc-discovery",
+       "UGC browse/rate/play boundary with moderation & entitlement hooks",
+       "modding-ugc",
+       "E",
+       [
+        "online-services-liveops"
+       ]
+      ],
+      [
+       "XC.EXT.mod-editor",
+       "Redistributable modder editor/SDK build (licence/NDA stripping, sandboxed tool plugins)",
+       "modding-ugc",
+       "E",
+       [
+        "packaging-release-patching",
+        "platform-architect",
+        "security-engineering"
+       ]
+      ],
+      [
+       "XC.EXT.fork-integration",
+       "Customization-seam catalogue, licensee modification manifest, upstream-merge tooling & reports",
+       "api-lifecycle-migration",
+       "E",
+       [
+        "build-release-architect",
+        "collaboration-version-control"
+       ]
+      ],
+      [
+       "XC.EXT.ugc-integrity",
+       "Mod/UGC distribution integrity: package signing via C-SIGN, author identity & 2FA at the distribution boundary, update pinning/review, remote revocation/kill switch, native-code mod policy (sandboxed by default, native only by explicit player opt-in)",
+       "modding-ugc",
+       "E",
+       [
+        "security-engineering",
+        "online-services-liveops",
+        "platform-services"
+       ]
+      ],
+      [
+       "XC.EXT.generated-assets",
+       "Runtime validation & cooking of player-prompted generated assets under XC.SEC.genai",
+       "modding-ugc",
+       "M",
+       [
+        "asset-cook-processors",
+        "security-engineering",
+        "online-services-liveops"
+       ]
       ]
      ]
     },
@@ -9847,6 +11969,15 @@
        "Error-message & diagnostic quality standards",
        "developer-experience-docs",
        "E"
+      ],
+      [
+       "XC.DX.creator-docs",
+       "Creator documentation: per-discipline tool manuals, in-editor contextual help, learning paths for non-programmers, kept in sync with tool changes",
+       "developer-experience-docs",
+       "E",
+       [
+        "editor-ui-framework"
+       ]
       ]
      ]
     }

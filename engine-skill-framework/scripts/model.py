@@ -39,6 +39,7 @@ class Model:
         self.radar_doc = _load("radar.json") if os.path.exists(os.path.join(DATA, "radar.json")) else {"entries": []}
         self.legacy_doc = _load("legacy-patterns.json") if os.path.exists(os.path.join(DATA, "legacy-patterns.json")) else {"patterns": []}
         self.milestone_doc = _load("milestones.json") if os.path.exists(os.path.join(DATA, "milestones.json")) else {"milestones": []}
+        self.untrusted_doc = _load("untrusted-inputs.json") if os.path.exists(os.path.join(DATA, "untrusted-inputs.json")) else {"inputs": []}
         self.reindex()
 
     def reindex(self):
@@ -119,12 +120,21 @@ class Model:
         return [self.layer(c) for c in self.skill(sid)["provides"]
                 if c in self.contracts and self.layer(c) != "P" and self.layer(c) < TOOL_LAYER]
 
+    def code_layers_implemented(self, sid):
+        return [self.layer(c) for c in self.skill(sid).get("implements", [])
+                if c in self.contracts and self.layer(c) != "P" and self.layer(c) < TOOL_LAYER]
+
+    def floor_layers(self, sid):
+        """Module layers that unattributed dependencies are checked against: provided contracts, or for a pure
+        implementer (a backend) the contracts it implements."""
+        return self.code_layers_provided(sid) or self.code_layers_implemented(sid)
+
     def universals_for(self, sid):
         """Universal contracts apply to 'all' skills, and 'runtime' universals to runtime/tool code skills
         that sit at layer >= 2 (or provide no code contract). Foundation skills (L0/L1 providers) list their
         dependencies explicitly, which is what keeps the bootstrap tier acyclic."""
         s = self.skill(sid)
-        provided = self.code_layers_provided(sid)
+        provided = self.floor_layers(sid)
         foundation = bool(provided) and min(provided) < 2
         out = []
         for cid in self.contracts:
@@ -164,6 +174,41 @@ class Model:
                     edges[s].add(o)
         return edges
 
+    def base_module(self, sid):
+        """The module that unattributed dependencies belong to: the lowest-layer code contract a skill provides."""
+        s = self.skill(sid)
+        pool = s["provides"] if self.code_layers_provided(sid) else s.get("implements", [])
+        code = [c for c in pool if c in self.contracts and self.layer(c) != "P" and self.layer(c) < TOOL_LAYER]
+        return min(code, key=self.layer) if code else "_"
+
+    def module_edges(self, include_optional=True):
+        """(skill, module) -> set((skill, module)) over code contracts, counting universals.
+        Unattributed deps belong to the base module; 'C-X@C-Y' belongs to module C-Y, which also depends on its
+        own skill's base module. This is the granularity at which bootstrap order is real."""
+        edges = {}
+        for s in self.skill_order:
+            base = self.base_module(s)
+            edges.setdefault((s, base), set())
+            for c in self.skill(s)["provides"] + self.skill(s).get("implements", []):
+                if c in self.contracts and self.layer(c) != "P" and self.layer(c) < TOOL_LAYER and c != base:
+                    edges.setdefault((s, c), set()).add((s, base))
+            raw = list(self.skill(s)["consumes"]) + [u for u in self.universals_for(s)
+                                                      if u not in {self.parse_dep(d)[0] for d in self.skill(s)["consumes"]}]
+            for dep in raw:
+                cid, opt = self.parse_dep(dep)
+                if (opt and not include_optional) or cid not in self.contracts or self.layer(cid) == "P":
+                    continue
+                if self.layer(cid) >= TOOL_LAYER:
+                    continue
+                mod = self.parse_for(dep) or base
+                o = self.contract(cid)["owner"]
+                if o == s:
+                    continue
+                target = (o, cid if cid != self.base_module(o) else self.base_module(o))
+                edges.setdefault((s, mod), set()).add(target)
+                edges.setdefault(target, set())
+        return edges
+
     # ---- configurations
     def config(self, name):
         c = self.configurations[name]
@@ -183,9 +228,15 @@ class Model:
             return False
         if target not in s["targets"]:
             return False
-        if s["platforms"] is not None and not any(p in platforms for p in s["platforms"]):
+        if s["platforms"] is not None and not any(p in self.platform_set(name) for p in s["platforms"]):
             return False
         return True
+
+    def platform_set(self, name):
+        """Platforms a configuration builds for; a tools configuration also covers the platforms it targets
+        (cook, package, deploy), which pulls in platform skills' tool-side modules."""
+        c = self.configurations[name]
+        return list(dict.fromkeys(c.get("platforms", []) + c.get("target_platforms", [])))
 
     def members(self, name):
         return [s for s in self.skill_order if self.in_configuration(s, name)]

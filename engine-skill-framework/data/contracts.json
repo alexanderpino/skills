@@ -6,11 +6,18 @@
    "layer": 0,
    "owner": "platform-architect",
    "name": "Platform abstraction layer",
-   "summary": "OS services, CPU/GPU capability discovery and device database, windowing, display & safe area, lifecycle and system events (memory pressure, thermal/power, network reachability, audio endpoint, locale, OS accessibility settings, overlay/focus, storage, page size), clocks and clock-domain correlation, processes/pipes/shared memory/dev sockets, HTTP(S)/TLS client, permissions, thread creation/affinity/QoS and main-thread dispatch. Platform code lives only in the PAL or in a registered platform backend slot.",
+   "summary": "OS services, CPU/GPU capability discovery and device database, windowing, display & safe area, lifecycle and system events (memory pressure, thermal/power, network reachability, audio endpoint, locale, OS accessibility settings, overlay/focus, storage, page size), clocks and clock-domain correlation, processes/pipes/shared memory/dev sockets, HTTP(S)/TLS client, permissions, thread creation/affinity/QoS and main-thread dispatch. Platform code lives only in the PAL or in a registered platform backend slot; suspend/resume quiesce protocol (outstanding IO, GPU idle/device recreate, connection loss) and time-discontinuity events; interfaces and policy owned by platform-architect; each platform's implementation is a registered backend implemented by that platform's skill; key chain: device record → GPU feature tier (C-GPUTIER) + platform capability tier → performance tier → knob set (C-SCALE).",
    "requires": [
     "C-BASE"
    ],
-   "conformance": true
+   "conformance": true,
+   "needs_implementer": true,
+   "oracle_author": "accessibility",
+   "boundary": true,
+   "test_double": {
+    "kind": "null/fake platform + event injection",
+    "owner": "platform-architect"
+   }
   },
   {
    "id": "C-ERR",
@@ -22,7 +29,8 @@
     "C-BASE"
    ],
    "universal": "runtime",
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "test-architect"
   },
   {
    "id": "C-MOD",
@@ -34,18 +42,22 @@
     "C-ERR",
     "C-TASK"
    ],
-   "conformance": true
+   "conformance": true,
+   "universal": "runtime",
+   "oracle_author": "hot-reload-iteration"
   },
   {
    "id": "C-CFG",
    "layer": 1,
    "owner": "core-runtime-architect",
    "name": "Configuration & cvars",
-   "summary": "Layered config sources (defaults, platform, device profile, remote/live, user) with precedence, typed cvars read through versioned immutable snapshots latched at sync points, queued change notification.",
+   "summary": "Layered config sources (defaults, platform, device profile, remote/live, user) with precedence, typed cvars read through versioned immutable snapshots latched at sync points, queued change notification; per-layer trust tier and per-cvar settable-from allow-list; settings are declared as scoped C-CFG entries (device/user/cloud); the user layer is a read-only projection populated by the persisted settings store (GAM.SAVE.settings); the remote/live layer is a sink of the single C-LIVE remote-config payload.",
    "requires": [
     "C-BASE"
    ],
-   "conformance": true
+   "conformance": true,
+   "universal": "runtime",
+   "oracle_author": "gameplay-data"
   },
   {
    "id": "C-MATH",
@@ -54,7 +66,8 @@
    "name": "Math & numeric conventions",
    "summary": "Vector/matrix types, precision classes, deterministic-math variants, fixed and scalable (vector-length-agnostic) SIMD kernels, convention enforcement.",
    "requires": [],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "animation-runtime"
   },
   {
    "id": "C-MEM",
@@ -66,18 +79,25 @@
     "C-BASE"
    ],
    "universal": "runtime",
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "containers-core-types",
+   "boundary": true,
+   "test_double": {
+    "kind": "tracking/failing allocator",
+    "owner": "memory-allocators"
+   }
   },
   {
    "id": "C-TYPES",
    "layer": 1,
    "owner": "containers-core-types",
    "name": "Core types & containers",
-   "summary": "Containers, strings, versioned stable hashing, general-purpose compression codecs, vetted cryptographic primitives wrapper, ownership/view types.",
+   "summary": "Containers, strings, versioned stable hashing, general-purpose compression codecs, vetted hashinggraphic primitives wrapper, ownership/view types.",
    "requires": [
     "C-MEM"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "core-runtime-architect"
   },
   {
    "id": "C-SYNC",
@@ -88,7 +108,8 @@
    "requires": [
     "C-BASE"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "entity-object-model"
   },
   {
    "id": "C-TASK",
@@ -100,19 +121,21 @@
     "C-SYNC",
     "C-MEM"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "animation-architect"
   },
   {
    "id": "C-INSTR",
    "layer": 1,
    "owner": "observability-telemetry",
    "name": "Instrumentation",
-   "summary": "Log/trace/metric API; zero cost when compiled out; trace format.",
+   "summary": "Log/trace/metric API; zero cost when compiled out; trace format; declared overhead per zone/counter class, overhead budget in C-BUDGET.",
    "requires": [
     "C-BASE"
    ],
    "universal": "runtime",
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "cpu-performance"
   },
   {
    "id": "C-CRASH",
@@ -125,7 +148,8 @@
     "C-INSTR"
    ],
    "universal": "runtime",
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "test-architect"
   },
   {
    "id": "C-DET",
@@ -136,14 +160,15 @@
    "requires": [
     "C-MATH"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "character-movement"
   },
   {
    "id": "C-BUDGET",
    "layer": "P",
    "owner": "performance-architect",
    "name": "Budgets & performance gates",
-   "summary": "Budget numbers per hardware tier × configuration × refresh class, derived from the performance model; perf gate thresholds.",
+   "summary": "Budget numbers per hardware tier × configuration × refresh class, derived from the performance model; perf gate thresholds; transfer bytes per frame and async-queue occupancy per tier.",
    "requires": [],
    "universal": "all"
   },
@@ -156,18 +181,20 @@
    "requires": [
     "C-MOD"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "editor-architect"
   },
   {
    "id": "C-FRAME",
    "layer": 2,
    "owner": "frame-orchestration",
-   "name": "Frame, tick phases & time",
+   "name": "Frame schedule, phases & time",
    "summary": "Time domains and multi-rate cadences, pipelining depth, the minimal set of named global sync points, frame-wide access declarations (ECS components and registered service resources) from which ordering is derived, the canonical simulation schedule, injectable test clock.",
    "requires": [
     "C-TASK"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "ai-behavior-perception"
   },
   {
    "id": "C-ID",
@@ -178,7 +205,8 @@
    "requires": [
     "C-TYPES"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "ecs-runtime"
   },
   {
    "id": "C-ECS",
@@ -191,7 +219,8 @@
     "C-TASK",
     "C-FRAME"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "audio-architect"
   },
   {
    "id": "C-REFL",
@@ -202,7 +231,8 @@
    "requires": [
     "C-TYPES"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "api-lifecycle-migration"
   },
   {
    "id": "C-SER",
@@ -213,19 +243,26 @@
    "requires": [
     "C-REFL"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "collaboration-version-control"
   },
   {
    "id": "C-IO",
    "layer": 2,
    "owner": "async-io-storage",
    "name": "Async IO",
-   "summary": "IO requests, priorities, deadlines, completions, decompression targets.",
+   "summary": "IO requests, priorities, deadlines, completions, decompression targets; GPU decompression is declared as external work items executed as render-graph nodes where no dedicated decompression queue exists.",
    "requires": [
     "C-PAL",
     "C-TASK"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "loading-streaming-performance",
+   "boundary": true,
+   "test_double": {
+    "kind": "in-memory IO with fault points",
+    "owner": "async-io-storage"
+   }
   },
   {
    "id": "C-VFS",
@@ -237,7 +274,8 @@
     "C-IO",
     "C-SER"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "localization-i18n"
   },
   {
    "id": "C-ASSET",
@@ -249,20 +287,22 @@
     "C-SER",
     "C-ID"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "ai-assisted-authoring"
   },
   {
    "id": "C-RES",
    "layer": 2,
    "owner": "resource-streaming-architect",
    "name": "Resource lifetime & streaming requests",
-   "summary": "Resource handles and explicit lifetime; load requests with priority/deadline; the staged load pipeline (IO → decompress → fixup → GPU upload → publish) that every resource type implements; pool registration, pressure signals and shrink-by-deadline requests; residency notifications drained at a declared C-FRAME phase; fallbacks.",
+   "summary": "Resource handles and explicit lifetime; load requests with priority/deadline; the staged load pipeline (IO → decompress → fixup → GPU upload → publish) that every resource type implements; pool registration, pressure signals and shrink-by-deadline requests; residency notifications drained at a declared C-FRAME phase; fallbacks; every CPU/GPU pool registers with the arbiter and never sizes itself.",
    "requires": [
     "C-ASSET",
     "C-VFS",
     "C-MEM"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "audio-dsp-mixing"
   },
   {
    "id": "C-RELOAD",
@@ -274,56 +314,74 @@
     "C-RES",
     "C-MOD"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "scripting-runtime"
   },
   {
    "id": "C-SPATIAL",
    "layer": 2,
    "owner": "spatial-transforms",
    "name": "Transforms & spatial queries",
-   "summary": "Transform representation incl. large-world coordinates, hierarchy, generic spatial queries, per-phase change sets (moved/attached/teleported) consumed by all spatial replicas.",
+   "summary": "Transform representation incl. large-world coordinates, hierarchy, generic spatial queries, per-phase change sets (moved/attached/teleported) consumed by all spatial replicas; batched query API.",
    "requires": [
     "C-MATH",
     "C-ID"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "crowd-simulation"
   },
   {
    "id": "C-RHI",
    "layer": 2,
    "owner": "rhi-core",
    "name": "Render hardware interface",
-   "summary": "Devices, queues and command recording, completion tokens, binding-model tier (bindless / descriptor-buffer / bind-group), pipeline-state-model tier (monolithic PSO / libraries / shader objects / state-object programs), GPU-generated work primitives, presentation, implicit-sync backends; the RHI consumes C-PRESENT to report present feedback.",
+   "summary": "Devices, queues and command recording, completion tokens, binding-model tier (bindless / descriptor-buffer / bind-group), pipeline-state-model tier (monolithic PSO / libraries / shader objects / state-object programs), GPU-generated work primitives, presentation, implicit-sync backends; the RHI consumes C-PRESENT to report present feedback; shipping-grade GPU timestamp signal for the governor; optional tensor/matrix resource types and weight-layout conversion tier (reviewed by ml-inference-runtime before freeze).",
    "requires": [
     "C-PAL",
     "C-MEM",
     "C-SYNC"
    ],
    "needs_implementer": true,
-   "conformance": true
+   "conformance": true,
+   "platforms": [
+    "pc",
+    "console",
+    "mobile",
+    "web",
+    "xr-standalone"
+   ],
+   "oracle_author": "gpu-memory-resources",
+   "boundary": true,
+   "test_double": {
+    "kind": "null/software device",
+    "owner": "rhi-core"
+   }
   },
   {
    "id": "C-GPUMEM",
    "layer": 2,
    "owner": "gpu-memory-resources",
    "name": "GPU resources & memory",
-   "summary": "Resource creation, heaps, residency, upload/readback, lifetime.",
+   "summary": "Resource creation, heaps, residency, upload/readback, lifetime; residency obeys arbiter pressure/shrink requests delivered through the C-RES pool registration hook.",
    "requires": [
     "C-RHI"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "async-io-storage"
   },
   {
    "id": "C-ML",
    "layer": 2,
    "owner": "ml-inference-runtime",
    "name": "ML inference",
-   "summary": "Model format and packaging, CPU and NPU backends, async invocation, precision classes, budgets.",
+   "summary": "Model format and packaging, CPU and NPU backends, async invocation, precision classes, budgets; sequence sessions, streaming results, residency class, local/remote routing.",
    "requires": [
     "C-TASK",
     "C-MEM"
    ],
-   "conformance": true
+   "conformance": true,
+   "gated": true,
+   "oracle_author": "anti-cheat-integrity"
   },
   {
    "id": "C-WORLD",
@@ -335,7 +393,8 @@
     "C-SPATIAL",
     "C-RES"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "dedicated-server"
   },
   {
    "id": "C-RG",
@@ -347,75 +406,84 @@
     "C-RHI",
     "C-GPUMEM"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "atmosphere-weather"
   },
   {
    "id": "C-SHADER",
    "layer": 3,
    "owner": "shader-system",
    "name": "Shader interface & interop",
-   "summary": "Shader modules, permutations and budgets, binding layouts generated per binding tier, interop headers, neural/tensor intrinsics tier.",
+   "summary": "Shader modules, permutations and budgets, binding layouts generated per binding tier, interop headers, neural/tensor intrinsics tier; neural/tensor intrinsics are an optional tier with a mandatory standalone-dispatch fallback through C-MLGPU.",
    "requires": [
     "C-RHI"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "geometry-pipeline"
   },
   {
    "id": "C-MATIF",
    "layer": 3,
    "owner": "material-system",
    "name": "Material interface",
-   "summary": "Material parameters, shading model inputs, material domains.",
+   "summary": "Material parameters, shading model inputs, material domains; raster-stage program (mask, world-position offset, displacement) and visibility-buffer/deferred resolve entry points.",
    "requires": [
     "C-SHADER"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "character-rendering"
   },
   {
    "id": "C-RSCENE",
    "layer": 3,
    "owner": "render-architect",
    "name": "Render scene & render features",
-   "summary": "Render features and views, render-scene data streams extracted as change-tracked deltas (no per-object proxy mirror; CPU cost O(changes)), feature registration with minimum GPU tier, non-mesh primitive kinds.",
+   "summary": "Render features and views, render-scene data streams extracted as change-tracked deltas (no per-object proxy mirror; CPU cost O(changes)), feature registration with minimum GPU tier, non-mesh primitive kinds; GPU-deformation flags and a cache-invalidation channel (pages, surface caches, BLAS updates); one persistent instance scene (C-INSTANCES); features consume it and never mirror it.",
    "requires": [
     "C-RG",
     "C-SPATIAL",
     "C-MATIF"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "cinematics-sequencer"
   },
   {
    "id": "C-TEMPORAL",
    "layer": 3,
    "owner": "reconstruction-upscaling",
    "name": "Temporal data",
-   "summary": "Motion vectors, jitter, history validity, reactive/transparency masks, resolution scaling; motion-vector obligations for every moving/animated surface; UI/HUD separation for frame generation; depth+motion submission for XR spacewarp.",
+   "summary": "Motion vectors, jitter, history validity, reactive/transparency masks, resolution scaling; motion-vector obligations for every moving/animated surface; UI/HUD separation for frame generation; depth+motion submission for XR spacewarp; denoiser signal submission (signal class, hit distance, sample count, guide buffers from C-SCENETEX) with per-signal and joint ray-reconstruction modes.",
    "requires": [
     "C-RG"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "deformation-skinning"
   },
   {
    "id": "C-RT",
    "layer": 3,
    "owner": "ray-tracing-infrastructure",
-   "name": "Ray queries",
-   "summary": "Ray-query contract with hardware and software (SDF/BVH compute) backends: acceleration structures, instance data, hit/material binding, update policy.",
+   "name": "Render-scene ray tracing",
+   "summary": "Render-side binding over C-RTAS: TLAS population from C-INSTANCES/C-RSCENE, hit/material binding, RT LOD, update policy.",
    "requires": [
-    "C-RSCENE"
+    "C-RSCENE",
+    "C-RTAS"
    ],
-   "conformance": true
+   "conformance": true,
+   "gated": true,
+   "oracle_author": "direct-lighting-shadows"
   },
   {
    "id": "C-TEXT",
    "layer": 3,
    "owner": "text-fonts",
    "name": "Text layout & glyphs",
-   "summary": "Shaped glyph runs, font fallback, glyph atlas/curve data.",
+   "summary": "Shaped glyph runs, font fallback, glyph atlas/curve data; runs carry BCP-47 language/script; locale-aware line breaking.",
    "requires": [
     "C-TYPES"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "editor-ui-framework"
   },
   {
    "id": "C-DRAW2D",
@@ -428,32 +496,37 @@
     "C-SHADER",
     "C-TEXT"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "ui-architect"
   },
   {
    "id": "C-PHYS",
    "layer": 3,
    "owner": "physics-architect",
    "name": "Physics world & scene queries",
-   "summary": "Bodies, shapes, queries (handle-addressed, batched), contact events with budgets, stepping phases, batch add/remove O(batch), snapshot/restore/resimulate participation, collider history for rewind.",
+   "summary": "Bodies, shapes, queries (handle-addressed, batched), contact events with budgets, stepping phases, batch add/remove O(batch), snapshot/restore/resimulate participation, collider history for rewind; world instances and local simulation spaces; conformance: restore + resimulate N ticks reproduces the state hash at the declared determinism level.",
    "requires": [
     "C-SPATIAL",
     "C-FRAME",
-    "C-ID"
+    "C-ID",
+    "C-SNAPSHOT",
+    "C-DET"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "gameplay-architect"
   },
   {
    "id": "C-ANIM",
    "layer": 3,
    "owner": "animation-architect",
    "name": "Animation pose output",
-   "summary": "Pose output and control input (parameters, action/montage requests, instance lifetime), root motion, animation events, pose history for rewind, network-sync hooks, physics/render hand-off.",
+   "summary": "Pose output and control input (parameters, action/montage requests, instance lifetime), root motion, animation events, pose history for rewind, network-sync hooks, physics/render hand-off; trajectory/desired-motion input and root-motion delta output.",
    "requires": [
     "C-SPATIAL",
     "C-ID"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "cloth-deformables"
   },
   {
    "id": "C-AUDIO",
@@ -465,7 +538,8 @@
     "C-SPATIAL",
     "C-ID"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "destruction-fracture"
   },
   {
    "id": "C-INPUT",
@@ -476,7 +550,8 @@
    "requires": [
     "C-FRAME"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-NET",
@@ -488,19 +563,26 @@
     "C-FRAME",
     "C-ID"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "online-performance"
   },
   {
    "id": "C-SVC",
    "layer": 3,
    "owner": "platform-services",
    "name": "Platform services",
-   "summary": "Identity tokens, entitlements & commerce, privileges, social graph, achievements, leaderboards, cloud save, region/age policy.",
+   "summary": "Identity tokens, entitlements & commerce, privileges, social graph, achievements, leaderboards, cloud save, region/age policy; platform-user handle and sign-in/user-change events on every platform.",
    "requires": [
     "C-PAL",
     "C-TASK"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "certification-compliance",
+   "boundary": true,
+   "test_double": {
+    "kind": "first-party service emulator",
+    "owner": "platform-services"
+   }
   },
   {
    "id": "C-LOC",
@@ -511,14 +593,15 @@
    "requires": [
     "C-ASSET"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "audio-content-runtime"
   },
   {
    "id": "C-UI",
    "layer": 3,
    "owner": "ui-architect",
    "name": "UI widgets & binding",
-   "summary": "Widget model, data binding, focus, layout.",
+   "summary": "Widget model, data binding, focus, layout; bindings resolved at load time and driven by change notification; per-local-player UI roots and focus owners; world-to-view projection for in-world UI.",
    "requires": [
     "C-REFL",
     "C-INPUT",
@@ -526,18 +609,20 @@
     "C-TEXT",
     "C-LOC"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "reference-games"
   },
   {
    "id": "C-NAV",
    "layer": 3,
    "owner": "navigation-pathfinding",
    "name": "Navigation queries",
-   "summary": "Path requests, navmesh/grid queries, dynamic obstacles.",
+   "summary": "Path requests, navmesh/grid queries, dynamic obstacles; batched path/query requests; nav produces path corridors and steering intents and never moves bodies.",
    "requires": [
     "C-SPATIAL"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "ai-behavior-perception"
   },
   {
    "id": "C-GAME",
@@ -549,55 +634,61 @@
     "C-ID",
     "C-FRAME"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "cinematics-sequencer"
   },
   {
    "id": "C-SCRIPT",
    "layer": 3,
    "owner": "scripting-runtime",
    "name": "Script bindings",
-   "summary": "Binding generation, sandbox limits, script lifecycle.",
+   "summary": "Binding generation, sandbox limits, script lifecycle; execution on task-graph workers via per-worker VMs/isolates; world mutation only through deferred command buffers; weak handles to engine objects; script-authored systems declare access sets and are scheduled through C-FRAME.",
    "requires": [
     "C-REFL"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "modding-ugc"
   },
   {
    "id": "C-SAVE",
    "layer": 3,
    "owner": "persistence-save",
    "name": "Save games",
-   "summary": "Save participation, versioned save records, async save/load.",
+   "summary": "Save participation, versioned save records, async save/load; persisted player-settings store per scope, populating the C-CFG user layer.",
    "requires": [
     "C-SER",
     "C-ID"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "narrative-dialogue"
   },
   {
    "id": "C-COOK",
    "layer": 5,
    "owner": "content-pipeline-architect",
    "name": "Cook-step processors",
-   "summary": "Processor inputs, cache keys, determinism class (bit-exact / tolerance / pinned-artifact), platform variants, world-scope steps, per-asset on-demand invocation, validation hooks.",
+   "summary": "Processor inputs, cache keys, determinism class (bit-exact / tolerance / pinned-artifact), platform variants, world-scope steps, per-asset on-demand invocation, validation hooks; interactive, editor-invoked geometry operations (boolean/remesh/UV) for blockout.",
    "requires": [
     "C-ASSET",
     "C-SER",
     "C-TASK"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "build-release-architect"
   },
   {
    "id": "C-EDCMD",
    "layer": 5,
    "owner": "editor-architect",
    "name": "Editor commands & tool extension",
-   "summary": "Transactions, undo/redo, selection, tool registration.",
+   "summary": "Serializable, diff-based commands and transactions, undo/redo scopes (world, asset editor, PIE exclusion), selection, tool registration; journal feed for recovery and multi-user; cross-process transactions.",
    "requires": [
     "C-REFL",
-    "C-SER"
+    "C-SER",
+    "C-IPC"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "animation-graphs"
   },
   {
    "id": "C-GRAPH",
@@ -608,7 +699,8 @@
    "requires": [
     "C-EDCMD"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "material-system"
   },
   {
    "id": "C-BUILD",
@@ -617,7 +709,8 @@
    "name": "Build description",
    "summary": "Targets, configurations, toolchains, codegen steps.",
    "requires": [],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "ci-cd-automation"
   },
   {
    "id": "C-PKG",
@@ -629,14 +722,15 @@
     "C-VFS",
     "C-BUILD"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "build-release-architect"
   },
   {
    "id": "C-ARCH",
    "layer": "P",
    "owner": "engine-architect",
    "name": "Architecture, layering & profiles",
-   "summary": "Layer rules, contract registry, configuration profiles, conventions.",
+   "summary": "Layer rules, contract registry, configuration profiles, conventions; every query contract declares its batch granularity.",
    "requires": [],
    "universal": "all"
   },
@@ -663,7 +757,7 @@
    "layer": "P",
    "owner": "program-orchestration",
    "name": "Agent coordination protocol",
-   "summary": "Ownership ledger with access classes; write sets by module convention (src/<skill-id>/, tools/<skill-id>/; tests owned by the test-owning skill); shared-file protocol; contributor semantics (review + change request, never direct writes); change requests; integration order and milestones; human-gate tasks; failure triage; per-change provenance; critic gates with calibration and independent adjudication.",
+   "summary": "Ownership ledger with access classes; write sets by module convention (src/<skill-id>/, tools/<skill-id>/; tests owned by the test-owning skill); shared-file protocol; contributor semantics (review + change request, never direct writes); change requests; integration order and milestones; human-gate tasks; failure triage; per-change provenance; critic gates with calibration and independent adjudication; access classes per skill (public | nda:<holder>); NDA work routed only to cleared agents; test write sets: tests/unit/<skill-id>/ implementer-owned; tests/acceptance/<contract-id>/ owned by the contract's oracle_author, read-only (oracle-ro) for implementers.",
    "requires": [],
    "universal": "all"
   },
@@ -672,9 +766,18 @@
    "layer": "P",
    "owner": "test-architect",
    "name": "Test & validation definition of done",
-   "summary": "Required test kinds per skill, test determinism, coverage & mutation thresholds, the evidence bundle an implementer hands to S3/S4 critics, oracle independence, conformance suites owned by contract owners with consumer-driven additions.",
+   "summary": "Required test kinds per skill, test determinism, coverage & mutation thresholds, the evidence bundle an implementer hands to S3/S4 critics, oracle independence, conformance suites owned by contract owners with consumer-driven additions; a provider change merges only when the contract's conformance suite, including consumer-contributed cases, passes.",
    "requires": [],
-   "universal": "all"
+   "universal": "all",
+   "evidence_bundle": [
+    "unit+acceptance results",
+    "mutation score",
+    "coverage",
+    "fuzz hours on registered inputs",
+    "determinism lanes",
+    "perf gate results",
+    "validation-layer/sanitizer runs"
+   ]
   },
   {
    "id": "C-API",
@@ -709,18 +812,21 @@
    "name": "Bootstrap base",
    "summary": "Raw page allocator, raw log/assert/abort sink, monotonic clock, raw thread primitives and late-bound hook tables that higher layers install (allocator, log sink, assert handler, crash annotator). Depends on nothing.",
    "requires": [],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "concurrency-primitives"
   },
   {
    "id": "C-LIFETIME",
    "layer": 1,
-   "owner": "core-runtime-architect",
+   "owner": "concurrency-primitives",
    "name": "Ownership & retirement",
    "summary": "Engine-wide ownership and cross-thread reference rules; deferred-destruction/retirement service keyed to completion tokens (task completion, frames in flight, GPU fences).",
    "requires": [
     "C-SYNC"
    ],
-   "conformance": true
+   "conformance": true,
+   "universal": "runtime",
+   "oracle_author": "resource-streaming-architect"
   },
   {
    "id": "C-IPC",
@@ -732,7 +838,8 @@
     "C-PAL",
     "C-TASK"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "visual-debugging-tools"
   },
   {
    "id": "C-SCALE",
@@ -744,7 +851,8 @@
     "C-CFG"
    ],
    "universal": "runtime",
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "test-architect"
   },
   {
    "id": "C-FLOW",
@@ -755,18 +863,20 @@
    "requires": [
     "C-FRAME"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "input-system"
   },
   {
    "id": "C-PRESENT",
    "layer": 2,
    "owner": "frame-orchestration",
    "name": "Present timeline",
-   "summary": "Present timeline and display-time prediction, latency markers, interposed presenters (frame generation, XR compositor, cloud encoder), GPU-frame-complete and present-feedback sink implemented by the RHI (dependency inversion).",
+   "summary": "Present timeline and display-time prediction, latency markers, interposed presenters (frame generation, XR compositor), GPU-frame-complete and present-feedback sink implemented by the RHI (dependency inversion); shipping-grade GPU-frame-time and present-feedback signals that do not depend on C-INSTR.",
    "requires": [
     "C-FRAME"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "reconstruction-upscaling"
   },
   {
    "id": "C-SNAPSHOT",
@@ -778,7 +888,8 @@
     "C-FRAME",
     "C-SER"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "physics-architect"
   },
   {
    "id": "C-REPLAY",
@@ -790,7 +901,8 @@
     "C-SNAPSHOT",
     "C-SER"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "physics-tools"
   },
   {
    "id": "C-VIEW",
@@ -801,29 +913,32 @@
    "requires": [
     "C-SPATIAL"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "gameplay-systems-toolkit"
   },
   {
    "id": "C-SIGNIF",
    "layer": 2,
    "owner": "world-architect",
    "name": "Significance & simulation tiers",
-   "summary": "Per-entity significance, simulation tier and update budget, computed once from views/players (all players on a server) and consumed by each domain's LOD policy.",
+   "summary": "Per-entity significance, simulation tier and update budget, computed once from views/players (all players on a server) and consumed by each domain's LOD policy; significance/relevancy computed over a spatial bucketing (C-SPATIAL index) with declared cost per player; tier-transition protocol: per-domain promote/demote handlers, state hand-off records, spawn-in validity (depenetration, grounding), hysteresis.",
    "requires": [
     "C-VIEW"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "character-physics"
   },
   {
    "id": "C-ENV",
    "layer": 3,
    "owner": "world-architect",
    "name": "Environment queries",
-   "summary": "Environment query service: ground height/surface type, water surface/volume (height, velocity, depth, body id), wind field, weather parameters, deformation deltas; implemented by terrain, water, atmosphere and voxel providers; headless-capable.",
+   "summary": "Environment query service: ground height/surface type, water surface/volume (height, velocity, depth, body id), wind field, weather parameters, deformation deltas; implemented by terrain, water, atmosphere and voxel providers; headless-capable; queries submitted as batched streams per phase; provider bound per region/cell at activation (no per-query dispatch across providers).",
    "requires": [
     "C-SPATIAL"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "collision-detection"
   },
   {
    "id": "C-GPUTIER",
@@ -834,7 +949,8 @@
    "requires": [
     "C-RHI"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "render-architect"
   },
   {
    "id": "C-INSTANCES",
@@ -846,7 +962,8 @@
     "C-RG",
     "C-GPUMEM"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "path-tracing"
   },
   {
    "id": "C-GEOLOD",
@@ -857,7 +974,8 @@
    "requires": [
     "C-RG"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "ray-tracing-infrastructure"
   },
   {
    "id": "C-VT",
@@ -869,7 +987,8 @@
     "C-RG",
     "C-GPUMEM"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "render-2d-vector"
   },
   {
    "id": "C-LIGHT",
@@ -880,7 +999,8 @@
    "requires": [
     "C-RSCENE"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "global-illumination"
   },
   {
    "id": "C-GI",
@@ -891,18 +1011,20 @@
    "requires": [
     "C-RSCENE"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "translucency-decals"
   },
   {
    "id": "C-ATMOS",
    "layer": 3,
    "owner": "atmosphere-weather",
    "name": "Atmosphere & participating media",
-   "summary": "Aerial perspective, froxel/local media volumes, cloud shadows, weather-driven global material parameters.",
+   "summary": "Aerial perspective, froxel/local media volumes, cloud shadows, weather-driven global material parameters; media sampling and injection only; sun/sky lighting inputs travel through C-LIGHTENV; inject-media and sample-media API for the single media integrator.",
    "requires": [
     "C-RSCENE"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "vfx-particles"
   },
   {
    "id": "C-VIDEO",
@@ -913,7 +1035,8 @@
    "requires": [
     "C-RG"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "ui-architect"
   },
   {
    "id": "C-DEVICE",
@@ -924,32 +1047,45 @@
    "requires": [
     "C-PAL"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "vehicle-physics",
+   "boundary": true,
+   "test_double": {
+    "kind": "virtual devices / injection",
+    "owner": "input-devices-haptics"
+   }
   },
   {
    "id": "C-NETLINK",
    "layer": 2,
    "owner": "network-transport",
    "name": "Network links & sessions",
-   "summary": "Sessions, channels, reliability/ordering classes, send budgets, link statistics, connection events; used by replication, voice, rollback input exchange and telemetry streams.",
+   "summary": "Sessions, channels, reliability/ordering classes, send budgets, link statistics, connection events; used by replication, voice, rollback input exchange and telemetry streams; platform-SDK transports (Steam/EOS/console relays) register as backends implemented by platform-services and online-services-liveops.",
    "requires": [
     "C-PAL",
     "C-TASK"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "net-session",
+   "boundary": true,
+   "test_double": {
+    "kind": "loopback + link conditioner",
+    "owner": "network-transport"
+   }
   },
   {
    "id": "C-REP",
    "layer": 3,
    "owner": "replication",
    "name": "Replication",
-   "summary": "Replicated state declaration, relevancy hooks, RPCs, net IDs, batch registration, replay and spectator streams.",
+   "summary": "Replicated state declaration, relevancy hooks, RPCs, net IDs, batch registration, replay and spectator streams; producers mark dirty state; no per-connection full-state comparison.",
    "requires": [
     "C-NETLINK",
     "C-SER",
     "C-ID"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "prediction-rollback"
   },
   {
    "id": "C-PREDICT",
@@ -958,12 +1094,13 @@
    "name": "Prediction & rollback",
    "summary": "Predicted/rollback-able state registration, tick-stamped input history, resimulation hooks, rewind queries, cosmetic-effect suppression during resim.",
    "requires": [
-    "C-REP",
+    "C-NETLINK",
     "C-DET",
     "C-SNAPSHOT",
     "C-INPUT"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "anti-cheat-integrity"
   },
   {
    "id": "C-MOVE",
@@ -975,53 +1112,59 @@
     "C-PHYS",
     "C-GAME"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "motion-synthesis"
   },
   {
    "id": "C-GAMEDATA",
    "layer": 3,
    "owner": "gameplay-data",
    "name": "Gameplay data",
-   "summary": "Data tables, curve assets, tuning assets with overrides, live override layer.",
+   "summary": "Data tables, curve assets, tuning assets with overrides, live override layer; gameplay tag registry and tag queries; the live override layer is a sink of the single C-LIVE remote-config payload (precedence in CORE.LIFE.config).",
    "requires": [
     "C-REFL",
     "C-ASSET"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "gameplay-systems-toolkit"
   },
   {
    "id": "C-DIALOGUE",
    "layer": 3,
    "owner": "narrative-dialogue",
    "name": "Dialogue lines & narrative state",
-   "summary": "Line records (speaker, text per locale, VO per locale, timing, lip-sync data), conditions, playback requests, narrative fact store.",
+   "summary": "Line records (speaker, text per locale, VO per locale, timing, lip-sync data), conditions, playback requests, narrative fact store; runtime line records (provenance = generated, transient ID, locale, moderation verdict, TTS/lip-sync-at-runtime flags, caption obligations).",
    "requires": [
     "C-LOC",
     "C-ID"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "facial-animation"
   },
   {
    "id": "C-AIAGENT",
    "layer": 4,
    "owner": "ai-behavior-perception",
    "name": "AI decision-provider extension point",
-   "summary": "Optional decision providers (learned policies, LLM agents) with budget, timeout, moderation and authored fallback.",
+   "summary": "Optional decision providers (learned policies, LLM agents) with budget, timeout, moderation and authored fallback; conversational memory persisted through C-SAVE with retention and PII limits; generated text routed through localization; provider outputs enter simulation only as recorded external inputs (C-REPLAY external stream; replicated from authority); providers are never re-invoked on resimulate.",
    "requires": [
     "C-GAME"
    ],
-   "conformance": true
+   "conformance": true,
+   "gated": true,
+   "oracle_author": "crowd-simulation"
   },
   {
    "id": "C-A11YRT",
    "layer": 3,
    "owner": "accessibility",
    "name": "Accessibility runtime",
-   "summary": "Caption/subtitle submission, screen-reader announcements and accessibility-tree ingestion, TTS/STT, accessibility settings and change events.",
+   "summary": "Caption/subtitle submission, screen-reader announcements and accessibility-tree ingestion, TTS/STT, accessibility settings and change events; caption sources: dialogue, audio-event captions, sequencer; settings read through a snapshot like C-CFG; accessibility settings are C-CFG settings entries.",
    "requires": [
     "C-TEXT"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "ui-architect"
   },
   {
    "id": "C-DEVUI",
@@ -1032,30 +1175,38 @@
    "requires": [
     "C-DRAW2D"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "editor-ui-framework"
   },
   {
    "id": "C-EDHOST",
    "layer": 5,
    "owner": "editor-ui-framework",
    "name": "Editor host",
-   "summary": "Asset-editor host, preview-scene registration, thumbnail providers, inspector customization, tool-mode registration, shared curve/timeline widgets.",
+   "summary": "Asset-editor host (panel embedding of preview worlds from C-EDVIEW), thumbnail caching, inspector customization, shared curve/timeline widgets; every asset editor registers a diff/merge provider (C-VCS).",
    "requires": [
     "C-EDCMD"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "fluid-simulation"
   },
   {
    "id": "C-LIVE",
    "layer": 3,
    "owner": "online-services-liveops",
    "name": "Online & live-ops services",
-   "summary": "Sessions/matchmaking tickets, remote config, events/experiments, chat sessions, moderation, generative/inference service calls with quotas, trusted time, service emulation.",
+   "summary": "Sessions/matchmaking tickets, remote config, events/experiments, chat sessions, moderation, generative/inference service calls with quotas, trusted time, service emulation; cross-platform parties and presence; content-key delivery for pre-loaded and embargoed content.",
    "requires": [
     "C-PAL",
     "C-TASK"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "dedicated-server",
+   "boundary": true,
+   "test_double": {
+    "kind": "service emulator",
+    "owner": "online-services-liveops"
+   }
   },
   {
    "id": "C-XRVIEW",
@@ -1066,7 +1217,8 @@
    "requires": [
     "C-VIEW"
    ],
-   "conformance": true
+   "conformance": true,
+   "oracle_author": "render-architect"
   },
   {
    "id": "C-MLGPU",
@@ -1078,7 +1230,9 @@
     "C-RG",
     "C-ML"
    ],
-   "conformance": true
+   "conformance": true,
+   "gated": true,
+   "oracle_author": "texture-streaming-vt"
   },
   {
    "id": "C-CERT",
@@ -1103,7 +1257,7 @@
    "layer": "P",
    "owner": "perf-benchmarking",
    "name": "Benchmark registration",
-   "summary": "Benchmark registration, metric schema, C-BUDGET line reference, warm-up and variance rules, required hardware tier, replay-driven runs.",
+   "summary": "Benchmark registration, metric schema, C-BUDGET line reference, warm-up and variance rules, required hardware tier, replay-driven runs; runs through the in-process runner in OBS.LOG.bench-runtime, present in every configuration; gates run on the profile build configuration.",
    "requires": [],
    "universal": "all"
   },
@@ -1122,6 +1276,319 @@
    "name": "Release model",
    "summary": "Branch model, release trains, version identifiers, client/server/content compatibility keys, LTS and hotfix streams.",
    "requires": []
+  },
+  {
+   "id": "C-GOVERN",
+   "layer": 2,
+   "owner": "runtime-scalability",
+   "name": "Runtime governor",
+   "summary": "Governor control inputs from shipping-grade signals (GPU frame time, present feedback, pool pressure, thermal/power) independent of C-INSTR; actuator commands through C-SCALE; decision log.",
+   "requires": [
+    "C-SCALE",
+    "C-PRESENT",
+    "C-RES"
+   ],
+   "conformance": true,
+   "oracle_author": "visual-debugging-tools"
+  },
+  {
+   "id": "C-SCENETEX",
+   "layer": 3,
+   "owner": "render-architect",
+   "name": "Per-view scene textures",
+   "summary": "Named per-view render-graph resources and their producer phases: depth, HZB, visibility IDs, surface-attribute decode (visibility buffer and deferred), velocity, scene color, denoiser/upscaler guide buffers; variants per shading path and tier.",
+   "requires": [
+    "C-RG",
+    "C-MATIF"
+   ],
+   "conformance": true,
+   "oracle_author": "render-validation"
+  },
+  {
+   "id": "C-COLOR",
+   "layer": 3,
+   "owner": "post-color-hdr",
+   "name": "Color, exposure & display state",
+   "summary": "Working color space, per-view exposure and pre-exposure with its frame latency, output display descriptor (SDR/HDR, transfer function, paper white, peak luminance, calibration), UI/video composition rules.",
+   "requires": [
+    "C-RG",
+    "C-PAL"
+   ],
+   "conformance": true,
+   "oracle_author": "media-playback"
+  },
+  {
+   "id": "C-LIGHTENV",
+   "layer": 3,
+   "owner": "render-architect",
+   "name": "Per-frame lighting environment",
+   "summary": "Per-view environment block published in an early declared phase: sun/moon direction and illuminance after atmospheric transmittance, sky irradiance, cloud-shadow and fog resources, weather material scalars. Implemented by atmosphere-weather where present; a static default otherwise.",
+   "requires": [
+    "C-RG"
+   ],
+   "conformance": true,
+   "oracle_author": "water-ocean"
+  },
+  {
+   "id": "C-TRANSLUCENT",
+   "layer": 3,
+   "owner": "translucency-decals",
+   "name": "Translucent & decal submission",
+   "summary": "Translucent surface submission (sort keys, OIT tier, composition pass before/after DOF and upscale), refraction/distortion buffer, decal submission.",
+   "requires": [
+    "C-RSCENE",
+    "C-MATIF",
+    "C-SCENETEX"
+   ],
+   "conformance": true,
+   "oracle_author": "character-rendering"
+  },
+  {
+   "id": "C-RTAS",
+   "layer": 2,
+   "owner": "ray-tracing-infrastructure",
+   "name": "Acceleration structures & ray queries",
+   "summary": "Acceleration-structure build/refit/compaction, instance and geometry inputs, ray-query API with hardware and software backends; independent of the render scene.",
+   "requires": [
+    "C-RHI",
+    "C-GPUMEM"
+   ],
+   "conformance": true,
+   "gated": true,
+   "oracle_author": "spatial-audio-acoustics"
+  },
+  {
+   "id": "C-PCG",
+   "layer": 3,
+   "owner": "procedural-generation",
+   "name": "Procedural generation requests",
+   "summary": "Seeded, deterministic generation requests per cell/chunk/level, headless-capable; results as entity/instance batches.",
+   "requires": [
+    "C-DET",
+    "C-SPATIAL"
+   ],
+   "conformance": true,
+   "oracle_author": "terrain"
+  },
+  {
+   "id": "C-VEHICLE",
+   "layer": 3,
+   "owner": "vehicle-physics",
+   "name": "Vehicle control & telemetry",
+   "summary": "Control inputs (throttle, brake, steer, collective…), seat/occupant attachment points, telemetry stream (RPM, load, slip, contacts), force-feedback torque source, simulation-tier hand-off (physics ↔ kinematic ↔ abstract).",
+   "requires": [
+    "C-PHYS"
+   ],
+   "conformance": true,
+   "oracle_author": "audio-content-runtime"
+  },
+  {
+   "id": "C-TARGETPLAT",
+   "layer": 5,
+   "owner": "platform-architect",
+   "name": "Target-platform tool modules",
+   "summary": "Per-target-platform tool modules loaded by editor, cooker and packager: cook format variants, shader backend compiler hook, packager, deploy/launch/debug on device.",
+   "requires": [
+    "C-COOK"
+   ],
+   "needs_implementer": true,
+   "conformance": true,
+   "oracle_author": "content-pipeline-architect"
+  },
+  {
+   "id": "C-NETSESSION",
+   "layer": 3,
+   "owner": "net-session",
+   "name": "Network session",
+   "summary": "Session lifecycle events (connect, join-ready, spawn, reconnect, travel, disconnect with reason), host mode, baseline hand-off, auth results.",
+   "requires": [
+    "C-NETLINK",
+    "C-NET"
+   ],
+   "conformance": true,
+   "oracle_author": "gameplay-architect"
+  },
+  {
+   "id": "C-SERVER",
+   "layer": 3,
+   "owner": "dedicated-server",
+   "name": "Server host lifecycle",
+   "summary": "Host lifecycle (allocate, ready, health, drain, shutdown), instance metadata, per-connection budgets and overload state, authenticated admin command surface.",
+   "requires": [
+    "C-NET",
+    "C-FRAME"
+   ],
+   "conformance": true,
+   "oracle_author": "server-scaleout-persistence"
+  },
+  {
+   "id": "C-SHARD",
+   "layer": 3,
+   "owner": "server-scaleout-persistence",
+   "name": "Multi-server authority",
+   "summary": "Region/cell → server ownership map, entity migration protocol, authority transfer, cross-boundary relevancy, cross-server messages.",
+   "requires": [
+    "C-REP",
+    "C-WORLD",
+    "C-NET"
+   ],
+   "conformance": true,
+   "oracle_author": "replication"
+  },
+  {
+   "id": "C-SRVDATA",
+   "layer": 3,
+   "owner": "server-scaleout-persistence",
+   "name": "Server persistence & transactions",
+   "summary": "Persistent records with leases and write-behind, idempotent transactions, schema migration hooks.",
+   "requires": [
+    "C-SER",
+    "C-NET"
+   ],
+   "conformance": true,
+   "oracle_author": "persistence-save"
+  },
+  {
+   "id": "C-EDVIEW",
+   "layer": 5,
+   "owner": "world-editor-viewport",
+   "name": "Viewport tool modes",
+   "summary": "Viewport tool modes, brush/stroke input and world raycast picking, gizmo/manipulator extension, viewport overlays, 2D/ortho mode, preview-world creation.",
+   "requires": [
+    "C-EDCMD"
+   ],
+   "conformance": true,
+   "oracle_author": "navigation-pathfinding"
+  },
+  {
+   "id": "C-VCS",
+   "layer": 5,
+   "owner": "collaboration-version-control",
+   "name": "Version control",
+   "summary": "Workspace/changelist model, status and lock queries, checkout-on-write hook, semantic diff/merge provider registration, sparse-sync payload requests, partner-scoped access.",
+   "requires": [
+    "C-ASSET",
+    "C-SER"
+   ],
+   "conformance": true,
+   "oracle_author": "graph-editor-framework"
+  },
+  {
+   "id": "C-EDIT",
+   "layer": 4,
+   "owner": "modding-ugc",
+   "name": "Runtime edit session",
+   "summary": "In-game creation sessions: serializable commands (schema shared with C-EDCMD per ED.ARCH.transactions), undo, selection, permissions and per-creation budgets, publish/version.",
+   "requires": [
+    "C-SER",
+    "C-ID",
+    "C-FRAME"
+   ],
+   "conformance": true,
+   "oracle_author": "gameplay-systems-toolkit"
+  },
+  {
+   "id": "C-AUTOMATION",
+   "layer": 3,
+   "owner": "visual-debugging-tools",
+   "name": "Runtime automation & introspection",
+   "summary": "Structured command/query/observe protocol, discovery of exposed debug state and controls, frame stepping, capture triggers, capability negotiation, versioned schema from C-REFL, dev-only authentication; compiled out of shipping builds.",
+   "requires": [
+    "C-IPC",
+    "C-REFL"
+   ],
+   "conformance": true,
+   "oracle_author": "editor-architect"
+  },
+  {
+   "id": "C-INTEGRITY",
+   "layer": 3,
+   "owner": "anti-cheat-integrity",
+   "name": "Integrity validation hooks",
+   "summary": "Validator registration per authoritative action (movement deltas, hits, economy), anomaly-signal sink, rate-limit policy, client anti-cheat middleware boundary, attestation results.",
+   "requires": [
+    "C-ID",
+    "C-FRAME"
+   ],
+   "conformance": true,
+   "oracle_author": "platform-services"
+  },
+  {
+   "id": "C-TESTHOST",
+   "layer": 1,
+   "owner": "test-runtime-harness",
+   "name": "Test host",
+   "summary": "Test registration, runner, fixtures, fault-point registry, result reporting; present in development and test builds of every configuration.",
+   "requires": [
+    "C-BASE"
+   ],
+   "universal": "runtime",
+   "conformance": true,
+   "oracle_author": "test-architect"
+  },
+  {
+   "id": "C-SIGN",
+   "layer": 1,
+   "owner": "security-runtime",
+   "name": "Crypto & signed artifacts",
+   "summary": "Crypto primitives and CSPRNG, signature envelope, trust roots, rotation/revocation, version floors (anti-rollback), algorithm agility.",
+   "requires": [
+    "C-TYPES"
+   ],
+   "conformance": true,
+   "oracle_author": "modding-ugc"
+  },
+  {
+   "id": "C-ABILITY",
+   "layer": 4,
+   "owner": "gameplay-systems-toolkit",
+   "name": "Abilities, effects & attributes",
+   "summary": "Ability activation, effects, attributes, tag queries, gameplay messages, hit results.",
+   "requires": [
+    "C-GAME",
+    "C-GAMEDATA"
+   ],
+   "conformance": true,
+   "oracle_author": "ai-behavior-perception"
+  },
+  {
+   "id": "C-CROWD",
+   "layer": 4,
+   "owner": "crowd-simulation",
+   "name": "Crowds & mass agents",
+   "summary": "Agent spawn/despawn, batched queries, LOD and tier hooks, traffic promotion requests.",
+   "requires": [
+    "C-NAV",
+    "C-SIGNIF"
+   ],
+   "conformance": true,
+   "oracle_author": "gameplay-architect"
+  },
+  {
+   "id": "C-SEQ",
+   "layer": 4,
+   "owner": "cinematics-sequencer",
+   "name": "Sequences",
+   "summary": "Sequence playback, actor binding, event/track callbacks, skip and blend policy.",
+   "requires": [
+    "C-ANIM",
+    "C-VIEW"
+   ],
+   "conformance": true,
+   "oracle_author": "gameplay-architect"
+  },
+  {
+   "id": "C-AI",
+   "layer": 4,
+   "owner": "ai-behavior-perception",
+   "name": "AI agents",
+   "summary": "Brain assignment (behavior/state trees, utility, HTN), perception stimulus sources, smart-object claim/release, environment query service; learned/LLM providers plug in through C-AIAGENT.",
+   "requires": [
+    "C-GAME",
+    "C-NAV"
+   ],
+   "conformance": true,
+   "oracle_author": "crowd-simulation"
   }
  ]
 }
