@@ -490,7 +490,12 @@ def run(m):
     # -- tool-side territory reaches the editor/cook through tool contracts
     for cid in m.caps:
         c = m.cap(cid)
-        if TOOL_SIDE.search(c["name"]) and c["area"] != "CNT.COOK":
+        if CONFIDENTIAL.search(c["name"]) and cid not in CONFIDENTIAL_EXEMPT and \
+                not str(m.skill(c["owner"]).get("access", "")).startswith("nda") and \
+                "via PLAT.CON.confidential-slots" not in c["name"] and "slot in PLAT.CON" not in c["name"]:
+            E(f"capability {cid} names confidential console territory but its owner {c['owner']} has no NDA access")
+        if TOOL_SIDE.search(c["name"]) and c["area"] != "CNT.COOK" and cid not in TOOL_SIDE_EXEMPT \
+                and not c["area"].endswith(".TOOL"):
             s_ = m.skill(c["owner"])
             if s_.get("kind") == "runtime" and not s_.get("tool_consumes"):
                 E(f"runtime skill {c['owner']} owns tool-side capability {cid} but consumes no tool contract")
@@ -587,8 +592,14 @@ def run(m):
 
 CAP_REF = re.compile(r"\b(?:ARCH|PLAT|CORE|RES|CNT|WLD|RND|ML|PHY|ANM|AUD|INP|NET|GAM|UI|ED|BLD|QA|PRF|OBS|XC)"
                      r"\.[A-Z0-9]+\.[a-z0-9-]+[a-z0-9]\b")
-TOOL_SIDE = re.compile(r"cook step|authoring → runtime baking|bake pipeline|editor render features|"
-                       r"generation orchestration", re.I)
+TOOL_SIDE = re.compile(r"\bcook(ed|ing| step)?\b|\bbak(e|ed|ing)\b|\beditor\b|\bSDK\b.*tool|modder editor|"
+                       r"authoring tool|generation orchestration", re.I)
+# runtime capabilities whose wording matches TOOL_SIDE but which are runtime by design (each justified)
+TOOL_SIDE_EXEMPT = {
+    "ED.DEBUG.automation-protocol",   # runtime automation protocol ships in development builds on every target
+}
+CONFIDENTIAL = re.compile(r"confidential|console (API|SDK)", re.I)
+CONFIDENTIAL_EXEMPT = {"PLAT.PAL.confidential-extensions"}   # the mechanism, owned by the public platform lead
 AUTHORING_WORKSTREAMS = {"world", "simulation", "audio", "ui", "gameplay"}
 
 PLATFORM_AREAS = {"PLAT.CON": "console", "PLAT.MOB": "mobile", "PLAT.WEB": "web", "PLAT.DESK": "pc",
@@ -631,6 +642,8 @@ def selftest():
         ("milestone claim not closed", lambda m: m.milestone_doc["milestones"][1]["configurations"].append("standard-3d-client@pc"), "member skills are not built by then"),
         ("contract frozen before owner", lambda m: [ms["contracts_frozen"].remove("C-RT") or m.milestone_doc["milestones"][0]["contracts_frozen"].append("C-RT") for ms in m.milestone_doc["milestones"] if "C-RT" in ms["contracts_frozen"]], "before its owner"),
         ("authoring path missing", lambda m: [c.__setitem__(2, "gameplay-camera") for d in m.cap_doc["domains"] for a in d["areas"] for c in a["caps"] if c[0] == "GAM.TOOL.camera"] and None or m.skill("gameplay-camera").__setitem__("workstream", "gameplay") or [c.__setitem__(2, "gameplay-architect") for d in m.cap_doc["domains"] for a in d["areas"] for c in a["caps"] if c[0] == "GAM.TOOL.camera"], "has no authoring path"),
+        ("tool-side cap without tool contract", lambda m: m.skill("ecs-runtime").__setitem__("tool_consumes", []), "owns tool-side capability CORE.ECS.baking"),
+        ("public owner of confidential territory", lambda m: [c.__setitem__(1, "Async IO backends (console APIs)") for d in m.cap_doc["domains"] for a in d["areas"] for c in a["caps"] if c[0] == "RES.IO.backends"], "names confidential console territory"),
         ("missing implementer", lambda m: [m.skill(s)["implements"].remove("C-RHI") for s in m.skill_order if "C-RHI" in m.skill(s)["implements"]], "no implementer"),
     ]
     ok = True

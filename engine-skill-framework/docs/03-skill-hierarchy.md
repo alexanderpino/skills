@@ -122,7 +122,7 @@
             net-session  (8)
             server-scaleout-persistence  (5)
     [L] gameplay-architect  (11)
-            modding-ugc  (9)
+            modding-ugc  (10)
             gameplay-systems-toolkit  (12)
             scripting-runtime  (12)
             navigation-pathfinding  (9)
@@ -194,8 +194,8 @@ A configuration is a point on three independent axes: scale/feature **profiles**
 | minimal-client | minimal | client | pc, console, mobile, web | 75 | 678 |
 | indie-2d-client | min2d | client | pc, console, mobile, web | 82 | 738 |
 | indie-2d-tools | min2d | tools | pc | 93 | 834 |
-| indie-2d-online-moddable-client | min2d, online, ugc | client | pc, console, mobile | 86 | 796 |
-| indie-2d-online-moddable-server | min2d, online, ugc | server | server-host | 61 | 569 |
+| indie-2d-online-moddable-client | min2d, online, ugc | client | pc, console, mobile | 86 | 797 |
+| indie-2d-online-moddable-server | min2d, online, ugc | server | server-host | 61 | 570 |
 | rts-2d-massim-client | min2d, massim, online-lockstep | client | pc | 84 | 765 |
 | lite-3d-mobile-client | lite3d | client | mobile | 96 | 845 |
 | lite-3d-mobile-online-client | lite3d, online | client | mobile | 101 | 903 |
@@ -210,9 +210,9 @@ A configuration is a point on three independent axes: scale/feature **profiles**
 | sandbox-online-server | std3d, sandbox, online | server | server-host | 72 | 642 |
 | xr-standalone-client | lite3d, xr | client | xr-standalone | 97 | 861 |
 | xr-pc-client | std3d, xr | client | pc | 98 | 876 |
-| aaa-open-world-online-client | std3d, openworld, online, aaa, ugc, vehicles, team-large | client | pc, console | 108 | 963 |
-| aaa-open-world-online-server | std3d, openworld, online, aaa, ugc, vehicles, team-large | server | server-host | 73 | 654 |
-| aaa-open-world-online-tools | std3d, openworld, online, aaa, ugc, vehicles, team-large | tools | pc | 123 | 1094 |
+| aaa-open-world-online-client | std3d, openworld, online, aaa, ugc, vehicles, team-large | client | pc, console | 108 | 964 |
+| aaa-open-world-online-server | std3d, openworld, online, aaa, ugc, vehicles, team-large | server | server-host | 73 | 655 |
+| aaa-open-world-online-tools | std3d, openworld, online, aaa, ugc, vehicles, team-large | tools | pc | 123 | 1095 |
 | sandbox-2d-client | min2d, sandbox | client | pc | 80 | 726 |
 | xr-console-client | std3d, xr | client | console | 96 | 873 |
 | lite-3d-portable-console-client | lite3d | client | console | 95 | 842 |
@@ -678,10 +678,10 @@ Plugin architecture: manifests, discovery, dependency resolution, load phases, b
 
 Mod and UGC support: mod SDK, content overrides via VFS layering, sandboxed mod scripting, UGC upload and moderation boundaries, mod compatibility across patches.
 
-- **Owns:** `XC.EXT.mod-sdk`; `XC.EXT.mod-loading`; `XC.EXT.ugc`; `XC.EXT.mod-compat`; `XC.EXT.player-creation`; `XC.EXT.ugc-discovery`; `XC.EXT.mod-editor`; `XC.EXT.ugc-integrity`; `XC.EXT.generated-assets`
+- **Owns:** `XC.EXT.mod-sdk`; `XC.EXT.mod-loading`; `XC.EXT.ugc`; `XC.EXT.mod-compat`; `XC.EXT.player-creation`; `XC.EXT.ugc-discovery`; `XC.EXT.mod-editor`; `XC.EXT.ugc-integrity`; `XC.EXT.generated-assets`; `XC.EXT.runtime-graphs`
 - **Contributes to:** `PLAT.SVC.moderation`; `RND.SHADER.untrusted`; `PHY.COL.runtime-build`; `ED.ARCH.transactions`; `QA.FUNC.compat-corpus`; `XC.SEC.sandbox`
 - **Not responsible for:** Sandbox policy → security-engineering; Script VM → scripting-runtime
-- **Provides:** C-EDIT · **Consumes:** C-VFS, C-SCRIPT, C-PLUGIN, C-SVC, C-SIGN · **Tool-side:** C-EDCMD, C-EDHOST, C-COOK
+- **Provides:** C-EDIT · **Consumes:** C-VFS, C-SCRIPT, C-PLUGIN, C-SVC, C-SIGN, C-SHADER? · **Tool-side:** C-EDCMD, C-EDHOST, C-COOK
 - **Untrusted inputs:** mods, ugc-graphs
 - **Expertise:** mod ecosystems, sandboxing, content overrides
 - **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
@@ -893,7 +893,7 @@ Windows, Linux, SteamOS and macOS integration: display modes, HDR and VRR capabi
 Console-class integration from platform-holder documentation: OS and memory model (UMA), suspend/resume, multi-user model, devkit workflows, platform requirements feeding certification.
 
 - **Owns:** `PLAT.CON.os-memory`; `PLAT.CON.user-model`; `PLAT.CON.suspend`; `PLAT.CON.devkit`; `PLAT.CON.portable`; `PLAT.CON.cross-gen`; `PLAT.CON.pal`; `PLAT.CON.confidential-slots`
-- **Contributes to:** `PLAT.PAL.lifecycle`; `PLAT.PAL.thread-affinity`; `PLAT.PAL.performance-modes`; `PLAT.PAL.confidential-extensions`; `PLAT.PAL.display`; `PLAT.SVC.user-model`; `PLAT.XR.runtime-backends`; `RES.IO.hw-decompress`; `CNT.COOK.on-demand`; `INP.DEV.hotplug`; `INP.ACT.platform-remap`; `NET.ARCH.connectivity`; `NET.TRANS.platform-requirements`; `NET.TRANS.local-network`; `GAM.SAVE.platform`; `BLD.SYS.platform-sdks`; `BLD.CI.build-distribution`; `BLD.CI.device-lanes`; `BLD.REL.archival`; `XC.SEC.key-custody`; `XC.SEC.attestation`
+- **Contributes to:** `PLAT.PAL.lifecycle`; `PLAT.PAL.thread-affinity`; `PLAT.PAL.performance-modes`; `PLAT.PAL.confidential-extensions`; `PLAT.PAL.display`; `PLAT.SVC.user-model`; `RES.IO.hw-decompress`; `CNT.COOK.on-demand`; `INP.DEV.hotplug`; `INP.ACT.platform-remap`; `NET.ARCH.connectivity`; `NET.TRANS.platform-requirements`; `NET.TRANS.local-network`; `GAM.SAVE.platform`; `BLD.SYS.platform-sdks`; `BLD.CI.build-distribution`; `BLD.CI.device-lanes`; `BLD.REL.archival`; `XC.SEC.key-custody`; `XC.SEC.attestation`
 - **Not responsible for:** Certification tracking → certification-compliance; Console graphics API backends → rhi-console
 - **Provides:** — · **Consumes:** C-BASE · **Implements:** C-PAL, C-SVC, C-TARGETPLAT
 - **Untrusted inputs:** launch-args
@@ -961,7 +961,7 @@ Device layer: keyboard/mouse raw input, gamepads, touch and gestures, motion sen
 XR integration: OpenXR, stereo/multiview rendering hooks, foveation, reprojection and latency, XR input and hand tracking, comfort and safety requirements.
 
 - **Owns:** `PLAT.XR.openxr`; `PLAT.XR.reprojection`; `PLAT.XR.input`; `PLAT.XR.comfort`; `PLAT.XR.fixed-foveation`; `PLAT.XR.passthrough`; `PLAT.XR.scene`; `PLAT.XR.anchors`; `PLAT.XR.depth-occlusion`; `PLAT.XR.layers`; `PLAT.XR.gaze-input`; `PLAT.XR.light-estimation`; `PLAT.XR.mobile-ar`; `PLAT.XR.runtime-backends`; `PLAT.XR.scene-export`; `PLAT.XR.body-face`
-- **Contributes to:** `CORE.FRAME.present-timeline`; `CORE.FRAME.host-loop`; `WLD.SPACE.views`; `RND.ARCH.multiview`; `RND.ARCH.multiview-nview`; `RND.RECON.foveation`; `RND.POST.display-state`; `ANM.IK.avatar-embodiment`; `GAM.CAM.comfort`; `UI.FW.xr-interaction`
+- **Contributes to:** `PLAT.CON.confidential-slots`; `CORE.FRAME.present-timeline`; `CORE.FRAME.host-loop`; `WLD.SPACE.views`; `RND.ARCH.multiview`; `RND.ARCH.multiview-nview`; `RND.RECON.foveation`; `RND.POST.display-state`; `ANM.IK.avatar-embodiment`; `GAM.CAM.comfort`; `UI.FW.xr-interaction`
 - **Not responsible for:** Render pipeline → render-architect; Generic input actions → input-system
 - **Provides:** C-XRVIEW · **Consumes:** C-PAL, C-INPUT, C-FRAME, C-PRESENT, C-VIEW, C-DEVICE, C-TEMPORAL?, C-A11Y, C-COLOR?
 - **Expertise:** OpenXR, stereo rendering, motion-to-photon latency
@@ -1213,7 +1213,7 @@ Render graph declaration and compilation, automatic barriers, transient aliasing
 Shading language and dialect, compilation toolchain, permutations, reflection and binding layouts, interop headers, caches and distributed compilation, hot reload, shader debugging, PSO-list gathering.
 
 - **Owns:** `RND.SHADER.language`; `RND.SHADER.toolchain`; `RND.SHADER.permutations`; `RND.SHADER.reflection`; `RND.SHADER.interop`; `RND.SHADER.cache`; `RND.SHADER.reload`; `RND.SHADER.debug`; `RND.SHADER.pso-lists`; `RND.SHADER.slang`; `RND.SHADER.precache`; `RND.SHADER.permutation-budget`; `RND.SHADER.neural`; `RND.SHADER.autodiff`; `RND.SHADER.binding-abstraction`; `RND.SHADER.gpu-debug-draw`; `RND.SHADER.untrusted`
-- **Contributes to:** `PLAT.DESK.os-security`; `RND.RHI.pso`; `RND.RHI.binding-tiers`; `PRF.METH.pipeline-budgets`
+- **Contributes to:** `PLAT.DESK.os-security`; `RND.RHI.pso`; `RND.RHI.binding-tiers`; `PRF.METH.pipeline-budgets`; `XC.EXT.runtime-graphs`
 - **Not responsible for:** Material graphs → material-system; Runtime PSO cache → rhi-core
 - **Provides:** C-SHADER · **Consumes:** C-RHI, C-GPUTIER, C-ML?, C-RELOAD?, C-RES · **Tool-side:** C-COOK
 - **Untrusted inputs:** shader-caches, ugc-graphs
@@ -1753,7 +1753,7 @@ Reusable gameplay systems: abilities, effects and attributes, gameplay tags, cam
 - **Owns:** `GAM.SYS.abilities`; `GAM.SYS.tags`; `GAM.SYS.spawning`; `GAM.SYS.messages`; `GAM.SYS.predicted-abilities`; `GAM.SYS.impacts`; `GAM.SYS.volumes`; `GAM.SYS.building`; `GAM.SYS.hit-detection`; `GAM.SYS.projectiles`; `GAM.SYS.markers`; `GAM.TOOL.tags-abilities`
 - **Contributes to:** `PHY.DEST.structural`; `UI.FW.maps`
 - **Not responsible for:** Generic events → entity-object-model; Cinematic cameras → cinematics-sequencer
-- **Provides:** C-ABILITY · **Consumes:** C-GAME, C-VIEW, C-PHYS?, C-ANIM?, C-AUDIO?, C-DEVICE?, C-PREDICT?, C-REP?, C-INPUT?, C-GAMEDATA, C-A11Y, C-EDIT?, C-INTEGRITY?, C-A11YRT?, C-AI?, C-SCRIPT?, C-LOC?, C-DET? · **Tool-side:** C-EDCMD, C-EDHOST
+- **Provides:** C-ABILITY · **Consumes:** C-GAME, C-VIEW, C-PHYS?, C-ANIM?, C-AUDIO?, C-DEVICE?, C-PREDICT?, C-REP?, C-INPUT?, C-GAMEDATA, C-A11Y, C-EDIT?, C-INTEGRITY?, C-A11YRT?, C-AI?, C-SCRIPT?, C-LOC?, C-DET?, C-UI? · **Tool-side:** C-EDCMD, C-EDHOST
 - **Expertise:** ability systems, camera design, gameplay tags
 - **Critics (G2):** K-ARCH, K-NET, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
@@ -1764,7 +1764,7 @@ Reusable gameplay systems: abilities, effects and attributes, gameplay tags, cam
 Scripting language selection, VM embedding and bindings, sandboxing, debugging and profiling, hot reload, visual scripting, AOT/JIT constraints, GC policy, VM concurrency model.
 
 - **Owns:** `GAM.SCR.selection`; `GAM.SCR.vm`; `GAM.SCR.sandbox`; `GAM.SCR.debug`; `GAM.SCR.reload`; `GAM.SCR.visual`; `GAM.SCR.aot`; `GAM.SCR.gc`; `GAM.SCR.concurrency`; `GAM.SCR.level-scripting`; `GAM.SCR.hotfix`; `GAM.TOOL.script-debugger`
-- **Contributes to:** `CORE.LIFE.ownership-model`; `CORE.REFL.bindings`; `GAM.SYS.volumes`; `UI.FW.logic`
+- **Contributes to:** `CORE.LIFE.ownership-model`; `CORE.REFL.bindings`; `GAM.SYS.volumes`; `UI.FW.logic`; `XC.EXT.runtime-graphs`
 - **Not responsible for:** Reflection substrate → reflection-metadata; Graph editor UI → graph-editor-framework
 - **Provides:** C-SCRIPT · **Consumes:** C-REFL, C-RELOAD?, C-TASK, C-LIFETIME, C-FRAME, C-ID, C-ECS?, C-DET? · **Tool-side:** C-GRAPH, C-EDCMD, C-EDHOST
 - **Untrusted inputs:** scripts
@@ -1806,7 +1806,7 @@ Decision making (behavior trees, utility, HTN/GOAP, state trees), perception, en
 - **Owns:** `GAM.AI.decisions`; `GAM.AI.perception`; `GAM.AI.queries`; `GAM.AI.smart-objects`; `GAM.AI.lod`; `GAM.AI.learned`; `GAM.AI.tactical`; `GAM.AI.llm-dialogue`; `GAM.AI.llm-decision`; `GAM.AI.local-guardrails`; `GAM.AI.team-visibility`; `GAM.AI.search`; `GAM.TOOL.ai-editors`; `GAM.TOOL.ai-debug`
 - **Contributes to:** `GAM.NARR.barks`; `UI.LOC.generated`; `QA.CERT.genai`; `XC.SEC.genai`
 - **Not responsible for:** Navigation → navigation-pathfinding; ML runtime → ml-inference-runtime
-- **Provides:** C-AIAGENT, C-AI · **Consumes:** C-GAME, C-NAV?, C-SPATIAL, C-PHYS?, C-ML?, C-LIVE?, C-DIALOGUE?, C-SIGNIF?, C-SAVE?, C-FRAME, C-FLOW, C-VEHICLE?, C-ABILITY?, C-MOVE?, C-SCRIPT?, C-DET? · **Tool-side:** C-GRAPH, C-EDCMD, C-EDHOST
+- **Provides:** C-AIAGENT, C-AI · **Consumes:** C-GAME, C-NAV?, C-SPATIAL, C-PHYS?, C-ML?, C-LIVE?, C-DIALOGUE?, C-SIGNIF?, C-SAVE?, C-FRAME, C-FLOW, C-VEHICLE?, C-ABILITY?, C-MOVE?, C-SCRIPT?, C-DET?, C-REP? · **Tool-side:** C-GRAPH, C-EDCMD, C-EDHOST
 - **Untrusted inputs:** generated-content
 - **Expertise:** game AI, utility theory, HTN planning, ML policy & LLM integration (latency, cost, moderation, fallback)
 - **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
@@ -1912,7 +1912,7 @@ Viewport and navigation, gizmos, snapping and placement, partition-aware world e
 Shared node-graph editor for material, animation, VFX, audio, PCG and visual-script graphs: framework, compile/validation contract, debugging, diff and merge.
 
 - **Owns:** `ED.GRAPH.framework`; `ED.GRAPH.compile`; `ED.GRAPH.debug`; `ED.GRAPH.diff`
-- **Contributes to:** `RND.MAT.graph`; `RND.VFX.graph`; `RND.TOOL.material-editor`; `RND.TOOL.vfx-editor`; `ANM.TOOL.graph-editor`; `AUD.TOOL.designer`; `GAM.SCR.visual`; `GAM.TOOL.ai-editors`; `GAM.TOOL.dialogue`
+- **Contributes to:** `RND.MAT.graph`; `RND.VFX.graph`; `RND.TOOL.material-editor`; `RND.TOOL.vfx-editor`; `ANM.TOOL.graph-editor`; `AUD.TOOL.designer`; `GAM.SCR.visual`; `GAM.TOOL.ai-editors`; `GAM.TOOL.dialogue`; `XC.EXT.runtime-graphs`
 - **Not responsible for:** Each domain's graph semantics → material-system, animation-graphs, vfx-particles, audio-content-runtime, procedural-generation, scripting-runtime, ai-behavior-perception, narrative-dialogue
 - **Provides:** C-GRAPH · **Consumes:** C-EDCMD, C-SER · **Tool-side:** C-VCS
 - **Expertise:** node editors, graph compilers, visual diff

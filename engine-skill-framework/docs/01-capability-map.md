@@ -4,7 +4,7 @@
 
 Everything required to build **and ship** the engine, decomposed as domain → area → capability. Each capability has exactly one owning skill (**bold**); contributors coordinate through the owner's contract. Maturity: unmarked = established production; `emerging` = shipping in some titles, evaluate per ADR; `experimental` = research, never an architectural baseline; `speculative` = watch only.
 
-**1360 capabilities** in 21 domains — 1250 established, 89 emerging, 21 experimental, 0 speculative.
+**1361 capabilities** in 21 domains — 1251 established, 89 emerging, 21 experimental, 0 speculative.
 
 ## Domains
 
@@ -30,7 +30,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 | [QA · Testing & validation](#qa) | 9 | 72 |
 | [PRF · Performance engineering](#prf) | 7 | 41 |
 | [OBS · Observability & diagnostics](#obs) | 2 | 21 |
-| [XC · Cross-cutting runtime disciplines](#xc) | 5 | 72 |
+| [XC · Cross-cutting runtime disciplines](#xc) | 5 | 73 |
 
 ## ARCH
 
@@ -156,7 +156,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `PLAT.CON.portable` Portable-console integration — **platform-console**
 - `PLAT.CON.cross-gen` Cross-generation SKUs & backward-compatibility modes — **platform-console**
 - `PLAT.CON.pal` PAL implementation for console OS (C-PAL backend: OS services, windowing, threads, clocks, IO, display, power, events) — **platform-console** · with platform-architect
-- `PLAT.CON.confidential-slots` Confidential implementations of registered slots (IO/decompression units, audio endpoints, save storage, crash upload, system keyboard, entitlement SDK) behind public interfaces owned by domain skills — **platform-console** · with async-io-storage, audio-architect, persistence-save, crash-diagnostics, text-fonts
+- `PLAT.CON.confidential-slots` Confidential implementations of registered slots (IO/decompression units, audio endpoints, save storage, crash upload, system keyboard, entitlement SDK, console XR SDK) behind public interfaces owned by domain skills — **platform-console** · with async-io-storage, audio-architect, persistence-save, crash-diagnostics, text-fonts, xr-runtime
 
 **PLAT.MOB — Mobile & portable**
 
@@ -211,7 +211,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `PLAT.XR.gaze-input` Gaze + pinch interaction `emerging` — **xr-runtime** · with input-system, privacy-data-protection
 - `PLAT.XR.light-estimation` Real-world light estimation `emerging` — **xr-runtime** · with global-illumination
 - `PLAT.XR.mobile-ar` Phone/tablet AR sessions (ARKit/ARCore class) — **xr-runtime**
-- `PLAT.XR.runtime-backends` XR runtime backends: OpenXR, visionOS Compositor Services, console XR SDK (confidential slot) — **xr-runtime** · with platform-mobile, platform-console, rhi-metal
+- `PLAT.XR.runtime-backends` XR runtime backends: OpenXR, visionOS Compositor Services (console XR SDK slot in PLAT.CON.confidential-slots) — **xr-runtime** · with platform-mobile, rhi-metal
 - `PLAT.XR.scene-export` OS-composited shared-space scenes (engine exports a scene description via C-RSCENE change streams) `emerging` — **xr-runtime** · with render-architect
 - `PLAT.XR.body-face` Body, face & eye-expression tracking inputs (OpenXR extensions) with biometric privacy class `emerging` — **xr-runtime** · with privacy-data-protection
 
@@ -421,7 +421,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 
 **RES.IO — Asynchronous IO**
 
-- `RES.IO.backends` Async IO backends (io_uring, IOCP, DirectStorage, console APIs) — **async-io-storage**
+- `RES.IO.backends` Async IO backends (io_uring, IOCP, DirectStorage; console variants via PLAT.CON.confidential-slots) — **async-io-storage**
 - `RES.IO.scheduling` IO scheduling, prioritization, queue depth, batching — **async-io-storage**
 - `RES.IO.gpu-decompress` GPU decompression (GDeflate class) — **async-io-storage** · with gpu-memory-resources
 - `RES.IO.mmap` Memory-mapped IO restricted to prefetched/locked or tool-side use — **async-io-storage**
@@ -1905,6 +1905,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `XC.EXT.fork-integration` Customization-seam catalogue, licensee modification manifest, upstream-merge tooling & reports — **api-lifecycle-migration** · with build-release-architect, collaboration-version-control
 - `XC.EXT.ugc-integrity` Mod/UGC distribution integrity: package signing via C-SIGN, author identity & 2FA at the distribution boundary, update pinning/review, remote revocation/kill switch, native-code mod policy (sandboxed by default, native only by explicit player opt-in) — **modding-ugc** · with security-engineering, online-services-liveops, platform-services
 - `XC.EXT.generated-assets` Runtime validation & cooking of player-prompted generated assets under XC.SEC.genai `emerging` — **modding-ugc** · with asset-cook-processors, security-engineering, online-services-liveops
+- `XC.EXT.runtime-graphs` Runtime compilation of UGC-authored graphs in client targets (restricted node set, validation, shader/VM compile under RND.SHADER.untrusted limits; C-GRAPH node/pin model as shared schema) — **modding-ugc** · with shader-system, graph-editor-framework, scripting-runtime
 
 **XC.DX — Documentation & developer experience**
 

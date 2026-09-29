@@ -601,7 +601,7 @@
    "layer": 3,
    "owner": "ui-architect",
    "name": "UI widgets & binding",
-   "summary": "Widget model, data binding, focus, layout; bindings resolved at load time and driven by change notification; per-local-player UI roots and focus owners; world-to-view projection for in-world UI.",
+   "summary": "Widget model, data binding, focus, layout; bindings resolved at load time and driven by change notification; per-local-player UI roots and focus owners; world-to-view projection for in-world UI; marker-source interface for the map service (implemented by gameplay marker registries).",
    "requires": [
     "C-REFL",
     "C-INPUT",
@@ -1078,7 +1078,7 @@
    "layer": 3,
    "owner": "replication",
    "name": "Replication",
-   "summary": "Replicated state declaration, relevancy hooks, RPCs, net IDs, batch registration, replay and spectator streams; producers mark dirty state; no per-connection full-state comparison.",
+   "summary": "Replicated state declaration, relevancy hooks, RPCs, net IDs, batch registration, replay and spectator streams; producers mark dirty state; no per-connection full-state comparison; per-faction visibility registers as a relevancy filter through the relevancy hooks (basis of XC.SEC.info-hiding).",
    "requires": [
     "C-NETLINK",
     "C-SER",
@@ -1478,7 +1478,7 @@
    "layer": 4,
    "owner": "modding-ugc",
    "name": "Runtime edit session",
-   "summary": "In-game creation sessions: serializable commands (schema shared with C-EDCMD per ED.ARCH.transactions), undo, selection, permissions and per-creation budgets, publish/version.",
+   "summary": "In-game creation sessions: serializable commands (schema shared with C-EDCMD per ED.ARCH.transactions), undo, selection, permissions and per-creation budgets, publish/version; runtime graph authoring and compilation (XC.EXT.runtime-graphs; node/pin schema shared with C-GRAPH).",
    "requires": [
     "C-SER",
     "C-ID",
@@ -1543,7 +1543,7 @@
    "layer": 4,
    "owner": "gameplay-systems-toolkit",
    "name": "Abilities, effects & attributes",
-   "summary": "Ability activation, effects, attributes, tag queries, gameplay messages, hit results.",
+   "summary": "Ability activation, effects, attributes, tag queries, gameplay messages, hit results; marker registry (POIs) published to C-UI marker sources.",
    "requires": [
     "C-GAME",
     "C-GAMEDATA"
@@ -1582,7 +1582,7 @@
    "layer": 4,
    "owner": "ai-behavior-perception",
    "name": "AI agents",
-   "summary": "Brain assignment (behavior/state trees, utility, HTN), perception stimulus sources, smart-object claim/release, environment query service; learned/LLM providers plug in through C-AIAGENT.",
+   "summary": "Brain assignment (behavior/state trees, utility, HTN), perception stimulus sources, smart-object claim/release, environment query service; learned/LLM providers plug in through C-AIAGENT; per-faction visibility and explored-state queries; the visibility field is published to fog rendering and maps through a declared C-FLOW channel.",
    "requires": [
     "C-GAME",
     "C-NAV"

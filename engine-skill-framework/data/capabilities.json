@@ -818,7 +818,7 @@
       ],
       [
        "PLAT.CON.confidential-slots",
-       "Confidential implementations of registered slots (IO/decompression units, audio endpoints, save storage, crash upload, system keyboard, entitlement SDK) behind public interfaces owned by domain skills",
+       "Confidential implementations of registered slots (IO/decompression units, audio endpoints, save storage, crash upload, system keyboard, entitlement SDK, console XR SDK) behind public interfaces owned by domain skills",
        "platform-console",
        "E",
        [
@@ -826,7 +826,8 @@
         "audio-architect",
         "persistence-save",
         "crash-diagnostics",
-        "text-fonts"
+        "text-fonts",
+        "xr-runtime"
        ]
       ]
      ]
@@ -1206,12 +1207,11 @@
       ],
       [
        "PLAT.XR.runtime-backends",
-       "XR runtime backends: OpenXR, visionOS Compositor Services, console XR SDK (confidential slot)",
+       "XR runtime backends: OpenXR, visionOS Compositor Services (console XR SDK slot in PLAT.CON.confidential-slots)",
        "xr-runtime",
        "E",
        [
         "platform-mobile",
-        "platform-console",
         "rhi-metal"
        ]
       ],
@@ -2516,7 +2516,7 @@
      "caps": [
       [
        "RES.IO.backends",
-       "Async IO backends (io_uring, IOCP, DirectStorage, console APIs)",
+       "Async IO backends (io_uring, IOCP, DirectStorage; console variants via PLAT.CON.confidential-slots)",
        "async-io-storage",
        "E"
       ],
@@ -11914,6 +11914,20 @@
         "asset-cook-processors",
         "security-engineering",
         "online-services-liveops"
+       ]
+      ],
+      [
+       "XC.EXT.runtime-graphs",
+       "Runtime compilation of UGC-authored graphs in client targets (restricted node set, validation, shader/VM compile under RND.SHADER.untrusted limits; C-GRAPH node/pin model as shared schema)",
+       "modding-ugc",
+       "E",
+       [
+        "shader-system",
+        "graph-editor-framework",
+        "scripting-runtime"
+       ],
+       [
+        "ugc"
        ]
       ]
      ]

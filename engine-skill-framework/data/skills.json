@@ -1490,7 +1490,8 @@
     "C-SCRIPT",
     "C-PLUGIN",
     "C-SVC",
-    "C-SIGN"
+    "C-SIGN",
+    "C-SHADER?"
    ],
    "expertise": [
     "mod ecosystems",
@@ -5523,7 +5524,8 @@
     "C-AI?",
     "C-SCRIPT?",
     "C-LOC?",
-    "C-DET?"
+    "C-DET?",
+    "C-UI?"
    ],
    "expertise": [
     "ability systems",
@@ -5754,7 +5756,8 @@
     "C-ABILITY?",
     "C-MOVE?",
     "C-SCRIPT?",
-    "C-DET?"
+    "C-DET?",
+    "C-REP?"
    ],
    "expertise": [
     "game AI",
