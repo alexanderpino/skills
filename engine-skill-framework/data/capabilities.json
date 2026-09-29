@@ -1,0 +1,1040 @@
+{
+  "_doc": "Engine Capability Map. Each capability is [id, name, owner-skill, maturity, contributors?]. Maturity: E=established production, M=emerging production, X=experimental research, S=speculative. Exactly one owner per capability; contributors must coordinate through the owner's contract.",
+  "domains": [
+    {"id": "ARCH", "name": "Engine architecture, governance & agent organization", "areas": [
+      {"id": "ARCH.REQ", "name": "Requirements & configuration profiles", "caps": [
+        ["ARCH.REQ.game-requirements", "Capture target game requirements (genre, scale, platforms, online model) as engine requirements", "engine-architect", "E"],
+        ["ARCH.REQ.profiles", "Engine configuration profiles & feature sets (indie 2D → AAA open-world online)", "engine-architect", "E"],
+        ["ARCH.REQ.hardware-tiers", "Target hardware tier definitions (portable, mobile, console, PC min/rec/high)", "engine-architect", "E", ["performance-architect"]],
+        ["ARCH.REQ.non-goals", "Capability & non-goal register (what the engine deliberately does not do)", "engine-architect", "E"]
+      ]},
+      {"id": "ARCH.STRUCT", "name": "Structure & boundaries", "caps": [
+        ["ARCH.STRUCT.layering", "Layering rules & module boundaries", "engine-architect", "E"],
+        ["ARCH.STRUCT.contracts", "Contract registry between subsystems", "engine-architect", "E"],
+        ["ARCH.STRUCT.build-buy", "Build / integrate / buy decisions (middleware, OSS)", "engine-architect", "E", ["architecture-governance"]],
+        ["ARCH.STRUCT.replaceability", "Subsystem replaceability & optionality (modules absent in small profiles)", "engine-architect", "E"],
+        ["ARCH.STRUCT.conventions", "Global conventions: units, handedness, up-axis, coordinate spaces", "engine-architect", "E", ["math-simd-numerics"]],
+        ["ARCH.STRUCT.arbitration", "Cross-domain arbitration & escalation of boundary disputes", "engine-architect", "E"]
+      ]},
+      {"id": "ARCH.GOV", "name": "Architecture governance", "caps": [
+        ["ARCH.GOV.adr", "ADR lifecycle with evidence, alternatives, revisit conditions", "architecture-governance", "E"],
+        ["ARCH.GOV.fitness", "Automated architectural fitness functions (layering, dependency, contract conformance)", "architecture-governance", "E"],
+        ["ARCH.GOV.anti-legacy", "Anti-legacy review of designs against flagged patterns", "architecture-governance", "E"],
+        ["ARCH.GOV.radar", "Technology radar & maturity tiers with promotion criteria", "architecture-governance", "E", ["research-evidence"]],
+        ["ARCH.GOV.coding-standard", "Coding standard & language subset", "architecture-governance", "E", ["core-runtime-architect"]]
+      ]},
+      {"id": "ARCH.EVID", "name": "Research & evidence", "caps": [
+        ["ARCH.EVID.grading", "Source grading & provenance tiers", "research-evidence", "E"],
+        ["ARCH.EVID.survey", "Literature survey protocol per decision", "research-evidence", "E"],
+        ["ARCH.EVID.spike", "Prototype/spike protocol producing evidence where literature is thin", "research-evidence", "E"],
+        ["ARCH.EVID.claims", "Benchmark-backed claims standard", "research-evidence", "E", ["perf-benchmarking"]]
+      ]},
+      {"id": "ARCH.ORG", "name": "Agent organization", "caps": [
+        ["ARCH.ORG.decomposition", "Milestone → task decomposition by skill territory", "program-orchestration", "E"],
+        ["ARCH.ORG.ownership-ledger", "Ownership ledger & territory locks", "program-orchestration", "E"],
+        ["ARCH.ORG.integration", "Integration sequencing & milestone vertical slices", "program-orchestration", "E"],
+        ["ARCH.ORG.change-requests", "Contract change-request protocol between agents", "program-orchestration", "E", ["architecture-governance"]],
+        ["ARCH.ORG.critic-gates", "Scheduling critic gates per stage", "program-orchestration", "E"]
+      ]}
+    ]},
+
+    {"id": "PLAT", "name": "Platform & hardware abstraction", "areas": [
+      {"id": "PLAT.PAL", "name": "Platform abstraction layer", "caps": [
+        ["PLAT.PAL.os", "OS services abstraction (threads, virtual memory, files, time, dynamic libraries)", "platform-architect", "E"],
+        ["PLAT.PAL.cpu-topology", "CPU topology & feature discovery (hybrid cores, SMT, caches, NUMA, ISA)", "platform-architect", "E", ["job-system-task-graph"]],
+        ["PLAT.PAL.windowing", "Windowing & surfaces", "platform-architect", "E"],
+        ["PLAT.PAL.lifecycle", "Process lifecycle (suspend, resume, constrained, terminate)", "platform-architect", "E", ["platform-console", "platform-mobile-portable"]],
+        ["PLAT.PAL.capability-tiers", "Platform capability tiers & feature query", "platform-architect", "E"],
+        ["PLAT.PAL.web", "Web target (WASM + WebGPU)", "platform-architect", "M"],
+        ["PLAT.PAL.cloud-streaming", "Cloud-streaming targets (latency, encode, input)", "platform-architect", "M"]
+      ]},
+      {"id": "PLAT.DESK", "name": "Desktop & handheld PC", "caps": [
+        ["PLAT.DESK.os-integration", "Windows / Linux / SteamOS / macOS integration", "platform-desktop", "E"],
+        ["PLAT.DESK.display", "Display enumeration, modes, DPI, HDR & VRR capability", "platform-desktop", "E"],
+        ["PLAT.DESK.handheld", "Handheld PC specifics (power, resolution, controls)", "platform-desktop", "E"],
+        ["PLAT.DESK.server-host", "Server host OS specifics (Linux containers)", "platform-desktop", "E", ["dedicated-server"]]
+      ]},
+      {"id": "PLAT.CON", "name": "Console-class platforms", "caps": [
+        ["PLAT.CON.os-memory", "Console OS & memory model (UMA, reserved memory, fixed hardware)", "platform-console", "E"],
+        ["PLAT.CON.user-model", "Console multi-user model & user/device pairing", "platform-console", "E"],
+        ["PLAT.CON.suspend", "Suspend / resume / quick-resume", "platform-console", "E"],
+        ["PLAT.CON.devkit", "Devkit workflows & SDK toolchains", "platform-console", "E", ["build-system-toolchains"]]
+      ]},
+      {"id": "PLAT.MOB", "name": "Mobile & portable", "caps": [
+        ["PLAT.MOB.os", "iOS / Android / portable-console integration", "platform-mobile-portable", "E"],
+        ["PLAT.MOB.tbdr", "Tile-based GPU implications (bandwidth, on-chip memory)", "platform-mobile-portable", "E", ["render-graph-scheduling"]],
+        ["PLAT.MOB.thermal", "Thermal & power adaptivity", "platform-mobile-portable", "E", ["performance-architect"]],
+        ["PLAT.MOB.storage", "Storage & download-size constraints", "platform-mobile-portable", "E"]
+      ]},
+      {"id": "PLAT.SVC", "name": "Platform & online services integration", "caps": [
+        ["PLAT.SVC.identity", "User identity, sign-in, account linking, crossplay identity", "platform-online-services", "E"],
+        ["PLAT.SVC.achievements", "Achievements, trophies, activities, rich presence", "platform-online-services", "E"],
+        ["PLAT.SVC.entitlements", "Entitlements, store, DLC ownership", "platform-online-services", "E"],
+        ["PLAT.SVC.cloud-save", "Cloud save services", "platform-online-services", "E", ["persistence-save"]],
+        ["PLAT.SVC.matchmaking", "Matchmaking / lobby / session integration boundary", "platform-online-services", "E", ["network-architect"]],
+        ["PLAT.SVC.remote-config", "Remote configuration & feature flags", "platform-online-services", "E"],
+        ["PLAT.SVC.moderation", "UGC & text-chat moderation service boundary", "platform-online-services", "E", ["modding-ugc"]],
+        ["PLAT.SVC.capture", "Media capture & share integration", "platform-online-services", "E"]
+      ]},
+      {"id": "PLAT.XR", "name": "XR", "caps": [
+        ["PLAT.XR.openxr", "OpenXR runtime integration", "xr-runtime", "E"],
+        ["PLAT.XR.stereo", "Stereo / multiview rendering integration", "xr-runtime", "E", ["render-architect"]],
+        ["PLAT.XR.foveation", "Fixed & eye-tracked foveated rendering", "xr-runtime", "M"],
+        ["PLAT.XR.reprojection", "Reprojection & motion-to-photon latency", "xr-runtime", "E"],
+        ["PLAT.XR.input", "XR input & hand tracking", "xr-runtime", "E", ["input-devices-haptics"]],
+        ["PLAT.XR.comfort", "Comfort & safety requirements", "xr-runtime", "E"]
+      ]}
+    ]},
+
+    {"id": "CORE", "name": "Core runtime foundations", "areas": [
+      {"id": "CORE.LIFE", "name": "Lifecycle, modules, configuration, errors", "caps": [
+        ["CORE.LIFE.boot", "Parallel boot via init dependency graph", "core-runtime-architect", "E"],
+        ["CORE.LIFE.modules", "Module system (static/dynamic linking, init order)", "core-runtime-architect", "E"],
+        ["CORE.LIFE.shutdown", "Deterministic shutdown & teardown ordering", "core-runtime-architect", "E"],
+        ["CORE.LIFE.services", "Service registry & dependency-injection policy (no hidden globals)", "core-runtime-architect", "E"],
+        ["CORE.LIFE.config", "Layered configuration, cvars, command line, per-platform/per-device values", "core-runtime-architect", "E"],
+        ["CORE.LIFE.errors", "Error-handling & failure model (expected-style results, fatal vs recoverable)", "core-runtime-architect", "E"],
+        ["CORE.LIFE.asserts", "Assertion tiers & contract checks", "core-runtime-architect", "E", ["crash-diagnostics"]],
+        ["CORE.LIFE.language", "Language standard & compiler feature policy (C++20/23, exceptions/RTTI policy)", "core-runtime-architect", "E"]
+      ]},
+      {"id": "CORE.MATH", "name": "Math & numerics", "caps": [
+        ["CORE.MATH.linear", "SIMD linear algebra (vectors, matrices, quaternions)", "math-simd-numerics", "E"],
+        ["CORE.MATH.geometry", "Geometry primitives & intersection tests", "math-simd-numerics", "E"],
+        ["CORE.MATH.compgeo", "Computational geometry (hulls, triangulation, booleans)", "math-simd-numerics", "E"],
+        ["CORE.MATH.robustness", "Numerical robustness & precision analysis", "math-simd-numerics", "E"],
+        ["CORE.MATH.precision", "Double & mixed-precision math for large worlds", "math-simd-numerics", "E", ["spatial-transforms"]],
+        ["CORE.MATH.deterministic", "Cross-platform reproducible math library", "math-simd-numerics", "E", ["determinism-replay"]],
+        ["CORE.MATH.random", "Random numbers & noise functions", "math-simd-numerics", "E"],
+        ["CORE.MATH.curves", "Curves, splines & interpolation", "math-simd-numerics", "E"],
+        ["CORE.MATH.spmd", "Wide-SIMD / SPMD kernels & runtime ISA dispatch", "math-simd-numerics", "E", ["cpu-performance"]],
+        ["CORE.MATH.formats", "Half, packed & quantized numeric formats", "math-simd-numerics", "E"]
+      ]},
+      {"id": "CORE.MEM", "name": "Memory", "caps": [
+        ["CORE.MEM.virtual", "Virtual memory reservation & mapping", "memory-allocators", "E"],
+        ["CORE.MEM.allocators", "Allocator families (linear/frame, pool, TLSF, slab, buddy)", "memory-allocators", "E"],
+        ["CORE.MEM.thread-caches", "Thread-local caches & NUMA-aware allocation", "memory-allocators", "E"],
+        ["CORE.MEM.tracking", "Memory tagging, tracking & attribution", "memory-allocators", "E", ["observability-telemetry"]],
+        ["CORE.MEM.budget-enforcement", "Budget enforcement mechanisms per subsystem", "memory-allocators", "E", ["performance-architect"]],
+        ["CORE.MEM.fragmentation", "Fragmentation control & defragmentation/relocation", "memory-allocators", "E"],
+        ["CORE.MEM.debugging", "Memory debugging (guard pages, poisoning, sanitizer integration)", "memory-allocators", "E", ["robustness-fuzzing"]],
+        ["CORE.MEM.oom", "Out-of-memory policy & graceful degradation", "memory-allocators", "E"],
+        ["CORE.MEM.uma", "Unified-memory CPU/GPU accounting", "memory-allocators", "E", ["gpu-memory-resources"]]
+      ]},
+      {"id": "CORE.TYPES", "name": "Core types & containers", "caps": [
+        ["CORE.TYPES.containers", "Containers (arrays, open-addressing hash maps, inline, SoA, intrusive, rings)", "containers-core-types", "E"],
+        ["CORE.TYPES.strings", "Strings, UTF-8 handling, interned names", "containers-core-types", "E"],
+        ["CORE.TYPES.hashing", "Non-cryptographic & stable content hashing", "containers-core-types", "E"],
+        ["CORE.TYPES.bits", "Bit manipulation & bitsets", "containers-core-types", "E"],
+        ["CORE.TYPES.algorithms", "Sort, search & generic algorithms", "containers-core-types", "E"],
+        ["CORE.TYPES.ownership", "Span/view & explicit-ownership types", "containers-core-types", "E", ["core-runtime-architect"]]
+      ]},
+      {"id": "CORE.CONC", "name": "Concurrency primitives", "caps": [
+        ["CORE.CONC.atomics", "Memory model & atomics", "concurrency-primitives", "E"],
+        ["CORE.CONC.sync", "Synchronization primitives (futex-backed locks, events, spin with backoff)", "concurrency-primitives", "E"],
+        ["CORE.CONC.lockfree", "Lock-free / wait-free structures (MPMC queues, work-stealing deques)", "concurrency-primitives", "E"],
+        ["CORE.CONC.reclamation", "Safe memory reclamation (epochs, hazard pointers)", "concurrency-primitives", "E"],
+        ["CORE.CONC.correctness", "Thread-safety annotations & model checking", "concurrency-primitives", "E", ["robustness-fuzzing"]]
+      ]},
+      {"id": "CORE.JOBS", "name": "Jobs, task graphs, fibers", "caps": [
+        ["CORE.JOBS.scheduler", "Work-stealing job scheduler", "job-system-task-graph", "E"],
+        ["CORE.JOBS.graph", "Task graphs with explicit dependencies", "job-system-task-graph", "E"],
+        ["CORE.JOBS.fibers", "Fibers and C++20 coroutines", "job-system-task-graph", "E"],
+        ["CORE.JOBS.priorities", "Priorities, QoS classes & latency-critical lanes", "job-system-task-graph", "E"],
+        ["CORE.JOBS.hetero", "Heterogeneous-core placement (P/E cores, SMT siblings)", "job-system-task-graph", "E", ["platform-architect"]],
+        ["CORE.JOBS.numa", "NUMA-aware scheduling", "job-system-task-graph", "E"],
+        ["CORE.JOBS.completions", "IO & GPU completion integration into the scheduler", "job-system-task-graph", "E", ["async-io-storage"]],
+        ["CORE.JOBS.parallel-algos", "Parallel-for & parallel algorithms", "job-system-task-graph", "E"],
+        ["CORE.JOBS.blocking", "Blocking & long-running task policy", "job-system-task-graph", "E"]
+      ]},
+      {"id": "CORE.FRAME", "name": "Frame & time orchestration", "caps": [
+        ["CORE.FRAME.pipelining", "Frame pipelining across simulation, render & GPU", "frame-orchestration", "E"],
+        ["CORE.FRAME.phases", "Tick phases, sync points & phase barriers", "frame-orchestration", "E", ["ecs-runtime"]],
+        ["CORE.FRAME.fixed-step", "Fixed-step simulation with interpolation", "frame-orchestration", "E"],
+        ["CORE.FRAME.time", "Time domains (real, game, dilation, pause) & clocks", "frame-orchestration", "E"],
+        ["CORE.FRAME.latency", "Input-to-photon latency & frame pacing (Reflex / Anti-Lag class)", "frame-orchestration", "E", ["platform-desktop"]],
+        ["CORE.FRAME.async-work", "Multi-frame asynchronous work", "frame-orchestration", "E"],
+        ["CORE.FRAME.headless", "Headless / server tick model", "frame-orchestration", "E", ["dedicated-server"]]
+      ]},
+      {"id": "CORE.OBJ", "name": "Object model & identity", "caps": [
+        ["CORE.OBJ.identity", "Entity identity (generational IDs, stable GUIDs)", "entity-object-model", "E"],
+        ["CORE.OBJ.hybrid", "Hybrid object-model policy (ECS vs services vs asset objects vs UI objects)", "entity-object-model", "E"],
+        ["CORE.OBJ.references", "Reference kinds (hard, soft, weak) & lifetime", "entity-object-model", "E", ["resource-streaming-architect"]],
+        ["CORE.OBJ.events", "Events, messaging & inter-system communication", "entity-object-model", "E"]
+      ]},
+      {"id": "CORE.ECS", "name": "Entity component system", "caps": [
+        ["CORE.ECS.storage", "Component storage (archetype chunks vs sparse sets)", "ecs-runtime", "E"],
+        ["CORE.ECS.queries", "Queries & filters", "ecs-runtime", "E"],
+        ["CORE.ECS.change", "Change detection & versioning", "ecs-runtime", "E"],
+        ["CORE.ECS.structural", "Structural changes & command buffers", "ecs-runtime", "E"],
+        ["CORE.ECS.scheduling", "System scheduling & access-conflict analysis", "ecs-runtime", "E", ["frame-orchestration"]],
+        ["CORE.ECS.relationships", "Relationships & hierarchies in ECS", "ecs-runtime", "M"],
+        ["CORE.ECS.singletons", "Shared / singleton components & resources", "ecs-runtime", "E"],
+        ["CORE.ECS.baking", "Authoring → runtime baking", "ecs-runtime", "E", ["content-pipeline-architect"]],
+        ["CORE.ECS.debug", "ECS debugging & inspection", "ecs-runtime", "E", ["visual-debugging-tools"]]
+      ]},
+      {"id": "CORE.REFL", "name": "Reflection & metadata", "caps": [
+        ["CORE.REFL.registry", "Type registry & type IDs", "reflection-metadata", "E"],
+        ["CORE.REFL.generation", "Reflection generation (codegen now; C++26 static reflection when available)", "reflection-metadata", "M"],
+        ["CORE.REFL.attributes", "Attributes & metadata", "reflection-metadata", "E"],
+        ["CORE.REFL.properties", "Property system for editing & binding", "reflection-metadata", "E", ["editor-ui-framework"]],
+        ["CORE.REFL.bindings", "Script-binding substrate", "reflection-metadata", "E", ["scripting-runtime"]],
+        ["CORE.REFL.dynamic", "Type erasure & dynamic invocation", "reflection-metadata", "E"]
+      ]},
+      {"id": "CORE.SER", "name": "Serialization & schema", "caps": [
+        ["CORE.SER.binary", "Binary serialization", "serialization-schema", "E"],
+        ["CORE.SER.text", "Text / diff-friendly source formats", "serialization-schema", "E", ["collaboration-version-control"]],
+        ["CORE.SER.evolution", "Schema evolution, versioning & upgraders", "serialization-schema", "E"],
+        ["CORE.SER.relocatable", "In-place loadable / relocatable layouts", "serialization-schema", "E", ["package-formats-vfs"]],
+        ["CORE.SER.canonical", "Deterministic canonical serialization", "serialization-schema", "E", ["determinism-replay"]],
+        ["CORE.SER.portability", "Endianness & ABI portability", "serialization-schema", "E"],
+        ["CORE.SER.untrusted", "Untrusted-input validation during deserialization", "serialization-schema", "E", ["security-engineering"]]
+      ]}
+    ]},
+
+    {"id": "RES", "name": "Resources, IO, packaging & streaming", "areas": [
+      {"id": "RES.MGMT", "name": "Runtime resource management", "caps": [
+        ["RES.MGMT.handles", "Resource handles & explicit lifetime", "resource-streaming-architect", "E"],
+        ["RES.MGMT.requests", "Load requests with priority & deadline", "resource-streaming-architect", "E"],
+        ["RES.MGMT.dependencies", "Dependency-aware loading", "resource-streaming-architect", "E", ["content-pipeline-architect"]],
+        ["RES.MGMT.streaming", "Streaming manager (budgets, eviction, prediction)", "resource-streaming-architect", "E"],
+        ["RES.MGMT.fallbacks", "Fallback / placeholder resources", "resource-streaming-architect", "E"],
+        ["RES.MGMT.no-stall", "Fully asynchronous loading (no main-thread waits)", "resource-streaming-architect", "E"],
+        ["RES.MGMT.reload", "Resource reload plumbing", "resource-streaming-architect", "E", ["hot-reload-iteration"]]
+      ]},
+      {"id": "RES.IO", "name": "Asynchronous IO", "caps": [
+        ["RES.IO.backends", "Async IO backends (io_uring, IOCP, DirectStorage, console APIs)", "async-io-storage", "E"],
+        ["RES.IO.scheduling", "IO scheduling, prioritization, queue depth, batching", "async-io-storage", "E"],
+        ["RES.IO.gpu-decompress", "GPU decompression (GDeflate class)", "async-io-storage", "M", ["gpu-memory-resources"]],
+        ["RES.IO.mmap", "Memory-mapped IO", "async-io-storage", "E"],
+        ["RES.IO.fs", "File-system & path abstraction", "async-io-storage", "E", ["platform-architect"]],
+        ["RES.IO.errors", "IO error handling & retries", "async-io-storage", "E"]
+      ]},
+      {"id": "RES.PKG", "name": "Packages & virtual file system", "caps": [
+        ["RES.PKG.format", "Package / container format & chunking", "package-formats-vfs", "E"],
+        ["RES.PKG.compression", "Compression codec selection (Kraken/zstd/LZ4/GDeflate class)", "package-formats-vfs", "E"],
+        ["RES.PKG.vfs", "VFS mounting & layering (base, patch, DLC, mods)", "package-formats-vfs", "E"],
+        ["RES.PKG.crypto", "Content encryption & signing", "package-formats-vfs", "E", ["security-engineering"]],
+        ["RES.PKG.install-layout", "Install chunks & play-while-installing layout", "package-formats-vfs", "E", ["packaging-release-patching"]]
+      ]}
+    ]},
+
+    {"id": "CNT", "name": "Asset identity & content pipeline", "areas": [
+      {"id": "CNT.ID", "name": "Asset identity & registry", "caps": [
+        ["CNT.ID.identity", "Asset identity (GUID + content hash)", "content-pipeline-architect", "E"],
+        ["CNT.ID.registry", "Asset registry & queries", "content-pipeline-architect", "E"],
+        ["CNT.ID.dependencies", "Asset dependency graph & reference tracking", "content-pipeline-architect", "E"],
+        ["CNT.ID.redirects", "Renames, moves & redirects", "content-pipeline-architect", "E"]
+      ]},
+      {"id": "CNT.IMP", "name": "Import & interchange", "caps": [
+        ["CNT.IMP.gltf", "glTF import", "asset-import-interchange", "E"],
+        ["CNT.IMP.fbx", "FBX import", "asset-import-interchange", "E"],
+        ["CNT.IMP.usd", "OpenUSD import & composition", "asset-import-interchange", "M"],
+        ["CNT.IMP.textures", "Texture source formats (EXR, PNG, TIFF, PSD)", "asset-import-interchange", "E"],
+        ["CNT.IMP.audio", "Audio source formats", "asset-import-interchange", "E", ["audio-content-runtime"]],
+        ["CNT.IMP.materialx", "MaterialX / OpenPBR material interchange", "asset-import-interchange", "M", ["material-system"]],
+        ["CNT.IMP.livelink", "DCC live link", "asset-import-interchange", "E"],
+        ["CNT.IMP.reimport", "Reimport & source tracking", "asset-import-interchange", "E"],
+        ["CNT.IMP.scans", "Photogrammetry & scan ingestion", "asset-import-interchange", "E"]
+      ]},
+      {"id": "CNT.COOK", "name": "Cooking & derived data", "caps": [
+        ["CNT.COOK.architecture", "Deterministic, incremental, per-platform cook architecture", "content-pipeline-architect", "E"],
+        ["CNT.COOK.contract", "Cook-step processor contract (inputs, cache keys, determinism)", "content-pipeline-architect", "E"],
+        ["CNT.COOK.ddc", "Derived-data cache & content-addressed store", "content-pipeline-architect", "E"],
+        ["CNT.COOK.distributed", "Distributed / remote cooking", "content-pipeline-architect", "E"],
+        ["CNT.COOK.textures", "Texture processing & GPU texture-compression encoding (BCn, ASTC)", "asset-cook-processors", "E"],
+        ["CNT.COOK.meshes", "Mesh optimization (vertex cache/fetch, quantization, tangents)", "asset-cook-processors", "E"],
+        ["CNT.COOK.variants", "Platform & quality-tier variants", "content-pipeline-architect", "E", ["performance-architect"]],
+        ["CNT.COOK.determinism-check", "Cook determinism verification", "content-pipeline-architect", "E", ["test-architect"]]
+      ]},
+      {"id": "CNT.VAL", "name": "Content validation", "caps": [
+        ["CNT.VAL.framework", "Content validation & linting framework", "content-pipeline-architect", "E"],
+        ["CNT.VAL.budgets", "Content budget validation (triangles, texture sizes, bones)", "content-pipeline-architect", "E", ["performance-architect"]]
+      ]}
+    ]},
+
+    {"id": "WLD", "name": "World representation, streaming & environment", "areas": [
+      {"id": "WLD.MODEL", "name": "World model", "caps": [
+        ["WLD.MODEL.strategy", "World representation strategy (data-oriented, no universal scene graph)", "world-architect", "E"],
+        ["WLD.MODEL.document", "World / level document format", "world-data-model", "E"],
+        ["WLD.MODEL.prefabs", "Prefabs, nested overrides & variants", "world-data-model", "E"],
+        ["WLD.MODEL.layers", "Data layers & world variants", "world-data-model", "E"],
+        ["WLD.MODEL.file-per-object", "One-file-per-object layout for collaboration", "world-data-model", "E", ["collaboration-version-control"]],
+        ["WLD.MODEL.instancing", "Level instances & world instancing", "world-data-model", "E"],
+        ["WLD.MODEL.travel", "Level transitions & seamless travel", "world-architect", "E", ["gameplay-architect"]]
+      ]},
+      {"id": "WLD.PART", "name": "Partitioning & streaming", "caps": [
+        ["WLD.PART.grid", "World partition & streaming cells", "world-architect", "E"],
+        ["WLD.PART.sources", "Streaming sources & activation policy", "world-architect", "E", ["resource-streaming-architect"]],
+        ["WLD.PART.hlod", "HLOD strategy & generation orchestration", "world-architect", "E", ["virtualized-geometry-lod"]],
+        ["WLD.PART.sim-lod", "Simulation LOD & significance management", "world-architect", "E"],
+        ["WLD.PART.server", "Server-side world streaming", "world-architect", "E", ["dedicated-server"]],
+        ["WLD.PART.lwc-policy", "Large-world coordinate policy", "world-architect", "E"]
+      ]},
+      {"id": "WLD.SPACE", "name": "Transforms & spatial queries", "caps": [
+        ["WLD.SPACE.transforms", "Transform representation & parallel hierarchy propagation", "spatial-transforms", "E"],
+        ["WLD.SPACE.attachments", "Attachments & sockets", "spatial-transforms", "E", ["animation-architect"]],
+        ["WLD.SPACE.lwc", "Large-world coordinates implementation (64-bit positions, camera-relative)", "spatial-transforms", "E"],
+        ["WLD.SPACE.index", "Generic spatial index & query service for non-physics consumers", "spatial-transforms", "E"],
+        ["WLD.SPACE.hashing", "Spatial hashing for massive agent counts", "spatial-transforms", "E", ["crowd-simulation"]]
+      ]},
+      {"id": "WLD.ENV", "name": "Environment systems", "caps": [
+        ["WLD.ENV.terrain-rep", "Terrain representation (heightfield, virtual heightfield, voxel/mesh)", "terrain", "E"],
+        ["WLD.ENV.terrain-render", "Terrain rendering (clipmaps, CDLOD, virtual)", "terrain", "E", ["gpu-driven-pipeline"]],
+        ["WLD.ENV.terrain-materials", "Terrain material layering & virtual texturing", "terrain", "E", ["texture-streaming-vt"]],
+        ["WLD.ENV.terrain-tools", "Terrain sculpt & paint tool logic", "terrain", "E", ["world-editor-viewport"]],
+        ["WLD.ENV.terrain-deform", "Runtime terrain deformation", "terrain", "E"],
+        ["WLD.ENV.vegetation", "Vegetation instancing & rendering", "vegetation-foliage", "E"],
+        ["WLD.ENV.foliage-placement", "Procedural foliage placement", "vegetation-foliage", "E", ["procedural-generation"]],
+        ["WLD.ENV.wind", "Wind & interaction", "vegetation-foliage", "E"],
+        ["WLD.ENV.ocean", "Ocean spectral simulation", "water-ocean", "E"],
+        ["WLD.ENV.rivers", "Rivers, lakes & shorelines", "water-ocean", "E"],
+        ["WLD.ENV.water-render", "Water surface rendering", "water-ocean", "E", ["translucency-decals"]],
+        ["WLD.ENV.buoyancy", "Water queries & buoyancy data", "water-ocean", "E", ["character-vehicle-physics"]],
+        ["WLD.ENV.sky", "Sky & atmospheric scattering", "atmosphere-weather", "E"],
+        ["WLD.ENV.clouds", "Volumetric clouds", "atmosphere-weather", "E"],
+        ["WLD.ENV.fog", "Volumetric fog & local participating media", "atmosphere-weather", "E"],
+        ["WLD.ENV.weather", "Weather state, wetness, snow accumulation", "atmosphere-weather", "E"],
+        ["WLD.ENV.time-of-day", "Time of day & celestial bodies", "atmosphere-weather", "E"]
+      ]},
+      {"id": "WLD.PCG", "name": "Procedural generation", "caps": [
+        ["WLD.PCG.framework", "Deterministic graph-based PCG framework", "procedural-generation", "E"],
+        ["WLD.PCG.runtime", "Runtime generation at stream-in", "procedural-generation", "E"],
+        ["WLD.PCG.scatter", "Rule-based placement & scattering", "procedural-generation", "E"],
+        ["WLD.PCG.grammars", "Grammar & constraint-solving methods (WFC class)", "procedural-generation", "E"],
+        ["WLD.PCG.ml", "ML-generated content", "procedural-generation", "X"]
+      ]}
+    ]},
+
+    {"id": "RND", "name": "Rendering", "areas": [
+      {"id": "RND.ARCH", "name": "Render architecture", "caps": [
+        ["RND.ARCH.pipeline", "Rendering pipeline organization & feature composition", "render-architect", "E"],
+        ["RND.ARCH.shading-path", "Shading path choice (forward+, deferred, visibility buffer)", "render-architect", "E"],
+        ["RND.ARCH.feature-contract", "Render feature / plugin contract", "render-architect", "E"],
+        ["RND.ARCH.scene-sync", "Render scene representation & world → render sync", "render-architect", "E", ["gpu-driven-pipeline"]],
+        ["RND.ARCH.scalability", "Render scalability tiers", "render-architect", "E", ["performance-architect"]],
+        ["RND.ARCH.multiview", "Multi-view rendering (split-screen, PiP, render targets, captures)", "render-architect", "E"],
+        ["RND.ARCH.debug-modes", "Buffer visualization & render debug modes", "render-architect", "E", ["visual-debugging-tools"]],
+        ["RND.ARCH.threading", "Parallel command recording & render threading model", "render-architect", "E", ["rhi-core"]]
+      ]},
+      {"id": "RND.RHI", "name": "Hardware interface", "caps": [
+        ["RND.RHI.backends", "API backends (D3D12, Vulkan, Metal, console, WebGPU)", "rhi-core", "E"],
+        ["RND.RHI.queues", "Command recording & queues", "rhi-core", "E"],
+        ["RND.RHI.sync", "GPU synchronization (timeline fences, enhanced barriers)", "rhi-core", "E"],
+        ["RND.RHI.bindless", "Bindless descriptor model", "rhi-core", "E"],
+        ["RND.RHI.pso", "Pipeline state objects, PSO caches & async creation", "rhi-core", "E", ["shader-system"]],
+        ["RND.RHI.present", "Swapchain, present modes, VRR", "rhi-core", "E", ["frame-orchestration"]],
+        ["RND.RHI.caps", "GPU capability tiers & feature detection", "rhi-core", "E"],
+        ["RND.RHI.crash", "GPU breadcrumbs & device-lost recovery", "rhi-core", "E", ["crash-diagnostics"]],
+        ["RND.RHI.queries", "Timestamp & pipeline-statistics queries", "rhi-core", "E", ["observability-telemetry"]],
+        ["RND.RHI.workarounds", "Vendor & driver workaround management", "rhi-core", "E"]
+      ]},
+      {"id": "RND.MEM", "name": "GPU memory & resources", "caps": [
+        ["RND.MEM.heaps", "GPU heaps & suballocation", "gpu-memory-resources", "E"],
+        ["RND.MEM.residency", "Residency management & overcommit", "gpu-memory-resources", "E"],
+        ["RND.MEM.upload", "Upload, readback & staging rings", "gpu-memory-resources", "E"],
+        ["RND.MEM.sparse", "Sparse / tiled / reserved resources", "gpu-memory-resources", "E"],
+        ["RND.MEM.budget", "GPU memory budgeting & defragmentation", "gpu-memory-resources", "E", ["performance-architect"]],
+        ["RND.MEM.lifetime", "Resource lifetime tracking decoupled from frame boundaries", "gpu-memory-resources", "E"]
+      ]},
+      {"id": "RND.GRAPH", "name": "Render graph & GPU scheduling", "caps": [
+        ["RND.GRAPH.declare", "Render graph declaration & compilation", "render-graph-scheduling", "E"],
+        ["RND.GRAPH.barriers", "Automatic barriers & layout transitions", "render-graph-scheduling", "E"],
+        ["RND.GRAPH.aliasing", "Transient resource aliasing", "render-graph-scheduling", "E", ["gpu-memory-resources"]],
+        ["RND.GRAPH.async", "Async compute & multi-queue scheduling", "render-graph-scheduling", "E"],
+        ["RND.GRAPH.tbdr", "Pass merging & tile-memory use on TBDR GPUs", "render-graph-scheduling", "E", ["platform-mobile-portable"]],
+        ["RND.GRAPH.history", "Persistent cross-frame resources & history", "render-graph-scheduling", "E"],
+        ["RND.GRAPH.work-graphs", "Work graphs execution model integration", "render-graph-scheduling", "M"],
+        ["RND.GRAPH.compute", "General GPU compute for non-render systems", "render-graph-scheduling", "E"],
+        ["RND.GRAPH.readback", "CPU ↔ GPU readback latency contract", "render-graph-scheduling", "E"]
+      ]},
+      {"id": "RND.SHADER", "name": "Shader system", "caps": [
+        ["RND.SHADER.language", "Shading language & dialect (HLSL, Slang)", "shader-system", "E"],
+        ["RND.SHADER.toolchain", "Compilation toolchain (DXC, Slang, SPIR-V, Metal shader converter)", "shader-system", "E"],
+        ["RND.SHADER.permutations", "Permutation management & specialization", "shader-system", "E"],
+        ["RND.SHADER.reflection", "Shader reflection & binding-layout generation", "shader-system", "E"],
+        ["RND.SHADER.interop", "Shared C++/shader interop headers", "shader-system", "E"],
+        ["RND.SHADER.cache", "Shader caches & distributed compilation", "shader-system", "E", ["ci-cd-automation"]],
+        ["RND.SHADER.reload", "Shader hot reload", "shader-system", "E", ["hot-reload-iteration"]],
+        ["RND.SHADER.debug", "Shader debugging & GPU printf", "shader-system", "E"],
+        ["RND.SHADER.pso-lists", "PSO / permutation list gathering from play traces", "shader-system", "E", ["rhi-core"]]
+      ]},
+      {"id": "RND.MAT", "name": "Materials", "caps": [
+        ["RND.MAT.model", "Material model (OpenPBR-class, layered)", "material-system", "E"],
+        ["RND.MAT.graph", "Material graph → shader code generation", "material-system", "E", ["graph-editor-framework"]],
+        ["RND.MAT.instances", "Material instances & runtime parameters", "material-system", "E"],
+        ["RND.MAT.tiers", "Material quality tiers & LOD", "material-system", "E"],
+        ["RND.MAT.neural", "Neural materials", "material-system", "X", ["ml-inference-runtime"]],
+        ["RND.MAT.validation", "Material validation (energy conservation, furnace tests)", "material-system", "E", ["render-validation"]]
+      ]},
+      {"id": "RND.GEO", "name": "GPU-driven geometry pipeline", "caps": [
+        ["RND.GEO.gpu-scene", "GPU scene & instance data management", "gpu-driven-pipeline", "E"],
+        ["RND.GEO.culling", "GPU frustum & two-phase HZB occlusion culling", "gpu-driven-pipeline", "E"],
+        ["RND.GEO.indirect", "Indirect draws / ExecuteIndirect / device-generated commands", "gpu-driven-pipeline", "E"],
+        ["RND.GEO.mesh-shaders", "Mesh & amplification shader pipeline", "gpu-driven-pipeline", "E"],
+        ["RND.GEO.visbuffer", "Visibility-buffer rasterization", "gpu-driven-pipeline", "E", ["render-architect"]],
+        ["RND.GEO.fallback", "CPU-driven fallback path for low-tier GPUs", "gpu-driven-pipeline", "E"],
+        ["RND.GEO.instancing", "Instancing & batching", "gpu-driven-pipeline", "E"]
+      ]},
+      {"id": "RND.LOD", "name": "Level of detail & virtualized geometry", "caps": [
+        ["RND.LOD.clusters", "Cluster hierarchy / virtualized geometry", "virtualized-geometry-lod", "E"],
+        ["RND.LOD.cluster-build", "Cluster DAG building & simplification (cook side)", "virtualized-geometry-lod", "E", ["asset-cook-processors"]],
+        ["RND.LOD.swraster", "Software rasterization of micro-polygons", "virtualized-geometry-lod", "E"],
+        ["RND.LOD.streaming", "Cluster / page streaming", "virtualized-geometry-lod", "E", ["resource-streaming-architect"]],
+        ["RND.LOD.discrete", "Discrete LOD generation & selection", "virtualized-geometry-lod", "E"],
+        ["RND.LOD.hlod", "HLOD proxy meshes & impostors", "virtualized-geometry-lod", "E"],
+        ["RND.LOD.deforming", "LOD for skinned / deforming geometry", "virtualized-geometry-lod", "M", ["deformation-skinning"]],
+        ["RND.LOD.displacement", "Displacement / tessellation on virtualized geometry", "virtualized-geometry-lod", "M"]
+      ]},
+      {"id": "RND.TEX", "name": "Textures & virtual texturing", "caps": [
+        ["RND.TEX.formats", "Runtime texture formats", "texture-streaming-vt", "E"],
+        ["RND.TEX.mip-streaming", "Mip streaming & priority", "texture-streaming-vt", "E"],
+        ["RND.TEX.feedback", "Sampler-feedback streaming", "texture-streaming-vt", "M"],
+        ["RND.TEX.vt", "Virtual texturing (streaming & runtime-composited)", "texture-streaming-vt", "E"],
+        ["RND.TEX.ntc", "Neural texture compression", "texture-streaming-vt", "M", ["ml-inference-runtime"]],
+        ["RND.TEX.mip-layout", "Streaming-friendly mip & tile layout in cook", "texture-streaming-vt", "E", ["asset-cook-processors"]]
+      ]},
+      {"id": "RND.LIGHT", "name": "Direct lighting & shadows", "caps": [
+        ["RND.LIGHT.units", "Light types & physical light units", "direct-lighting-shadows", "E"],
+        ["RND.LIGHT.clustered", "Clustered / tiled light culling", "direct-lighting-shadows", "E"],
+        ["RND.LIGHT.stochastic", "Stochastic many-light sampling (ReSTIR DI class)", "direct-lighting-shadows", "M"],
+        ["RND.LIGHT.area", "Area lights (LTC)", "direct-lighting-shadows", "E"],
+        ["RND.LIGHT.csm", "Cascaded shadow maps", "direct-lighting-shadows", "E"],
+        ["RND.LIGHT.vsm", "Virtual shadow maps", "direct-lighting-shadows", "E"],
+        ["RND.LIGHT.rt-shadows", "Ray-traced shadows", "direct-lighting-shadows", "E", ["ray-tracing-infrastructure"]],
+        ["RND.LIGHT.contact", "Contact / screen-space shadows", "direct-lighting-shadows", "E"],
+        ["RND.LIGHT.profiles", "Light functions & IES profiles", "direct-lighting-shadows", "E"]
+      ]},
+      {"id": "RND.GI", "name": "Global illumination & reflections", "caps": [
+        ["RND.GI.baked", "Baked lighting & GPU lightmap baking", "global-illumination", "E"],
+        ["RND.GI.probes", "Irradiance / radiance probe volumes (DDGI class)", "global-illumination", "E"],
+        ["RND.GI.screen-space", "Screen-space GI & ambient occlusion", "global-illumination", "E"],
+        ["RND.GI.hybrid", "Surface / radiance-cache hybrid GI (software + hardware RT)", "global-illumination", "E"],
+        ["RND.GI.restir", "ReSTIR GI & path-traced GI", "global-illumination", "M"],
+        ["RND.GI.reflections", "Reflections (screen-space, ray-traced, probes)", "global-illumination", "E"],
+        ["RND.GI.sky", "Sky lighting & environment capture", "global-illumination", "E", ["atmosphere-weather"]],
+        ["RND.GI.specular-occlusion", "Specular occlusion", "global-illumination", "E"],
+        ["RND.GI.sdf", "SDF / voxel scene representations for tracing", "global-illumination", "E", ["ray-tracing-infrastructure"]]
+      ]},
+      {"id": "RND.RT", "name": "Ray tracing infrastructure", "caps": [
+        ["RND.RT.as", "Acceleration structure build, refit, compaction & update scheduling", "ray-tracing-infrastructure", "E"],
+        ["RND.RT.instances", "TLAS instance management at scale", "ray-tracing-infrastructure", "E"],
+        ["RND.RT.pipelines", "Inline RT vs RT pipelines & shader tables", "ray-tracing-infrastructure", "E"],
+        ["RND.RT.omm", "Opacity micromaps & alpha-tested geometry", "ray-tracing-infrastructure", "M"],
+        ["RND.RT.lod", "RT LOD & raster/RT geometry mismatch", "ray-tracing-infrastructure", "E", ["virtualized-geometry-lod"]],
+        ["RND.RT.software", "Software ray tracing fallback", "ray-tracing-infrastructure", "E"],
+        ["RND.RT.ser", "Shader execution reordering", "ray-tracing-infrastructure", "M"],
+        ["RND.RT.cluster-blas", "Cluster / partitioned acceleration structures", "ray-tracing-infrastructure", "M"]
+      ]},
+      {"id": "RND.PT", "name": "Path tracing", "caps": [
+        ["RND.PT.reference", "Reference path tracer as ground-truth oracle", "path-tracing", "E"],
+        ["RND.PT.realtime", "Real-time path tracing (ReSTIR PT class)", "path-tracing", "M"],
+        ["RND.PT.offline", "Offline / cinematic render mode", "path-tracing", "E", ["cinematics-sequencer"]]
+      ]},
+      {"id": "RND.RECON", "name": "Reconstruction, resolution & denoising", "caps": [
+        ["RND.RECON.taa", "Temporal anti-aliasing & reconstruction", "reconstruction-upscaling", "E"],
+        ["RND.RECON.upscalers", "Temporal & ML upscalers (DLSS, FSR, XeSS, PSSR class)", "reconstruction-upscaling", "E"],
+        ["RND.RECON.framegen", "Frame generation / interpolation", "reconstruction-upscaling", "M"],
+        ["RND.RECON.dynres", "Dynamic resolution scaling", "reconstruction-upscaling", "E", ["frame-orchestration"]],
+        ["RND.RECON.motion-vectors", "Motion vector, jitter & history contract", "reconstruction-upscaling", "E"],
+        ["RND.RECON.denoise", "Spatiotemporal & ML denoising (ray reconstruction class)", "reconstruction-upscaling", "M", ["global-illumination"]],
+        ["RND.RECON.vrs", "Variable-rate shading", "reconstruction-upscaling", "E"]
+      ]},
+      {"id": "RND.POST", "name": "Post-processing, HDR & color", "caps": [
+        ["RND.POST.effects", "Post chain (bloom, depth of field, motion blur, lens)", "post-color-hdr", "E"],
+        ["RND.POST.camera", "Physical camera & exposure", "post-color-hdr", "E"],
+        ["RND.POST.color", "Color management pipeline (working space, ACES 2.0 class output transforms, OCIO)", "post-color-hdr", "E"],
+        ["RND.POST.hdr-output", "HDR output (PQ, scRGB, metadata, calibration)", "post-color-hdr", "E", ["rhi-core"]],
+        ["RND.POST.tonemap", "Tonemapping & display mapping", "post-color-hdr", "E"],
+        ["RND.POST.grading", "Grading LUTs, film grain, sharpening", "post-color-hdr", "E"]
+      ]},
+      {"id": "RND.TRANS", "name": "Translucency & decals", "caps": [
+        ["RND.TRANS.oit", "Transparency & order-independent transparency", "translucency-decals", "E"],
+        ["RND.TRANS.refraction", "Refraction & distortion", "translucency-decals", "E"],
+        ["RND.TRANS.decals", "Decals (deferred, clustered, mesh)", "translucency-decals", "E"],
+        ["RND.TRANS.lighting", "Translucent lighting & volumetric integration", "translucency-decals", "E", ["atmosphere-weather"]]
+      ]},
+      {"id": "RND.CHAR", "name": "Character rendering", "caps": [
+        ["RND.CHAR.skin", "Skin subsurface scattering", "character-rendering", "E"],
+        ["RND.CHAR.eyes", "Eyes", "character-rendering", "E"],
+        ["RND.CHAR.hair", "Strand-based hair & fur rendering", "character-rendering", "M"],
+        ["RND.CHAR.lod", "Digital-human LOD", "character-rendering", "E"]
+      ]},
+      {"id": "RND.2D", "name": "2D, vector & UI rendering", "caps": [
+        ["RND.2D.sprites", "Sprite batching", "render-2d-vector", "E"],
+        ["RND.2D.tilemaps", "Tilemaps", "render-2d-vector", "E"],
+        ["RND.2D.lighting", "2D lighting & shadows", "render-2d-vector", "E"],
+        ["RND.2D.vector", "Vector graphics / path rendering", "render-2d-vector", "E"],
+        ["RND.2D.ui-backend", "UI render backend (batching, clipping, SDF, HDR compositing)", "render-2d-vector", "E", ["ui-architect"]],
+        ["RND.2D.pixel", "Pixel-perfect & retro presentation", "render-2d-vector", "E"]
+      ]},
+      {"id": "RND.VFX", "name": "Particles & VFX", "caps": [
+        ["RND.VFX.gpu-sim", "GPU particle simulation", "vfx-particles", "E"],
+        ["RND.VFX.graph", "VFX graph runtime", "vfx-particles", "E", ["graph-editor-framework"]],
+        ["RND.VFX.primitives", "Ribbons, beams, mesh particles", "vfx-particles", "E"],
+        ["RND.VFX.collision", "Particle collision (depth buffer, SDF)", "vfx-particles", "E"],
+        ["RND.VFX.budgets", "VFX budgets, LOD & significance", "vfx-particles", "E", ["performance-architect"]]
+      ]}
+    ]},
+
+    {"id": "ML", "name": "Machine-learning runtime", "areas": [
+      {"id": "ML.RT", "name": "Inference", "caps": [
+        ["ML.RT.inference", "Inference runtime (GPU cooperative-vector / tensor paths, CPU paths)", "ml-inference-runtime", "M"],
+        ["ML.RT.packaging", "Model packaging, quantization & versioning", "ml-inference-runtime", "M"],
+        ["ML.RT.scheduling", "Inference scheduling within frame budgets", "ml-inference-runtime", "M", ["render-graph-scheduling"]],
+        ["ML.RT.training-boundary", "Training & dataset pipeline boundary", "ml-inference-runtime", "M"],
+        ["ML.RT.determinism", "Inference determinism characteristics", "ml-inference-runtime", "M", ["determinism-replay"]]
+      ]}
+    ]},
+
+    {"id": "PHY", "name": "Physics & simulation", "areas": [
+      {"id": "PHY.ARCH", "name": "Physics architecture", "caps": [
+        ["PHY.ARCH.build-integrate", "Physics engine build vs integrate decision", "physics-architect", "E"],
+        ["PHY.ARCH.world", "Physics world representation & ECS integration", "physics-architect", "E"],
+        ["PHY.ARCH.stepping", "Stepping, substepping & frame sync", "physics-architect", "E", ["frame-orchestration"]],
+        ["PHY.ARCH.determinism", "Physics determinism levels", "physics-architect", "E", ["determinism-replay"]],
+        ["PHY.ARCH.lod", "Physics LOD & scalability", "physics-architect", "E"],
+        ["PHY.ARCH.materials", "Physics materials & surface types", "physics-architect", "E"],
+        ["PHY.ARCH.gpu", "GPU physics offload", "physics-architect", "M"]
+      ]},
+      {"id": "PHY.COL", "name": "Collision", "caps": [
+        ["PHY.COL.shapes", "Collision shapes", "collision-detection", "E"],
+        ["PHY.COL.broadphase", "Broadphase", "collision-detection", "E"],
+        ["PHY.COL.narrowphase", "Narrowphase & contact manifolds (GJK, EPA, SAT)", "collision-detection", "E"],
+        ["PHY.COL.ccd", "Continuous collision detection", "collision-detection", "E"],
+        ["PHY.COL.queries", "Scene queries (ray, sweep, overlap)", "collision-detection", "E"],
+        ["PHY.COL.filtering", "Collision filtering & layers", "collision-detection", "E"],
+        ["PHY.COL.complex", "Mesh, heightfield & SDF collision", "collision-detection", "E"],
+        ["PHY.COL.cook", "Collision data cooking", "collision-detection", "E", ["asset-cook-processors"]]
+      ]},
+      {"id": "PHY.DYN", "name": "Rigid-body dynamics", "caps": [
+        ["PHY.DYN.solver", "Integration & constraint solvers (TGS, soft-step, XPBD)", "rigid-body-dynamics", "E"],
+        ["PHY.DYN.joints", "Constraints & joints", "rigid-body-dynamics", "E"],
+        ["PHY.DYN.islands", "Islands & sleeping", "rigid-body-dynamics", "E"],
+        ["PHY.DYN.parallel", "Parallel solving", "rigid-body-dynamics", "E", ["job-system-task-graph"]],
+        ["PHY.DYN.stability", "Stacking stability & mass ratios", "rigid-body-dynamics", "E"],
+        ["PHY.DYN.kinematic", "Kinematic & animated bodies", "rigid-body-dynamics", "E", ["animation-architect"]]
+      ]},
+      {"id": "PHY.CTRL", "name": "Characters & vehicles", "caps": [
+        ["PHY.CTRL.character", "Character controllers (kinematic & dynamic)", "character-vehicle-physics", "E"],
+        ["PHY.CTRL.vehicles", "Vehicles (wheels, tires, suspension, drivetrain)", "character-vehicle-physics", "E"],
+        ["PHY.CTRL.buoyancy", "Buoyancy", "character-vehicle-physics", "E", ["water-ocean"]],
+        ["PHY.CTRL.platforms", "Moving platforms & physical interaction", "character-vehicle-physics", "E"]
+      ]},
+      {"id": "PHY.SOFT", "name": "Deformables", "caps": [
+        ["PHY.SOFT.cloth", "Cloth simulation", "cloth-deformables", "E"],
+        ["PHY.SOFT.softbody", "Soft bodies", "cloth-deformables", "E"],
+        ["PHY.SOFT.ropes", "Ropes & cables", "cloth-deformables", "E"],
+        ["PHY.SOFT.hair-sim", "Hair strand simulation", "cloth-deformables", "M", ["character-rendering"]],
+        ["PHY.SOFT.ml", "ML cloth & learned deformables", "cloth-deformables", "X"]
+      ]},
+      {"id": "PHY.DEST", "name": "Destruction", "caps": [
+        ["PHY.DEST.authoring", "Fracture authoring & precomputation", "destruction-fracture", "E"],
+        ["PHY.DEST.runtime", "Runtime fracture & debris management", "destruction-fracture", "E"],
+        ["PHY.DEST.replication", "Destruction replication strategy", "destruction-fracture", "E", ["replication"]],
+        ["PHY.DEST.propagation", "Destruction → navigation / render / audio updates", "destruction-fracture", "E"]
+      ]},
+      {"id": "PHY.FLUID", "name": "Fluids", "caps": [
+        ["PHY.FLUID.particles", "Particle fluids (SPH, PBF, FLIP)", "fluid-simulation", "E"],
+        ["PHY.FLUID.grid", "Grid-based smoke & fire", "fluid-simulation", "E"],
+        ["PHY.FLUID.shallow", "Shallow-water / heightfield water simulation", "fluid-simulation", "E", ["water-ocean"]],
+        ["PHY.FLUID.gpu", "GPU fluid solvers", "fluid-simulation", "E"]
+      ]},
+      {"id": "PHY.2D", "name": "2D physics", "caps": [
+        ["PHY.2D.dynamics", "2D rigid bodies & collision", "physics-2d", "E"],
+        ["PHY.2D.controllers", "2D character controllers", "physics-2d", "E"],
+        ["PHY.2D.determinism", "2D determinism", "physics-2d", "E"]
+      ]}
+    ]},
+
+    {"id": "ANM", "name": "Animation", "areas": [
+      {"id": "ANM.ARCH", "name": "Animation architecture", "caps": [
+        ["ANM.ARCH.data-model", "Animation data model (skeletons, clips, curves)", "animation-architect", "E"],
+        ["ANM.ARCH.pipeline", "Parallel evaluation pipeline", "animation-architect", "E"],
+        ["ANM.ARCH.sync", "Animation / physics / gameplay sync & root-motion policy", "animation-architect", "E"],
+        ["ANM.ARCH.lod", "Animation LOD & update rate", "animation-architect", "E"],
+        ["ANM.ARCH.budgets", "Animation budgets", "animation-architect", "E"]
+      ]},
+      {"id": "ANM.RT", "name": "Animation runtime", "caps": [
+        ["ANM.RT.sampling", "Sampling & decompression", "animation-runtime", "E"],
+        ["ANM.RT.compression", "Animation compression (ACL class)", "animation-runtime", "E"],
+        ["ANM.RT.blending", "Blending, layering, masks, additives", "animation-runtime", "E"],
+        ["ANM.RT.retargeting", "Retargeting", "animation-runtime", "E"],
+        ["ANM.RT.events", "Curves, events & notifies", "animation-runtime", "E"],
+        ["ANM.RT.2d", "2D skeletal & flipbook animation", "animation-runtime", "E", ["render-2d-vector"]]
+      ]},
+      {"id": "ANM.DEF", "name": "Skinning & deformation", "caps": [
+        ["ANM.DEF.skinning", "GPU skinning (linear, dual quaternion)", "deformation-skinning", "E"],
+        ["ANM.DEF.morphs", "Morph targets & blendshapes", "deformation-skinning", "E"],
+        ["ANM.DEF.ml", "ML deformers", "deformation-skinning", "M", ["ml-inference-runtime"]],
+        ["ANM.DEF.rt", "Deformed-geometry acceleration structure updates", "deformation-skinning", "E", ["ray-tracing-infrastructure"]],
+        ["ANM.DEF.motion-vectors", "Deformation motion vectors", "deformation-skinning", "E", ["reconstruction-upscaling"]]
+      ]},
+      {"id": "ANM.GRAPH", "name": "Animation graphs", "caps": [
+        ["ANM.GRAPH.graph", "Animation graphs & state machines", "animation-graphs", "E"],
+        ["ANM.GRAPH.blendspaces", "Blend spaces", "animation-graphs", "E"],
+        ["ANM.GRAPH.compile", "Graph compilation & data-driven evaluation", "animation-graphs", "E"],
+        ["ANM.GRAPH.debug", "Graph debugging & rewind", "animation-graphs", "E", ["visual-debugging-tools"]]
+      ]},
+      {"id": "ANM.SYN", "name": "Motion synthesis", "caps": [
+        ["ANM.SYN.motion-matching", "Motion matching", "motion-synthesis", "E"],
+        ["ANM.SYN.learned", "Learned motion matching & neural controllers", "motion-synthesis", "M", ["ml-inference-runtime"]],
+        ["ANM.SYN.database", "Pose database building", "motion-synthesis", "E"],
+        ["ANM.SYN.trajectory", "Trajectory prediction & gameplay coupling", "motion-synthesis", "E"]
+      ]},
+      {"id": "ANM.IK", "name": "IK, procedural & physical animation", "caps": [
+        ["ANM.IK.solvers", "IK solvers (two-bone, CCD, FABRIK, full-body)", "ik-procedural-animation", "E"],
+        ["ANM.IK.feet", "Foot placement & ground adaptation", "ik-procedural-animation", "E"],
+        ["ANM.IK.procedural", "Procedural animation (look-at, secondary motion, springs)", "ik-procedural-animation", "E"],
+        ["ANM.IK.physical", "Physical animation, active ragdoll & ragdoll blending", "ik-procedural-animation", "E", ["rigid-body-dynamics"]]
+      ]},
+      {"id": "ANM.FACE", "name": "Facial animation", "caps": [
+        ["ANM.FACE.rigs", "Facial rigs & solvers", "facial-animation", "E"],
+        ["ANM.FACE.lipsync", "Audio-driven & ML lip sync", "facial-animation", "M", ["audio-content-runtime"]],
+        ["ANM.FACE.capture", "Performance-capture import", "facial-animation", "E", ["asset-import-interchange"]]
+      ]},
+      {"id": "ANM.CINE", "name": "Cinematics", "caps": [
+        ["ANM.CINE.sequencer", "Sequencer / timeline", "cinematics-sequencer", "E"],
+        ["ANM.CINE.cameras", "Camera cuts & cinematic cameras", "cinematics-sequencer", "E"],
+        ["ANM.CINE.movie-render", "High-quality movie rendering", "cinematics-sequencer", "E", ["path-tracing"]],
+        ["ANM.CINE.preload", "Cutscene streaming & preloading", "cinematics-sequencer", "E", ["resource-streaming-architect"]]
+      ]}
+    ]},
+
+    {"id": "AUD", "name": "Audio", "areas": [
+      {"id": "AUD.ARCH", "name": "Audio architecture", "caps": [
+        ["AUD.ARCH.engine", "Audio engine architecture & threading", "audio-architect", "E"],
+        ["AUD.ARCH.devices", "Audio device backends", "audio-architect", "E"],
+        ["AUD.ARCH.voices", "Voice management & virtualization", "audio-architect", "E"],
+        ["AUD.ARCH.middleware", "Middleware integration decision (own vs Wwise/FMOD class)", "audio-architect", "E"],
+        ["AUD.ARCH.budgets", "Audio budgets (CPU, memory, voices)", "audio-architect", "E"]
+      ]},
+      {"id": "AUD.DSP", "name": "DSP & mixing", "caps": [
+        ["AUD.DSP.mixer", "Mixer graph & buses", "audio-dsp-mixing", "E"],
+        ["AUD.DSP.effects", "DSP effects & convolution reverb", "audio-dsp-mixing", "E"],
+        ["AUD.DSP.dynamics", "Dynamics, ducking, sidechain & loudness management", "audio-dsp-mixing", "E"],
+        ["AUD.DSP.codecs", "Codecs & decoding (Opus, Vorbis, ADPCM, hardware)", "audio-dsp-mixing", "E"],
+        ["AUD.DSP.streaming", "Audio streaming", "audio-dsp-mixing", "E", ["resource-streaming-architect"]],
+        ["AUD.DSP.synthesis", "Procedural audio synthesis", "audio-dsp-mixing", "E"],
+        ["AUD.DSP.voip", "Voice-chat capture, echo cancellation & processing", "audio-dsp-mixing", "E", ["network-transport"]]
+      ]},
+      {"id": "AUD.SPAT", "name": "Spatial audio & acoustics", "caps": [
+        ["AUD.SPAT.panning", "Panning & distance models", "spatial-audio-acoustics", "E"],
+        ["AUD.SPAT.hrtf", "HRTF binaural rendering", "spatial-audio-acoustics", "E"],
+        ["AUD.SPAT.ambisonics", "Ambisonics", "spatial-audio-acoustics", "E"],
+        ["AUD.SPAT.object", "Object-based output (Atmos, Tempest 3D, Windows Sonic class)", "spatial-audio-acoustics", "E"],
+        ["AUD.SPAT.occlusion", "Occlusion & obstruction", "spatial-audio-acoustics", "E", ["collision-detection"]],
+        ["AUD.SPAT.propagation", "Acoustic propagation (ray-traced, precomputed wave)", "spatial-audio-acoustics", "M"],
+        ["AUD.SPAT.environments", "Reverb zones & environment modeling", "spatial-audio-acoustics", "E"]
+      ]},
+      {"id": "AUD.CONTENT", "name": "Audio content runtime", "caps": [
+        ["AUD.CONTENT.events", "Audio event system & parameters", "audio-content-runtime", "E"],
+        ["AUD.CONTENT.music", "Interactive / adaptive music", "audio-content-runtime", "E"],
+        ["AUD.CONTENT.dialogue", "Dialogue & VO system", "audio-content-runtime", "E", ["localization-i18n"]],
+        ["AUD.CONTENT.authoring", "Audio authoring tool integration", "audio-content-runtime", "E"],
+        ["AUD.CONTENT.haptics", "Audio-to-haptics", "audio-content-runtime", "E", ["input-devices-haptics"]]
+      ]}
+    ]},
+
+    {"id": "INP", "name": "Input", "areas": [
+      {"id": "INP.DEV", "name": "Devices", "caps": [
+        ["INP.DEV.abstraction", "Device abstraction (HID, GameInput class)", "input-devices-haptics", "E"],
+        ["INP.DEV.kbm", "Keyboard & mouse raw input", "input-devices-haptics", "E"],
+        ["INP.DEV.gamepads", "Gamepads", "input-devices-haptics", "E"],
+        ["INP.DEV.touch", "Touch & gestures", "input-devices-haptics", "E"],
+        ["INP.DEV.motion", "Motion sensors & gyro", "input-devices-haptics", "E"],
+        ["INP.DEV.pen", "Pen / stylus", "input-devices-haptics", "E"],
+        ["INP.DEV.haptics", "Haptics (rumble, HD haptics, adaptive triggers)", "input-devices-haptics", "E"],
+        ["INP.DEV.hotplug", "Hotplug & device-user pairing", "input-devices-haptics", "E", ["platform-console"]]
+      ]},
+      {"id": "INP.ACT", "name": "Actions", "caps": [
+        ["INP.ACT.mapping", "Action mapping & input contexts", "input-system", "E"],
+        ["INP.ACT.remapping", "Rebinding / remapping", "input-system", "E"],
+        ["INP.ACT.latency", "Input buffering & latency accounting", "input-system", "E", ["frame-orchestration"]],
+        ["INP.ACT.accessibility", "Accessibility input (hold/toggle, one-switch, copilot)", "input-system", "E", ["accessibility"]],
+        ["INP.ACT.local-mp", "Local multiplayer device assignment", "input-system", "E"],
+        ["INP.ACT.recording", "Input recording & replay", "input-system", "E", ["determinism-replay"]],
+        ["INP.ACT.ui-routing", "UI navigation routing", "input-system", "E", ["ui-architect"]],
+        ["INP.ACT.glyphs", "Per-device prompts & glyphs", "input-system", "E"]
+      ]}
+    ]},
+
+    {"id": "NET", "name": "Networking & multiplayer", "areas": [
+      {"id": "NET.ARCH", "name": "Network architecture", "caps": [
+        ["NET.ARCH.model", "Netcode model selection (authoritative server, lockstep, rollback, P2P/relay)", "network-architect", "E"],
+        ["NET.ARCH.tick", "Network tick & time model", "network-architect", "E", ["frame-orchestration"]],
+        ["NET.ARCH.authority", "Authority model", "network-architect", "E"],
+        ["NET.ARCH.budgets", "Network budgets & scale targets (players, entities, bandwidth)", "network-architect", "E"],
+        ["NET.ARCH.versioning", "Protocol versioning & compatibility", "network-architect", "E", ["api-lifecycle-migration"]],
+        ["NET.ARCH.sharding", "Spatially sharded multi-server worlds", "network-architect", "M"]
+      ]},
+      {"id": "NET.TRANS", "name": "Transport", "caps": [
+        ["NET.TRANS.sockets", "UDP sockets & platform network APIs", "network-transport", "E"],
+        ["NET.TRANS.reliability", "Reliability & ordering channels", "network-transport", "E"],
+        ["NET.TRANS.mtu", "Fragmentation & MTU", "network-transport", "E"],
+        ["NET.TRANS.congestion", "Congestion control & bandwidth estimation", "network-transport", "E"],
+        ["NET.TRANS.crypto", "Encryption & connection authentication", "network-transport", "E", ["security-engineering"]],
+        ["NET.TRANS.nat", "NAT traversal & relays", "network-transport", "E", ["platform-online-services"]],
+        ["NET.TRANS.lifecycle", "Connection lifecycle & timeouts", "network-transport", "E"],
+        ["NET.TRANS.simulation", "Network link simulation (latency, loss, jitter)", "network-transport", "E"],
+        ["NET.TRANS.quic", "QUIC / WebTransport evaluation", "network-transport", "M"]
+      ]},
+      {"id": "NET.REP", "name": "Replication", "caps": [
+        ["NET.REP.state", "Entity & property replication", "replication", "E"],
+        ["NET.REP.compression", "Delta compression, quantization & bit packing", "replication", "E"],
+        ["NET.REP.interest", "Interest management / relevancy", "replication", "E"],
+        ["NET.REP.priority", "Prioritization & bandwidth allocation", "replication", "E"],
+        ["NET.REP.rpc", "RPCs & reliable events", "replication", "E"],
+        ["NET.REP.interpolation", "Snapshot interpolation", "replication", "E"],
+        ["NET.REP.replays", "Replay recording from the replication stream", "replication", "E"],
+        ["NET.REP.ids", "Network ID mapping", "replication", "E", ["entity-object-model"]]
+      ]},
+      {"id": "NET.PRED", "name": "Prediction & latency hiding", "caps": [
+        ["NET.PRED.prediction", "Client prediction & reconciliation", "prediction-rollback", "E"],
+        ["NET.PRED.rollback", "Rollback netcode", "prediction-rollback", "E"],
+        ["NET.PRED.lagcomp", "Lag compensation / server rewind", "prediction-rollback", "E"],
+        ["NET.PRED.lockstep", "Deterministic lockstep", "prediction-rollback", "E", ["determinism-replay"]],
+        ["NET.PRED.physics", "Networked physics", "prediction-rollback", "E", ["rigid-body-dynamics"]],
+        ["NET.PRED.clock", "Clock synchronization", "prediction-rollback", "E"]
+      ]},
+      {"id": "NET.SRV", "name": "Servers", "caps": [
+        ["NET.SRV.headless", "Headless server build & stripping", "dedicated-server", "E"],
+        ["NET.SRV.density", "Server tick cost & multi-instance density", "dedicated-server", "E"],
+        ["NET.SRV.orchestration", "Fleet orchestration & allocation boundary", "dedicated-server", "E", ["platform-online-services"]],
+        ["NET.SRV.observability", "Server observability", "dedicated-server", "E", ["observability-telemetry"]],
+        ["NET.SRV.listen", "Listen servers & host migration", "dedicated-server", "E", ["network-architect"]]
+      ]}
+    ]},
+
+    {"id": "GAM", "name": "Gameplay, scripting, AI & persistence", "areas": [
+      {"id": "GAM.FW", "name": "Gameplay framework", "caps": [
+        ["GAM.FW.rules", "Game rules, players & possession", "gameplay-architect", "E"],
+        ["GAM.FW.extension", "Gameplay extension points & game-module structure", "gameplay-architect", "E"],
+        ["GAM.FW.flow", "Game flow (menus, loading screens, transitions)", "gameplay-architect", "E"],
+        ["GAM.FW.local-players", "Local players & split-screen at gameplay level", "gameplay-architect", "E", ["input-system"]]
+      ]},
+      {"id": "GAM.SYS", "name": "Gameplay systems toolkit", "caps": [
+        ["GAM.SYS.abilities", "Abilities, effects & attributes", "gameplay-systems-toolkit", "E"],
+        ["GAM.SYS.tags", "Gameplay tags", "gameplay-systems-toolkit", "E"],
+        ["GAM.SYS.camera", "Camera system (rigs, blending, collision)", "gameplay-systems-toolkit", "E"],
+        ["GAM.SYS.spawning", "Spawning & pooling", "gameplay-systems-toolkit", "E"],
+        ["GAM.SYS.messages", "Tag-scoped gameplay message routing", "gameplay-systems-toolkit", "E"],
+        ["GAM.SYS.photo", "Photo mode", "gameplay-systems-toolkit", "E"]
+      ]},
+      {"id": "GAM.SCR", "name": "Scripting", "caps": [
+        ["GAM.SCR.selection", "Scripting language selection", "scripting-runtime", "E"],
+        ["GAM.SCR.vm", "VM embedding & bindings", "scripting-runtime", "E"],
+        ["GAM.SCR.sandbox", "Sandboxing & resource limits", "scripting-runtime", "E", ["security-engineering"]],
+        ["GAM.SCR.debug", "Script debugging (DAP) & profiling", "scripting-runtime", "E"],
+        ["GAM.SCR.reload", "Script hot reload", "scripting-runtime", "E", ["hot-reload-iteration"]],
+        ["GAM.SCR.visual", "Visual scripting", "scripting-runtime", "E", ["graph-editor-framework"]],
+        ["GAM.SCR.aot", "AOT / JIT constraints per platform", "scripting-runtime", "E"],
+        ["GAM.SCR.gc", "Garbage-collection policy & engine interaction", "scripting-runtime", "E"]
+      ]},
+      {"id": "GAM.AI", "name": "Navigation, crowds & AI", "caps": [
+        ["GAM.AI.navmesh", "Navmesh generation (tiled, runtime rebuild)", "navigation-pathfinding", "E"],
+        ["GAM.AI.pathfinding", "Pathfinding (A*, hierarchical, grid)", "navigation-pathfinding", "E"],
+        ["GAM.AI.following", "Path following & steering", "navigation-pathfinding", "E"],
+        ["GAM.AI.links", "Off-mesh links & special movement", "navigation-pathfinding", "E"],
+        ["GAM.AI.volumes", "3D / flying / volumetric navigation", "navigation-pathfinding", "E"],
+        ["GAM.AI.flowfields", "Flow fields", "crowd-simulation", "E"],
+        ["GAM.AI.avoidance", "Crowd avoidance (ORCA / RVO)", "crowd-simulation", "E"],
+        ["GAM.AI.mass", "Mass-agent simulation & LOD", "crowd-simulation", "E", ["ecs-runtime"]],
+        ["GAM.AI.decisions", "Decision making (behavior trees, utility, HTN/GOAP, state trees)", "ai-behavior-perception", "E"],
+        ["GAM.AI.perception", "Perception", "ai-behavior-perception", "E"],
+        ["GAM.AI.queries", "Environment queries", "ai-behavior-perception", "E", ["spatial-transforms"]],
+        ["GAM.AI.smart-objects", "Smart objects", "ai-behavior-perception", "E"],
+        ["GAM.AI.lod", "AI scheduling & LOD", "ai-behavior-perception", "E"],
+        ["GAM.AI.learned", "Learned policies / ML agents", "ai-behavior-perception", "X"],
+        ["GAM.AI.llm", "LLM-driven NPC dialogue & behavior", "ai-behavior-perception", "X"]
+      ]},
+      {"id": "GAM.SAVE", "name": "Persistence", "caps": [
+        ["GAM.SAVE.model", "Save-game model & serialization", "persistence-save", "E"],
+        ["GAM.SAVE.migration", "Save versioning & migration", "persistence-save", "E", ["serialization-schema"]],
+        ["GAM.SAVE.atomic", "Atomic writes & corruption resistance", "persistence-save", "E"],
+        ["GAM.SAVE.platform", "Platform save APIs & quotas", "persistence-save", "E", ["platform-console"]],
+        ["GAM.SAVE.cloud", "Cloud save sync & conflicts", "persistence-save", "E", ["platform-online-services"]],
+        ["GAM.SAVE.world-state", "Persistent world-state deltas", "persistence-save", "E", ["world-data-model"]],
+        ["GAM.SAVE.checkpoints", "Checkpoints & autosave", "persistence-save", "E"]
+      ]}
+    ]},
+
+    {"id": "UI", "name": "UI, text, localization & accessibility", "areas": [
+      {"id": "UI.FW", "name": "UI framework", "caps": [
+        ["UI.FW.architecture", "UI architecture (retained + data binding for game UI; immediate for dev UI)", "ui-architect", "E"],
+        ["UI.FW.layout", "Layout engine (flex, grid, anchors)", "ui-architect", "E"],
+        ["UI.FW.styling", "Styling & theming", "ui-architect", "E"],
+        ["UI.FW.focus", "Focus & gamepad/keyboard navigation", "ui-architect", "E", ["input-system"]],
+        ["UI.FW.animation", "UI animation & transitions", "ui-architect", "E"],
+        ["UI.FW.world-ui", "In-world / diegetic UI", "ui-architect", "E", ["render-architect"]],
+        ["UI.FW.authoring", "UI designer tool logic", "ui-architect", "E", ["editor-ui-framework"]],
+        ["UI.FW.performance", "UI performance (invalidation, batching)", "ui-architect", "E"]
+      ]},
+      {"id": "UI.TXT", "name": "Text & fonts", "caps": [
+        ["UI.TXT.fonts", "Font loading & fallback chains", "text-fonts", "E"],
+        ["UI.TXT.raster", "Glyph rasterization (SDF, MSDF, GPU curves)", "text-fonts", "E"],
+        ["UI.TXT.shaping", "Text shaping (HarfBuzz class)", "text-fonts", "E"],
+        ["UI.TXT.bidi", "Bidirectional text & line breaking (UAX #9, #14)", "text-fonts", "E"],
+        ["UI.TXT.rich", "Rich text, inline images, color emoji", "text-fonts", "E"],
+        ["UI.TXT.ime", "Text input & IME integration", "text-fonts", "E", ["platform-architect"]]
+      ]},
+      {"id": "UI.LOC", "name": "Localization", "caps": [
+        ["UI.LOC.strings", "String tables & stable IDs", "localization-i18n", "E"],
+        ["UI.LOC.messageformat", "Plurals & gender (ICU MessageFormat class)", "localization-i18n", "E"],
+        ["UI.LOC.cldr", "Locale formatting (CLDR)", "localization-i18n", "E"],
+        ["UI.LOC.pipeline", "Localization pipeline & translation-management integration", "localization-i18n", "E"],
+        ["UI.LOC.pseudo", "Pseudo-localization", "localization-i18n", "E"],
+        ["UI.LOC.assets", "Localized asset variants", "localization-i18n", "E", ["content-pipeline-architect"]],
+        ["UI.LOC.culturalization", "Culturalization & regional content variants", "localization-i18n", "E", ["certification-compliance"]]
+      ]},
+      {"id": "UI.A11Y", "name": "Accessibility", "caps": [
+        ["UI.A11Y.requirements", "Accessibility requirements framework (XAG, GAG, CVAA, EAA)", "accessibility", "E"],
+        ["UI.A11Y.screen-reader", "Screen reader, TTS & STT integration", "accessibility", "E", ["platform-architect"]],
+        ["UI.A11Y.subtitles", "Subtitles & captions", "accessibility", "E", ["audio-content-runtime"]],
+        ["UI.A11Y.vision", "Colorblind & contrast modes", "accessibility", "E", ["post-color-hdr"]],
+        ["UI.A11Y.motion", "Motion reduction & photosensitivity options", "accessibility", "E"],
+        ["UI.A11Y.text-scale", "Text scaling", "accessibility", "E", ["ui-architect"]],
+        ["UI.A11Y.assists", "Assist & difficulty hooks", "accessibility", "E", ["gameplay-architect"]],
+        ["UI.A11Y.validation", "Accessibility validation", "accessibility", "E", ["test-architect"]]
+      ]}
+    ]},
+
+    {"id": "ED", "name": "Editor & content tools", "areas": [
+      {"id": "ED.ARCH", "name": "Editor architecture", "caps": [
+        ["ED.ARCH.process", "Editor process architecture (in-process vs out-of-process runtime)", "editor-architect", "E"],
+        ["ED.ARCH.separation", "Editor ↔ runtime data separation", "editor-architect", "E"],
+        ["ED.ARCH.transactions", "Command / transaction / undo-redo system", "editor-architect", "E"],
+        ["ED.ARCH.selection", "Selection model", "editor-architect", "E"],
+        ["ED.ARCH.extension", "Editor extension API & tool scripting (Python class)", "editor-architect", "E", ["plugin-system"]],
+        ["ED.ARCH.pie", "Play-in-editor & simulation isolation", "editor-architect", "E", ["world-editor-viewport"]],
+        ["ED.ARCH.remote", "Remote / on-device live editing", "editor-architect", "E"],
+        ["ED.ARCH.headless", "Headless editor & commandlets", "editor-architect", "E", ["ci-cd-automation"]],
+        ["ED.ARCH.scale", "Editor performance for large projects", "editor-architect", "E"]
+      ]},
+      {"id": "ED.UI", "name": "Editor UI framework", "caps": [
+        ["ED.UI.toolkit", "Tool UI toolkit (docking, panels)", "editor-ui-framework", "E"],
+        ["ED.UI.inspectors", "Reflection-driven property editors & inspectors", "editor-ui-framework", "E"],
+        ["ED.UI.asset-browser", "Asset browser", "editor-ui-framework", "E", ["content-pipeline-architect"]],
+        ["ED.UI.imgui", "Immediate-mode developer UI", "editor-ui-framework", "E"],
+        ["ED.UI.ux", "Editor UX standards & usability testing", "editor-ui-framework", "E"]
+      ]},
+      {"id": "ED.WORLD", "name": "World editor", "caps": [
+        ["ED.WORLD.viewport", "Viewport & camera navigation", "world-editor-viewport", "E"],
+        ["ED.WORLD.gizmos", "Gizmos & manipulators", "world-editor-viewport", "E"],
+        ["ED.WORLD.placement", "Snapping, placement & alignment", "world-editor-viewport", "E"],
+        ["ED.WORLD.partitioned", "Partition-aware world editing & loading", "world-editor-viewport", "E", ["world-architect"]],
+        ["ED.WORLD.splines", "Spline & path tools", "world-editor-viewport", "E"],
+        ["ED.WORLD.modes", "Environment tool-mode hosting", "world-editor-viewport", "E", ["terrain"]]
+      ]},
+      {"id": "ED.GRAPH", "name": "Graph editors", "caps": [
+        ["ED.GRAPH.framework", "Node-graph editor framework", "graph-editor-framework", "E"],
+        ["ED.GRAPH.compile", "Graph compile & validation contract", "graph-editor-framework", "E"],
+        ["ED.GRAPH.debug", "Graph debugging", "graph-editor-framework", "E", ["visual-debugging-tools"]],
+        ["ED.GRAPH.diff", "Graph diff & merge", "graph-editor-framework", "E", ["collaboration-version-control"]]
+      ]},
+      {"id": "ED.COLLAB", "name": "Collaboration & version control", "caps": [
+        ["ED.COLLAB.vcs", "Source control integration (Perforce, Git class)", "collaboration-version-control", "E"],
+        ["ED.COLLAB.locking", "Locking & checkout workflows", "collaboration-version-control", "E"],
+        ["ED.COLLAB.multiuser", "Multi-user concurrent editing", "collaboration-version-control", "E"],
+        ["ED.COLLAB.merge", "Merge tooling for scene & asset data", "collaboration-version-control", "E", ["serialization-schema"]],
+        ["ED.COLLAB.review", "Content review workflows", "collaboration-version-control", "E"],
+        ["ED.COLLAB.binaries", "Large binary storage strategy", "collaboration-version-control", "E", ["ci-cd-automation"]]
+      ]},
+      {"id": "ED.DEBUG", "name": "Visual debugging", "caps": [
+        ["ED.DEBUG.draw", "Debug draw API", "visual-debugging-tools", "E"],
+        ["ED.DEBUG.console", "In-game console & cheat commands", "visual-debugging-tools", "E"],
+        ["ED.DEBUG.inspector", "Runtime entity inspector & gameplay debugger", "visual-debugging-tools", "E"],
+        ["ED.DEBUG.visual-log", "Visual logger & rewind", "visual-debugging-tools", "E", ["determinism-replay"]],
+        ["ED.DEBUG.menus", "Debug menus & overlays", "visual-debugging-tools", "E", ["observability-telemetry"]]
+      ]},
+      {"id": "ED.AI", "name": "AI-assisted authoring", "caps": [
+        ["ED.AI.generative", "Generative asset tools & editor copilots", "ai-assisted-authoring", "M"],
+        ["ED.AI.processing", "ML-assisted processing (retopology, rigging, UV, LOD)", "ai-assisted-authoring", "M"],
+        ["ED.AI.provenance", "Provenance & licensing of generated content", "ai-assisted-authoring", "M", ["certification-compliance"]]
+      ]}
+    ]},
+
+    {"id": "BLD", "name": "Build, CI/CD & release", "areas": [
+      {"id": "BLD.SYS", "name": "Build system", "caps": [
+        ["BLD.SYS.graph", "Build system & build graph", "build-system-toolchains", "E"],
+        ["BLD.SYS.toolchains", "Compiler & toolchain matrix", "build-system-toolchains", "E"],
+        ["BLD.SYS.compile-speed", "C++ modules, unity builds, PCH", "build-system-toolchains", "E"],
+        ["BLD.SYS.caching", "Compile caching & distributed compilation", "build-system-toolchains", "E"],
+        ["BLD.SYS.codegen", "Code-generation integration", "build-system-toolchains", "E", ["reflection-metadata"]],
+        ["BLD.SYS.third-party", "Third-party dependency management", "build-system-toolchains", "E", ["security-engineering"]],
+        ["BLD.SYS.static-analysis", "Static analysis integration", "build-system-toolchains", "E", ["robustness-fuzzing"]],
+        ["BLD.SYS.configs", "Build configurations (debug, development, test, shipping)", "build-system-toolchains", "E"]
+      ]},
+      {"id": "BLD.CI", "name": "CI/CD & automation", "caps": [
+        ["BLD.CI.pipelines", "CI pipelines", "ci-cd-automation", "E"],
+        ["BLD.CI.farm", "Build farm & artifact storage", "ci-cd-automation", "E"],
+        ["BLD.CI.gating", "Pre-submit & merge gating", "ci-cd-automation", "E", ["test-architect"]],
+        ["BLD.CI.symbols", "Symbol server & symbol management", "ci-cd-automation", "E", ["crash-diagnostics"]],
+        ["BLD.CI.devices", "Device-farm orchestration", "ci-cd-automation", "E", ["functional-automation-soak"]],
+        ["BLD.CI.cli", "Developer CLI & automation", "ci-cd-automation", "E"],
+        ["BLD.CI.branching", "Branching & merge model", "build-release-architect", "E"],
+        ["BLD.CI.versioning", "Engine release management & versioning", "build-release-architect", "E"],
+        ["BLD.CI.orchestration", "Code → content → package pipeline orchestration", "build-release-architect", "E"]
+      ]},
+      {"id": "BLD.REL", "name": "Packaging & release", "caps": [
+        ["BLD.REL.packaging", "Platform packaging & signing", "packaging-release-patching", "E"],
+        ["BLD.REL.submission", "Store-submission artifacts", "packaging-release-patching", "E", ["certification-compliance"]],
+        ["BLD.REL.patching", "Delta / chunk-based patching", "packaging-release-patching", "E", ["package-formats-vfs"]],
+        ["BLD.REL.dlc", "DLC & content updates", "packaging-release-patching", "E"],
+        ["BLD.REL.on-demand", "Install-on-demand & streaming install", "packaging-release-patching", "E"],
+        ["BLD.REL.compat", "Client / server / content version compatibility", "packaging-release-patching", "E", ["network-architect"]],
+        ["BLD.REL.cdn", "Content delivery boundary", "packaging-release-patching", "E", ["platform-online-services"]],
+        ["BLD.REL.rollback", "Release rollback", "packaging-release-patching", "E"]
+      ]}
+    ]},
+
+    {"id": "QA", "name": "Testing & validation", "areas": [
+      {"id": "QA.STRAT", "name": "Test strategy", "caps": [
+        ["QA.STRAT.pyramid", "Test strategy & pyramid per subsystem", "test-architect", "E"],
+        ["QA.STRAT.frameworks", "Unit & integration test frameworks", "test-architect", "E"],
+        ["QA.STRAT.dod", "Test definition-of-done contract", "test-architect", "E"],
+        ["QA.STRAT.coverage", "Coverage & mutation testing", "test-architect", "E"],
+        ["QA.STRAT.flaky", "Flaky-test management", "test-architect", "E", ["ci-cd-automation"]],
+        ["QA.STRAT.content", "Test content & test maps", "test-architect", "E"],
+        ["QA.STRAT.contracts", "Contract tests between subsystems", "test-architect", "E"]
+      ]},
+      {"id": "QA.RENDER", "name": "Rendering validation", "caps": [
+        ["QA.RENDER.golden", "Golden-image tests with perceptual metrics (FLIP class)", "render-validation", "E"],
+        ["QA.RENDER.matrix", "GPU / driver matrix testing", "render-validation", "E", ["rhi-core"]],
+        ["QA.RENDER.reference", "Path-traced reference comparison", "render-validation", "E", ["path-tracing"]],
+        ["QA.RENDER.api-validation", "Graphics API validation layers in CI", "render-validation", "E", ["rhi-core"]]
+      ]},
+      {"id": "QA.FUNC", "name": "Functional & stability testing", "caps": [
+        ["QA.FUNC.automation", "Gameplay automation & bots", "functional-automation-soak", "E"],
+        ["QA.FUNC.smoke", "Smoke & boot tests", "functional-automation-soak", "E"],
+        ["QA.FUNC.soak", "Soak & stability testing (memory growth, leaks)", "functional-automation-soak", "E"],
+        ["QA.FUNC.compat", "Hardware / OS compatibility matrix", "functional-automation-soak", "E"],
+        ["QA.FUNC.network", "Network test harnesses", "functional-automation-soak", "E", ["network-transport"]],
+        ["QA.FUNC.load", "Server load testing", "functional-automation-soak", "E", ["dedicated-server"]]
+      ]},
+      {"id": "QA.ROBUST", "name": "Robustness", "caps": [
+        ["QA.ROBUST.fuzzing", "Fuzzing (assets, packets, saves, scripts, mods)", "robustness-fuzzing", "E"],
+        ["QA.ROBUST.sanitizers", "Sanitizer build policy (ASan, UBSan, TSan)", "robustness-fuzzing", "E"],
+        ["QA.ROBUST.faults", "Fault injection (IO errors, OOM, device lost)", "robustness-fuzzing", "E"],
+        ["QA.ROBUST.concurrency", "Concurrency stress & schedule perturbation", "robustness-fuzzing", "E", ["concurrency-primitives"]]
+      ]},
+      {"id": "QA.CERT", "name": "Certification & compliance", "caps": [
+        ["QA.CERT.platform", "Platform certification requirements tracking", "certification-compliance", "E"],
+        ["QA.CERT.prechecks", "Automated certification pre-checks", "certification-compliance", "E"],
+        ["QA.CERT.ratings", "Age-rating content compliance", "certification-compliance", "E"],
+        ["QA.CERT.privacy", "Privacy-law compliance (GDPR, COPPA class)", "certification-compliance", "E", ["security-engineering"]],
+        ["QA.CERT.a11y-law", "Accessibility-law compliance", "certification-compliance", "E", ["accessibility"]],
+        ["QA.CERT.licenses", "Third-party license compliance & SBOM", "certification-compliance", "E", ["security-engineering"]],
+        ["QA.CERT.photosensitivity", "Photosensitive-seizure testing", "certification-compliance", "E", ["render-validation"]]
+      ]}
+    ]},
+
+    {"id": "PRF", "name": "Performance engineering", "areas": [
+      {"id": "PRF.METH", "name": "Method & budgets", "caps": [
+        ["PRF.METH.loop", "Performance method (hypothesis → instrument → measure → optimize → regression test)", "performance-architect", "E"],
+        ["PRF.METH.budgets", "Budgets (frame, memory, IO, bandwidth, power) per tier", "performance-architect", "E"],
+        ["PRF.METH.scalability", "Scalability framework & device profiles", "performance-architect", "E"],
+        ["PRF.METH.gates", "Performance gates in CI", "performance-architect", "E", ["ci-cd-automation"]]
+      ]},
+      {"id": "PRF.BENCH", "name": "Benchmarking", "caps": [
+        ["PRF.BENCH.micro", "Microbenchmark harness", "perf-benchmarking", "E"],
+        ["PRF.BENCH.workloads", "Representative workload scenes", "perf-benchmarking", "E", ["test-architect"]],
+        ["PRF.BENCH.stats", "Automated capture & statistics", "perf-benchmarking", "E"],
+        ["PRF.BENCH.regression", "Regression detection & bisection", "perf-benchmarking", "E", ["ci-cd-automation"]],
+        ["PRF.BENCH.dashboards", "Performance dashboards", "perf-benchmarking", "E", ["observability-telemetry"]]
+      ]},
+      {"id": "PRF.CPU", "name": "CPU performance", "caps": [
+        ["PRF.CPU.cache", "Cache & memory-access optimization", "cpu-performance", "E"],
+        ["PRF.CPU.simd", "Vectorization audits", "cpu-performance", "E", ["math-simd-numerics"]],
+        ["PRF.CPU.contention", "Contention & false-sharing analysis", "cpu-performance", "E", ["concurrency-primitives"]],
+        ["PRF.CPU.hybrid", "Hybrid-core & power-aware tuning", "cpu-performance", "E", ["job-system-task-graph"]],
+        ["PRF.CPU.compiler", "PGO / LTO & compiler optimization", "cpu-performance", "E", ["build-system-toolchains"]]
+      ]},
+      {"id": "PRF.GPU", "name": "GPU performance", "caps": [
+        ["PRF.GPU.analysis", "Occupancy, bandwidth & cache analysis", "gpu-performance", "E"],
+        ["PRF.GPU.overlap", "Barrier & async-overlap tuning", "gpu-performance", "E", ["render-graph-scheduling"]],
+        ["PRF.GPU.tools", "Vendor tool expertise across PC, console & mobile", "gpu-performance", "E"],
+        ["PRF.GPU.power", "GPU power & thermal", "gpu-performance", "E", ["platform-mobile-portable"]]
+      ]},
+      {"id": "PRF.LOAD", "name": "Loading & hitches", "caps": [
+        ["PRF.LOAD.load-time", "Load-time optimization", "loading-streaming-performance", "E"],
+        ["PRF.LOAD.hitches", "Hitch & stutter elimination (PSO, streaming, GC)", "loading-streaming-performance", "E"],
+        ["PRF.LOAD.io", "IO throughput analysis", "loading-streaming-performance", "E", ["async-io-storage"]],
+        ["PRF.LOAD.startup", "Startup time", "loading-streaming-performance", "E"]
+      ]}
+    ]},
+
+    {"id": "OBS", "name": "Observability & diagnostics", "areas": [
+      {"id": "OBS.LOG", "name": "Instrumentation", "caps": [
+        ["OBS.LOG.logging", "Structured logging", "observability-telemetry", "E"],
+        ["OBS.LOG.tracing", "Trace instrumentation (CPU, GPU, IO, memory zones)", "observability-telemetry", "E"],
+        ["OBS.LOG.profilers", "Profiler integrations (Tracy, Perfetto, PIX, Superluminal class)", "observability-telemetry", "E"],
+        ["OBS.LOG.metrics", "Metrics & counters", "observability-telemetry", "E"],
+        ["OBS.LOG.stats", "In-game stats overlays", "observability-telemetry", "E", ["visual-debugging-tools"]],
+        ["OBS.LOG.telemetry", "Development & live telemetry pipeline", "observability-telemetry", "E"],
+        ["OBS.LOG.consent", "Telemetry privacy & consent", "observability-telemetry", "E", ["security-engineering"]],
+        ["OBS.LOG.remote", "Remote diagnostics to devices", "observability-telemetry", "E"]
+      ]},
+      {"id": "OBS.CRASH", "name": "Crash & hang diagnostics", "caps": [
+        ["OBS.CRASH.capture", "Crash capture & minidumps", "crash-diagnostics", "E"],
+        ["OBS.CRASH.pipeline", "Crash reporting, bucketing & triage", "crash-diagnostics", "E"],
+        ["OBS.CRASH.symbolication", "Symbolication", "crash-diagnostics", "E", ["ci-cd-automation"]],
+        ["OBS.CRASH.gpu", "GPU crash dumps", "crash-diagnostics", "E", ["rhi-core"]],
+        ["OBS.CRASH.hangs", "Hang & watchdog detection", "crash-diagnostics", "E"],
+        ["OBS.CRASH.oom", "OOM diagnostics", "crash-diagnostics", "E", ["memory-allocators"]],
+        ["OBS.CRASH.asserts", "Assert & ensure reporting", "crash-diagnostics", "E"]
+      ]}
+    ]},
+
+    {"id": "XC", "name": "Cross-cutting runtime disciplines", "areas": [
+      {"id": "XC.DET", "name": "Determinism & replay", "caps": [
+        ["XC.DET.levels", "Determinism levels & per-subsystem contract", "determinism-replay", "E"],
+        ["XC.DET.float", "Floating-point determinism policy (flags, FMA, transcendentals)", "determinism-replay", "E", ["math-simd-numerics"]],
+        ["XC.DET.parallel", "Deterministic parallel execution (ordered reductions)", "determinism-replay", "E", ["job-system-task-graph"]],
+        ["XC.DET.replay", "Input & state record/replay for debugging", "determinism-replay", "E"],
+        ["XC.DET.desync", "Desync detection & state hashing", "determinism-replay", "E"],
+        ["XC.DET.compat", "Replay compatibility across builds", "determinism-replay", "E", ["api-lifecycle-migration"]]
+      ]},
+      {"id": "XC.ITER", "name": "Hot reload & iteration", "caps": [
+        ["XC.ITER.protocol", "Reload protocol & state preservation", "hot-reload-iteration", "E"],
+        ["XC.ITER.live-coding", "C++ live coding", "hot-reload-iteration", "E"],
+        ["XC.ITER.coordination", "Asset, shader, script & config reload coordination", "hot-reload-iteration", "E"],
+        ["XC.ITER.metrics", "Iteration-time metrics (edit → see latency)", "hot-reload-iteration", "E", ["developer-experience-docs"]]
+      ]},
+      {"id": "XC.SEC", "name": "Security", "caps": [
+        ["XC.SEC.threats", "Threat modeling", "security-engineering", "E"],
+        ["XC.SEC.coding", "Secure coding & memory-safety policy", "security-engineering", "E"],
+        ["XC.SEC.trust", "Trust boundaries for untrusted input", "security-engineering", "E"],
+        ["XC.SEC.supply-chain", "Supply-chain security (SBOM, signing, reproducible builds)", "security-engineering", "E", ["build-system-toolchains"]],
+        ["XC.SEC.secrets", "Secrets management", "security-engineering", "E", ["ci-cd-automation"]],
+        ["XC.SEC.tamper", "Anti-tamper & DRM boundary", "security-engineering", "E"],
+        ["XC.SEC.privacy", "Privacy engineering", "security-engineering", "E"],
+        ["XC.SEC.sandbox", "Mod / UGC sandbox policy", "security-engineering", "E", ["modding-ugc"]],
+        ["XC.SEC.server-validation", "Server-side cheat validation", "anti-cheat-integrity", "E"],
+        ["XC.SEC.anticheat", "Client anti-cheat middleware integration boundary", "anti-cheat-integrity", "E"],
+        ["XC.SEC.abuse", "Exploit & economy-abuse detection signals", "anti-cheat-integrity", "E", ["platform-online-services"]]
+      ]},
+      {"id": "XC.EXT", "name": "Extensibility & evolution", "caps": [
+        ["XC.EXT.api-surface", "Public API surface definition", "api-lifecycle-migration", "E"],
+        ["XC.EXT.versioning", "Semantic versioning & deprecation policy", "api-lifecycle-migration", "E"],
+        ["XC.EXT.abi", "ABI policy for binary plugins", "api-lifecycle-migration", "E", ["plugin-system"]],
+        ["XC.EXT.upgrade", "Engine upgrade tooling (codemods, data upgraders)", "api-lifecycle-migration", "E", ["serialization-schema"]],
+        ["XC.EXT.lts", "LTS & support policy", "api-lifecycle-migration", "E", ["build-release-architect"]],
+        ["XC.EXT.plugins", "Plugin architecture & discovery", "plugin-system", "E"],
+        ["XC.EXT.plugin-deps", "Plugin packaging & dependency resolution", "plugin-system", "E"],
+        ["XC.EXT.mod-sdk", "Mod SDK & tooling", "modding-ugc", "E"],
+        ["XC.EXT.mod-loading", "Mod loading & override precedence", "modding-ugc", "E", ["package-formats-vfs"]],
+        ["XC.EXT.ugc", "UGC pipeline", "modding-ugc", "E", ["platform-online-services"]],
+        ["XC.EXT.mod-compat", "Mod compatibility across patches", "modding-ugc", "E", ["api-lifecycle-migration"]]
+      ]},
+      {"id": "XC.DX", "name": "Documentation & developer experience", "caps": [
+        ["XC.DX.api-docs", "API reference generation", "developer-experience-docs", "E"],
+        ["XC.DX.arch-docs", "Architecture & subsystem documentation", "developer-experience-docs", "E", ["engine-architect"]],
+        ["XC.DX.samples", "Sample-project ladder (2D → open-world online) doubling as integration tests", "developer-experience-docs", "E"],
+        ["XC.DX.templates", "Project templates & creation", "developer-experience-docs", "E"],
+        ["XC.DX.onboarding", "Onboarding paths", "developer-experience-docs", "E"],
+        ["XC.DX.doc-tests", "Documentation testing (snippets compile and run)", "developer-experience-docs", "E", ["test-architect"]],
+        ["XC.DX.errors", "Error-message & diagnostic quality standards", "developer-experience-docs", "E"]
+      ]}
+    ]}
+  ]
+}

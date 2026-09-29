@@ -1,0 +1,41 @@
+# Gauntlet G1 — Framework Gauntlet Protocol
+
+G1 answers one question: **do we have everything, with the right boundaries?** It does not judge whether any skill is *described* well; that is G2 (see `docs/08-phase-2-plan.md`).
+
+## The loop
+
+```
+data/*.json ──render──▶ docs/01-05 (+ 00 rationale)
+      ▲                         │
+      │                  14 blind critics (fresh context each round)
+   revise                       │
+      │                  findings (schema below)
+      └──── dispositions ◀──────┘
+```
+
+1. **Gate.** `python3 scripts/check.py` must be green and `check.py --selftest` must go red on every mutation before a round starts. Critics never re-derive what the gate proves: unique owners, closure, layering, reference integrity.
+2. **Critique.** Every critic in `data/critics.json` (stage G1) reviews the whole framework in a fresh context. Critics receive the artifact only: `data/`, `docs/00-05`, and from round 2 on `docs/06-07`. They never receive this log, prior findings, or the builder's dispositions. That is the blind rule.
+3. **Findings.** Each finding has:
+   `id · critic · severity (blocker | major | minor) · type (omission | overlap | wrong-boundary | wrong-owner | obsolete-assumption | missing-contract | dependency-error | maturity-error | scale-down | other) · target (capability / skill / contract ids) · evidence · proposed change`.
+   - **blocker**: the framework cannot coordinate agents correctly (e.g. two owners, a missing domain that many skills need).
+   - **major**: a material omission or wrong boundary that would cause rework or silent legacy architecture.
+   - **minor**: a wording, naming or small-placement issue.
+   Stylistic preferences are not findings.
+4. **Disposition.** The builder assigns each finding one disposition: **accept** (change applied, commit referenced), **reject** (with a technical reason recorded), or **merge** (a duplicate of another finding). Dispositions are recorded in `gauntlet/round-N/dispositions.md`.
+5. **Revise, re-gate, re-render.** Every accepted change that is structural is also expressed in data, so the next gate checks it. A missing brief term becomes a `seed-map.json` entry.
+
+## Convergence (stop rule)
+
+The loop stops only when both hold:
+
+- **A.** In one full round, all critics produce **zero accepted blocker or major findings**.
+- **B.** The **Completeness Critic** produces zero accepted material omissions in **two consecutive rounds**. Each round uses a fresh instance with no memory of the previous one.
+
+A re-raised finding that was rejected earlier counts as non-material unless it brings new evidence. A fixed round count is never a stop reason. If a round still has accepted blocker or major findings, another round runs.
+
+## Independence measures
+
+- Fresh context per critic per round; no shared scratchpad.
+- Critics do not see each other's output within a round.
+- The builder (lead agent) never grades its own fixes. The next round's critics do.
+- Critics are told the brief's standard: "best practice" means the strongest demonstrated approach today, not the most common historical one.

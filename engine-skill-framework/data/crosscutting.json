@@ -1,0 +1,26 @@
+{
+  "_doc": "Every cross-cutting requirement from the brief has one owning skill that defines the obligation and reviews every other skill against it. 'obligation' is what each skill's SKILL.md must address in phase 2.",
+  "concerns": [
+    {"concern": "performance", "owner": "performance-architect", "obligation": "Declare budgets per tier, hot paths, and the benchmark that proves them."},
+    {"concern": "memory usage", "owner": "memory-allocators", "obligation": "Declare allocation strategy, memory tags, peak/steady budgets and OOM behavior."},
+    {"concern": "cache behavior", "owner": "cpu-performance", "obligation": "Declare data layouts of hot data and access patterns; justify pointer chasing."},
+    {"concern": "concurrency", "owner": "concurrency-primitives", "obligation": "Declare threading model, shared state, synchronization and task-graph placement."},
+    {"concern": "latency", "owner": "frame-orchestration", "obligation": "Declare frame phase placement and latency contribution."},
+    {"concern": "determinism", "owner": "determinism-replay", "obligation": "Declare the determinism level provided and how it is tested."},
+    {"concern": "observability", "owner": "observability-telemetry", "obligation": "Declare trace zones, counters and logs; zero cost when compiled out."},
+    {"concern": "debugging", "owner": "visual-debugging-tools", "obligation": "Declare debug visualizations, inspectors and console commands."},
+    {"concern": "testing", "owner": "test-architect", "obligation": "Meet the test definition of done (unit, contract, integration, fuzz where untrusted)."},
+    {"concern": "scalability", "owner": "performance-architect", "obligation": "Declare behavior from the smallest to the largest configuration and the scaling knobs."},
+    {"concern": "security", "owner": "security-engineering", "obligation": "Declare untrusted inputs and validation; follow the trust-boundary contract."},
+    {"concern": "platform portability", "owner": "platform-architect", "obligation": "No platform code above the PAL; declare capability-tier behavior."},
+    {"concern": "maintainability", "owner": "architecture-governance", "obligation": "Contracts documented, ADRs recorded, fitness functions pass."},
+    {"concern": "tooling", "owner": "editor-architect", "obligation": "Declare authoring path, inspectors and editor integration for every user-facing feature."},
+    {"concern": "failure recovery", "owner": "core-runtime-architect", "obligation": "Follow the error model; declare degradation and recovery behavior."},
+    {"concern": "hot reload", "owner": "hot-reload-iteration", "obligation": "Declare what reloads live and how state is preserved."},
+    {"concern": "data migration", "owner": "serialization-schema", "obligation": "Version every persisted format and ship upgraders."},
+    {"concern": "backwards compatibility", "owner": "api-lifecycle-migration", "obligation": "Classify APIs public/internal and follow deprecation policy."},
+    {"concern": "developer usability", "owner": "developer-experience-docs", "obligation": "Ship docs, a sample, and actionable error messages."},
+    {"concern": "accessibility", "owner": "accessibility", "obligation": "Map player-facing features to accessibility requirements."},
+    {"concern": "evidence", "owner": "research-evidence", "obligation": "Every major decision cites graded evidence and a maturity class."}
+  ]
+}
