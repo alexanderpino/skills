@@ -9,7 +9,7 @@
 
 ## What each node becomes
 
-Each skill node becomes a directory that follows this repository's skill conventions:
+Each skill node becomes a self-contained directory. The framework defines its own layout and does not depend on any other skill or repository convention:
 
 ```
 skills/<skill-id>/
@@ -55,7 +55,7 @@ skills/<skill-id>/
 - Every technique named in the ladder carries a maturity class that matches the capability map. An `experimental` technique is never the recommendation without an ADR reference.
 - Every non-responsibility names an owner, and that owner's SKILL.md lists the item as a responsibility, so both sides agree.
 - Every cited source has a provenance tier; none are forum or tutorial sources.
-- Trigger descriptions pass the repository's trigger-eval conventions (`evals/`).
+- Trigger descriptions pass the skill's own trigger evals in `evals/`: positive prompts that must select the skill, near-miss prompts that must select a neighbouring skill named in its non-responsibilities, and negative prompts.
 - Size budget: SKILL.md stays a router; depth moves to `references/`.
 
 ## G2 convergence
