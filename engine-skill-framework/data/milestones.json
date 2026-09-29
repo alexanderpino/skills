@@ -1,0 +1,241 @@
+{
+ "_doc": "Milestone ladder (walking skeleton first, then widening). Each milestone lists the build skills that join it; check.py proves each milestone closed over its own and earlier milestones' skills. Process skills are active from M0. Contracts reach 'draft' when first consumed and 'frozen' at the listed milestone.",
+ "milestones": [
+  {
+   "id": "M0",
+   "name": "Walking skeleton",
+   "configuration": "indie-2d-client",
+   "skills": [
+    "platform-architect",
+    "platform-desktop",
+    "core-runtime-architect",
+    "math-simd-numerics",
+    "memory-allocators",
+    "containers-core-types",
+    "concurrency-primitives",
+    "job-system-task-graph",
+    "observability-telemetry",
+    "crash-diagnostics",
+    "runtime-scalability",
+    "frame-orchestration",
+    "entity-object-model",
+    "reflection-metadata",
+    "serialization-schema",
+    "async-io-storage",
+    "package-formats-vfs",
+    "content-pipeline-architect",
+    "resource-streaming-architect",
+    "gpu-platform-architect",
+    "rhi-core",
+    "rhi-vulkan",
+    "gpu-memory-resources",
+    "render-graph-scheduling",
+    "shader-system",
+    "text-fonts",
+    "render-2d-vector",
+    "input-devices-haptics",
+    "input-system",
+    "asset-cook-processors",
+    "build-system-toolchains",
+    "ci-cd-automation"
+   ],
+   "exit": "Boots on one PC platform, runs the task graph, opens a window, presents through the RHI, reads input, draws a sprite and text, loads one cooked asset from a package, passes CI and the determinism/sanitizer smoke lanes.",
+   "contracts_frozen": [
+    "C-BASE",
+    "C-MEM",
+    "C-SYNC",
+    "C-TASK",
+    "C-ERR",
+    "C-INSTR"
+   ],
+   "contracts_draft": [
+    "C-PAL",
+    "C-RHI",
+    "C-RG",
+    "C-SHADER",
+    "C-RES",
+    "C-ASSET",
+    "C-FRAME"
+   ]
+  },
+  {
+   "id": "M1",
+   "name": "Indie 2D vertical slice",
+   "configuration": "indie-2d-client",
+   "skills": [
+    "ecs-runtime",
+    "spatial-transforms",
+    "world-architect",
+    "world-data-model",
+    "determinism-replay",
+    "physics-architect",
+    "physics-2d",
+    "animation-architect",
+    "animation-runtime",
+    "animation-graphs",
+    "audio-architect",
+    "audio-dsp-mixing",
+    "audio-content-runtime",
+    "localization-i18n",
+    "accessibility",
+    "ui-architect",
+    "gameplay-architect",
+    "gameplay-systems-toolkit",
+    "gameplay-data",
+    "scripting-runtime",
+    "persistence-save",
+    "character-movement",
+    "render-architect",
+    "material-system",
+    "post-color-hdr",
+    "texture-streaming-vt",
+    "reconstruction-upscaling",
+    "vfx-particles",
+    "visual-debugging-tools",
+    "plugin-system",
+    "hot-reload-iteration",
+    "editor-architect",
+    "editor-ui-framework",
+    "world-editor-viewport",
+    "graph-editor-framework",
+    "asset-import-interchange",
+    "platform-services",
+    "media-playback",
+    "narrative-dialogue",
+    "navigation-pathfinding",
+    "ai-behavior-perception",
+    "cinematics-sequencer",
+    "packaging-release-patching",
+    "physics-tools"
+   ],
+   "exit": "The indie-2d reference game is shippable on PC with editor, save, localization, accessibility baseline and hot reload; indie-2d-tools configuration builds.",
+   "contracts_frozen": [
+    "C-PAL",
+    "C-FRAME",
+    "C-ID",
+    "C-ECS",
+    "C-SER",
+    "C-ASSET",
+    "C-RES",
+    "C-DRAW2D",
+    "C-UI"
+   ],
+   "contracts_draft": [
+    "C-RSCENE",
+    "C-PHYS",
+    "C-ANIM",
+    "C-AUDIO",
+    "C-GAME"
+   ]
+  },
+  {
+   "id": "M2",
+   "name": "Standard 3D",
+   "configuration": "standard-3d-client",
+   "skills": [
+    "geometry-pipeline",
+    "virtualized-geometry-lod",
+    "direct-lighting-shadows",
+    "global-illumination",
+    "ray-tracing-infrastructure",
+    "translucency-decals",
+    "atmosphere-weather",
+    "terrain",
+    "water-ocean",
+    "vegetation-foliage",
+    "collision-detection",
+    "rigid-body-dynamics",
+    "character-physics",
+    "cloth-deformables",
+    "ik-procedural-animation",
+    "deformation-skinning",
+    "facial-animation",
+    "spatial-audio-acoustics",
+    "character-rendering",
+    "path-tracing",
+    "rhi-d3d12",
+    "rhi-metal",
+    "platform-console",
+    "platform-mobile",
+    "collaboration-version-control",
+    "destruction-fracture"
+   ],
+   "exit": "The standard-3d reference game runs on PC and one console tier with GPU-driven and CPU-submission paths, reference path tracer validation, and the lite-3d mobile configuration.",
+   "contracts_frozen": [
+    "C-RSCENE",
+    "C-INSTANCES",
+    "C-PHYS",
+    "C-ANIM",
+    "C-AUDIO",
+    "C-RHI"
+   ],
+   "contracts_draft": [
+    "C-RT",
+    "C-LIGHT",
+    "C-GI",
+    "C-ENV"
+   ]
+  },
+  {
+   "id": "M3",
+   "name": "Open world & large simulation",
+   "configuration": "open-world-client",
+   "skills": [
+    "procedural-generation",
+    "crowd-simulation",
+    "motion-synthesis",
+    "vehicle-physics"
+   ],
+   "exit": "Open-world reference slice streams at target speed within the arbitration budget; massim configuration closed and benchmarked.",
+   "contracts_frozen": [
+    "C-WORLD",
+    "C-SIGNIF",
+    "C-ENV"
+   ],
+   "contracts_draft": []
+  },
+  {
+   "id": "M4",
+   "name": "Online",
+   "configuration": "online-3d-server",
+   "skills": [
+    "network-architect",
+    "network-transport",
+    "replication",
+    "prediction-rollback",
+    "dedicated-server",
+    "anti-cheat-integrity",
+    "online-services-liveops"
+   ],
+   "exit": "Online reference game with dedicated server, prediction/rollback, bot load test and cert pre-checks for online features.",
+   "contracts_frozen": [
+    "C-NET",
+    "C-NETLINK",
+    "C-REP",
+    "C-PREDICT"
+   ],
+   "contracts_draft": []
+  },
+  {
+   "id": "M5",
+   "name": "AAA & ecosystem",
+   "configuration": "aaa-open-world-online-client",
+   "skills": [
+    "ml-inference-runtime",
+    "fluid-simulation",
+    "modding-ugc",
+    "xr-runtime",
+    "platform-web",
+    "rhi-webgpu",
+    "ai-assisted-authoring",
+    "voxel-worlds"
+   ],
+   "exit": "AAA reference slice; mods; XR; web; ML features behind optional contracts.",
+   "contracts_frozen": [],
+   "contracts_draft": [
+    "C-ML",
+    "C-MLGPU"
+   ]
+  }
+ ]
+}

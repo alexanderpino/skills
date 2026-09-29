@@ -7,19 +7,19 @@ Cross-cutting disciplines own an **obligation** that every other skill must meet
 | Concern | Owner | Obligation on every skill |
 |---|---|---|
 | performance | performance-architect | Declare budgets per tier, hot paths, and the benchmark that proves them. |
-| memory usage | memory-allocators | Declare allocation strategy, memory tags, peak/steady budgets and OOM behavior. |
+| memory usage | memory-performance | Declare allocation strategy, memory tags, peak/steady budgets and OOM behavior (mechanisms by memory-allocators). |
 | cache behavior | cpu-performance | Declare data layouts of hot data and access patterns; justify pointer chasing. |
-| concurrency | concurrency-primitives | Declare threading model, shared state, synchronization and task-graph placement. |
+| concurrency | concurrency-primitives | Declare shared state and synchronization; follow thread-safety annotation conventions. |
 | latency | frame-orchestration | Declare frame phase placement and latency contribution. |
 | determinism | determinism-replay | Declare the determinism level provided and how it is tested. |
 | observability | observability-telemetry | Declare trace zones, counters and logs; zero cost when compiled out. |
 | debugging | visual-debugging-tools | Declare debug visualizations, inspectors and console commands. |
 | testing | test-architect | Meet the test definition of done (unit, contract, integration, fuzz where untrusted). |
-| scalability | performance-architect | Declare behavior from the smallest to the largest configuration and the scaling knobs. |
+| scalability | performance-architect | Declare behavior from the smallest to the largest configuration, scaling knobs, unit costs and asymptotic class per world-scale dimension; spatial replicas update in O(changes). |
 | security | security-engineering | Declare untrusted inputs and validation; follow the trust-boundary contract. |
 | platform portability | platform-architect | No platform code above the PAL; declare capability-tier behavior. |
 | maintainability | architecture-governance | Contracts documented, ADRs recorded, fitness functions pass. |
-| tooling | editor-architect | Declare authoring path, inspectors and editor integration for every user-facing feature. |
+| tooling | editor-architect | Declare authoring path, inspectors and editor integration; tool logic is domain-owned, the editor provides the host. |
 | failure recovery | core-runtime-architect | Follow the error model; declare degradation and recovery behavior. |
 | hot reload | hot-reload-iteration | Declare what reloads live and how state is preserved. |
 | data migration | serialization-schema | Version every persisted format and ship upgraders. |
@@ -27,6 +27,13 @@ Cross-cutting disciplines own an **obligation** that every other skill must meet
 | developer usability | developer-experience-docs | Ship docs, a sample, and actionable error messages. |
 | accessibility | accessibility | Map player-facing features to accessibility requirements. |
 | evidence | research-evidence | Every major decision cites graded evidence and a maturity class. |
+| thread placement | job-system-task-graph | Declare frame-phase placement, dedicated threads (via the thread inventory) and OS-thread affinity needs. |
+| network authority & replication | network-architect | Declare replicated state, authority, prediction/rollback participation, cosmetic-vs-simulated split and server-target behavior. |
+| testability seams | test-architect | Declare the test seam each external dependency uses (null device, fake backend, injectable clock, service emulator). |
+| untrusted input | security-engineering | Register every untrusted input (untrusted_inputs) with a validating owner and a fuzz target. |
+| agent operability | editor-architect | Expose debug state and controls through the agent/automation API with structured results. |
+| external requirements | certification-compliance | Satisfy the entries of the C-CERT register mapped to your capabilities. |
+| authoring path | editor-architect | Every user-facing runtime feature has tool logic in a <DOMAIN>.TOOL capability owned by the domain skill, hosted via C-EDCMD/C-EDHOST. |
 
 ## Cross-cutting and orchestration skills
 
@@ -44,6 +51,7 @@ Cross-cutting disciplines own an **obligation** that every other skill must meet
 - **accessibility** (cross-cutting) — Maps XAG/GAG and legal requirements to engine features and owns subtitles and captions, screen-reader/TTS/STT hooks, colorblind and contrast modes, text scaling, motion and photosensitivity options, assist hooks, and their validation.
 - **api-lifecycle-migration** (cross-cutting) — Public API surface, semantic versioning and deprecation, ABI policy, engine-upgrade tooling (codemods, data upgraders) and LTS policy, so projects can move across engine versions.
 - **developer-experience-docs** (cross-cutting) — Documentation and developer experience: API reference, architecture docs, the sample-project ladder (2D → open-world online) that doubles as integration tests, templates, onboarding, doc testing, error-message standards, DX metrics.
+- **engine-product-management** (orchestrator) — The engine as a product for game teams: roadmap and prioritization across game-team requirements, bug and feature intake with triage SLAs, release notes and upgrade guides, the customer-project corpus that validates each engine release, and the engine licensing model.
 
 ## Universal contracts
 
@@ -51,7 +59,7 @@ Cross-cutting disciplines own an **obligation** that every other skill must meet
 - `C-MEM` Allocation & memory accounting — consumed by every runtime skill; owner memory-allocators.
 - `C-INSTR` Instrumentation — consumed by every runtime skill; owner observability-telemetry.
 - `C-CRASH` Crash & diagnostic hooks — consumed by every runtime skill; owner crash-diagnostics.
-- `C-BUDGET` Budgets & scalability profiles — consumed by every runtime skill; owner performance-architect.
+- `C-BUDGET` Budgets & performance gates — consumed by every skill; owner performance-architect.
 - `C-ARCH` Architecture, layering & profiles — consumed by every skill; owner engine-architect.
 - `C-ADR` ADR & fitness functions — consumed by every skill; owner architecture-governance.
 - `C-EVID` Evidence grading — consumed by every skill; owner research-evidence.
@@ -59,3 +67,7 @@ Cross-cutting disciplines own an **obligation** that every other skill must meet
 - `C-TEST` Test & validation definition of done — consumed by every skill; owner test-architect.
 - `C-API` API stability & deprecation — consumed by every skill; owner api-lifecycle-migration.
 - `C-TRUST` Trust boundaries — consumed by every skill; owner security-engineering.
+- `C-SCALE` Scalability & governor — consumed by every runtime skill; owner runtime-scalability.
+- `C-CERT` External requirements register — consumed by every skill; owner certification-compliance.
+- `C-PERF` Performance findings protocol — consumed by every skill; owner performance-architect.
+- `C-BENCH` Benchmark registration — consumed by every skill; owner perf-benchmarking.

@@ -2,1852 +2,2191 @@
 
 # 03 · Skill Hierarchy
 
-**124 skills**: 3 orchestrator, 11 cross-cutting, 96 expert, 14 lead.
+**143 skills**: 4 orchestrator, 11 cross-cutting, 113 expert, 15 lead.
 
 ## Tree
 
 ```
-[O] engine-architect  (10)
-    [O] architecture-governance  (5)
-    [O] program-orchestration  (5)
-    [X] research-evidence  (4)
-    [X] performance-architect  (4)
-            perf-benchmarking  (5)
-            cpu-performance  (5)
-            gpu-performance  (4)
-            loading-streaming-performance  (4)
-    [X] test-architect  (7)
-            render-validation  (4)
-            functional-automation-soak  (6)
-            robustness-fuzzing  (4)
-            certification-compliance  (7)
-    [X] security-engineering  (8)
-            anti-cheat-integrity  (3)
-    [X] observability-telemetry  (8)
-    [X] crash-diagnostics  (7)
-    [X] determinism-replay  (6)
+[O] engine-architect  (13) ·process
+    [O] architecture-governance  (5) ·process
+    [O] program-orchestration  (16) ·process
+            reference-games  (3) ·process
+    [X] research-evidence  (4) ·process
+    [X] performance-architect  (8) ·process
+            perf-benchmarking  (8) ·process
+            cpu-performance  (5) ·process
+            gpu-performance  (5) ·process
+            loading-streaming-performance  (6) ·process
+            memory-performance  (4) ·process
+    [X] test-architect  (15) ·process
+            render-validation  (4) ·process
+            functional-automation-soak  (10) ·process
+            robustness-fuzzing  (4) ·process
+            certification-compliance  (13) ·process
+            simulation-validation  (5) ·process
+    [X] security-engineering  (19) ·process
+            anti-cheat-integrity  (4)
+    [X] observability-telemetry  (11)
+    [X] crash-diagnostics  (9)
+    [X] determinism-replay  (10)
     [X] hot-reload-iteration  (4)
-    [X] accessibility  (8)
-    [X] api-lifecycle-migration  (5)
-            plugin-system  (2)
+    [X] accessibility  (7)
+    [X] api-lifecycle-migration  (5) ·process
+            plugin-system  (3)
             modding-ugc  (4)
-    [X] developer-experience-docs  (7)
-        ml-inference-runtime  (5)
-    [L] core-runtime-architect  (8)
+    [X] developer-experience-docs  (7) ·process
+    [L] core-runtime-architect  (13)
             math-simd-numerics  (10)
             memory-allocators  (9)
-            containers-core-types  (6)
+            containers-core-types  (8)
             concurrency-primitives  (5)
-            job-system-task-graph  (9)
-            frame-orchestration  (7)
+            job-system-task-graph  (14)
+            frame-orchestration  (15)
             entity-object-model  (4)
-            ecs-runtime  (9)
-            reflection-metadata  (6)
+            ecs-runtime  (12)
+            reflection-metadata  (7)
             serialization-schema  (7)
-    [L] platform-architect  (7)
+            runtime-scalability  (4)
+    [L] platform-architect  (25)
             platform-desktop  (4)
-            platform-console  (4)
-            platform-mobile-portable  (4)
-            platform-online-services  (8)
-            input-system  (8)
-            input-devices-haptics  (8)
-            xr-runtime  (6)
-    [L] content-pipeline-architect  (12)
-            asset-import-interchange  (9)
-            asset-cook-processors  (2)
-    [L] resource-streaming-architect  (7)
-            async-io-storage  (6)
+            platform-console  (7)
+            platform-mobile  (7)
+            platform-services  (14)
+            input-system  (10)
+            input-devices-haptics  (13)
+            xr-runtime  (13)
+            platform-web  (5)
+            online-services-liveops  (11)
+    [L] content-pipeline-architect  (19)
+            asset-import-interchange  (15) ·tool
+            asset-cook-processors  (5) ·tool
+    [L] resource-streaming-architect  (10)
+            async-io-storage  (9)
             package-formats-vfs  (5)
-    [L] world-architect  (8)
-            world-data-model  (5)
-            spatial-transforms  (5)
-            terrain  (5)
-            vegetation-foliage  (3)
-            water-ocean  (4)
-            atmosphere-weather  (5)
-            procedural-generation  (5)
-    [L] render-architect  (8)
-            rhi-core  (10)
-            gpu-memory-resources  (6)
-            render-graph-scheduling  (9)
-            shader-system  (9)
-            material-system  (6)
-            gpu-driven-pipeline  (7)
-            virtualized-geometry-lod  (8)
+    [L] world-architect  (13)
+            world-data-model  (6)
+            spatial-transforms  (7)
+            terrain  (6)
+            vegetation-foliage  (4)
+            water-ocean  (6)
+            atmosphere-weather  (7)
+            procedural-generation  (6)
+            voxel-worlds  (4)
+    [L] render-architect  (9)
+            material-system  (9)
+            geometry-pipeline  (11)
+            virtualized-geometry-lod  (9)
             texture-streaming-vt  (6)
-            direct-lighting-shadows  (9)
-            global-illumination  (9)
-            ray-tracing-infrastructure  (8)
+            direct-lighting-shadows  (10)
+            global-illumination  (12)
             path-tracing  (3)
-            reconstruction-upscaling  (7)
-            post-color-hdr  (6)
+            reconstruction-upscaling  (11)
+            post-color-hdr  (9)
             translucency-decals  (4)
-            character-rendering  (4)
-            render-2d-vector  (6)
-            vfx-particles  (5)
-    [L] physics-architect  (7)
-            collision-detection  (8)
-            rigid-body-dynamics  (6)
-            character-vehicle-physics  (4)
+            character-rendering  (5)
+            render-2d-vector  (8)
+            vfx-particles  (7)
+            media-playback  (5)
+    [L] physics-architect  (14)
+            collision-detection  (10)
+            rigid-body-dynamics  (9)
+            character-physics  (3)
             cloth-deformables  (5)
             destruction-fracture  (4)
             fluid-simulation  (4)
-            physics-2d  (3)
-    [L] animation-architect  (5)
-            animation-runtime  (6)
-            deformation-skinning  (5)
-            animation-graphs  (4)
-            motion-synthesis  (4)
-            ik-procedural-animation  (4)
-            facial-animation  (3)
-            cinematics-sequencer  (4)
-    [L] audio-architect  (5)
-            audio-dsp-mixing  (7)
-            spatial-audio-acoustics  (7)
-            audio-content-runtime  (5)
-    [L] network-architect  (6)
-            network-transport  (9)
-            replication  (8)
-            prediction-rollback  (6)
-            dedicated-server  (5)
-    [L] gameplay-architect  (4)
-            gameplay-systems-toolkit  (6)
-            scripting-runtime  (8)
-            navigation-pathfinding  (5)
+            physics-2d  (4)
+            vehicle-physics  (5)
+            physics-tools  (6) ·tool
+    [L] animation-architect  (7)
+            animation-runtime  (11)
+            deformation-skinning  (7)
+            animation-graphs  (5)
+            motion-synthesis  (5)
+            ik-procedural-animation  (6)
+            facial-animation  (4)
+            cinematics-sequencer  (6)
+    [L] audio-architect  (9)
+            audio-dsp-mixing  (8)
+            spatial-audio-acoustics  (6)
+            audio-content-runtime  (8)
+    [L] network-architect  (10)
+            network-transport  (14)
+            replication  (13)
+            prediction-rollback  (8)
+            dedicated-server  (10)
+    [L] gameplay-architect  (10)
+            gameplay-systems-toolkit  (12)
+            scripting-runtime  (10)
+            navigation-pathfinding  (8)
             crowd-simulation  (3)
-            ai-behavior-perception  (7)
-            persistence-save  (7)
-    [L] ui-architect  (8)
-            text-fonts  (6)
-            localization-i18n  (7)
-    [L] editor-architect  (9)
-            editor-ui-framework  (5)
-            world-editor-viewport  (6)
-            graph-editor-framework  (4)
-            collaboration-version-control  (6)
-            visual-debugging-tools  (5)
-            ai-assisted-authoring  (3)
-    [L] build-release-architect  (3)
-            build-system-toolchains  (8)
-            ci-cd-automation  (6)
-            packaging-release-patching  (8)
+            ai-behavior-perception  (10)
+            persistence-save  (9)
+            character-movement  (5)
+            gameplay-data  (7)
+            narrative-dialogue  (7)
+    [L] ui-architect  (17)
+            text-fonts  (7)
+            localization-i18n  (9)
+    [L] editor-architect  (13) ·tool
+            editor-ui-framework  (9) ·tool
+            world-editor-viewport  (10) ·tool
+            graph-editor-framework  (4) ·tool
+            collaboration-version-control  (7) ·tool
+            visual-debugging-tools  (6)
+            ai-assisted-authoring  (3) ·tool
+    [L] build-release-architect  (5) ·process
+            build-system-toolchains  (9) ·tool
+            ci-cd-automation  (10) ·tool
+            packaging-release-patching  (12) ·tool
+    [L] gpu-platform-architect  (3)
+            ml-inference-runtime  (6)
+            rhi-core  (15)
+            gpu-memory-resources  (6)
+            render-graph-scheduling  (10)
+            shader-system  (17)
+            ray-tracing-infrastructure  (9)
+            rhi-d3d12  (3)
+            rhi-vulkan  (3)
+            rhi-metal  (3)
+            rhi-webgpu  (3)
+    [O] engine-product-management  (5) ·process
 ```
 
-`[O]` orchestrator · `[X]` cross-cutting discipline · `[L]` domain lead · (n) = capabilities owned.
+`[O]` orchestrator · `[X]` cross-cutting discipline · `[L]` domain lead · (n) = capabilities owned · ·tool = ships only in the tools target · ·process = organizational, never in a build.
 
-## Configuration profiles (scale-down proof)
+## Workstreams
 
-A configuration is a base profile plus add-ons. `check.py` proves every configuration is closed under its required dependencies, so a small configuration never drags in a large subsystem.
+Integration groups used for delegated arbitration and staffing (`ARCH.ORG.escalation`, `ARCH.ORG.staffing`).
 
-| Skill | indie-2d | indie-2d-online-moddable | mobile-3d | standard-3d | open-world | online-3d | aaa-open-world-online | dedicated-server | xr-3d |
-|---|---|---|---|---|---|---|---|---|---|
-| engine-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| architecture-governance | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| program-orchestration | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| research-evidence | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| performance-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| perf-benchmarking | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| cpu-performance | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| gpu-performance | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| loading-streaming-performance | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| test-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| render-validation | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| functional-automation-soak | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| robustness-fuzzing | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| certification-compliance | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| security-engineering | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| anti-cheat-integrity |  | ● |  |  |  | ● | ● | ● |  |
-| observability-telemetry | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| crash-diagnostics | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| determinism-replay | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| hot-reload-iteration | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| accessibility | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| api-lifecycle-migration | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| plugin-system | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| modding-ugc |  | ● |  |  |  |  | ● |  |  |
-| developer-experience-docs | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| ml-inference-runtime |  |  |  |  |  |  | ● |  |  |
-| core-runtime-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| math-simd-numerics | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| memory-allocators | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| containers-core-types | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| concurrency-primitives | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| job-system-task-graph | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| frame-orchestration | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| entity-object-model | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| ecs-runtime | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| reflection-metadata | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| serialization-schema | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| platform-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| platform-desktop | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| platform-console |  |  |  | ● | ● | ● | ● |  | ● |
-| platform-mobile-portable | ● | ● | ● |  |  |  |  |  |  |
-| platform-online-services | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| input-system | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| input-devices-haptics | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| xr-runtime |  |  |  |  |  |  |  |  | ● |
-| content-pipeline-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| asset-import-interchange | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| asset-cook-processors | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| resource-streaming-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| async-io-storage | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| package-formats-vfs | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| world-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| world-data-model | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| spatial-transforms | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| terrain |  |  |  |  | ● |  | ● |  |  |
-| vegetation-foliage |  |  |  |  | ● |  | ● |  |  |
-| water-ocean |  |  |  |  | ● |  | ● |  |  |
-| atmosphere-weather |  |  | ● | ● | ● | ● | ● |  | ● |
-| procedural-generation |  |  |  |  | ● |  | ● |  |  |
-| render-architect | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| rhi-core | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| gpu-memory-resources | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| render-graph-scheduling | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| shader-system | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| material-system | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| gpu-driven-pipeline |  |  | ● | ● | ● | ● | ● |  | ● |
-| virtualized-geometry-lod |  |  | ● | ● | ● | ● | ● |  | ● |
-| texture-streaming-vt |  |  | ● | ● | ● | ● | ● |  | ● |
-| direct-lighting-shadows |  |  | ● | ● | ● | ● | ● |  | ● |
-| global-illumination |  |  | ● | ● | ● | ● | ● |  | ● |
-| ray-tracing-infrastructure |  |  |  |  |  |  | ● |  |  |
-| path-tracing |  |  |  |  |  |  | ● |  |  |
-| reconstruction-upscaling |  |  | ● | ● | ● | ● | ● |  | ● |
-| post-color-hdr | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| translucency-decals |  |  | ● | ● | ● | ● | ● |  | ● |
-| character-rendering |  |  |  |  |  |  | ● |  |  |
-| render-2d-vector | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| vfx-particles | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| physics-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| collision-detection |  |  | ● | ● | ● | ● | ● | ● | ● |
-| rigid-body-dynamics |  |  | ● | ● | ● | ● | ● | ● | ● |
-| character-vehicle-physics |  |  | ● | ● | ● | ● | ● | ● | ● |
-| cloth-deformables |  |  |  | ● | ● | ● | ● |  | ● |
-| destruction-fracture |  |  |  |  |  |  | ● |  |  |
-| fluid-simulation |  |  |  |  |  |  | ● |  |  |
-| physics-2d | ● | ● |  |  |  |  |  |  |  |
-| animation-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| animation-runtime | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| deformation-skinning |  |  | ● | ● | ● | ● | ● |  | ● |
-| animation-graphs | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| motion-synthesis |  |  |  |  |  |  | ● |  |  |
-| ik-procedural-animation |  |  |  | ● | ● | ● | ● |  | ● |
-| facial-animation |  |  |  |  |  |  | ● |  |  |
-| cinematics-sequencer | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| audio-architect | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| audio-dsp-mixing | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| spatial-audio-acoustics |  |  | ● | ● | ● | ● | ● |  | ● |
-| audio-content-runtime | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| network-architect |  | ● |  |  |  | ● | ● | ● |  |
-| network-transport |  | ● |  |  |  | ● | ● | ● |  |
-| replication |  | ● |  |  |  | ● | ● | ● |  |
-| prediction-rollback |  | ● |  |  |  | ● | ● | ● |  |
-| dedicated-server |  | ● |  |  |  | ● | ● | ● |  |
-| gameplay-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| gameplay-systems-toolkit | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| scripting-runtime | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| navigation-pathfinding | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| crowd-simulation |  |  |  |  | ● |  | ● |  |  |
-| ai-behavior-perception | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| persistence-save | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| ui-architect | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| text-fonts | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| localization-i18n | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| editor-architect | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| editor-ui-framework | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| world-editor-viewport | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| graph-editor-framework | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| collaboration-version-control | ● | ● | ● | ● | ● | ● | ● |  | ● |
-| visual-debugging-tools | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| ai-assisted-authoring |  |  |  |  |  |  | ● |  |  |
-| build-release-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| build-system-toolchains | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| ci-cd-automation | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| packaging-release-patching | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| **total** | 86 | 93 | 98 | 100 | 105 | 106 | 121 | 67 | 101 |
+- **governance** (8): engine-architect, architecture-governance, program-orchestration, research-evidence, api-lifecycle-migration, developer-experience-docs, reference-games, engine-product-management
+- **performance** (6): performance-architect, perf-benchmarking, cpu-performance, gpu-performance, loading-streaming-performance, memory-performance
+- **quality** (7): test-architect, render-validation, functional-automation-soak, robustness-fuzzing, certification-compliance, security-engineering, simulation-validation
+- **online** (6): anti-cheat-integrity, network-architect, network-transport, replication, prediction-rollback, dedicated-server
+- **foundation** (17): observability-telemetry, crash-diagnostics, determinism-replay, hot-reload-iteration, plugin-system, core-runtime-architect, math-simd-numerics, memory-allocators, containers-core-types, concurrency-primitives, job-system-task-graph, frame-orchestration, entity-object-model, ecs-runtime, reflection-metadata, serialization-schema, runtime-scalability
+- **ui** (4): accessibility, ui-architect, text-fonts, localization-i18n
+- **gameplay** (11): modding-ugc, gameplay-architect, gameplay-systems-toolkit, scripting-runtime, navigation-pathfinding, crowd-simulation, ai-behavior-perception, persistence-save, character-movement, gameplay-data, narrative-dialogue
+- **rendering** (26): ml-inference-runtime, render-architect, rhi-core, gpu-memory-resources, render-graph-scheduling, shader-system, material-system, geometry-pipeline, virtualized-geometry-lod, texture-streaming-vt, direct-lighting-shadows, global-illumination, ray-tracing-infrastructure, path-tracing, reconstruction-upscaling, post-color-hdr, translucency-decals, character-rendering, render-2d-vector, vfx-particles, gpu-platform-architect, rhi-d3d12, rhi-vulkan, rhi-metal, rhi-webgpu, media-playback
+- **platform** (10): platform-architect, platform-desktop, platform-console, platform-mobile, platform-services, input-system, input-devices-haptics, xr-runtime, platform-web, online-services-liveops
+- **content** (6): content-pipeline-architect, asset-import-interchange, asset-cook-processors, resource-streaming-architect, async-io-storage, package-formats-vfs
+- **world** (9): world-architect, world-data-model, spatial-transforms, terrain, vegetation-foliage, water-ocean, atmosphere-weather, procedural-generation, voxel-worlds
+- **simulation** (18): physics-architect, collision-detection, rigid-body-dynamics, character-physics, cloth-deformables, destruction-fracture, fluid-simulation, physics-2d, animation-architect, animation-runtime, deformation-skinning, animation-graphs, motion-synthesis, ik-procedural-animation, facial-animation, cinematics-sequencer, vehicle-physics, physics-tools
+- **audio** (4): audio-architect, audio-dsp-mixing, spatial-audio-acoustics, audio-content-runtime
+- **tools** (7): editor-architect, editor-ui-framework, world-editor-viewport, graph-editor-framework, collaboration-version-control, visual-debugging-tools, ai-assisted-authoring
+- **release** (4): build-release-architect, build-system-toolchains, ci-cd-automation, packaging-release-patching
+
+## Configurations (scale-down proof)
+
+A configuration is a point on three independent axes: scale/feature **profiles** (a base plus add-ons), a build **target** (client, headless-client, server, tools) and target **platforms**. `check.py` proves every configuration closed under its required dependencies (process skills excluded: they are organizational), and that contracts needing an implementer (the RHI) have one on every platform.
+
+| Configuration | Profiles | Target | Platforms | Build skills | Capabilities |
+|---|---|---|---|---|---|
+| minimal-client | minimal | client | pc, console, mobile, web | 66 | 563 |
+| indie-2d-client | min2d | client | pc, console, mobile, web | 75 | 635 |
+| indie-2d-tools | min2d | tools | pc | 83 | 712 |
+| indie-2d-online-moddable-client | min2d, online, ugc | client | pc, console, mobile | 78 | 679 |
+| indie-2d-online-moddable-server | min2d, online, ugc | server | server-host | 53 | 481 |
+| rts-2d-massim-client | min2d, massim, online | client | pc | 76 | 664 |
+| lite-3d-mobile-client | lite3d | client | mobile | 89 | 726 |
+| lite-3d-mobile-online-client | lite3d, online | client | mobile | 93 | 774 |
+| standard-3d-client | std3d | client | pc, console | 93 | 756 |
+| standard-3d-tools | std3d | tools | pc | 104 | 848 |
+| open-world-client | std3d, openworld | client | pc, console | 95 | 765 |
+| online-3d-client | std3d, online | client | pc, console | 97 | 804 |
+| online-3d-server | std3d, online | server | server-host | 62 | 538 |
+| online-3d-bot-client | std3d, online | headless-client | server-host | 61 | 528 |
+| racing-3d-client | std3d, vehicles | client | pc, console | 94 | 761 |
+| rts-3d-massim-client | std3d, massim, online | client | pc | 97 | 800 |
+| sandbox-online-server | std3d, sandbox, online | server | server-host | 63 | 542 |
+| xr-standalone-client | lite3d, xr | client | xr-standalone | 89 | 736 |
+| xr-pc-client | std3d, xr | client | pc | 93 | 762 |
+| aaa-open-world-online-client | std3d, openworld, online, aaa, ugc, vehicles, team-large | client | pc, console | 102 | 836 |
+| aaa-open-world-online-server | std3d, openworld, online, aaa, ugc, vehicles, team-large | server | server-host | 67 | 562 |
+| aaa-open-world-online-tools | std3d, openworld, online, aaa, ugc, vehicles, team-large | tools | pc | 114 | 942 |
+
+### Membership matrix
+
+| Skill | minimal-client | indie-2d-client | indie-2d-tools | indie-2d-online-moddable-client | indie-2d-online-moddable-server | rts-2d-massim-client | lite-3d-mobile-client | lite-3d-mobile-online-client | standard-3d-client | standard-3d-tools | open-world-client | online-3d-client | online-3d-server | online-3d-bot-client | racing-3d-client | rts-3d-massim-client | sandbox-online-server | xr-standalone-client | xr-pc-client | aaa-open-world-online-client | aaa-open-world-online-server | aaa-open-world-online-tools |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| anti-cheat-integrity | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| observability-telemetry | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| crash-diagnostics | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| determinism-replay | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| hot-reload-iteration | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| accessibility | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| plugin-system | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| modding-ugc |  |  |  | ● | ● |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● | ● | ● |
+| ml-inference-runtime |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| core-runtime-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| math-simd-numerics | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| memory-allocators | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| containers-core-types | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| concurrency-primitives | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| job-system-task-graph | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| frame-orchestration | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| entity-object-model | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| ecs-runtime |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| reflection-metadata | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| serialization-schema | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| platform-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| platform-desktop | ● | ● | ● | ● |  | ● |  |  | ● | ● | ● | ● |  |  | ● | ● |  |  | ● | ● |  | ● |
+| platform-console | ● | ● |  | ● |  |  |  |  | ● |  | ● | ● |  |  | ● |  |  |  |  | ● |  |  |
+| platform-mobile | ● | ● |  | ● |  |  | ● | ● |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |
+| platform-services | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| input-system | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| input-devices-haptics | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| xr-runtime |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● | ● |  |  |  |
+| content-pipeline-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| asset-import-interchange |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |
+| asset-cook-processors |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |
+| resource-streaming-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| async-io-storage | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| package-formats-vfs | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| world-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| world-data-model | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| spatial-transforms | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| terrain |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| vegetation-foliage |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| water-ocean |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| atmosphere-weather |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| procedural-generation |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  | ● | ● | ● |
+| render-architect | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| rhi-core | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| gpu-memory-resources | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| render-graph-scheduling | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| shader-system | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| material-system | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| geometry-pipeline |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| virtualized-geometry-lod |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| texture-streaming-vt | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| direct-lighting-shadows |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| global-illumination |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| ray-tracing-infrastructure |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| path-tracing |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| reconstruction-upscaling | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| post-color-hdr | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| translucency-decals |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| character-rendering |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| render-2d-vector | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| vfx-particles | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| physics-architect |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| collision-detection |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| rigid-body-dynamics |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| character-physics |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| cloth-deformables |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| destruction-fracture |  |  |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● |
+| fluid-simulation |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● | ● | ● |
+| physics-2d |  | ● | ● | ● | ● | ● |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| animation-architect |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| animation-runtime |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| deformation-skinning |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| animation-graphs |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| motion-synthesis |  |  |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● |
+| ik-procedural-animation |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| facial-animation |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| cinematics-sequencer | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| audio-architect | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| audio-dsp-mixing | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| spatial-audio-acoustics |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| audio-content-runtime | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| network-architect |  |  |  | ● | ● | ● |  | ● |  |  |  | ● | ● | ● |  | ● | ● |  |  | ● | ● | ● |
+| network-transport |  |  |  | ● | ● | ● |  | ● |  |  |  | ● | ● | ● |  | ● | ● |  |  | ● | ● | ● |
+| replication |  |  |  | ● | ● | ● |  | ● |  |  |  | ● | ● | ● |  | ● | ● |  |  | ● | ● | ● |
+| prediction-rollback |  |  |  | ● | ● | ● |  | ● |  |  |  | ● | ● | ● |  | ● | ● |  |  | ● | ● | ● |
+| dedicated-server |  |  |  |  | ● |  |  |  |  |  |  |  | ● |  |  |  | ● |  |  |  | ● | ● |
+| gameplay-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| gameplay-systems-toolkit | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| scripting-runtime | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| navigation-pathfinding |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| crowd-simulation |  |  |  |  |  | ● |  |  |  |  | ● |  |  |  |  | ● |  |  |  | ● | ● | ● |
+| ai-behavior-perception | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| persistence-save | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| ui-architect | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| text-fonts | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| localization-i18n | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| editor-architect |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |
+| editor-ui-framework |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |
+| world-editor-viewport |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |
+| graph-editor-framework |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |
+| collaboration-version-control |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |
+| visual-debugging-tools | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| ai-assisted-authoring |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |
+| build-system-toolchains |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |
+| ci-cd-automation |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |
+| packaging-release-patching |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |
+| runtime-scalability | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| voxel-worlds |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |
+| gpu-platform-architect | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| rhi-d3d12 | ● | ● | ● | ● |  | ● |  |  | ● | ● | ● | ● |  |  | ● | ● |  |  | ● | ● |  | ● |
+| rhi-vulkan | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| rhi-metal | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  |  | ● | ● |  | ● |
+| rhi-webgpu | ● | ● |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| media-playback | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |
+| vehicle-physics |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  | ● | ● | ● |
+| physics-tools |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |
+| character-movement |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| gameplay-data | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| narrative-dialogue | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| platform-web | ● | ● |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| online-services-liveops | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| **total** | 66 | 75 | 83 | 78 | 53 | 76 | 89 | 93 | 93 | 104 | 95 | 97 | 62 | 61 | 94 | 97 | 63 | 89 | 93 | 102 | 67 | 114 |
 
 ## Skill cards
 
 ### engine-architect
 
-**Game Engine Chief Architect** · orchestrator · parent: — · profiles: all
+**Game Engine Chief Architect** · orchestrator · process · workstream: governance · parent: — · profiles: all
 
 Owns the engine's overall architecture: requirements and configuration profiles, layering and module boundaries, the contract registry, global conventions, build/integrate/buy decisions and cross-domain arbitration. Final authority on the boundaries between skills.
 
-- **Owns:** `ARCH.REQ.game-requirements`; `ARCH.REQ.profiles`; `ARCH.REQ.hardware-tiers`; `ARCH.REQ.non-goals`; `ARCH.STRUCT.layering`; `ARCH.STRUCT.contracts`; `ARCH.STRUCT.build-buy`; `ARCH.STRUCT.replaceability`; `ARCH.STRUCT.conventions`; `ARCH.STRUCT.arbitration`
-- **Contributes to:** `XC.DX.arch-docs`
+- **Owns:** `ARCH.REQ.game-requirements`; `ARCH.REQ.profiles`; `ARCH.REQ.hardware-tiers`; `ARCH.REQ.non-goals`; `ARCH.REQ.platform-matrix`; `ARCH.STRUCT.layering`; `ARCH.STRUCT.contracts`; `ARCH.STRUCT.build-buy`; `ARCH.STRUCT.replaceability`; `ARCH.STRUCT.conventions`; `ARCH.STRUCT.arbitration`; `ARCH.STRUCT.registration`; `ARCH.STRUCT.binding`
+- **Contributes to:** `ARCH.ORG.bootstrap`; `ARCH.ORG.escalation`; `ARCH.ORG.human-gates`; `RND.MEDIA.middleware`; `XC.DX.arch-docs`
 - **Not responsible for:** Running the ADR, fitness-function and anti-legacy process → architecture-governance; Scheduling work across agents and the ownership ledger → program-orchestration; Architecture inside a domain (e.g. shading-path choice) → render-architect
 - **Provides:** C-ARCH · **Consumes:** —
 - **Expertise:** engine architecture, requirements engineering, trade-off analysis, architecture views
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### architecture-governance
 
-**Architecture Governance** · orchestrator · parent: engine-architect · profiles: all
+**Architecture Governance** · orchestrator · process · workstream: governance · parent: engine-architect · profiles: all
 
 Runs architecture as an evidence-backed, governed process: ADR lifecycle with revisit conditions, technology radar with maturity tiers and promotion criteria, automated fitness functions (layering, dependency direction, contract conformance), anti-legacy review, coding standard.
 
-- **Owns:** `ARCH.GOV.adr`; `ARCH.GOV.fitness`; `ARCH.GOV.anti-legacy`; `ARCH.GOV.radar`; `ARCH.GOV.coding-standard`
-- **Contributes to:** `ARCH.STRUCT.build-buy`; `ARCH.ORG.change-requests`
+- **Owns:** `ARCH.GOV.adr`; `ARCH.GOV.fitness`; `ARCH.GOV.anti-legacy`; `ARCH.GOV.radar`; `ARCH.GOV.process-tiers`
+- **Contributes to:** `ARCH.STRUCT.build-buy`; `ARCH.STRUCT.platform-backends`; `ARCH.STRUCT.binding`; `ARCH.ORG.change-requests`; `CORE.LIFE.language`
 - **Not responsible for:** Making the architecture decisions themselves → engine-architect; Grading sources and running spikes → research-evidence; Test definition of done → test-architect
 - **Provides:** C-ADR · **Consumes:** —
 - **Expertise:** ADRs, fitness functions, static dependency analysis, technology radar
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### program-orchestration
 
-**Engine Program Orchestration** · orchestrator · parent: engine-architect · profiles: all
+**Engine Program Orchestration** · orchestrator · process · workstream: governance · parent: engine-architect · profiles: all
 
 Turns architecture into coordinated multi-agent work: decomposes milestones into tasks by skill territory, keeps the ownership ledger and territory locks, sequences integration through vertical slices, routes contract change requests, and schedules critic gates.
 
-- **Owns:** `ARCH.ORG.decomposition`; `ARCH.ORG.ownership-ledger`; `ARCH.ORG.integration`; `ARCH.ORG.change-requests`; `ARCH.ORG.critic-gates`
+- **Owns:** `ARCH.ORG.decomposition`; `ARCH.ORG.ownership-ledger`; `ARCH.ORG.integration`; `ARCH.ORG.change-requests`; `ARCH.ORG.critic-gates`; `ARCH.ORG.bootstrap`; `ARCH.ORG.milestones`; `ARCH.ORG.write-sets`; `ARCH.ORG.staffing`; `ARCH.ORG.escalation`; `ARCH.ORG.human-gates`; `ARCH.ORG.risk`; `ARCH.ORG.triage`; `ARCH.ORG.critic-calibration`; `ARCH.ORG.adjudication`; `ARCH.ORG.provenance`
+- **Contributes to:** `PLAT.PAL.confidential-extensions`; `QA.STRAT.contract-fakes`; `QA.AGENT.oracle-independence`; `XC.SEC.agent-boundary`
 - **Not responsible for:** Deciding architecture → engine-architect; CI mechanics → ci-cd-automation; Release versioning → build-release-architect
-- **Provides:** C-ORCH · **Consumes:** —
+- **Provides:** C-ORCH · **Consumes:** C-PROD
 - **Expertise:** multi-agent coordination, work breakdown, integration planning, critical-path analysis
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### research-evidence
 
-**Research & Evidence** · cross-cutting · parent: engine-architect · profiles: all
+**Research & Evidence** · cross-cutting · process · workstream: governance · parent: engine-architect · profiles: all
 
 Research discipline for every major decision: finds and grades authoritative evidence (production talks, platform docs, peer-reviewed work, reproducible benchmarks), classifies techniques as established / emerging / experimental / speculative, and runs spikes where literature is thin.
 
 - **Owns:** `ARCH.EVID.grading`; `ARCH.EVID.survey`; `ARCH.EVID.spike`; `ARCH.EVID.claims`
-- **Contributes to:** `ARCH.GOV.radar`
+- **Contributes to:** `ARCH.GOV.radar`; `ARCH.ORG.risk`
 - **Not responsible for:** Making the decision (the owning skill does, via an ADR) → architecture-governance; Benchmark infrastructure → perf-benchmarking
 - **Provides:** C-EVID · **Consumes:** —
 - **Expertise:** literature review, SIGGRAPH/GDC/HPG corpus, source provenance, experimental design
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### performance-architect
 
-**Performance Architect** · cross-cutting · parent: engine-architect · profiles: all
+**Performance Architect** · cross-cutting · process · workstream: performance · parent: engine-architect · profiles: all
 
 Owns performance as a discipline: the hypothesis → instrumentation → measurement → optimization → regression-test loop, budgets per subsystem and hardware tier, the scalability / device-profile framework, and performance gates.
 
-- **Owns:** `PRF.METH.loop`; `PRF.METH.budgets`; `PRF.METH.scalability`; `PRF.METH.gates`
-- **Contributes to:** `ARCH.REQ.hardware-tiers`; `PLAT.MOB.thermal`; `CORE.MEM.budget-enforcement`; `CNT.COOK.variants`; `CNT.VAL.budgets`; `RND.ARCH.scalability`; `RND.MEM.budget`; `RND.VFX.budgets`
-- **Not responsible for:** Optimizing a subsystem's code (its owner does, with review) → cpu-performance; Instrumentation API → observability-telemetry; Benchmark harness → perf-benchmarking
-- **Provides:** C-BUDGET · **Consumes:** C-INSTR, C-CFG
+- **Owns:** `PRF.METH.loop`; `PRF.METH.budgets`; `PRF.METH.scalability`; `PRF.METH.gates`; `PRF.METH.model`; `PRF.METH.asymptotics`; `PRF.METH.pipeline-budgets`; `PRF.METH.field`
+- **Contributes to:** `ARCH.REQ.hardware-tiers`; `PLAT.PAL.device-db`; `PLAT.MOB.thermal`; `CORE.MEM.budget-enforcement`; `CORE.FRAME.critical-path`; `CORE.SCALE.profiles`; `CORE.SCALE.governor`; `RES.MGMT.arbitration`; `CNT.COOK.variants`; `CNT.VAL.budgets`; `RND.ARCH.scalability`; `RND.MEM.budget`; `RND.SHADER.permutation-budget`; `RND.VFX.budgets`; `RND.GPU.tiers`
+- **Not responsible for:** Optimizing subsystem code (via C-PERF findings) → owning-skill; Instrumentation API → observability-telemetry; Benchmark harness → perf-benchmarking; Runtime scalability machinery → runtime-scalability
+- **Provides:** C-BUDGET, C-PERF · **Consumes:** —
 - **Expertise:** performance methodology, budgeting, scalability design
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### perf-benchmarking
 
-**Benchmarking & Performance Regression** · expert · parent: performance-architect · profiles: all
+**Benchmarking & Performance Regression** · expert · process · workstream: performance · parent: performance-architect · profiles: all
 
 Benchmark harnesses (micro and representative-workload scenes), automated capture, statistical analysis (variance, significance), regression detection and bisection, dashboards.
 
-- **Owns:** `PRF.BENCH.micro`; `PRF.BENCH.workloads`; `PRF.BENCH.stats`; `PRF.BENCH.regression`; `PRF.BENCH.dashboards`
-- **Contributes to:** `ARCH.EVID.claims`
+- **Owns:** `PRF.BENCH.micro`; `PRF.BENCH.workloads`; `PRF.BENCH.stats`; `PRF.BENCH.regression`; `PRF.BENCH.dashboards`; `PRF.BENCH.scale-content`; `PRF.BENCH.replay`; `PRF.BENCH.tools`
+- **Contributes to:** `ARCH.EVID.claims`; `ARCH.ORG.triage`; `QA.REF.content`; `QA.AGENT.baseline-governance`; `PRF.METH.model`; `PRF.METH.field`
 - **Not responsible for:** Setting budgets → performance-architect; CI infrastructure → ci-cd-automation
-- **Provides:** — · **Consumes:** C-INSTR, C-BUDGET
+- **Provides:** C-BENCH · **Consumes:** C-INSTR, C-BUDGET
 - **Expertise:** benchmark statistics, workload design, change-point detection
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### cpu-performance
 
-**CPU Performance Engineering** · expert · parent: performance-architect · profiles: all
+**CPU Performance Engineering** · expert · process · workstream: performance · parent: performance-architect · profiles: all
 
 CPU microarchitecture-level optimization and review: cache and memory-access patterns, vectorization audits, contention and false sharing, hybrid-core and power-aware tuning, PGO/LTO.
 
 - **Owns:** `PRF.CPU.cache`; `PRF.CPU.simd`; `PRF.CPU.contention`; `PRF.CPU.hybrid`; `PRF.CPU.compiler`
-- **Contributes to:** `CORE.MATH.spmd`
-- **Not responsible for:** Owning subsystem code → engine-architect; Math library → math-simd-numerics; Scheduler design → job-system-task-graph
+- **Contributes to:** `ARCH.STRUCT.binding`; `CORE.MATH.spmd`; `CORE.JOBS.thread-model`; `OBS.LOG.hw-counters`
+- **Not responsible for:** Owning subsystem code → owning-skill; Math library → math-simd-numerics; Scheduler design → job-system-task-graph; Changing subsystem code (findings route via C-PERF) → owning-skill
 - **Provides:** — · **Consumes:** C-INSTR, C-BUDGET, C-TASK
 - **Expertise:** x86-64 and ARM microarchitecture, VTune/uProf/Superluminal, SIMD, compiler optimization
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### gpu-performance
 
-**GPU Performance Engineering** · expert · parent: performance-architect · profiles: client
+**GPU Performance Engineering** · expert · process · workstream: performance · parent: performance-architect · profiles: all
 
 GPU performance analysis and review: occupancy, bandwidth, cache behavior, barrier and async-compute overlap, vendor tools across PC, console and mobile, GPU power.
 
-- **Owns:** `PRF.GPU.analysis`; `PRF.GPU.overlap`; `PRF.GPU.tools`; `PRF.GPU.power`
+- **Owns:** `PRF.GPU.analysis`; `PRF.GPU.overlap`; `PRF.GPU.tools`; `PRF.GPU.power`; `PRF.GPU.baselines`
+- **Contributes to:** `OBS.LOG.hw-counters`
 - **Not responsible for:** Render graph scheduling design → render-graph-scheduling; Shader authoring for features → render-architect
 - **Provides:** — · **Consumes:** C-INSTR, C-BUDGET, C-RG, C-RHI
 - **Expertise:** GPU architecture (RDNA, Ada/Blackwell, Xe, Apple, Mali/Adreno), PIX/RGP/Nsight, shader optimization
-- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### loading-streaming-performance
 
-**Loading & Hitch Performance** · expert · parent: performance-architect · profiles: all
+**Loading & Hitch Performance** · expert · process · workstream: performance · parent: performance-architect · profiles: all
 
 End-to-end load time, startup time and hitch elimination (PSO compilation, streaming stalls, GC pauses, synchronous waits), IO throughput analysis.
 
-- **Owns:** `PRF.LOAD.load-time`; `PRF.LOAD.hitches`; `PRF.LOAD.io`; `PRF.LOAD.startup`
+- **Owns:** `PRF.LOAD.load-time`; `PRF.LOAD.hitches`; `PRF.LOAD.io`; `PRF.LOAD.startup`; `PRF.LOAD.hitch-gate`; `PRF.LOAD.editor`
 - **Not responsible for:** IO backend implementation → async-io-storage; PSO cache implementation → rhi-core; Streaming policy → resource-streaming-architect
 - **Provides:** — · **Consumes:** C-INSTR, C-BUDGET, C-IO, C-RES
 - **Expertise:** IO profiling, frame-time distribution analysis, shader compilation stutter
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### test-architect
 
-**Test Architect** · cross-cutting · parent: engine-architect · profiles: all
+**Test Architect** · cross-cutting · process · workstream: quality · parent: engine-architect · profiles: all
 
 Test strategy and architecture: per-subsystem test pyramid, frameworks, the test definition of done every skill must meet, contract tests, test content, coverage and mutation policy, flakiness policy.
 
-- **Owns:** `QA.STRAT.pyramid`; `QA.STRAT.frameworks`; `QA.STRAT.dod`; `QA.STRAT.coverage`; `QA.STRAT.flaky`; `QA.STRAT.content`; `QA.STRAT.contracts`
-- **Contributes to:** `CNT.COOK.determinism-check`; `UI.A11Y.validation`; `BLD.CI.gating`; `PRF.BENCH.workloads`; `XC.DX.doc-tests`
+- **Owns:** `QA.STRAT.pyramid`; `QA.STRAT.frameworks`; `QA.STRAT.dod`; `QA.STRAT.coverage`; `QA.STRAT.flaky`; `QA.STRAT.content`; `QA.STRAT.contracts`; `QA.STRAT.oracles`; `QA.STRAT.integration`; `QA.STRAT.release-criteria`; `QA.STRAT.contract-fakes`; `QA.AGENT.oracle-independence`; `QA.AGENT.baseline-governance`; `QA.AGENT.test-integrity`; `QA.AGENT.mutation-gate`
+- **Contributes to:** `ARCH.ORG.critic-calibration`; `CNT.COOK.determinism-check`; `PHY.ARCH.validation`; `ANM.ARCH.validation`; `AUD.ARCH.validation`; `UI.A11Y.validation`; `BLD.CI.gating`; `QA.REF.ladder`; `PRF.BENCH.workloads`; `XC.DET.conformance`; `XC.DX.doc-tests`
 - **Not responsible for:** Running pipelines → ci-cd-automation; Performance regression → perf-benchmarking; Rendering image validation → render-validation
 - **Provides:** C-TEST · **Consumes:** —
 - **Expertise:** test strategy, contract testing, mutation testing, test determinism
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### render-validation
 
-**Rendering Validation** · expert · parent: test-architect · profiles: client
+**Rendering Validation** · expert · process · workstream: quality · parent: test-architect · profiles: all
 
 Rendering correctness validation: golden-image tests with perceptual metrics, tolerances per GPU/driver, comparisons against the reference path tracer, graphics API validation in CI.
 
 - **Owns:** `QA.RENDER.golden`; `QA.RENDER.matrix`; `QA.RENDER.reference`; `QA.RENDER.api-validation`
-- **Contributes to:** `RND.MAT.validation`; `QA.CERT.photosensitivity`
+- **Contributes to:** `RND.RHI.software-device`; `RND.RHI.conformance`; `RND.RHI.d3d12-validation`; `RND.RHI.vulkan-validation`; `RND.RHI.metal-validation`; `RND.RHI.webgpu-validation`; `RND.GRAPH.validation`; `RND.MAT.validation`; `QA.CERT.photosensitivity`; `QA.AGENT.baseline-governance`
 - **Not responsible for:** Fixing rendering features → render-architect; Material furnace tests (defines them; this skill runs them) → material-system
 - **Provides:** — · **Consumes:** C-RG, C-RHI, C-RSCENE, C-RT?
 - **Expertise:** image metrics (FLIP, SSIM), GPU nondeterminism, reference rendering
-- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### functional-automation-soak
 
-**Functional Automation & Soak** · expert · parent: test-architect · profiles: all
+**Functional Automation & Soak** · expert · process · workstream: quality · parent: test-architect · profiles: all
 
 Game-level automation: scripted and bot playthroughs, smoke/boot tests, soak and stability runs (memory growth, leaks), hardware/OS compatibility matrix, network harnesses and server load tests.
 
-- **Owns:** `QA.FUNC.automation`; `QA.FUNC.smoke`; `QA.FUNC.soak`; `QA.FUNC.compat`; `QA.FUNC.network`; `QA.FUNC.load`
-- **Contributes to:** `BLD.CI.devices`
+- **Owns:** `QA.FUNC.automation`; `QA.FUNC.smoke`; `QA.FUNC.soak`; `QA.FUNC.compat`; `QA.FUNC.network`; `QA.FUNC.load`; `QA.FUNC.editor`; `QA.FUNC.agent-exploration`; `QA.FUNC.bug-capture`; `QA.FUNC.playtest`
+- **Contributes to:** `ARCH.PROD.customer-corpus`; `INP.DEV.injection`; `NET.ARCH.validation`; `BLD.CI.devices`; `PRF.BENCH.scale-content`; `OBS.CRASH.feedback`
 - **Not responsible for:** Unit test frameworks → test-architect; Device-farm infrastructure → ci-cd-automation
 - **Provides:** — · **Consumes:** C-GAME?, C-INPUT?, C-NET?
 - **Expertise:** game automation, bots, long-run stability analysis
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### robustness-fuzzing
 
-**Robustness & Fuzzing** · expert · parent: test-architect · profiles: all
+**Robustness & Fuzzing** · expert · process · workstream: quality · parent: test-architect · profiles: all
 
 Robustness engineering: fuzzing every untrusted-input parser (assets, packets, saves, scripts, mods), sanitizer build policy, fault injection (IO errors, OOM, device lost), concurrency stress and schedule perturbation.
 
 - **Owns:** `QA.ROBUST.fuzzing`; `QA.ROBUST.sanitizers`; `QA.ROBUST.faults`; `QA.ROBUST.concurrency`
-- **Contributes to:** `CORE.MEM.debugging`; `CORE.CONC.correctness`; `BLD.SYS.static-analysis`
+- **Contributes to:** `PLAT.SVC.emulation`; `CORE.MEM.debugging`; `CORE.CONC.correctness`; `CORE.JOBS.fibers`; `CORE.JOBS.test-modes`; `CORE.JOBS.safety`; `CORE.FRAME.phase-violations`; `BLD.SYS.static-analysis`; `XC.DET.conformance`; `XC.SEC.testing`
 - **Not responsible for:** Threat model → security-engineering; Fixing parsers → serialization-schema
 - **Provides:** — · **Consumes:** C-SER, C-IO
 - **Expertise:** libFuzzer/AFL++, sanitizers, fault injection, TSan
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### certification-compliance
 
-**Certification & Compliance** · expert · parent: test-architect · profiles: all
+**Certification & Compliance** · expert · process · workstream: quality · parent: test-architect · profiles: all
 
 Tracks and pre-validates external requirements: platform certification (TRC/XR/Lotcheck class), age ratings, privacy law, accessibility law (CVAA, EAA), third-party licenses and SBOM, photosensitivity testing.
 
-- **Owns:** `QA.CERT.platform`; `QA.CERT.prechecks`; `QA.CERT.ratings`; `QA.CERT.privacy`; `QA.CERT.a11y-law`; `QA.CERT.licenses`; `QA.CERT.photosensitivity`
-- **Contributes to:** `UI.LOC.culturalization`; `ED.AI.provenance`; `BLD.REL.submission`
+- **Owns:** `QA.CERT.platform`; `QA.CERT.prechecks`; `QA.CERT.ratings`; `QA.CERT.privacy`; `QA.CERT.a11y-law`; `QA.CERT.licenses`; `QA.CERT.photosensitivity`; `QA.CERT.programs`; `QA.CERT.store-policy`; `QA.CERT.monetization-law`; `QA.CERT.regional`; `QA.CERT.export-crypto`; `QA.CERT.genai`
+- **Contributes to:** `ARCH.REQ.platform-matrix`; `ARCH.ORG.human-gates`; `PLAT.SVC.privileges`; `PLAT.SVC.age-region`; `PLAT.SVC.voice-text`; `PLAT.COMM.disclosure`; `CNT.ID.rights`; `GAM.FW.engagement`; `UI.FW.platform-dialogs`; `UI.LOC.culturalization`; `ED.AI.provenance`; `BLD.SYS.platform-sdks`; `BLD.REL.submission`; `XC.SEC.data-rights`
 - **Not responsible for:** Implementing platform features → platform-architect; Implementing accessibility features → accessibility
-- **Provides:** — · **Consumes:** C-A11Y?, C-SVC
+- **Provides:** C-CERT · **Consumes:** C-A11Y?, C-SVC
 - **Expertise:** platform requirements, privacy law, accessibility law, license compliance
-- **Critics (G2):** K-ARCH, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### security-engineering
 
-**Security Engineering** · cross-cutting · parent: engine-architect · profiles: all
+**Security Engineering** · cross-cutting · process · workstream: quality · parent: engine-architect · profiles: all
 
 Threat modeling and trust boundaries for every untrusted input, secure-coding and memory-safety policy, supply-chain security, secrets, anti-tamper boundary, privacy engineering, mod/UGC sandbox policy.
 
-- **Owns:** `XC.SEC.threats`; `XC.SEC.coding`; `XC.SEC.trust`; `XC.SEC.supply-chain`; `XC.SEC.secrets`; `XC.SEC.tamper`; `XC.SEC.privacy`; `XC.SEC.sandbox`
-- **Contributes to:** `CORE.SER.untrusted`; `RES.PKG.crypto`; `NET.TRANS.crypto`; `GAM.SCR.sandbox`; `BLD.SYS.third-party`; `QA.CERT.privacy`; `QA.CERT.licenses`; `OBS.LOG.consent`
+- **Owns:** `XC.SEC.threats`; `XC.SEC.coding`; `XC.SEC.trust`; `XC.SEC.supply-chain`; `XC.SEC.secrets`; `XC.SEC.tamper`; `XC.SEC.privacy`; `XC.SEC.sandbox`; `XC.SEC.memory-safety`; `XC.SEC.hardening`; `XC.SEC.crypto-policy`; `XC.SEC.vuln-response`; `XC.SEC.incident`; `XC.SEC.dev-trust`; `XC.SEC.agent-boundary`; `XC.SEC.key-custody`; `XC.SEC.genai`; `XC.SEC.data-rights`; `XC.SEC.testing`
+- **Contributes to:** `ARCH.ORG.provenance`; `PLAT.PAL.process`; `PLAT.PAL.confidential-extensions`; `PLAT.COMM.receipts`; `CORE.LIFE.language`; `CORE.LIFE.ipc`; `CORE.LIFE.interop`; `CORE.TYPES.crypto`; `CORE.SER.untrusted`; `RES.PKG.crypto`; `NET.TRANS.crypto`; `NET.TRANS.dos`; `GAM.SCR.sandbox`; `GAM.SAVE.integrity`; `BLD.SYS.third-party`; `BLD.CI.backports`; `QA.CERT.privacy`; `QA.CERT.licenses`; `QA.CERT.export-crypto`; `OBS.LOG.consent`; `OBS.LOG.analytics`; `OBS.CRASH.privacy`
 - **Not responsible for:** Cheat detection → anti-cheat-integrity; Fuzzing campaigns → robustness-fuzzing; Transport encryption implementation → network-transport
 - **Provides:** C-TRUST · **Consumes:** —
 - **Expertise:** threat modeling (STRIDE), memory safety, SLSA/SBOM, privacy engineering
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### anti-cheat-integrity
 
-**Anti-Cheat & Game Integrity** · expert · parent: security-engineering · profiles: online
+**Anti-Cheat & Game Integrity** · expert · runtime · workstream: online · parent: security-engineering · profiles: all · targets: client, headless-client, server, tools
 
 Cheat resistance for online games: server-authoritative validation patterns (movement, hits, economy), rate limiting, anomaly signals, integration boundary for client anti-cheat middleware.
 
-- **Owns:** `XC.SEC.server-validation`; `XC.SEC.anticheat`; `XC.SEC.abuse`
+- **Owns:** `XC.SEC.server-validation`; `XC.SEC.anticheat`; `XC.SEC.abuse`; `XC.SEC.score-integrity`
+- **Contributes to:** `PLAT.DESK.os-security`; `PLAT.SVC.leaderboards`; `PLAT.COMM.receipts`; `NET.PRED.input-commands`; `NET.SRV.transactions`; `XC.SEC.tamper`; `XC.SEC.incident`
 - **Not responsible for:** Replication design → replication; Transport encryption → network-transport
-- **Provides:** — · **Consumes:** C-NET, C-INSTR
+- **Provides:** — · **Consumes:** C-NET?, C-PREDICT?, C-PHYS?, C-GAME?, C-SVC?, C-LIVE?
 - **Expertise:** cheat taxonomies, server validation, anomaly detection
-- **Critics (G2):** K-ARCH, K-NET, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-NET, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### observability-telemetry
 
-**Observability & Telemetry** · cross-cutting · parent: engine-architect · profiles: all
+**Observability & Telemetry** · cross-cutting · runtime · workstream: foundation · parent: engine-architect · profiles: all · targets: client, headless-client, server, tools
 
 Instrumentation substrate: structured logging, trace zones (CPU, GPU, IO, memory), counters and metrics, profiler integrations, in-game stats, development and live telemetry with privacy consent; zero cost when compiled out.
 
-- **Owns:** `OBS.LOG.logging`; `OBS.LOG.tracing`; `OBS.LOG.profilers`; `OBS.LOG.metrics`; `OBS.LOG.stats`; `OBS.LOG.telemetry`; `OBS.LOG.consent`; `OBS.LOG.remote`
-- **Contributes to:** `CORE.MEM.tracking`; `RND.RHI.queries`; `NET.SRV.observability`; `ED.DEBUG.menus`; `PRF.BENCH.dashboards`
+- **Owns:** `OBS.LOG.logging`; `OBS.LOG.tracing`; `OBS.LOG.profilers`; `OBS.LOG.metrics`; `OBS.LOG.stats`; `OBS.LOG.telemetry`; `OBS.LOG.consent`; `OBS.LOG.remote`; `OBS.LOG.hw-counters`; `OBS.LOG.trace-analysis`; `OBS.LOG.analytics`
+- **Contributes to:** `PLAT.PAL.device-db`; `PLAT.PAL.devlink`; `PLAT.COMM.ads`; `CORE.MEM.tracking`; `CORE.JOBS.fibers`; `CORE.JOBS.introspection`; `RND.RHI.queries`; `NET.SRV.observability`; `ED.ARCH.agent-api`; `ED.DEBUG.menus`; `QA.FUNC.bug-capture`; `QA.FUNC.playtest`; `PRF.METH.field`; `PRF.BENCH.dashboards`; `PRF.MEM.snapshots`; `OBS.CRASH.privacy`; `XC.SEC.data-rights`
 - **Not responsible for:** Crash capture → crash-diagnostics; Debug drawing and consoles → visual-debugging-tools; Perf budgets → performance-architect
-- **Provides:** C-INSTR · **Consumes:** C-PAL
+- **Provides:** C-INSTR · **Consumes:** C-PAL, C-BASE, C-SYNC
 - **Expertise:** low-overhead tracing, Tracy/Perfetto formats, telemetry pipelines
-- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### crash-diagnostics
 
-**Crash & Hang Diagnostics** · cross-cutting · parent: engine-architect · profiles: all
+**Crash & Hang Diagnostics** · cross-cutting · runtime · workstream: foundation · parent: engine-architect · profiles: all · targets: client, headless-client, server, tools
 
 Crash, hang and GPU-fault capture and reporting: minidumps, symbolication, bucketing and triage, GPU crash dumps, watchdogs, OOM reports, assert reporting.
 
-- **Owns:** `OBS.CRASH.capture`; `OBS.CRASH.pipeline`; `OBS.CRASH.symbolication`; `OBS.CRASH.gpu`; `OBS.CRASH.hangs`; `OBS.CRASH.oom`; `OBS.CRASH.asserts`
-- **Contributes to:** `CORE.LIFE.asserts`; `RND.RHI.crash`; `BLD.CI.symbols`
+- **Owns:** `OBS.CRASH.capture`; `OBS.CRASH.pipeline`; `OBS.CRASH.symbolication`; `OBS.CRASH.gpu`; `OBS.CRASH.hangs`; `OBS.CRASH.oom`; `OBS.CRASH.asserts`; `OBS.CRASH.privacy`; `OBS.CRASH.feedback`
+- **Contributes to:** `PLAT.PAL.signals`; `CORE.LIFE.asserts`; `CORE.LIFE.ipc`; `CORE.JOBS.fibers`; `RND.RHI.crash`; `RND.RHI.driver-policy`; `ED.ARCH.recovery`; `BLD.CI.symbols`; `BLD.REL.archival`; `QA.FUNC.bug-capture`; `XC.SEC.data-rights`
 - **Not responsible for:** Emitting GPU breadcrumbs → rhi-core; Symbol server infrastructure → ci-cd-automation
-- **Provides:** C-CRASH · **Consumes:** C-PAL, C-INSTR
+- **Provides:** C-CRASH · **Consumes:** C-PAL, C-BASE, C-INSTR
 - **Expertise:** minidumps, DRED/Aftermath/RGD, crash bucketing
-- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### determinism-replay
 
-**Determinism & Replay** · cross-cutting · parent: engine-architect · profiles: all
+**Determinism & Replay** · cross-cutting · runtime · workstream: foundation · parent: engine-architect · profiles: all · targets: client, headless-client, server, tools
 
 Defines determinism levels (none, same-binary, cross-platform) per subsystem and the floating-point and parallel-execution rules that achieve them; owns input/state record-replay and desync detection.
 
-- **Owns:** `XC.DET.levels`; `XC.DET.float`; `XC.DET.parallel`; `XC.DET.replay`; `XC.DET.desync`; `XC.DET.compat`
-- **Contributes to:** `CORE.MATH.deterministic`; `CORE.SER.canonical`; `ML.RT.determinism`; `PHY.ARCH.determinism`; `INP.ACT.recording`; `NET.PRED.lockstep`; `ED.DEBUG.visual-log`
+- **Owns:** `XC.DET.levels`; `XC.DET.float`; `XC.DET.parallel`; `XC.DET.replay`; `XC.DET.desync`; `XC.DET.compat`; `XC.DET.snapshot`; `XC.DET.replay-format`; `XC.DET.conformance`; `XC.DET.external-inputs`
+- **Contributes to:** `CORE.MATH.deterministic`; `CORE.ECS.snapshot`; `CORE.SER.canonical`; `ML.RT.determinism`; `PHY.ARCH.determinism`; `PHY.ARCH.rewind`; `PHY.TOOL.visual-debugger`; `INP.ACT.recording`; `NET.PRED.lockstep`; `NET.PRED.lockstep-replay`; `NET.DBG.session-replay`; `ED.DEBUG.visual-log`; `QA.FUNC.bug-capture`; `QA.SIM.golden-traces`; `PRF.BENCH.replay`
 - **Not responsible for:** Rollback netcode → prediction-rollback; Deterministic math implementation → math-simd-numerics
-- **Provides:** C-DET · **Consumes:** C-MATH, C-TASK, C-SER
+- **Provides:** C-DET, C-SNAPSHOT, C-REPLAY · **Consumes:** C-MATH, C-TASK, C-SER@C-SNAPSHOT, C-FRAME@C-SNAPSHOT
+- **Untrusted inputs:** replays
 - **Expertise:** IEEE-754 reproducibility, deterministic scheduling, state hashing
-- **Critics (G2):** K-ARCH, K-SYSTEMS, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### hot-reload-iteration
 
-**Hot Reload & Iteration** · cross-cutting · parent: engine-architect · profiles: all
+**Hot Reload & Iteration** · cross-cutting · runtime · workstream: foundation · parent: engine-architect · profiles: all · targets: client, headless-client, server, tools
 
 Owns the reload protocol (change detection, dependency invalidation, state preservation) that assets, shaders, scripts, config and C++ live coding plug into; measures edit → see latency.
 
 - **Owns:** `XC.ITER.protocol`; `XC.ITER.live-coding`; `XC.ITER.coordination`; `XC.ITER.metrics`
-- **Contributes to:** `RES.MGMT.reload`; `RND.SHADER.reload`; `GAM.SCR.reload`
-- **Not responsible for:** Each system's own reload implementation → resource-streaming-architect; Build system → build-system-toolchains
-- **Provides:** C-RELOAD · **Consumes:** C-RES, C-MOD, C-REFL
+- **Contributes to:** `PLAT.PAL.fs-watch`; `RES.MGMT.reload`; `CNT.COOK.on-demand`; `RND.SHADER.reload`; `GAM.SCR.reload`; `ED.ARCH.discipline-workflows`
+- **Not responsible for:** Each system's own reload implementation (via C-RELOAD) → owning-skill; Build system → build-system-toolchains
+- **Provides:** C-RELOAD · **Consumes:** C-RES, C-MOD, C-REFL · **Tool-side:** C-BUILD
 - **Expertise:** live coding, state migration, iteration-time measurement
-- **Critics (G2):** K-ARCH, K-SYSTEMS, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### accessibility
 
-**Accessibility** · cross-cutting · parent: engine-architect · profiles: client
+**Accessibility** · cross-cutting · runtime · workstream: ui · parent: engine-architect · profiles: all · targets: client, tools
 
 Maps XAG/GAG and legal requirements to engine features and owns subtitles and captions, screen-reader/TTS/STT hooks, colorblind and contrast modes, text scaling, motion and photosensitivity options, assist hooks, and their validation.
 
-- **Owns:** `UI.A11Y.requirements`; `UI.A11Y.screen-reader`; `UI.A11Y.subtitles`; `UI.A11Y.vision`; `UI.A11Y.motion`; `UI.A11Y.text-scale`; `UI.A11Y.assists`; `UI.A11Y.validation`
-- **Contributes to:** `INP.ACT.accessibility`; `QA.CERT.a11y-law`
-- **Not responsible for:** Input remapping implementation → input-system; UI layout engine → ui-architect; Legal compliance sign-off → certification-compliance
-- **Provides:** C-A11Y · **Consumes:** C-UI, C-INPUT, C-AUDIO?, C-TEXT
+- **Owns:** `UI.A11Y.requirements`; `UI.A11Y.screen-reader`; `UI.A11Y.subtitles`; `UI.A11Y.motion`; `UI.A11Y.assists`; `UI.A11Y.validation`; `UI.A11Y.comms`
+- **Contributes to:** `PLAT.PAL.system-events`; `PLAT.SVC.voice-text`; `RND.POST.colorblind`; `INP.DEV.eye-tracking`; `INP.ACT.accessibility`; `GAM.SAVE.settings`; `UI.FW.text-scale`; `UI.FW.a11y-tree`; `UI.FW.subtitles`; `QA.CERT.a11y-law`
+- **Not responsible for:** Input remapping implementation → input-system; UI layout engine & subtitle presentation → ui-architect; Colorblind passes → post-color-hdr; Legal compliance sign-off → certification-compliance
+- **Provides:** C-A11Y, C-A11YRT · **Consumes:** C-TEXT, C-PAL, C-DIALOGUE?
 - **Expertise:** game accessibility guidelines, assistive tech APIs, inclusive design
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### api-lifecycle-migration
 
-**API Lifecycle & Engine Migration** · cross-cutting · parent: engine-architect · profiles: all
+**API Lifecycle & Engine Migration** · cross-cutting · process · workstream: governance · parent: engine-architect · profiles: all
 
 Public API surface, semantic versioning and deprecation, ABI policy, engine-upgrade tooling (codemods, data upgraders) and LTS policy, so projects can move across engine versions.
 
 - **Owns:** `XC.EXT.api-surface`; `XC.EXT.versioning`; `XC.EXT.abi`; `XC.EXT.upgrade`; `XC.EXT.lts`
-- **Contributes to:** `NET.ARCH.versioning`; `XC.DET.compat`; `XC.EXT.mod-compat`
+- **Contributes to:** `ARCH.PROD.customer-corpus`; `NET.ARCH.versioning`; `BLD.CI.backports`; `XC.DET.compat`; `XC.SEC.vuln-response`; `XC.EXT.mod-compat`
 - **Not responsible for:** Data schema mechanisms → serialization-schema; Plugin loading → plugin-system
-- **Provides:** C-API · **Consumes:** C-SER, C-REFL
+- **Provides:** C-API · **Consumes:** C-SER, C-REFL, C-RELEASE
 - **Expertise:** API design, semver, clang tooling codemods
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### plugin-system
 
-**Plugin System** · expert · parent: api-lifecycle-migration · profiles: all
+**Plugin System** · expert · runtime · workstream: foundation · parent: api-lifecycle-migration · profiles: all · targets: client, headless-client, server, tools
 
 Plugin architecture: manifests, discovery, dependency resolution, load phases, binary vs source plugins, isolation, distribution format.
 
-- **Owns:** `XC.EXT.plugins`; `XC.EXT.plugin-deps`
-- **Contributes to:** `ED.ARCH.extension`; `XC.EXT.abi`
+- **Owns:** `XC.EXT.plugins`; `XC.EXT.plugin-deps`; `XC.EXT.plugin-trust`
+- **Contributes to:** `ED.ARCH.extension`; `XC.SEC.dev-trust`; `XC.EXT.abi`
 - **Not responsible for:** Mods & UGC → modding-ugc; Module linking internals → core-runtime-architect
-- **Provides:** C-PLUGIN · **Consumes:** C-MOD
+- **Provides:** C-PLUGIN · **Consumes:** C-MOD, C-BASE, C-API
+- **Untrusted inputs:** editor-plugins
 - **Expertise:** plugin architectures, dynamic loading, ABI stability
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### modding-ugc
 
-**Modding & UGC** · expert · parent: api-lifecycle-migration · profiles: ugc
+**Modding & UGC** · expert · runtime · workstream: gameplay · parent: api-lifecycle-migration · profiles: ugc · targets: client, headless-client, server, tools
 
 Mod and UGC support: mod SDK, content overrides via VFS layering, sandboxed mod scripting, UGC upload and moderation boundaries, mod compatibility across patches.
 
 - **Owns:** `XC.EXT.mod-sdk`; `XC.EXT.mod-loading`; `XC.EXT.ugc`; `XC.EXT.mod-compat`
-- **Contributes to:** `PLAT.SVC.moderation`; `XC.SEC.sandbox`
+- **Contributes to:** `PLAT.SVC.moderation`; `RND.SHADER.untrusted`; `XC.SEC.sandbox`
 - **Not responsible for:** Sandbox policy → security-engineering; Script VM → scripting-runtime
 - **Provides:** — · **Consumes:** C-VFS, C-SCRIPT, C-PLUGIN, C-SVC
+- **Untrusted inputs:** mods, ugc-graphs
 - **Expertise:** mod ecosystems, sandboxing, content overrides
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### developer-experience-docs
 
-**Developer Experience & Documentation** · cross-cutting · parent: engine-architect · profiles: all
+**Developer Experience & Documentation** · cross-cutting · process · workstream: governance · parent: engine-architect · profiles: all
 
 Documentation and developer experience: API reference, architecture docs, the sample-project ladder (2D → open-world online) that doubles as integration tests, templates, onboarding, doc testing, error-message standards, DX metrics.
 
 - **Owns:** `XC.DX.api-docs`; `XC.DX.arch-docs`; `XC.DX.samples`; `XC.DX.templates`; `XC.DX.onboarding`; `XC.DX.doc-tests`; `XC.DX.errors`
-- **Contributes to:** `XC.ITER.metrics`
+- **Contributes to:** `ARCH.PROD.release-notes`; `QA.STRAT.integration`; `XC.ITER.metrics`
 - **Not responsible for:** ADR records → architecture-governance; Iteration-time tooling → hot-reload-iteration
 - **Provides:** — · **Consumes:** —
 - **Expertise:** technical writing, docs-as-code, sample design, DX metrics
-- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### ml-inference-runtime
 
-**ML Inference Runtime** · expert · parent: engine-architect · profiles: aaa
+**ML Inference Runtime** · expert · runtime · workstream: rendering · parent: gpu-platform-architect · profiles: lite3d, std3d · targets: client, headless-client, server, tools
 
 Runtime neural-network inference shared by neural rendering, animation, audio and AI: GPU (cooperative-vector / tensor) and CPU backends, model packaging and quantization, scheduling within frame budgets, determinism characteristics.
 
-- **Owns:** `ML.RT.inference`; `ML.RT.packaging`; `ML.RT.scheduling`; `ML.RT.training-boundary`; `ML.RT.determinism`
-- **Contributes to:** `RND.MAT.neural`; `RND.TEX.ntc`; `ANM.DEF.ml`; `ANM.SYN.learned`
-- **Not responsible for:** Vendor upscalers → reconstruction-upscaling; Neural feature design (texture, material, animation) → texture-streaming-vt
-- **Provides:** C-ML · **Consumes:** C-RHI, C-RG, C-TASK
+- **Owns:** `ML.RT.inference`; `ML.RT.packaging`; `ML.RT.scheduling`; `ML.RT.training-boundary`; `ML.RT.determinism`; `ML.RT.npu`
+- **Contributes to:** `CNT.COOK.gpu-steps`; `RND.SHADER.neural`; `RND.MAT.neural`; `RND.TEX.ntc`; `RND.GI.neural-cache`; `ANM.DEF.ml`; `ANM.SYN.learned`; `AUD.CONTENT.speech`
+- **Not responsible for:** Vendor upscalers → reconstruction-upscaling; In-shader (fused) networks → shader-system; Neural feature design → owning-skill; Model training → external:ml-training
+- **Provides:** C-ML, C-MLGPU · **Consumes:** C-TASK, C-RHI?@C-MLGPU, C-RG?@C-MLGPU, C-PAL
 - **Expertise:** inference engines, quantization, cooperative vectors, ONNX
-- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### core-runtime-architect
 
-**Core Runtime Architect** · lead · parent: engine-architect · profiles: all
+**Core Runtime Architect** · lead · runtime · workstream: foundation · parent: engine-architect · profiles: all · targets: client, headless-client, server, tools
 
 Core runtime architecture: layering within core, module system and engine lifecycle (parallel boot, init graph, shutdown), configuration and cvars, error-handling and failure model, language and compiler feature policy.
 
-- **Owns:** `CORE.LIFE.boot`; `CORE.LIFE.modules`; `CORE.LIFE.shutdown`; `CORE.LIFE.services`; `CORE.LIFE.config`; `CORE.LIFE.errors`; `CORE.LIFE.asserts`; `CORE.LIFE.language`
-- **Contributes to:** `ARCH.GOV.coding-standard`; `CORE.TYPES.ownership`
+- **Owns:** `CORE.LIFE.boot`; `CORE.LIFE.modules`; `CORE.LIFE.shutdown`; `CORE.LIFE.services`; `CORE.LIFE.config`; `CORE.LIFE.errors`; `CORE.LIFE.asserts`; `CORE.LIFE.language`; `CORE.LIFE.bootstrap`; `CORE.LIFE.ownership-model`; `CORE.LIFE.ipc`; `CORE.LIFE.config-snapshots`; `CORE.LIFE.interop`
+- **Contributes to:** `PLAT.PAL.base`; `CORE.TYPES.ownership`; `XC.SEC.memory-safety`
 - **Not responsible for:** Allocator design → memory-allocators; Scheduler → job-system-task-graph; Frame loop → frame-orchestration
-- **Provides:** C-MOD, C-CFG, C-ERR · **Consumes:** C-PAL
+- **Provides:** C-MOD, C-CFG, C-ERR, C-LIFETIME, C-IPC · **Consumes:** C-PAL, C-BASE, C-MEM, C-TYPES, C-SYNC, C-TASK, C-INSTR
 - **Expertise:** C++20/23, module systems, error models, configuration systems
-- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### math-simd-numerics
 
-**Math, SIMD & Numerics** · expert · parent: core-runtime-architect · profiles: all
+**Math, SIMD & Numerics** · expert · runtime · workstream: foundation · parent: core-runtime-architect · profiles: all · targets: client, headless-client, server, tools
 
 Math and numerics: SIMD linear algebra, geometry and intersection primitives, computational geometry, numerical robustness, mixed and double precision, deterministic math, RNG and noise, curves, quantized formats, SPMD kernels with ISA dispatch.
 
 - **Owns:** `CORE.MATH.linear`; `CORE.MATH.geometry`; `CORE.MATH.compgeo`; `CORE.MATH.robustness`; `CORE.MATH.precision`; `CORE.MATH.deterministic`; `CORE.MATH.random`; `CORE.MATH.curves`; `CORE.MATH.spmd`; `CORE.MATH.formats`
-- **Contributes to:** `ARCH.STRUCT.conventions`; `PRF.CPU.simd`; `XC.DET.float`
+- **Contributes to:** `ARCH.STRUCT.conventions`; `PHY.CTRL.orbital`; `PRF.CPU.simd`; `XC.DET.float`
 - **Not responsible for:** Coordinate conventions decision → engine-architect; Determinism rules → determinism-replay
 - **Provides:** C-MATH · **Consumes:** C-PAL
 - **Expertise:** numerical analysis, SIMD (SSE/AVX2/AVX-512/NEON/SVE), computational geometry
-- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### memory-allocators
 
-**Memory & Allocators** · expert · parent: core-runtime-architect · profiles: all
+**Memory & Allocators** · expert · runtime · workstream: foundation · parent: core-runtime-architect · profiles: all · targets: client, headless-client, server, tools
 
 Memory management: virtual memory, allocator families, thread-local and NUMA-aware allocation, tagging and attribution, budget enforcement mechanisms, fragmentation control, memory debugging, OOM policy, UMA accounting.
 
 - **Owns:** `CORE.MEM.virtual`; `CORE.MEM.allocators`; `CORE.MEM.thread-caches`; `CORE.MEM.tracking`; `CORE.MEM.budget-enforcement`; `CORE.MEM.fragmentation`; `CORE.MEM.debugging`; `CORE.MEM.oom`; `CORE.MEM.uma`
-- **Contributes to:** `OBS.CRASH.oom`
+- **Contributes to:** `PLAT.PAL.system-events`; `RES.MGMT.arbitration`; `PRF.MEM.footprint`; `OBS.LOG.trace-analysis`; `OBS.CRASH.oom`; `XC.SEC.hardening`
 - **Not responsible for:** GPU heaps → gpu-memory-resources; Budget numbers → performance-architect
-- **Provides:** C-MEM · **Consumes:** C-PAL
+- **Provides:** C-MEM · **Consumes:** C-PAL, C-BASE
 - **Expertise:** allocator design, virtual memory, TLSF, memory profiling
-- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### containers-core-types
 
-**Containers & Core Types** · expert · parent: core-runtime-architect · profiles: all
+**Containers & Core Types** · expert · runtime · workstream: foundation · parent: core-runtime-architect · profiles: all · targets: client, headless-client, server, tools
 
 Containers and core types: cache-friendly containers (open-addressing maps, inline and SoA containers, rings), strings and UTF-8, interned names, hashing, bit utilities, algorithms, explicit-ownership and view types.
 
-- **Owns:** `CORE.TYPES.containers`; `CORE.TYPES.strings`; `CORE.TYPES.hashing`; `CORE.TYPES.bits`; `CORE.TYPES.algorithms`; `CORE.TYPES.ownership`
+- **Owns:** `CORE.TYPES.containers`; `CORE.TYPES.strings`; `CORE.TYPES.hashing`; `CORE.TYPES.bits`; `CORE.TYPES.algorithms`; `CORE.TYPES.ownership`; `CORE.TYPES.codecs`; `CORE.TYPES.crypto`
+- **Contributes to:** `XC.SEC.crypto-policy`
 - **Not responsible for:** Concurrent containers → concurrency-primitives; Entity handles → entity-object-model
-- **Provides:** C-TYPES · **Consumes:** C-MEM
+- **Provides:** C-TYPES · **Consumes:** C-MEM, C-BASE
 - **Expertise:** data structures, hashing, Unicode basics
-- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### concurrency-primitives
 
-**Concurrency Primitives** · expert · parent: core-runtime-architect · profiles: all
+**Concurrency Primitives** · expert · runtime · workstream: foundation · parent: core-runtime-architect · profiles: all · targets: client, headless-client, server, tools
 
 Memory model and atomics, synchronization primitives, lock-free and wait-free structures, safe memory reclamation, thread-safety annotations and model checking; reviewer for concurrent code engine-wide.
 
 - **Owns:** `CORE.CONC.atomics`; `CORE.CONC.sync`; `CORE.CONC.lockfree`; `CORE.CONC.reclamation`; `CORE.CONC.correctness`
-- **Contributes to:** `QA.ROBUST.concurrency`; `PRF.CPU.contention`
+- **Contributes to:** `CORE.LIFE.ownership-model`; `QA.ROBUST.concurrency`; `PRF.CPU.contention`
 - **Not responsible for:** Scheduling → job-system-task-graph; Concurrency test campaigns → robustness-fuzzing
-- **Provides:** C-SYNC · **Consumes:** C-PAL
+- **Provides:** C-SYNC · **Consumes:** C-PAL, C-BASE
 - **Expertise:** C++ memory model, lock-free algorithms, futexes, Relacy/CDSChecker-style checking
-- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### job-system-task-graph
 
-**Job System & Task Graph** · expert · parent: core-runtime-architect · profiles: all
+**Job System & Task Graph** · expert · runtime · workstream: foundation · parent: core-runtime-architect · profiles: all · targets: client, headless-client, server, tools
 
 Task-parallel execution: work-stealing scheduler, dependency task graphs, fibers and C++20 coroutines, priorities and QoS, heterogeneous-core and NUMA placement, IO/GPU completion integration, parallel algorithms, blocking policy.
 
-- **Owns:** `CORE.JOBS.scheduler`; `CORE.JOBS.graph`; `CORE.JOBS.fibers`; `CORE.JOBS.priorities`; `CORE.JOBS.hetero`; `CORE.JOBS.numa`; `CORE.JOBS.completions`; `CORE.JOBS.parallel-algos`; `CORE.JOBS.blocking`
-- **Contributes to:** `PLAT.PAL.cpu-topology`; `PHY.DYN.parallel`; `PRF.CPU.hybrid`; `XC.DET.parallel`
+- **Owns:** `CORE.JOBS.scheduler`; `CORE.JOBS.graph`; `CORE.JOBS.fibers`; `CORE.JOBS.priorities`; `CORE.JOBS.hetero`; `CORE.JOBS.numa`; `CORE.JOBS.completions`; `CORE.JOBS.parallel-algos`; `CORE.JOBS.blocking`; `CORE.JOBS.thread-model`; `CORE.JOBS.pinned`; `CORE.JOBS.test-modes`; `CORE.JOBS.introspection`; `CORE.JOBS.safety`
+- **Contributes to:** `PLAT.PAL.cpu-topology`; `PLAT.PAL.threads`; `PLAT.PAL.thread-affinity`; `PLAT.WEB.runtime`; `PHY.DYN.parallel`; `PRF.CPU.hybrid`; `OBS.LOG.trace-analysis`; `XC.DET.parallel`
 - **Not responsible for:** Frame phase layout → frame-orchestration; IO backends → async-io-storage
-- **Provides:** C-TASK · **Consumes:** C-SYNC, C-PAL
+- **Provides:** C-TASK · **Consumes:** C-SYNC, C-PAL, C-BASE, C-MEM
 - **Expertise:** work stealing, fibers, coroutines, hybrid CPU scheduling
-- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### frame-orchestration
 
-**Frame Orchestration & Time** · expert · parent: core-runtime-architect · profiles: all
+**Frame Orchestration & Time** · expert · runtime · workstream: foundation · parent: core-runtime-architect · profiles: all · targets: client, headless-client, server, tools
 
 The engine loop expressed as a task graph: frame pipelining across simulation, render and GPU, tick phases and sync points, fixed-step simulation with interpolation, time domains, latency and pacing control.
 
-- **Owns:** `CORE.FRAME.pipelining`; `CORE.FRAME.phases`; `CORE.FRAME.fixed-step`; `CORE.FRAME.time`; `CORE.FRAME.latency`; `CORE.FRAME.async-work`; `CORE.FRAME.headless`
-- **Contributes to:** `CORE.ECS.scheduling`; `RND.RHI.present`; `RND.RECON.dynres`; `PHY.ARCH.stepping`; `INP.ACT.latency`; `NET.ARCH.tick`
+- **Owns:** `CORE.FRAME.pipelining`; `CORE.FRAME.phases`; `CORE.FRAME.fixed-step`; `CORE.FRAME.time`; `CORE.FRAME.latency`; `CORE.FRAME.async-work`; `CORE.FRAME.headless`; `CORE.FRAME.access-model`; `CORE.FRAME.channels`; `CORE.FRAME.sim-schedule`; `CORE.FRAME.amortized`; `CORE.FRAME.critical-path`; `CORE.FRAME.test-clock`; `CORE.FRAME.phase-violations`; `CORE.FRAME.present-timeline`
+- **Contributes to:** `ARCH.STRUCT.registration`; `PLAT.PAL.clocks`; `CORE.LIFE.config-snapshots`; `CORE.ECS.scheduling`; `CORE.SCALE.governor`; `RND.ARCH.scene-sync`; `RND.RHI.present`; `RND.RECON.framegen`; `RND.RECON.dynres`; `PHY.ARCH.stepping`; `ANM.ARCH.sync`; `AUD.ARCH.clock`; `INP.ACT.latency`; `NET.ARCH.tick`; `GAM.FW.execution`
 - **Not responsible for:** System ordering inside a phase → ecs-runtime; Swapchain presentation → rhi-core
-- **Provides:** C-FRAME · **Consumes:** C-TASK, C-CFG
+- **Provides:** C-FRAME, C-FLOW, C-PRESENT · **Consumes:** C-TASK, C-CFG, C-PAL
 - **Expertise:** frame pipelining, latency analysis, fixed timestep
-- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### entity-object-model
 
-**Object Model & Identity** · expert · parent: core-runtime-architect · profiles: all
+**Object Model & Identity** · expert · runtime · workstream: foundation · parent: core-runtime-architect · profiles: all · targets: client, headless-client, server, tools
 
 Object-model strategy and identity: generational entity IDs, stable GUIDs, hard/soft/weak references, the hybrid-model policy stating which data lives in ECS vs services vs asset objects vs UI, events and messaging.
 
 - **Owns:** `CORE.OBJ.identity`; `CORE.OBJ.hybrid`; `CORE.OBJ.references`; `CORE.OBJ.events`
-- **Contributes to:** `NET.REP.ids`
+- **Contributes to:** `CORE.LIFE.ownership-model`; `NET.REP.ids`; `GAM.SYS.messages`
 - **Not responsible for:** ECS storage and queries → ecs-runtime; Asset references → content-pipeline-architect; Network IDs → replication
-- **Provides:** C-ID · **Consumes:** C-TYPES, C-SYNC
+- **Provides:** C-ID · **Consumes:** C-TYPES, C-SYNC, C-LIFETIME
 - **Expertise:** object models, handle systems, lifetime design
-- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### ecs-runtime
 
-**ECS Runtime** · expert · parent: core-runtime-architect · profiles: all
+**ECS Runtime** · expert · runtime · workstream: foundation · parent: core-runtime-architect · profiles: min2d, lite3d, std3d · targets: client, headless-client, server, tools
 
 ECS: storage (archetype chunks or sparse sets, chosen by ADR), queries, change detection, structural changes and command buffers, system scheduling with access-conflict analysis, relationships, singletons, authoring → runtime baking, debugging.
 
-- **Owns:** `CORE.ECS.storage`; `CORE.ECS.queries`; `CORE.ECS.change`; `CORE.ECS.structural`; `CORE.ECS.scheduling`; `CORE.ECS.relationships`; `CORE.ECS.singletons`; `CORE.ECS.baking`; `CORE.ECS.debug`
-- **Contributes to:** `CORE.FRAME.phases`; `GAM.AI.mass`
+- **Owns:** `CORE.ECS.storage`; `CORE.ECS.queries`; `CORE.ECS.change`; `CORE.ECS.structural`; `CORE.ECS.scheduling`; `CORE.ECS.relationships`; `CORE.ECS.singletons`; `CORE.ECS.baking`; `CORE.ECS.debug`; `CORE.ECS.bridges`; `CORE.ECS.snapshot`; `CORE.ECS.safety`
+- **Contributes to:** `CORE.FRAME.phases`; `CORE.FRAME.access-model`; `WLD.PART.activation`; `WLD.PART.cook`; `WLD.SPACE.change-sets`; `GAM.FW.execution`; `GAM.AI.mass`; `XC.DET.snapshot`
 - **Not responsible for:** World partition → world-architect; Transform propagation → spatial-transforms; Object-model policy → entity-object-model
-- **Provides:** C-ECS · **Consumes:** C-ID, C-TASK, C-FRAME, C-REFL?
+- **Provides:** C-ECS · **Consumes:** C-ID, C-TASK, C-FRAME, C-REFL?, C-SNAPSHOT, C-RELOAD?
 - **Expertise:** ECS architectures, data-oriented design, parallel scheduling
-- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### reflection-metadata
 
-**Reflection & Metadata** · expert · parent: core-runtime-architect · profiles: all
+**Reflection & Metadata** · expert · runtime · workstream: foundation · parent: core-runtime-architect · profiles: all · targets: client, headless-client, server, tools
 
 Type registry, reflection generation (codegen now, C++26 static reflection when toolchains allow), attributes, the property system, script-binding substrate, dynamic invocation.
 
-- **Owns:** `CORE.REFL.registry`; `CORE.REFL.generation`; `CORE.REFL.attributes`; `CORE.REFL.properties`; `CORE.REFL.bindings`; `CORE.REFL.dynamic`
+- **Owns:** `CORE.REFL.registry`; `CORE.REFL.generation`; `CORE.REFL.attributes`; `CORE.REFL.properties`; `CORE.REFL.bindings`; `CORE.REFL.dynamic`; `CORE.REFL.static-default`
 - **Contributes to:** `BLD.SYS.codegen`
 - **Not responsible for:** Serialization formats → serialization-schema; Editor widgets → editor-ui-framework; Script VM → scripting-runtime
 - **Provides:** C-REFL · **Consumes:** C-TYPES
 - **Expertise:** metaprogramming, code generation, C++26 reflection
-- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### serialization-schema
 
-**Serialization & Schema Evolution** · expert · parent: core-runtime-architect · profiles: all
+**Serialization & Schema Evolution** · expert · runtime · workstream: foundation · parent: core-runtime-architect · profiles: all · targets: client, headless-client, server, tools
 
 Binary and text formats, schema evolution and upgraders, in-place loadable layouts, canonical deterministic serialization, portability, and validation of untrusted input.
 
 - **Owns:** `CORE.SER.binary`; `CORE.SER.text`; `CORE.SER.evolution`; `CORE.SER.relocatable`; `CORE.SER.canonical`; `CORE.SER.portability`; `CORE.SER.untrusted`
-- **Contributes to:** `GAM.SAVE.migration`; `ED.COLLAB.merge`; `XC.EXT.upgrade`
+- **Contributes to:** `NET.SRV.persistence`; `GAM.SAVE.migration`; `ED.COLLAB.merge`; `XC.EXT.upgrade`
 - **Not responsible for:** Package containers → package-formats-vfs; Network bit packing → replication; Save-game semantics → persistence-save
 - **Provides:** C-SER · **Consumes:** C-REFL, C-TYPES
+- **Untrusted inputs:** assets, saves, packets
 - **Expertise:** schema evolution, binary formats, parsers for untrusted input
-- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### platform-architect
 
-**Platform Architect** · lead · parent: engine-architect · profiles: all
+**Platform Architect** · lead · runtime · workstream: platform · parent: engine-architect · profiles: all · targets: client, headless-client, server, tools
 
 Platform abstraction layer and porting strategy: OS services, CPU/GPU capability discovery, windowing, process lifecycle, capability tiers, and evaluation of new targets (web, cloud streaming).
 
-- **Owns:** `PLAT.PAL.os`; `PLAT.PAL.cpu-topology`; `PLAT.PAL.windowing`; `PLAT.PAL.lifecycle`; `PLAT.PAL.capability-tiers`; `PLAT.PAL.web`; `PLAT.PAL.cloud-streaming`
-- **Contributes to:** `CORE.JOBS.hetero`; `RES.IO.fs`; `UI.TXT.ime`; `UI.A11Y.screen-reader`
-- **Not responsible for:** Graphics API backends → rhi-core; Store and online services → platform-online-services; Toolchains → build-system-toolchains
-- **Provides:** C-PAL · **Consumes:** —
+- **Owns:** `ARCH.STRUCT.platform-backends`; `PLAT.PAL.os`; `PLAT.PAL.cpu-topology`; `PLAT.PAL.windowing`; `PLAT.PAL.lifecycle`; `PLAT.PAL.capability-tiers`; `PLAT.PAL.cloud-streaming`; `PLAT.PAL.base`; `PLAT.PAL.threads`; `PLAT.PAL.thread-affinity`; `PLAT.PAL.process`; `PLAT.PAL.clocks`; `PLAT.PAL.signals`; `PLAT.PAL.fs-watch`; `PLAT.PAL.power`; `PLAT.PAL.system-events`; `PLAT.PAL.safe-area`; `PLAT.PAL.permissions`; `PLAT.PAL.device-db`; `PLAT.PAL.performance-modes`; `PLAT.PAL.os-support-policy`; `PLAT.PAL.devlink`; `PLAT.PAL.confidential-extensions`; `PLAT.PAL.cloud-hybrid`; `PLAT.PAL.display`
+- **Contributes to:** `ARCH.REQ.platform-matrix`; `ARCH.ORG.bootstrap`; `CORE.LIFE.bootstrap`; `CORE.JOBS.hetero`; `CORE.JOBS.thread-model`; `CORE.JOBS.pinned`; `CORE.SCALE.profiles`; `RES.MGMT.arbitration`; `RES.IO.fs`; `ML.RT.npu`; `UI.FW.safe-area`; `UI.TXT.ime`; `UI.A11Y.screen-reader`
+- **Not responsible for:** Graphics API backends → rhi-core; Store and online services → platform-services; Toolchains → build-system-toolchains
+- **Provides:** C-PAL, C-BASE · **Consumes:** —
 - **Expertise:** OS internals (Windows, Linux, macOS), porting, CPU topology
-- **Critics (G2):** K-ARCH, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### platform-desktop
 
-**Desktop & Handheld PC Platforms** · expert · parent: platform-architect · profiles: all
+**Desktop & Handheld PC Platforms** · expert · runtime · workstream: platform · parent: platform-architect · profiles: all · targets: client, headless-client, server, tools · platforms: pc
 
 Windows, Linux, SteamOS and macOS integration: display modes, HDR and VRR capability, DPI, OS-specific IO and scheduling behavior, handheld-PC specifics, server host OS.
 
-- **Owns:** `PLAT.DESK.os-integration`; `PLAT.DESK.display`; `PLAT.DESK.handheld`; `PLAT.DESK.server-host`
-- **Contributes to:** `CORE.FRAME.latency`
+- **Owns:** `PLAT.DESK.os-integration`; `PLAT.DESK.handheld`; `PLAT.DESK.os-security`; `PLAT.DESK.arm64`
+- **Contributes to:** `PLAT.PAL.performance-modes`; `PLAT.PAL.display`; `CORE.FRAME.latency`; `CORE.FRAME.present-timeline`; `NET.SRV.host-os`; `BLD.SYS.platform-sdks`; `QA.CERT.programs`
 - **Not responsible for:** HDR signal encoding → post-color-hdr; Swapchain → rhi-core
 - **Provides:** — · **Consumes:** C-PAL
 - **Expertise:** Win32/GameInput, Linux/Proton, macOS
-- **Critics (G2):** K-ARCH, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### platform-console
 
-**Console Platforms** · expert · parent: platform-architect · profiles: std3d
+**Console Platforms** · expert · runtime · workstream: platform · parent: platform-architect · profiles: all · targets: client, headless-client, server, tools · platforms: console
 
 Console-class integration from platform-holder documentation: OS and memory model (UMA), suspend/resume, multi-user model, devkit workflows, platform requirements feeding certification.
 
-- **Owns:** `PLAT.CON.os-memory`; `PLAT.CON.user-model`; `PLAT.CON.suspend`; `PLAT.CON.devkit`
-- **Contributes to:** `PLAT.PAL.lifecycle`; `INP.DEV.hotplug`; `GAM.SAVE.platform`
+- **Owns:** `PLAT.CON.os-memory`; `PLAT.CON.user-model`; `PLAT.CON.suspend`; `PLAT.CON.devkit`; `PLAT.CON.portable`; `PLAT.CON.cross-gen`; `PLAT.CON.rhi-backends`
+- **Contributes to:** `PLAT.PAL.lifecycle`; `PLAT.PAL.thread-affinity`; `PLAT.PAL.performance-modes`; `PLAT.PAL.confidential-extensions`; `PLAT.PAL.display`; `RES.IO.hw-decompress`; `CNT.COOK.on-demand`; `INP.DEV.hotplug`; `NET.ARCH.connectivity`; `NET.TRANS.platform-requirements`; `GAM.SAVE.platform`; `BLD.SYS.platform-sdks`; `BLD.CI.build-distribution`; `BLD.REL.archival`; `XC.SEC.key-custody`
 - **Not responsible for:** Certification tracking → certification-compliance; Console graphics API backend → rhi-core
-- **Provides:** — · **Consumes:** C-PAL, C-SVC
+- **Provides:** — · **Consumes:** C-PAL, C-SVC, C-GPUTIER · **Implements:** C-RHI
 - **Expertise:** console architectures, platform requirements, UMA memory
-- **Critics (G2):** K-ARCH, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
-### platform-mobile-portable
+### platform-mobile
 
-**Mobile & Portable Platforms** · expert · parent: platform-architect · profiles: mobile3d, min2d
+**Mobile Platforms** · expert · runtime · workstream: platform · parent: platform-architect · profiles: all · targets: client, headless-client, server, tools · platforms: mobile, xr-standalone
 
-iOS, Android and portable-console integration: app lifecycle, thermal and power adaptivity, tile-based GPU implications, storage and download-size constraints.
+iOS and Android (incl. Android-based standalone XR) integration: app lifecycle, thermal/power adaptivity, tile-based GPU implications, frame pacing, storage, notifications, deep links.
 
-- **Owns:** `PLAT.MOB.os`; `PLAT.MOB.tbdr`; `PLAT.MOB.thermal`; `PLAT.MOB.storage`
-- **Contributes to:** `PLAT.PAL.lifecycle`; `RND.GRAPH.tbdr`; `PRF.GPU.power`
+- **Owns:** `PLAT.MOB.os`; `PLAT.MOB.tbdr`; `PLAT.MOB.thermal`; `PLAT.MOB.storage`; `PLAT.MOB.frame-pacing`; `PLAT.MOB.notifications`; `PLAT.MOB.links`
+- **Contributes to:** `PLAT.PAL.lifecycle`; `PLAT.PAL.thread-affinity`; `PLAT.PAL.display`; `CORE.SCALE.governor`; `CNT.COOK.on-demand`; `RND.ARCH.submission-strategy`; `RND.GRAPH.tbdr`; `RND.GEO.cpu-submission`; `NET.ARCH.connectivity`; `NET.TRANS.platform-requirements`; `BLD.SYS.platform-sdks`; `BLD.REL.on-demand`; `QA.CERT.programs`; `PRF.GPU.power`
 - **Not responsible for:** Render-graph TBDR optimizations → render-graph-scheduling; Touch input → input-devices-haptics
 - **Provides:** — · **Consumes:** C-PAL
 - **Expertise:** Android/iOS, mobile GPUs, power management
-- **Critics (G2):** K-ARCH, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
-### platform-online-services
+### platform-services
 
-**Platform & Online Services** · expert · parent: platform-architect · profiles: all
+**Platform Services** · expert · runtime · workstream: platform · parent: platform-architect · profiles: all · targets: client, headless-client, server, tools
 
-Abstraction over first-party platform services and third-party online backends: identity and sign-in, achievements and presence, entitlements and store, cloud saves, matchmaking/lobby/session boundaries, remote config, moderation boundaries, media capture, crossplay identity.
+First-party platform and store services: identity and sign-in, achievements and presence, entitlements and commerce through first-party stores, privileges and parental controls, social graph and invites, block/mute and text filtering, crossplay policy, leaderboards, cloud-save APIs, media capture, age and region policy enforcement.
 
-- **Owns:** `PLAT.SVC.identity`; `PLAT.SVC.achievements`; `PLAT.SVC.entitlements`; `PLAT.SVC.cloud-save`; `PLAT.SVC.matchmaking`; `PLAT.SVC.remote-config`; `PLAT.SVC.moderation`; `PLAT.SVC.capture`
-- **Contributes to:** `NET.TRANS.nat`; `NET.SRV.orchestration`; `GAM.SAVE.cloud`; `BLD.REL.cdn`; `XC.SEC.abuse`; `XC.EXT.ugc`
-- **Not responsible for:** Game-server hosting → dedicated-server; Save-game content → persistence-save; Backend implementation (outside engine scope) → engine-architect
-- **Provides:** C-SVC · **Consumes:** C-PAL, C-TASK
+- **Owns:** `PLAT.SVC.identity`; `PLAT.SVC.achievements`; `PLAT.SVC.entitlements`; `PLAT.SVC.cloud-save`; `PLAT.SVC.capture`; `PLAT.SVC.social`; `PLAT.SVC.privileges`; `PLAT.SVC.social-safety`; `PLAT.SVC.crossplay-policy`; `PLAT.SVC.leaderboards`; `PLAT.SVC.age-region`; `PLAT.COMM.iap`; `PLAT.COMM.receipts`; `PLAT.COMM.disclosure`
+- **Contributes to:** `CORE.LIFE.config`; `RES.IO.remote`; `NET.TRANS.nat`; `NET.SRV.orchestration`; `GAM.FW.engagement`; `GAM.SAVE.cloud`; `BLD.REL.cdn`; `QA.CERT.store-policy`; `QA.CERT.monetization-law`; `QA.CERT.regional`; `XC.SEC.abuse`; `XC.EXT.ugc`
+- **Not responsible for:** Third-party/own backend & live-ops boundaries → online-services-liveops; Game-server hosting → dedicated-server; Save-game content → persistence-save; Backend implementation → external:backend
+- **Provides:** C-SVC · **Consumes:** C-PAL, C-TASK, C-CFG
+- **Untrusted inputs:** invites-deep-links
 - **Expertise:** platform SDKs, online service APIs, auth tokens
-- **Critics (G2):** K-ARCH, K-NET, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-NET, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### input-system
 
-**Input Actions** · expert · parent: platform-architect · profiles: client
+**Input Actions** · expert · runtime · workstream: platform · parent: platform-architect · profiles: all · targets: client, headless-client, server, tools
 
 Action-level input: mapping and context stacks, rebinding, buffering and latency accounting, local-multiplayer assignment, accessibility input options, UI navigation routing, per-device glyphs, recording and replay.
 
-- **Owns:** `INP.ACT.mapping`; `INP.ACT.remapping`; `INP.ACT.latency`; `INP.ACT.accessibility`; `INP.ACT.local-mp`; `INP.ACT.recording`; `INP.ACT.ui-routing`; `INP.ACT.glyphs`
-- **Contributes to:** `GAM.FW.local-players`; `UI.FW.focus`
+- **Owns:** `INP.ACT.mapping`; `INP.ACT.remapping`; `INP.ACT.latency`; `INP.ACT.accessibility`; `INP.ACT.local-mp`; `INP.ACT.recording`; `INP.ACT.ui-routing`; `INP.ACT.glyphs`; `INP.ACT.confirm-swap`; `INP.ACT.calibration`
+- **Contributes to:** `PLAT.XR.gaze-input`; `AUD.ARCH.clock`; `NET.PRED.input-commands`; `GAM.FW.local-players`; `GAM.FW.control`; `GAM.FW.engagement`; `GAM.SAVE.settings`; `UI.FW.focus`; `XC.DET.replay-format`
 - **Not responsible for:** Device drivers and haptics → input-devices-haptics; UI focus logic → ui-architect
-- **Provides:** C-INPUT · **Consumes:** C-PAL, C-FRAME, C-A11Y
+- **Provides:** C-INPUT · **Consumes:** C-DEVICE?, C-FRAME, C-SER, C-A11Y
 - **Expertise:** input systems, latency measurement, remapping UX
-- **Critics (G2):** K-ARCH, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### input-devices-haptics
 
-**Input Devices & Haptics** · expert · parent: platform-architect · profiles: client
+**Input Devices & Haptics** · expert · runtime · workstream: platform · parent: platform-architect · profiles: all · targets: client, tools
 
 Device layer: keyboard/mouse raw input, gamepads, touch and gestures, motion sensors, pen, hotplug and user pairing, haptics (rumble, HD haptics, adaptive triggers).
 
-- **Owns:** `INP.DEV.abstraction`; `INP.DEV.kbm`; `INP.DEV.gamepads`; `INP.DEV.touch`; `INP.DEV.motion`; `INP.DEV.pen`; `INP.DEV.haptics`; `INP.DEV.hotplug`
+- **Owns:** `INP.DEV.abstraction`; `INP.DEV.kbm`; `INP.DEV.gamepads`; `INP.DEV.touch`; `INP.DEV.motion`; `INP.DEV.pen`; `INP.DEV.haptics`; `INP.DEV.hotplug`; `INP.DEV.haptic-assets`; `INP.DEV.force-feedback`; `INP.DEV.specialty`; `INP.DEV.eye-tracking`; `INP.DEV.injection`
 - **Contributes to:** `PLAT.XR.input`; `AUD.CONTENT.haptics`
 - **Not responsible for:** Action mapping → input-system; XR controllers → xr-runtime
-- **Provides:** — · **Consumes:** C-PAL, C-INPUT
+- **Provides:** C-DEVICE · **Consumes:** C-PAL
 - **Expertise:** HID, GameInput/SDL-class APIs, haptics
-- **Critics (G2):** K-ARCH, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### xr-runtime
 
-**XR Runtime** · expert · parent: platform-architect · profiles: xr
+**XR Runtime** · expert · runtime · workstream: platform · parent: platform-architect · profiles: xr · targets: client, tools
 
 XR integration: OpenXR, stereo/multiview rendering hooks, foveation, reprojection and latency, XR input and hand tracking, comfort and safety requirements.
 
-- **Owns:** `PLAT.XR.openxr`; `PLAT.XR.stereo`; `PLAT.XR.foveation`; `PLAT.XR.reprojection`; `PLAT.XR.input`; `PLAT.XR.comfort`
+- **Owns:** `PLAT.XR.openxr`; `PLAT.XR.reprojection`; `PLAT.XR.input`; `PLAT.XR.comfort`; `PLAT.XR.fixed-foveation`; `PLAT.XR.passthrough`; `PLAT.XR.scene`; `PLAT.XR.anchors`; `PLAT.XR.depth-occlusion`; `PLAT.XR.layers`; `PLAT.XR.gaze-input`; `PLAT.XR.light-estimation`; `PLAT.XR.mobile-ar`
+- **Contributes to:** `CORE.FRAME.present-timeline`; `WLD.SPACE.views`; `RND.ARCH.multiview`; `RND.RECON.foveation`; `UI.FW.xr-interaction`
 - **Not responsible for:** Render pipeline → render-architect; Generic input actions → input-system
-- **Provides:** — · **Consumes:** C-PAL, C-RSCENE, C-INPUT, C-FRAME
+- **Provides:** C-XRVIEW · **Consumes:** C-PAL, C-INPUT, C-FRAME, C-PRESENT, C-VIEW, C-DEVICE, C-TEMPORAL?, C-A11Y
 - **Expertise:** OpenXR, stereo rendering, motion-to-photon latency
-- **Critics (G2):** K-ARCH, K-RENDER, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### content-pipeline-architect
 
-**Content Pipeline Architect** · lead · parent: engine-architect · profiles: all
+**Content Pipeline Architect** · lead · runtime · workstream: content · parent: engine-architect · profiles: all · targets: client, headless-client, server, tools
 
 Asset identity and the content pipeline: asset registry and dependency graph, deterministic incremental per-platform cooking, the cook-step contract, derived-data cache and content-addressed store, distributed cooking, content validation.
 
-- **Owns:** `CNT.ID.identity`; `CNT.ID.registry`; `CNT.ID.dependencies`; `CNT.ID.redirects`; `CNT.COOK.architecture`; `CNT.COOK.contract`; `CNT.COOK.ddc`; `CNT.COOK.distributed`; `CNT.COOK.variants`; `CNT.COOK.determinism-check`; `CNT.VAL.framework`; `CNT.VAL.budgets`
-- **Contributes to:** `CORE.ECS.baking`; `RES.MGMT.dependencies`; `UI.LOC.assets`; `ED.UI.asset-browser`
+- **Owns:** `CNT.ID.identity`; `CNT.ID.registry`; `CNT.ID.dependencies`; `CNT.ID.redirects`; `CNT.ID.rights`; `CNT.COOK.architecture`; `CNT.COOK.contract`; `CNT.COOK.ddc`; `CNT.COOK.distributed`; `CNT.COOK.variants`; `CNT.COOK.determinism-check`; `CNT.COOK.world-build`; `CNT.COOK.on-demand`; `CNT.COOK.shared-cache`; `CNT.COOK.gpu-steps`; `CNT.VAL.framework`; `CNT.VAL.budgets`; `CNT.VAL.audit`; `CNT.VAL.submit-gate`
+- **Contributes to:** `CORE.ECS.baking`; `RES.MGMT.dependencies`; `RND.GI.bake-pipeline`; `AUD.CONTENT.licensed-music`; `UI.LOC.assets`; `UI.LOC.overflow-validation`; `ED.UI.asset-browser`; `ED.UI.thumbnails`; `ED.AI.provenance`; `PRF.METH.pipeline-budgets`; `PRF.BENCH.tools`; `PRF.MEM.attribution`
 - **Not responsible for:** Format-specific builders (shaders, animation, clusters…) → shader-system; Runtime loading → resource-streaming-architect; Import formats → asset-import-interchange
-- **Provides:** C-ASSET, C-COOK · **Consumes:** C-SER, C-TASK, C-REFL
+- **Provides:** C-ASSET, C-COOK · **Consumes:** C-SER, C-TASK, C-REFL · **Tool-side:** C-ML?
 - **Expertise:** build systems for data, content-addressed storage, incremental computation
-- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### asset-import-interchange
 
-**Asset Import & Interchange** · expert · parent: content-pipeline-architect · profiles: all
+**Asset Import & Interchange** · expert · tool · workstream: content · parent: content-pipeline-architect · profiles: all · targets: tools
 
 Importers and interchange: glTF, FBX, OpenUSD, texture and audio source formats, MaterialX/OpenPBR, DCC live link, reimport and source tracking, scan data.
 
-- **Owns:** `CNT.IMP.gltf`; `CNT.IMP.fbx`; `CNT.IMP.usd`; `CNT.IMP.textures`; `CNT.IMP.audio`; `CNT.IMP.materialx`; `CNT.IMP.livelink`; `CNT.IMP.reimport`; `CNT.IMP.scans`
-- **Contributes to:** `ANM.FACE.capture`
+- **Owns:** `CNT.IMP.gltf`; `CNT.IMP.fbx`; `CNT.IMP.usd`; `CNT.IMP.textures`; `CNT.IMP.audio`; `CNT.IMP.materialx`; `CNT.IMP.livelink`; `CNT.IMP.reimport`; `CNT.IMP.scans`; `CNT.IMP.caches`; `CNT.IMP.procedural`; `CNT.IMP.rules`; `CNT.IMP.dcc-plugins`; `CNT.IMP.splats`; `CNT.IMP.geospatial`
+- **Contributes to:** `RND.GEO.splats`; `ANM.DEF.geometry-cache`; `ANM.FACE.capture`; `XC.SEC.dev-trust`
 - **Not responsible for:** Cooking → content-pipeline-architect; Material model → material-system
 - **Provides:** — · **Consumes:** C-ASSET, C-COOK
+- **Untrusted inputs:** imported-dcc-files
 - **Expertise:** glTF, FBX SDK, OpenUSD, MaterialX
-- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### asset-cook-processors
 
-**Asset Cook Processors** · expert · parent: content-pipeline-architect · profiles: all
+**Asset Cook Processors** · expert · tool · workstream: content · parent: content-pipeline-architect · profiles: all · targets: tools
 
 Generic processors: texture processing and GPU texture-compression encoding, mesh optimization, hosting of collision and other domain builders under the cook contract.
 
-- **Owns:** `CNT.COOK.textures`; `CNT.COOK.meshes`
-- **Contributes to:** `RND.LOD.cluster-build`; `RND.TEX.mip-layout`; `PHY.COL.cook`
+- **Owns:** `CNT.COOK.textures`; `CNT.COOK.meshes`; `CNT.COOK.images`; `CNT.COOK.geometry-ops`; `CNT.COOK.ml-assisted`
+- **Contributes to:** `RND.LOD.cluster-build`; `RND.TEX.mip-layout`; `RND.GI.lightmap-uv`; `RND.2D.atlas-cook`; `PHY.COL.cook`; `UI.TXT.font-subsetting`; `ED.WORLD.blockout`
 - **Not responsible for:** Cluster DAG building → virtualized-geometry-lod; Animation compression → animation-runtime; Shader compilation → shader-system
-- **Provides:** — · **Consumes:** C-COOK, C-MATH
+- **Provides:** — · **Consumes:** C-COOK, C-MATH, C-ML?
 - **Expertise:** BCn/ASTC encoders, mesh optimization, image processing
-- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### resource-streaming-architect
 
-**Resource & Streaming Architect** · lead · parent: engine-architect · profiles: all
+**Resource & Streaming Architect** · lead · runtime · workstream: content · parent: engine-architect · profiles: all · targets: client, headless-client, server, tools
 
 Runtime resource model: handles and explicit lifetime, load requests with priority and deadline, dependency-aware loading, the streaming manager (budgets, eviction, prediction), fallbacks, no-stall loading.
 
-- **Owns:** `RES.MGMT.handles`; `RES.MGMT.requests`; `RES.MGMT.dependencies`; `RES.MGMT.streaming`; `RES.MGMT.fallbacks`; `RES.MGMT.no-stall`; `RES.MGMT.reload`
-- **Contributes to:** `CORE.OBJ.references`; `WLD.PART.sources`; `RND.LOD.streaming`; `ANM.CINE.preload`; `AUD.DSP.streaming`
+- **Owns:** `RES.MGMT.handles`; `RES.MGMT.requests`; `RES.MGMT.dependencies`; `RES.MGMT.streaming`; `RES.MGMT.fallbacks`; `RES.MGMT.no-stall`; `RES.MGMT.reload`; `RES.MGMT.arbitration`; `RES.MGMT.gpu-requests`; `RES.MGMT.pipeline`
+- **Contributes to:** `CORE.LIFE.ownership-model`; `CORE.OBJ.references`; `CNT.COOK.on-demand`; `WLD.PART.sources`; `RND.SHADER.precache`; `RND.LOD.streaming`; `ANM.CINE.preload`; `AUD.DSP.streaming`; `UI.FW.loading-screens`; `PRF.MEM.peaks`; `OBS.LOG.trace-analysis`
 - **Not responsible for:** IO backends → async-io-storage; Package format → package-formats-vfs; Texture-specific streaming → texture-streaming-vt
-- **Provides:** C-RES · **Consumes:** C-ASSET, C-VFS, C-IO, C-TASK
+- **Provides:** C-RES · **Consumes:** C-ASSET, C-VFS, C-IO, C-TASK, C-GPUMEM?, C-FRAME, C-LIFETIME
 - **Expertise:** streaming systems, cache eviction, async loading
-- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### async-io-storage
 
-**Async IO & Storage** · expert · parent: resource-streaming-architect · profiles: all
+**Async IO & Storage** · expert · runtime · workstream: content · parent: resource-streaming-architect · profiles: all · targets: client, headless-client, server, tools
 
 Async IO: io_uring, IOCP, DirectStorage and console backends, IO scheduling and queue depth, GPU decompression, memory-mapped IO, file-system abstraction, error handling.
 
-- **Owns:** `RES.IO.backends`; `RES.IO.scheduling`; `RES.IO.gpu-decompress`; `RES.IO.mmap`; `RES.IO.fs`; `RES.IO.errors`
-- **Contributes to:** `CORE.JOBS.completions`; `PRF.LOAD.io`
+- **Owns:** `RES.IO.backends`; `RES.IO.scheduling`; `RES.IO.gpu-decompress`; `RES.IO.mmap`; `RES.IO.fs`; `RES.IO.errors`; `RES.IO.cpu-decompress`; `RES.IO.hw-decompress`; `RES.IO.remote`
+- **Contributes to:** `PLAT.DESK.os-security`; `CORE.JOBS.completions`; `RES.MGMT.pipeline`; `PRF.LOAD.io`
 - **Not responsible for:** Streaming decisions → resource-streaming-architect; Codec choice → package-formats-vfs
 - **Provides:** C-IO · **Consumes:** C-PAL, C-TASK, C-GPUMEM?
 - **Expertise:** NVMe, io_uring, DirectStorage, IO scheduling
-- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### package-formats-vfs
 
-**Package Formats & VFS** · expert · parent: resource-streaming-architect · profiles: all
+**Package Formats & VFS** · expert · runtime · workstream: content · parent: resource-streaming-architect · profiles: all · targets: client, headless-client, server, tools
 
 Package/container format and chunking, codec selection, VFS mount layering (base, patch, DLC, mods), encryption and signing, install-chunk layout.
 
 - **Owns:** `RES.PKG.format`; `RES.PKG.compression`; `RES.PKG.vfs`; `RES.PKG.crypto`; `RES.PKG.install-layout`
-- **Contributes to:** `CORE.SER.relocatable`; `BLD.REL.patching`; `XC.EXT.mod-loading`
+- **Contributes to:** `PLAT.LIVE.events`; `CORE.TYPES.codecs`; `CORE.SER.relocatable`; `RES.IO.hw-decompress`; `CNT.VAL.audit`; `BLD.REL.patching`; `XC.EXT.mod-loading`
 - **Not responsible for:** Patch generation → packaging-release-patching; Relocatable data layout → serialization-schema
 - **Provides:** C-VFS · **Consumes:** C-IO, C-SER
+- **Untrusted inputs:** decompressors, assets
 - **Expertise:** archive formats, compression codecs, content integrity
-- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### world-architect
 
-**World Architect** · lead · parent: engine-architect · profiles: all
+**World Architect** · lead · runtime · workstream: world · parent: engine-architect · profiles: all · targets: client, headless-client, server, tools
 
 World representation strategy (data-oriented, no universal scene graph), partitioning and streaming cells, streaming sources, HLOD strategy, simulation LOD and significance, large-world coordinate policy, level transitions, server-side world streaming.
 
-- **Owns:** `WLD.MODEL.strategy`; `WLD.MODEL.travel`; `WLD.PART.grid`; `WLD.PART.sources`; `WLD.PART.hlod`; `WLD.PART.sim-lod`; `WLD.PART.server`; `WLD.PART.lwc-policy`
-- **Contributes to:** `ED.WORLD.partitioned`
+- **Owns:** `WLD.MODEL.strategy`; `WLD.MODEL.travel`; `WLD.MODEL.planetary`; `WLD.PART.grid`; `WLD.PART.sources`; `WLD.PART.hlod`; `WLD.PART.sim-lod`; `WLD.PART.server`; `WLD.PART.lwc-policy`; `WLD.PART.activation`; `WLD.PART.cook`; `WLD.PART.sim-tiers`; `WLD.ENV.queries`
+- **Contributes to:** `CORE.SCALE.actuators`; `CNT.COOK.world-build`; `PHY.ARCH.streaming`; `NET.REP.interest`; `NET.SRV.zoning`; `ED.WORLD.partitioned`; `PRF.METH.model`; `PRF.LOAD.hitches`
 - **Not responsible for:** World document format → world-data-model; Transform math → spatial-transforms; HLOD mesh generation → virtualized-geometry-lod
-- **Provides:** C-WORLD · **Consumes:** C-SPATIAL, C-RES, C-ECS
+- **Provides:** C-WORLD, C-SIGNIF, C-ENV · **Consumes:** C-SPATIAL, C-RES, C-ECS?, C-VIEW, C-FRAME
 - **Expertise:** open-world streaming, spatial partitioning, significance systems
-- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### world-data-model
 
-**World Data Model** · expert · parent: world-architect · profiles: all
+**World Data Model** · expert · runtime · workstream: world · parent: world-architect · profiles: all · targets: client, headless-client, server, tools
 
 World and level documents, prefabs with nested overrides and variants, data layers, one-file-per-object layout for collaboration, level instances.
 
-- **Owns:** `WLD.MODEL.document`; `WLD.MODEL.prefabs`; `WLD.MODEL.layers`; `WLD.MODEL.file-per-object`; `WLD.MODEL.instancing`
-- **Contributes to:** `GAM.SAVE.world-state`
+- **Owns:** `WLD.MODEL.document`; `WLD.MODEL.prefabs`; `WLD.MODEL.layers`; `WLD.MODEL.file-per-object`; `WLD.MODEL.instancing`; `WLD.TOOL.prefabs`
+- **Contributes to:** `WLD.PART.cook`; `GAM.SCR.level-scripting`; `GAM.SAVE.world-state`
 - **Not responsible for:** Serialization mechanics → serialization-schema; Source-control workflows → collaboration-version-control
-- **Provides:** — · **Consumes:** C-WORLD, C-SER, C-ASSET, C-ID
+- **Provides:** — · **Consumes:** C-WORLD, C-SER, C-ASSET, C-ID, C-RELOAD? · **Tool-side:** C-EDCMD, C-EDHOST
 - **Expertise:** prefab systems, override resolution, mergeable data design
-- **Critics (G2):** K-ARCH, K-SYSTEMS, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### spatial-transforms
 
-**Transforms & Spatial Queries** · expert · parent: world-architect · profiles: all
+**Transforms & Spatial Queries** · expert · runtime · workstream: world · parent: world-architect · profiles: all · targets: client, headless-client, server, tools
 
 Transform representation and parallel hierarchy propagation, attachments, large-world coordinates implementation, generic spatial index and query service for non-physics consumers, spatial hashing.
 
-- **Owns:** `WLD.SPACE.transforms`; `WLD.SPACE.attachments`; `WLD.SPACE.lwc`; `WLD.SPACE.index`; `WLD.SPACE.hashing`
-- **Contributes to:** `CORE.MATH.precision`; `GAM.AI.queries`
-- **Not responsible for:** Physics broadphase → collision-detection; GPU culling → gpu-driven-pipeline
-- **Provides:** C-SPATIAL · **Consumes:** C-MATH, C-ECS, C-TASK
+- **Owns:** `WLD.SPACE.transforms`; `WLD.SPACE.attachments`; `WLD.SPACE.lwc`; `WLD.SPACE.index`; `WLD.SPACE.hashing`; `WLD.SPACE.views`; `WLD.SPACE.change-sets`
+- **Contributes to:** `CORE.MATH.precision`; `CORE.ECS.bridges`; `WLD.MODEL.planetary`; `PHY.ARCH.lwc`; `GAM.AI.queries`
+- **Not responsible for:** Physics broadphase → collision-detection; GPU culling → geometry-pipeline
+- **Provides:** C-SPATIAL, C-VIEW · **Consumes:** C-MATH, C-ECS?, C-TASK, C-ID
 - **Expertise:** transform hierarchies, BVH/grids, precision management
-- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### terrain
 
-**Terrain** · expert · parent: world-architect · profiles: openworld
+**Terrain** · expert · runtime · workstream: world · parent: world-architect · profiles: lite3d, std3d · targets: client, headless-client, server, tools
 
 Terrain end-to-end: representation, rendering, material layering, sculpt/paint tool logic, runtime deformation, collision data hand-off.
 
-- **Owns:** `WLD.ENV.terrain-rep`; `WLD.ENV.terrain-render`; `WLD.ENV.terrain-materials`; `WLD.ENV.terrain-tools`; `WLD.ENV.terrain-deform`
-- **Contributes to:** `ED.WORLD.modes`
+- **Owns:** `WLD.ENV.terrain-rep`; `WLD.ENV.terrain-render`; `WLD.ENV.terrain-materials`; `WLD.ENV.terrain-deform`; `WLD.ENV.terrain-planetary`; `WLD.TOOL.terrain`
+- **Contributes to:** `WLD.MODEL.planetary`; `WLD.ENV.queries`; `ED.WORLD.modes`
 - **Not responsible for:** Virtual texturing core → texture-streaming-vt; Viewport hosting → world-editor-viewport; Collision algorithms → collision-detection
-- **Provides:** — · **Consumes:** C-WORLD, C-RSCENE, C-PHYS, C-RES, C-MATIF, C-EDCMD?
+- **Provides:** — · **Consumes:** C-WORLD?, C-RSCENE?, C-PHYS?, C-RES, C-MATIF?, C-ENV, C-INSTANCES?, C-VT? · **Tool-side:** C-EDCMD, C-EDHOST · **Implements:** C-ENV
 - **Expertise:** terrain LOD, heightfield processing, virtual texturing
-- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### vegetation-foliage
 
-**Vegetation & Foliage** · expert · parent: world-architect · profiles: openworld
+**Vegetation & Foliage** · expert · runtime · workstream: world · parent: world-architect · profiles: lite3d, std3d · targets: client, headless-client, server, tools
 
 Vegetation instancing and rendering, procedural placement rules, wind and interaction, vegetation-specific LOD.
 
-- **Owns:** `WLD.ENV.vegetation`; `WLD.ENV.foliage-placement`; `WLD.ENV.wind`
+- **Owns:** `WLD.ENV.vegetation`; `WLD.ENV.foliage-placement`; `WLD.ENV.wind`; `WLD.TOOL.foliage`
+- **Contributes to:** `WLD.ENV.wind-field`
 - **Not responsible for:** Generic PCG framework → procedural-generation; Impostor generation → virtualized-geometry-lod
-- **Provides:** — · **Consumes:** C-WORLD, C-RSCENE, C-RES, C-PHYS?
+- **Provides:** — · **Consumes:** C-WORLD?, C-RSCENE?, C-RES, C-ENV?, C-INSTANCES?, C-TEMPORAL? · **Tool-side:** C-EDCMD, C-EDHOST
 - **Expertise:** foliage rendering, wind animation, instancing
-- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### water-ocean
 
-**Water & Ocean** · expert · parent: world-architect · profiles: openworld
+**Water & Ocean** · expert · runtime · workstream: world · parent: world-architect · profiles: lite3d, std3d · targets: client, headless-client, server, tools
 
 Ocean spectral simulation, rivers, lakes and shorelines, water surface rendering, water queries for buoyancy.
 
-- **Owns:** `WLD.ENV.ocean`; `WLD.ENV.rivers`; `WLD.ENV.water-render`; `WLD.ENV.buoyancy`
-- **Contributes to:** `PHY.CTRL.buoyancy`; `PHY.FLUID.shallow`
-- **Not responsible for:** Buoyancy dynamics → character-vehicle-physics; Fluid solvers → fluid-simulation
-- **Provides:** — · **Consumes:** C-WORLD, C-RSCENE, C-PHYS, C-RG
+- **Owns:** `WLD.ENV.ocean`; `WLD.ENV.rivers`; `WLD.ENV.water-render`; `WLD.ENV.buoyancy`; `WLD.ENV.water-interaction`; `WLD.TOOL.water`
+- **Contributes to:** `WLD.ENV.queries`; `PHY.DYN.buoyancy`; `PHY.CTRL.watercraft`; `PHY.FLUID.shallow`
+- **Not responsible for:** Buoyancy dynamics → character-physics; Fluid solvers → fluid-simulation
+- **Provides:** — · **Consumes:** C-WORLD?, C-RSCENE?, C-RG?, C-ENV, C-LIGHT?, C-GI?, C-TEMPORAL? · **Tool-side:** C-EDCMD, C-EDHOST · **Implements:** C-ENV
 - **Expertise:** FFT ocean, water rendering, shallow-water models
-- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-SIM, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### atmosphere-weather
 
-**Atmosphere, Volumetrics & Weather** · expert · parent: world-architect · profiles: mobile3d, std3d
+**Atmosphere, Volumetrics & Weather** · expert · runtime · workstream: world · parent: world-architect · profiles: lite3d, std3d · targets: client, headless-client, server, tools
 
 Sky and atmospheric scattering, volumetric clouds, volumetric fog and local media, weather state and surface response, time of day.
 
-- **Owns:** `WLD.ENV.sky`; `WLD.ENV.clouds`; `WLD.ENV.fog`; `WLD.ENV.weather`; `WLD.ENV.time-of-day`
-- **Contributes to:** `RND.GI.sky`; `RND.TRANS.lighting`
+- **Owns:** `WLD.ENV.sky`; `WLD.ENV.clouds`; `WLD.ENV.fog`; `WLD.ENV.weather`; `WLD.ENV.time-of-day`; `WLD.ENV.wind-field`; `WLD.TOOL.sky-weather`
+- **Contributes to:** `WLD.MODEL.planetary`; `WLD.ENV.queries`; `RND.GI.sky`; `RND.TRANS.lighting`; `RND.VFX.volumes`
 - **Not responsible for:** Sky lighting capture for GI → global-illumination; Translucency compositing → translucency-decals
-- **Provides:** — · **Consumes:** C-RSCENE, C-RG, C-FRAME
+- **Provides:** C-ATMOS · **Consumes:** C-RSCENE?, C-RG?, C-FRAME, C-ENV, C-LIGHT?, C-TEMPORAL? · **Tool-side:** C-EDCMD, C-EDHOST · **Implements:** C-ENV
 - **Expertise:** atmospheric scattering, volumetric rendering, weather systems
-- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### procedural-generation
 
-**Procedural Content Generation** · expert · parent: world-architect · profiles: openworld
+**Procedural Content Generation** · expert · runtime · workstream: world · parent: world-architect · profiles: openworld · targets: client, headless-client, server, tools
 
 Deterministic graph-based PCG framework usable in editor and at stream-in, placement and scattering rules, grammar and constraint methods; evaluates ML generation.
 
-- **Owns:** `WLD.PCG.framework`; `WLD.PCG.runtime`; `WLD.PCG.scatter`; `WLD.PCG.grammars`; `WLD.PCG.ml`
-- **Contributes to:** `WLD.ENV.foliage-placement`
+- **Owns:** `WLD.PCG.framework`; `WLD.PCG.runtime`; `WLD.PCG.scatter`; `WLD.PCG.grammars`; `WLD.PCG.ml`; `WLD.TOOL.pcg`
+- **Contributes to:** `WLD.ENV.foliage-placement`; `RND.GEO.dynamic-mesh`; `PRF.BENCH.scale-content`
 - **Not responsible for:** Foliage-specific rules → vegetation-foliage; Graph editor UI → graph-editor-framework
-- **Provides:** — · **Consumes:** C-WORLD, C-COOK?, C-DET, C-GRAPH?
+- **Provides:** — · **Consumes:** C-WORLD, C-DET, C-ML?, C-INSTANCES? · **Tool-side:** C-COOK, C-EDCMD, C-EDHOST, C-GRAPH
 - **Expertise:** PCG, WFC, deterministic generation
-- **Critics (G2):** K-ARCH, K-SYSTEMS, K-SIM, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-SIM, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### render-architect
 
-**Render Architect** · lead · parent: engine-architect · profiles: client
+**Render Architect** · lead · runtime · workstream: rendering · parent: engine-architect · profiles: all · targets: client, tools
 
 Rendering architecture: pipeline organization, shading-path choice (forward+, deferred, visibility buffer), render-feature contract, render scene and world→render sync, scalability tiers from 2D mobile to path-traced, multi-view, debug modes, render threading.
 
-- **Owns:** `RND.ARCH.pipeline`; `RND.ARCH.shading-path`; `RND.ARCH.feature-contract`; `RND.ARCH.scene-sync`; `RND.ARCH.scalability`; `RND.ARCH.multiview`; `RND.ARCH.debug-modes`; `RND.ARCH.threading`
-- **Contributes to:** `PLAT.XR.stereo`; `RND.GEO.visbuffer`; `UI.FW.world-ui`
-- **Not responsible for:** API backends → rhi-core; Pass scheduling → render-graph-scheduling; Individual features (GI, shadows…) → global-illumination
-- **Provides:** C-RSCENE · **Consumes:** C-RG, C-SPATIAL, C-MATIF, C-FRAME, C-ECS
+- **Owns:** `RND.ARCH.pipeline`; `RND.ARCH.shading-path`; `RND.ARCH.feature-contract`; `RND.ARCH.scene-sync`; `RND.ARCH.scalability`; `RND.ARCH.multiview`; `RND.ARCH.debug-modes`; `RND.ARCH.submission-strategy`; `RND.ARCH.editor-rendering`
+- **Contributes to:** `ARCH.STRUCT.registration`; `PLAT.XR.depth-occlusion`; `CORE.FRAME.access-model`; `WLD.SPACE.views`; `RND.MAT.custom-lighting`; `RND.GEO.visbuffer`; `UI.FW.world-ui`; `ED.UI.thumbnails`
+- **Not responsible for:** API backends → gpu-platform-architect; Pass scheduling → render-graph-scheduling; Individual features (GI, shadows…) → owning-skill
+- **Provides:** C-RSCENE · **Consumes:** C-RG, C-SPATIAL, C-MATIF, C-FRAME, C-FLOW, C-VIEW, C-GPUTIER, C-ECS?, C-XRVIEW?, C-INSTANCES?, C-A11Y
 - **Expertise:** real-time rendering architecture, GPU-driven pipelines, scalability
-- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### rhi-core
 
-**RHI Core** · expert · parent: render-architect · profiles: client
+**RHI Core** · expert · runtime · workstream: rendering · parent: gpu-platform-architect · profiles: all · targets: client, tools
 
 Render hardware interface over D3D12, Vulkan, Metal, console APIs and WebGPU: queues and command recording, synchronization, bindless descriptors, PSOs and PSO caching, presentation, capability tiers, GPU crash breadcrumbs, driver workarounds.
 
-- **Owns:** `RND.RHI.backends`; `RND.RHI.queues`; `RND.RHI.sync`; `RND.RHI.bindless`; `RND.RHI.pso`; `RND.RHI.present`; `RND.RHI.caps`; `RND.RHI.crash`; `RND.RHI.queries`; `RND.RHI.workarounds`
-- **Contributes to:** `RND.ARCH.threading`; `RND.SHADER.pso-lists`; `RND.POST.hdr-output`; `QA.RENDER.matrix`; `QA.RENDER.api-validation`; `OBS.CRASH.gpu`
-- **Not responsible for:** GPU memory allocation → gpu-memory-resources; Barrier planning → render-graph-scheduling; Shader compilation → shader-system
-- **Provides:** C-RHI · **Consumes:** C-PAL, C-SYNC
+- **Owns:** `RND.RHI.queues`; `RND.RHI.sync`; `RND.RHI.pso`; `RND.RHI.present`; `RND.RHI.caps`; `RND.RHI.crash`; `RND.RHI.queries`; `RND.RHI.workarounds`; `RND.RHI.binding-tiers`; `RND.RHI.implicit-sync`; `RND.RHI.driver-policy`; `RND.RHI.software-device`; `RND.RHI.capture-integration`; `RND.RHI.gpu-work`; `RND.RHI.conformance`
+- **Contributes to:** `PLAT.PAL.clocks`; `PLAT.PAL.device-db`; `PLAT.CON.rhi-backends`; `CORE.FRAME.present-timeline`; `RND.RHI.d3d12-quirks`; `RND.RHI.vulkan-quirks`; `RND.RHI.metal-quirks`; `RND.RHI.webgpu-quirks`; `RND.SHADER.pso-lists`; `RND.SHADER.precache`; `RND.SHADER.binding-abstraction`; `RND.POST.hdr-output`; `RND.GPU.tiers`; `RND.GPU.recording`; `QA.RENDER.matrix`; `QA.RENDER.api-validation`; `OBS.LOG.hw-counters`; `OBS.CRASH.gpu`
+- **Not responsible for:** GPU memory allocation → gpu-memory-resources; Barrier planning → render-graph-scheduling; Shader compilation → shader-system; Per-API backend code → rhi-d3d12, rhi-vulkan, rhi-metal, rhi-webgpu, platform-console
+- **Provides:** C-RHI · **Consumes:** C-PAL, C-SYNC, C-PRESENT, C-FRAME
 - **Expertise:** D3D12, Vulkan, Metal, GPU synchronization
-- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### gpu-memory-resources
 
-**GPU Memory & Resources** · expert · parent: render-architect · profiles: client
+**GPU Memory & Resources** · expert · runtime · workstream: rendering · parent: gpu-platform-architect · profiles: all · targets: client, tools
 
 GPU heaps and suballocation, residency and overcommit, upload/readback rings, sparse/reserved resources, GPU memory budgeting and defragmentation, lifetimes decoupled from frame boundaries.
 
 - **Owns:** `RND.MEM.heaps`; `RND.MEM.residency`; `RND.MEM.upload`; `RND.MEM.sparse`; `RND.MEM.budget`; `RND.MEM.lifetime`
-- **Contributes to:** `CORE.MEM.uma`; `RES.IO.gpu-decompress`; `RND.GRAPH.aliasing`
+- **Contributes to:** `CORE.LIFE.ownership-model`; `CORE.MEM.uma`; `RES.MGMT.arbitration`; `RES.MGMT.pipeline`; `RES.IO.gpu-decompress`; `RND.GRAPH.aliasing`
 - **Not responsible for:** Transient aliasing plans → render-graph-scheduling; Texture streaming policy → texture-streaming-vt
-- **Provides:** C-GPUMEM · **Consumes:** C-RHI
+- **Provides:** C-GPUMEM · **Consumes:** C-RHI, C-GPUTIER, C-LIFETIME
 - **Expertise:** D3D12MA/VMA-class allocators, residency, sparse resources
-- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### render-graph-scheduling
 
-**Render Graph & GPU Scheduling** · expert · parent: render-architect · profiles: client
+**Render Graph & GPU Scheduling** · expert · runtime · workstream: rendering · parent: gpu-platform-architect · profiles: all · targets: client, tools
 
 Render graph declaration and compilation, automatic barriers, transient aliasing, async compute and multi-queue scheduling, TBDR pass merging, history resources, work-graph integration, general GPU compute, readback contract.
 
-- **Owns:** `RND.GRAPH.declare`; `RND.GRAPH.barriers`; `RND.GRAPH.aliasing`; `RND.GRAPH.async`; `RND.GRAPH.tbdr`; `RND.GRAPH.history`; `RND.GRAPH.work-graphs`; `RND.GRAPH.compute`; `RND.GRAPH.readback`
-- **Contributes to:** `PLAT.MOB.tbdr`; `ML.RT.scheduling`; `PRF.GPU.overlap`
+- **Owns:** `RND.GRAPH.declare`; `RND.GRAPH.barriers`; `RND.GRAPH.aliasing`; `RND.GRAPH.async`; `RND.GRAPH.tbdr`; `RND.GRAPH.history`; `RND.GRAPH.work-graphs`; `RND.GRAPH.compute`; `RND.GRAPH.readback`; `RND.GRAPH.validation`
+- **Contributes to:** `PLAT.MOB.tbdr`; `RES.MGMT.gpu-requests`; `RND.RHI.implicit-sync`; `RND.RHI.gpu-work`; `ML.RT.scheduling`; `PRF.GPU.overlap`; `PRF.GPU.baselines`; `OBS.LOG.trace-analysis`
 - **Not responsible for:** Heap allocation → gpu-memory-resources; Feature passes → render-architect
 - **Provides:** C-RG · **Consumes:** C-RHI, C-GPUMEM, C-TASK
 - **Expertise:** frame graphs, GPU scheduling, work graphs
-- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### shader-system
 
-**Shader System** · expert · parent: render-architect · profiles: client
+**Shader System** · expert · runtime · workstream: rendering · parent: gpu-platform-architect · profiles: all · targets: client, tools
 
 Shading language and dialect, compilation toolchain, permutations, reflection and binding layouts, interop headers, caches and distributed compilation, hot reload, shader debugging, PSO-list gathering.
 
-- **Owns:** `RND.SHADER.language`; `RND.SHADER.toolchain`; `RND.SHADER.permutations`; `RND.SHADER.reflection`; `RND.SHADER.interop`; `RND.SHADER.cache`; `RND.SHADER.reload`; `RND.SHADER.debug`; `RND.SHADER.pso-lists`
-- **Contributes to:** `RND.RHI.pso`
+- **Owns:** `RND.SHADER.language`; `RND.SHADER.toolchain`; `RND.SHADER.permutations`; `RND.SHADER.reflection`; `RND.SHADER.interop`; `RND.SHADER.cache`; `RND.SHADER.reload`; `RND.SHADER.debug`; `RND.SHADER.pso-lists`; `RND.SHADER.slang`; `RND.SHADER.precache`; `RND.SHADER.permutation-budget`; `RND.SHADER.neural`; `RND.SHADER.autodiff`; `RND.SHADER.binding-abstraction`; `RND.SHADER.gpu-debug-draw`; `RND.SHADER.untrusted`
+- **Contributes to:** `PLAT.DESK.os-security`; `RND.RHI.pso`; `RND.RHI.binding-tiers`; `PRF.METH.pipeline-budgets`
 - **Not responsible for:** Material graphs → material-system; Runtime PSO cache → rhi-core
-- **Provides:** C-SHADER · **Consumes:** C-RHI, C-COOK, C-RELOAD
+- **Provides:** C-SHADER · **Consumes:** C-RHI, C-GPUTIER, C-ML?, C-RELOAD? · **Tool-side:** C-COOK
+- **Untrusted inputs:** ugc-graphs
 - **Expertise:** HLSL, Slang, DXC/SPIR-V, permutation management
-- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### material-system
 
-**Material System** · expert · parent: render-architect · profiles: client
+**Material System** · expert · runtime · workstream: rendering · parent: render-architect · profiles: all · targets: client, tools
 
 Material model (OpenPBR-class, layered), material graph → shader code generation, instances and parameters, quality tiers, material validation; evaluates neural materials.
 
-- **Owns:** `RND.MAT.model`; `RND.MAT.graph`; `RND.MAT.instances`; `RND.MAT.tiers`; `RND.MAT.neural`; `RND.MAT.validation`
-- **Contributes to:** `CNT.IMP.materialx`
+- **Owns:** `RND.MAT.model`; `RND.MAT.graph`; `RND.MAT.instances`; `RND.MAT.tiers`; `RND.MAT.neural`; `RND.MAT.validation`; `RND.MAT.openpbr`; `RND.MAT.custom-lighting`; `RND.TOOL.material-editor`
+- **Contributes to:** `CNT.IMP.materialx`; `RND.SHADER.precache`
 - **Not responsible for:** BRDF research reference → research-evidence; Graph editor UI → graph-editor-framework; Shader compiler → shader-system
-- **Provides:** C-MATIF · **Consumes:** C-SHADER, C-GRAPH?, C-ASSET
+- **Provides:** C-MATIF · **Consumes:** C-SHADER, C-ASSET, C-MLGPU?, C-GPUTIER · **Tool-side:** C-EDCMD, C-EDHOST, C-GRAPH
 - **Expertise:** PBR, OpenPBR/MaterialX, shader codegen
-- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
-### gpu-driven-pipeline
+### geometry-pipeline
 
-**GPU-Driven Geometry Pipeline** · expert · parent: render-architect · profiles: mobile3d, std3d
+**Geometry Submission Pipeline** · expert · runtime · workstream: rendering · parent: render-architect · profiles: lite3d, std3d · targets: client, tools
 
-GPU scene and instance data, GPU frustum and two-phase occlusion culling, indirect and device-generated commands, mesh/amplification shaders, visibility-buffer rasterization, instancing, CPU-driven fallback for low-tier GPUs.
+Instance scene and geometry submission for every 3D tier: persistent instance data with batched delta updates, the CPU-culled batched/instanced path (first-class on TBDR/mobile and lite3d), and the GPU-driven path (GPU culling, indirect/mesh shaders, visibility buffer) for desktop/console tiers.
 
-- **Owns:** `RND.GEO.gpu-scene`; `RND.GEO.culling`; `RND.GEO.indirect`; `RND.GEO.mesh-shaders`; `RND.GEO.visbuffer`; `RND.GEO.fallback`; `RND.GEO.instancing`
-- **Contributes to:** `WLD.ENV.terrain-render`; `RND.ARCH.scene-sync`
+- **Owns:** `RND.GEO.gpu-scene`; `RND.GEO.culling`; `RND.GEO.indirect`; `RND.GEO.mesh-shaders`; `RND.GEO.visbuffer`; `RND.GEO.instancing`; `RND.GEO.cpu-submission`; `RND.GEO.mesh-nodes`; `RND.GEO.dynamic-mesh`; `RND.GEO.splats`; `RND.GEO.splat-relight`
+- **Contributes to:** `WLD.PART.activation`; `WLD.ENV.terrain-render`; `RND.ARCH.scene-sync`; `RND.ARCH.submission-strategy`; `RND.RHI.gpu-work`
 - **Not responsible for:** Cluster LOD → virtualized-geometry-lod; Render-scene contract → render-architect
-- **Provides:** — · **Consumes:** C-RSCENE, C-RG, C-SHADER, C-GPUMEM
+- **Provides:** C-INSTANCES · **Consumes:** C-RSCENE, C-RG, C-SHADER, C-GPUMEM, C-GPUTIER, C-GEOLOD?, C-TEMPORAL?
 - **Expertise:** GPU culling, mesh shaders, ExecuteIndirect
-- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### virtualized-geometry-lod
 
-**Virtualized Geometry & LOD** · expert · parent: render-architect · profiles: mobile3d, std3d
+**Virtualized Geometry & LOD** · expert · runtime · workstream: rendering · parent: render-architect · profiles: lite3d, std3d · targets: client, tools
 
 All geometric LOD: cluster hierarchies and virtualized geometry, cluster DAG building, software micro-polygon rasterization, cluster streaming, discrete LOD, HLOD proxies and impostors, deforming-geometry LOD, displacement.
 
-- **Owns:** `RND.LOD.clusters`; `RND.LOD.cluster-build`; `RND.LOD.swraster`; `RND.LOD.streaming`; `RND.LOD.discrete`; `RND.LOD.hlod`; `RND.LOD.deforming`; `RND.LOD.displacement`
-- **Contributes to:** `WLD.PART.hlod`; `RND.RT.lod`
+- **Owns:** `RND.LOD.clusters`; `RND.LOD.cluster-build`; `RND.LOD.swraster`; `RND.LOD.streaming`; `RND.LOD.discrete`; `RND.LOD.hlod`; `RND.LOD.deforming`; `RND.LOD.displacement`; `RND.TOOL.mesh-lod`
+- **Contributes to:** `CNT.COOK.ml-assisted`; `WLD.PART.hlod`; `RND.RT.lod`; `ANM.DEF.crowd`
 - **Not responsible for:** HLOD strategy → world-architect; Generic mesh optimization → asset-cook-processors; RT acceleration structures → ray-tracing-infrastructure
-- **Provides:** — · **Consumes:** C-RSCENE, C-RG, C-RES, C-COOK, C-RT?
+- **Provides:** C-GEOLOD · **Consumes:** C-RSCENE, C-RG, C-RES, C-RT?, C-INSTANCES · **Tool-side:** C-COOK, C-EDCMD, C-EDHOST
 - **Expertise:** mesh simplification, cluster LOD, software rasterization
-- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### texture-streaming-vt
 
-**Textures & Virtual Texturing** · expert · parent: render-architect · profiles: mobile3d, std3d
+**Textures & Virtual Texturing** · expert · runtime · workstream: rendering · parent: render-architect · profiles: all · targets: client, tools
 
 Runtime texture formats, mip streaming, sampler-feedback streaming, virtual texturing, streaming-friendly cooked layout; evaluates neural texture compression.
 
 - **Owns:** `RND.TEX.formats`; `RND.TEX.mip-streaming`; `RND.TEX.feedback`; `RND.TEX.vt`; `RND.TEX.ntc`; `RND.TEX.mip-layout`
 - **Contributes to:** `WLD.ENV.terrain-materials`
 - **Not responsible for:** Texture encoding in cook → asset-cook-processors; Streaming manager → resource-streaming-architect
-- **Provides:** — · **Consumes:** C-RES, C-GPUMEM, C-RG, C-COOK, C-ML?
+- **Provides:** C-VT · **Consumes:** C-RES, C-GPUMEM, C-RG, C-ML?, C-MLGPU? · **Tool-side:** C-COOK
 - **Expertise:** virtual texturing, sampler feedback, texture compression
-- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### direct-lighting-shadows
 
-**Direct Lighting & Shadows** · expert · parent: render-architect · profiles: mobile3d, std3d
+**Direct Lighting & Shadows** · expert · runtime · workstream: rendering · parent: render-architect · profiles: lite3d, std3d · targets: client, tools
 
 Light types and physical units, clustered light culling, stochastic many-light sampling, area lights, cascaded, virtual and ray-traced shadows, contact shadows, light profiles.
 
-- **Owns:** `RND.LIGHT.units`; `RND.LIGHT.clustered`; `RND.LIGHT.stochastic`; `RND.LIGHT.area`; `RND.LIGHT.csm`; `RND.LIGHT.vsm`; `RND.LIGHT.rt-shadows`; `RND.LIGHT.contact`; `RND.LIGHT.profiles`
+- **Owns:** `RND.LIGHT.units`; `RND.LIGHT.clustered`; `RND.LIGHT.stochastic`; `RND.LIGHT.area`; `RND.LIGHT.csm`; `RND.LIGHT.vsm`; `RND.LIGHT.rt-shadows`; `RND.LIGHT.contact`; `RND.LIGHT.profiles`; `RND.LIGHT.channels`
 - **Not responsible for:** Indirect lighting → global-illumination; Denoisers → reconstruction-upscaling
-- **Provides:** — · **Consumes:** C-RSCENE, C-RG, C-RT?, C-TEMPORAL
+- **Provides:** C-LIGHT · **Consumes:** C-RSCENE, C-RG, C-RT?, C-TEMPORAL, C-INSTANCES?, C-GEOLOD?
 - **Expertise:** many-light rendering, shadow techniques, ReSTIR DI
-- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### global-illumination
 
-**Global Illumination & Reflections** · expert · parent: render-architect · profiles: mobile3d, std3d
+**Global Illumination & Reflections** · expert · runtime · workstream: rendering · parent: render-architect · profiles: lite3d, std3d · targets: client, tools
 
 Indirect lighting across tiers: baked lightmaps, probe volumes, screen-space GI and AO, surface/radiance-cache hybrid GI, ReSTIR GI, reflections, sky lighting, specular occlusion, SDF scene representations.
 
-- **Owns:** `RND.GI.baked`; `RND.GI.probes`; `RND.GI.screen-space`; `RND.GI.hybrid`; `RND.GI.restir`; `RND.GI.reflections`; `RND.GI.sky`; `RND.GI.specular-occlusion`; `RND.GI.sdf`
-- **Contributes to:** `RND.RECON.denoise`
+- **Owns:** `RND.GI.baked`; `RND.GI.probes`; `RND.GI.screen-space`; `RND.GI.hybrid`; `RND.GI.restir`; `RND.GI.reflections`; `RND.GI.sky`; `RND.GI.specular-occlusion`; `RND.GI.bake-pipeline`; `RND.GI.lightmap-uv`; `RND.GI.neural-cache`; `RND.TOOL.lighting`
+- **Contributes to:** `PLAT.XR.light-estimation`; `RND.RT.sdf-scene`; `RND.RECON.denoise`
 - **Not responsible for:** RT infrastructure → ray-tracing-infrastructure; Atmosphere model → atmosphere-weather
-- **Provides:** — · **Consumes:** C-RSCENE, C-RG, C-RT?, C-TEMPORAL, C-COOK?
+- **Provides:** C-GI · **Consumes:** C-RSCENE, C-RG, C-RT?, C-TEMPORAL, C-LIGHT, C-ATMOS?, C-MLGPU? · **Tool-side:** C-COOK, C-EDCMD, C-EDHOST
 - **Expertise:** real-time GI, radiance caching, lightmapping
-- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### ray-tracing-infrastructure
 
-**Ray Tracing Infrastructure** · expert · parent: render-architect · profiles: aaa
+**Ray Tracing Infrastructure** · expert · runtime · workstream: rendering · parent: gpu-platform-architect · profiles: lite3d, std3d · targets: client, tools
 
 Acceleration structure management at scale, inline vs pipeline RT, opacity micromaps, RT LOD, software RT fallback, shader execution reordering, cluster/partitioned acceleration structures.
 
-- **Owns:** `RND.RT.as`; `RND.RT.instances`; `RND.RT.pipelines`; `RND.RT.omm`; `RND.RT.lod`; `RND.RT.software`; `RND.RT.ser`; `RND.RT.cluster-blas`
-- **Contributes to:** `RND.LIGHT.rt-shadows`; `RND.GI.sdf`; `ANM.DEF.rt`
+- **Owns:** `RND.RT.as`; `RND.RT.instances`; `RND.RT.pipelines`; `RND.RT.omm`; `RND.RT.lod`; `RND.RT.software`; `RND.RT.ser`; `RND.RT.cluster-blas`; `RND.RT.sdf-scene`
+- **Contributes to:** `RND.GEO.splats`; `RND.LIGHT.rt-shadows`; `ANM.DEF.rt`
 - **Not responsible for:** Lighting algorithms using rays → global-illumination; Deformed-geometry updates → deformation-skinning
-- **Provides:** C-RT · **Consumes:** C-RSCENE, C-RG, C-GPUMEM
+- **Provides:** C-RT · **Consumes:** C-RSCENE, C-RG, C-GPUMEM, C-INSTANCES, C-GPUTIER
 - **Expertise:** DXR/Vulkan RT, BVH construction, RT performance
-- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### path-tracing
 
-**Path Tracing** · expert · parent: render-architect · profiles: aaa
+**Path Tracing** · expert · runtime · workstream: rendering · parent: render-architect · profiles: lite3d, std3d · targets: client, tools
 
 Reference path tracer as ground-truth oracle for validation, real-time path tracing, offline cinematic render mode.
 
 - **Owns:** `RND.PT.reference`; `RND.PT.realtime`; `RND.PT.offline`
-- **Contributes to:** `ANM.CINE.movie-render`; `QA.RENDER.reference`
+- **Contributes to:** `RND.GI.neural-cache`; `ANM.CINE.movie-render`; `QA.RENDER.reference`
 - **Not responsible for:** Movie render orchestration → cinematics-sequencer; Image comparison tests → render-validation
-- **Provides:** — · **Consumes:** C-RT, C-MATIF, C-RSCENE
+- **Provides:** — · **Consumes:** C-RT?, C-MATIF, C-RSCENE, C-LIGHT, C-GI?
 - **Expertise:** Monte Carlo rendering, ReSTIR PT, spectral rendering
-- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### reconstruction-upscaling
 
-**Reconstruction, Upscaling & Denoising** · expert · parent: render-architect · profiles: mobile3d, std3d
+**Reconstruction, Upscaling & Denoising** · expert · runtime · workstream: rendering · parent: render-architect · profiles: all · targets: client, tools
 
 Temporal anti-aliasing and reconstruction, temporal and ML upscalers, frame generation, dynamic resolution, the motion-vector/jitter/history contract, spatiotemporal and ML denoising, variable-rate shading.
 
-- **Owns:** `RND.RECON.taa`; `RND.RECON.upscalers`; `RND.RECON.framegen`; `RND.RECON.dynres`; `RND.RECON.motion-vectors`; `RND.RECON.denoise`; `RND.RECON.vrs`
-- **Contributes to:** `ANM.DEF.motion-vectors`
+- **Owns:** `RND.RECON.taa`; `RND.RECON.upscalers`; `RND.RECON.framegen`; `RND.RECON.dynres`; `RND.RECON.motion-vectors`; `RND.RECON.denoise`; `RND.RECON.vrs`; `RND.RECON.msaa`; `RND.RECON.post-aa`; `RND.RECON.specular-aa`; `RND.RECON.foveation`
+- **Contributes to:** `CORE.FRAME.present-timeline`; `CORE.SCALE.actuators`; `ANM.DEF.motion-vectors`
 - **Not responsible for:** Signal-specific sampling → global-illumination; Frame pacing → frame-orchestration
-- **Provides:** C-TEMPORAL · **Consumes:** C-RG, C-FRAME, C-ML?
+- **Provides:** C-TEMPORAL · **Consumes:** C-RG, C-FRAME, C-PRESENT, C-MLGPU?
 - **Expertise:** TAA/TSR, DLSS/FSR/XeSS SDKs, denoisers
-- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### post-color-hdr
 
-**Post-Processing, Color & HDR** · expert · parent: render-architect · profiles: client
+**Post-Processing, Color & HDR** · expert · runtime · workstream: rendering · parent: render-architect · profiles: all · targets: client, tools
 
 Post chain, physical camera and exposure, end-to-end color management (working space, output transforms, OCIO), HDR output and calibration, tonemapping, grading.
 
-- **Owns:** `RND.POST.effects`; `RND.POST.camera`; `RND.POST.color`; `RND.POST.hdr-output`; `RND.POST.tonemap`; `RND.POST.grading`
-- **Contributes to:** `UI.A11Y.vision`
+- **Owns:** `RND.POST.effects`; `RND.POST.camera`; `RND.POST.color`; `RND.POST.hdr-output`; `RND.POST.tonemap`; `RND.POST.grading`; `RND.POST.aces2`; `RND.POST.colorblind`; `RND.POST.stylized`
+- **Contributes to:** `RND.MEDIA.hdr`
 - **Not responsible for:** Display enumeration → platform-desktop; Upscaling → reconstruction-upscaling
-- **Provides:** — · **Consumes:** C-RG, C-RHI, C-CFG
+- **Provides:** — · **Consumes:** C-RG, C-RHI, C-CFG, C-A11Y, C-PAL
 - **Expertise:** color science, ACES, HDR10/PQ, post effects
-- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### translucency-decals
 
-**Translucency & Decals** · expert · parent: render-architect · profiles: mobile3d, std3d
+**Translucency & Decals** · expert · runtime · workstream: rendering · parent: render-architect · profiles: lite3d, std3d · targets: client, tools
 
 Transparency and OIT, refraction and distortion, decals, translucent lighting and volumetric integration.
 
 - **Owns:** `RND.TRANS.oit`; `RND.TRANS.refraction`; `RND.TRANS.decals`; `RND.TRANS.lighting`
 - **Contributes to:** `WLD.ENV.water-render`
 - **Not responsible for:** Particle simulation → vfx-particles; Volumetric media → atmosphere-weather
-- **Provides:** — · **Consumes:** C-RSCENE, C-RG, C-MATIF
+- **Provides:** — · **Consumes:** C-RSCENE, C-RG, C-MATIF, C-LIGHT, C-GI?, C-ATMOS?, C-TEMPORAL
 - **Expertise:** OIT, decal systems, translucency sorting
-- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### character-rendering
 
-**Character Rendering** · expert · parent: render-architect · profiles: aaa
+**Character Rendering** · expert · runtime · workstream: rendering · parent: render-architect · profiles: lite3d, std3d · targets: client, tools
 
 Skin subsurface scattering, eyes, strand-based hair and fur rendering, digital-human LOD.
 
-- **Owns:** `RND.CHAR.skin`; `RND.CHAR.eyes`; `RND.CHAR.hair`; `RND.CHAR.lod`
+- **Owns:** `RND.CHAR.skin`; `RND.CHAR.eyes`; `RND.CHAR.hair`; `RND.CHAR.lod`; `RND.CHAR.hair-cards`
 - **Contributes to:** `PHY.SOFT.hair-sim`
 - **Not responsible for:** Hair simulation → cloth-deformables; Skinning → deformation-skinning
-- **Provides:** — · **Consumes:** C-RSCENE, C-MATIF, C-ANIM, C-RG
+- **Provides:** — · **Consumes:** C-RSCENE, C-MATIF, C-ANIM, C-RG, C-LIGHT, C-GI?
 - **Expertise:** SSS, strand rendering, digital humans
-- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### render-2d-vector
 
-**2D, Vector & UI Rendering** · expert · parent: render-architect · profiles: client
+**2D, Vector & UI Rendering** · expert · runtime · workstream: rendering · parent: render-architect · profiles: all · targets: client, tools
 
 2D draw backend shared by 2D games, UI and debug overlays: sprites, tilemaps, 2D lighting, vector paths, UI batching/clipping/SDF, HDR compositing, pixel-perfect modes.
 
-- **Owns:** `RND.2D.sprites`; `RND.2D.tilemaps`; `RND.2D.lighting`; `RND.2D.vector`; `RND.2D.ui-backend`; `RND.2D.pixel`
-- **Contributes to:** `ANM.RT.2d`
+- **Owns:** `RND.2D.sprites`; `RND.2D.tilemaps`; `RND.2D.lighting`; `RND.2D.vector`; `RND.2D.ui-backend`; `RND.2D.pixel`; `RND.2D.atlas-cook`; `RND.TOOL.tilemap-sprite`
+- **Contributes to:** `ANM.RT.2d`; `ANM.TOOL.2d-rigging`; `ED.WORLD.2d-mode`
 - **Not responsible for:** Widget model → ui-architect; Glyph shaping → text-fonts
-- **Provides:** C-DRAW2D · **Consumes:** C-RG, C-SHADER, C-TEXT
+- **Provides:** C-DRAW2D · **Consumes:** C-RG, C-SHADER, C-TEXT, C-TEMPORAL?, C-A11Y · **Tool-side:** C-EDCMD, C-EDHOST
 - **Expertise:** 2D batching, vector rasterization, SDF rendering
-- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### vfx-particles
 
-**Particles & VFX** · expert · parent: render-architect · profiles: client
+**Particles & VFX** · expert · runtime · workstream: rendering · parent: render-architect · profiles: all · targets: client, tools
 
 GPU particle simulation, VFX graph runtime, ribbons/beams/mesh particles, particle collision, VFX budgets and significance.
 
-- **Owns:** `RND.VFX.gpu-sim`; `RND.VFX.graph`; `RND.VFX.primitives`; `RND.VFX.collision`; `RND.VFX.budgets`
+- **Owns:** `RND.VFX.gpu-sim`; `RND.VFX.graph`; `RND.VFX.primitives`; `RND.VFX.collision`; `RND.VFX.budgets`; `RND.VFX.volumes`; `RND.TOOL.vfx-editor`
+- **Contributes to:** `WLD.ENV.wind-field`; `GAM.SYS.impacts`; `ED.UI.curves-timeline`
 - **Not responsible for:** Physically based fluids → fluid-simulation; Translucency sorting → translucency-decals
-- **Provides:** — · **Consumes:** C-RSCENE, C-RG, C-GRAPH?, C-PHYS?
+- **Provides:** — · **Consumes:** C-RSCENE, C-RG, C-PHYS?, C-LIGHT?, C-GI?, C-ATMOS?, C-TEMPORAL?, C-ENV?, C-A11Y · **Tool-side:** C-GRAPH, C-EDCMD, C-EDHOST
 - **Expertise:** GPU particles, VFX authoring, Niagara/VFX Graph-class systems
-- **Critics (G2):** K-ARCH, K-RENDER, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-SIM, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### physics-architect
 
-**Physics Architect** · lead · parent: engine-architect · profiles: all
+**Physics Architect** · lead · runtime · workstream: simulation · parent: engine-architect · profiles: min2d, lite3d, std3d · targets: client, headless-client, server, tools
 
 Physics architecture: build vs integrate decision, physics world representation and ECS integration, stepping and frame sync, determinism levels, physics LOD, materials, GPU offload evaluation; covers both 2D and 3D.
 
-- **Owns:** `PHY.ARCH.build-integrate`; `PHY.ARCH.world`; `PHY.ARCH.stepping`; `PHY.ARCH.determinism`; `PHY.ARCH.lod`; `PHY.ARCH.materials`; `PHY.ARCH.gpu`
+- **Owns:** `PHY.ARCH.build-integrate`; `PHY.ARCH.world`; `PHY.ARCH.stepping`; `PHY.ARCH.determinism`; `PHY.ARCH.lod`; `PHY.ARCH.materials`; `PHY.ARCH.gpu`; `PHY.ARCH.rewind`; `PHY.ARCH.async`; `PHY.ARCH.streaming`; `PHY.ARCH.lwc`; `PHY.ARCH.middleware-layer`; `PHY.ARCH.events`; `PHY.ARCH.validation`
+- **Contributes to:** `CORE.FRAME.access-model`; `CORE.FRAME.sim-schedule`; `CORE.ECS.bridges`; `WLD.PART.activation`; `WLD.SPACE.change-sets`; `ANM.ARCH.sync`; `PRF.LOAD.hitches`; `XC.DET.snapshot`
 - **Not responsible for:** Collision algorithms → collision-detection; Solvers → rigid-body-dynamics; Networked physics → prediction-rollback
-- **Provides:** C-PHYS · **Consumes:** C-SPATIAL, C-ECS, C-FRAME, C-DET, C-TASK
+- **Provides:** C-PHYS · **Consumes:** C-SPATIAL, C-FRAME, C-DET, C-TASK, C-ECS?, C-WORLD?, C-RES, C-SIGNIF?, C-SNAPSHOT, C-ENV?, C-RG?
 - **Expertise:** physics engines (Jolt, PhysX, Havok, Box2D), simulation architecture
-- **Critics (G2):** K-ARCH, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### collision-detection
 
-**Collision Detection & Queries** · expert · parent: physics-architect · profiles: mobile3d, std3d, server
+**Collision Detection & Queries** · expert · runtime · workstream: simulation · parent: physics-architect · profiles: lite3d, std3d · targets: client, headless-client, server, tools
 
 Shapes, broadphase, narrowphase and contact manifolds, CCD, scene queries, filtering, mesh/heightfield/SDF collision, collision cooking.
 
-- **Owns:** `PHY.COL.shapes`; `PHY.COL.broadphase`; `PHY.COL.narrowphase`; `PHY.COL.ccd`; `PHY.COL.queries`; `PHY.COL.filtering`; `PHY.COL.complex`; `PHY.COL.cook`
-- **Contributes to:** `AUD.SPAT.occlusion`
+- **Owns:** `PHY.COL.shapes`; `PHY.COL.broadphase`; `PHY.COL.narrowphase`; `PHY.COL.ccd`; `PHY.COL.queries`; `PHY.COL.filtering`; `PHY.COL.cook`; `PHY.COL.mesh-heightfield`; `PHY.COL.sdf`; `PHY.COL.decomposition`
+- **Contributes to:** `PLAT.XR.scene`; `PHY.ARCH.streaming`; `PHY.CTRL.sensing`; `PHY.TOOL.collision-authoring`; `AUD.SPAT.occlusion`; `GAM.SYS.volumes`; `GAM.SYS.hit-detection`
 - **Not responsible for:** Generic spatial queries → spatial-transforms; Dynamics → rigid-body-dynamics
-- **Provides:** — · **Consumes:** C-PHYS, C-MATH, C-COOK?
+- **Provides:** — · **Consumes:** C-PHYS, C-MATH, C-DET, C-ENV? · **Tool-side:** C-COOK
 - **Expertise:** GJK/EPA, BVH broadphase, robust geometry
-- **Critics (G2):** K-ARCH, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### rigid-body-dynamics
 
-**Rigid-Body Dynamics** · expert · parent: physics-architect · profiles: mobile3d, std3d, server
+**Rigid-Body Dynamics** · expert · runtime · workstream: simulation · parent: physics-architect · profiles: lite3d, std3d · targets: client, headless-client, server, tools
 
 Integration and constraint solvers, joints, islands and sleeping, parallel solving, stacking stability, kinematic and animated bodies.
 
-- **Owns:** `PHY.DYN.solver`; `PHY.DYN.joints`; `PHY.DYN.islands`; `PHY.DYN.parallel`; `PHY.DYN.stability`; `PHY.DYN.kinematic`
-- **Contributes to:** `ANM.IK.physical`; `NET.PRED.physics`
-- **Not responsible for:** Character controllers → character-vehicle-physics; Ragdoll blending → ik-procedural-animation
-- **Provides:** — · **Consumes:** C-PHYS, C-TASK, C-DET
+- **Owns:** `PHY.DYN.solver`; `PHY.DYN.joints`; `PHY.DYN.islands`; `PHY.DYN.parallel`; `PHY.DYN.stability`; `PHY.DYN.kinematic`; `PHY.DYN.dof-lock`; `PHY.DYN.articulations`; `PHY.DYN.buoyancy`
+- **Contributes to:** `PHY.ARCH.rewind`; `PHY.TOOL.physics-asset`; `ANM.IK.physical`; `NET.PRED.physics`; `QA.SIM.stability-suite`
+- **Not responsible for:** Character controllers → character-physics; Ragdoll blending → ik-procedural-animation
+- **Provides:** — · **Consumes:** C-PHYS, C-TASK, C-DET, C-ANIM?, C-ENV?
 - **Expertise:** TGS/XPBD, constraint solvers, numerical stability
-- **Critics (G2):** K-ARCH, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
-### character-vehicle-physics
+### character-physics
 
-**Character & Vehicle Physics** · expert · parent: physics-architect · profiles: mobile3d, std3d, server
+**Character Physics** · expert · runtime · workstream: simulation · parent: physics-architect · profiles: lite3d, std3d · targets: client, headless-client, server, tools
 
-Character controllers (kinematic and dynamic), vehicles (wheels, tires, suspension, drivetrain), buoyancy, moving platforms and physical interaction.
+Character controllers (kinematic and dynamic), moving platforms and physical interaction.
 
-- **Owns:** `PHY.CTRL.character`; `PHY.CTRL.vehicles`; `PHY.CTRL.buoyancy`; `PHY.CTRL.platforms`
-- **Contributes to:** `WLD.ENV.buoyancy`
-- **Not responsible for:** Movement gameplay logic → gameplay-systems-toolkit; Movement prediction → prediction-rollback
-- **Provides:** — · **Consumes:** C-PHYS, C-INPUT?
+- **Owns:** `PHY.CTRL.character`; `PHY.CTRL.platforms`; `PHY.CTRL.sensing`
+- **Contributes to:** `WLD.ENV.buoyancy`; `PHY.TOOL.tuning`
+- **Not responsible for:** Movement modes & networked movement → character-movement; Vehicles → vehicle-physics
+- **Provides:** — · **Consumes:** C-PHYS, C-DET, C-ENV?
 - **Expertise:** character controllers, vehicle dynamics, tire models
-- **Critics (G2):** K-ARCH, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### cloth-deformables
 
-**Cloth & Deformables** · expert · parent: physics-architect · profiles: std3d
+**Cloth & Deformables** · expert · runtime · workstream: simulation · parent: physics-architect · profiles: lite3d, std3d · targets: client, headless-client, server, tools
 
 Cloth, soft bodies, ropes and cables, hair strand simulation; evaluates ML cloth.
 
 - **Owns:** `PHY.SOFT.cloth`; `PHY.SOFT.softbody`; `PHY.SOFT.ropes`; `PHY.SOFT.hair-sim`; `PHY.SOFT.ml`
+- **Contributes to:** `WLD.ENV.wind-field`
 - **Not responsible for:** Hair rendering → character-rendering; Skinning → deformation-skinning
-- **Provides:** — · **Consumes:** C-PHYS, C-ANIM, C-RG?
+- **Provides:** — · **Consumes:** C-PHYS, C-ANIM, C-RG?, C-ENV?, C-DET?, C-ML?
 - **Expertise:** XPBD, cloth simulation, strand dynamics
-- **Critics (G2):** K-ARCH, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### destruction-fracture
 
-**Destruction & Fracture** · expert · parent: physics-architect · profiles: aaa
+**Destruction & Fracture** · expert · runtime · workstream: simulation · parent: physics-architect · profiles: std3d · targets: client, headless-client, server, tools
 
 Fracture authoring and precomputation, runtime fracture and debris, destruction replication strategy, propagation to navigation, rendering and audio.
 
-- **Owns:** `PHY.DEST.authoring`; `PHY.DEST.runtime`; `PHY.DEST.replication`; `PHY.DEST.propagation`
+- **Owns:** `PHY.DEST.runtime`; `PHY.DEST.replication`; `PHY.DEST.propagation`; `PHY.TOOL.fracture`
 - **Not responsible for:** Replication mechanics → replication; Navmesh rebuild → navigation-pathfinding
-- **Provides:** — · **Consumes:** C-PHYS, C-RSCENE, C-NET?, C-COOK?
+- **Provides:** — · **Consumes:** C-PHYS, C-RSCENE?, C-REP?, C-NAV?, C-AUDIO?, C-INSTANCES? · **Tool-side:** C-COOK, C-EDCMD, C-EDHOST
 - **Expertise:** Voronoi fracture, debris management, destruction networking
-- **Critics (G2):** K-ARCH, K-SIM, K-NET, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SIM, K-NET, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### fluid-simulation
 
-**Fluid Simulation** · expert · parent: physics-architect · profiles: aaa
+**Fluid Simulation** · expert · runtime · workstream: simulation · parent: physics-architect · profiles: aaa · targets: client, headless-client, server, tools
 
 Particle fluids, grid smoke and fire, shallow-water simulation, GPU fluid solvers.
 
 - **Owns:** `PHY.FLUID.particles`; `PHY.FLUID.grid`; `PHY.FLUID.shallow`; `PHY.FLUID.gpu`
+- **Contributes to:** `WLD.ENV.water-interaction`; `RND.VFX.volumes`
 - **Not responsible for:** Ocean surface → water-ocean; Artistic particles → vfx-particles
-- **Provides:** — · **Consumes:** C-PHYS, C-RG, C-RSCENE?
+- **Provides:** — · **Consumes:** C-PHYS, C-RG?, C-RSCENE?, C-ENV?
 - **Expertise:** SPH/FLIP, Eulerian solvers, GPU simulation
-- **Critics (G2):** K-ARCH, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### physics-2d
 
-**2D Physics** · expert · parent: physics-architect · profiles: min2d
+**2D Physics** · expert · runtime · workstream: simulation · parent: physics-architect · profiles: min2d · targets: client, headless-client, server, tools
 
 2D rigid bodies and collision, 2D character controllers, 2D determinism.
 
-- **Owns:** `PHY.2D.dynamics`; `PHY.2D.controllers`; `PHY.2D.determinism`
+- **Owns:** `PHY.2D.dynamics`; `PHY.2D.controllers`; `PHY.2D.determinism`; `PHY.2D.shape-gen`
+- **Contributes to:** `PHY.TOOL.2d-shapes`; `QA.SIM.stability-suite`
 - **Not responsible for:** 3D physics → rigid-body-dynamics
 - **Provides:** — · **Consumes:** C-PHYS, C-DET
 - **Expertise:** Box2D-class solvers, 2D collision
-- **Critics (G2):** K-ARCH, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### animation-architect
 
-**Animation Architect** · lead · parent: engine-architect · profiles: all
+**Animation Architect** · lead · runtime · workstream: simulation · parent: engine-architect · profiles: min2d, lite3d, std3d · targets: client, headless-client, server, tools
 
 Animation architecture: data model, parallel evaluation pipeline, animation/physics/gameplay sync and root-motion policy, animation LOD, budgets.
 
-- **Owns:** `ANM.ARCH.data-model`; `ANM.ARCH.pipeline`; `ANM.ARCH.sync`; `ANM.ARCH.lod`; `ANM.ARCH.budgets`
-- **Contributes to:** `WLD.SPACE.attachments`; `PHY.DYN.kinematic`
+- **Owns:** `ANM.ARCH.data-model`; `ANM.ARCH.pipeline`; `ANM.ARCH.sync`; `ANM.ARCH.lod`; `ANM.ARCH.budgets`; `ANM.ARCH.net`; `ANM.ARCH.validation`
+- **Contributes to:** `CORE.FRAME.sim-schedule`; `CORE.ECS.bridges`; `WLD.SPACE.attachments`; `PHY.DYN.kinematic`; `QA.SIM.animation`; `XC.DET.snapshot`
 - **Not responsible for:** Sampling and blending → animation-runtime; Skinning → deformation-skinning
-- **Provides:** C-ANIM · **Consumes:** C-ECS, C-SPATIAL, C-FRAME, C-TASK, C-PHYS?
+- **Provides:** C-ANIM · **Consumes:** C-SPATIAL, C-FRAME, C-TASK, C-ECS?, C-PHYS?, C-NET?, C-REP?, C-SNAPSHOT, C-SIGNIF?
 - **Expertise:** animation systems, pose pipelines
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### animation-runtime
 
-**Animation Runtime** · expert · parent: animation-architect · profiles: all
+**Animation Runtime** · expert · runtime · workstream: simulation · parent: animation-architect · profiles: min2d, lite3d, std3d · targets: client, headless-client, server, tools
 
 Sampling and decompression, compression, blending/layering/masks/additives, retargeting, curves and notifies, 2D skeletal and flipbook animation.
 
-- **Owns:** `ANM.RT.sampling`; `ANM.RT.compression`; `ANM.RT.blending`; `ANM.RT.retargeting`; `ANM.RT.events`; `ANM.RT.2d`
+- **Owns:** `ANM.RT.sampling`; `ANM.RT.compression`; `ANM.RT.blending`; `ANM.RT.retargeting`; `ANM.RT.events`; `ANM.RT.2d`; `ANM.RT.pose-history`; `ANM.RT.2d-import`; `ANM.TOOL.asset-editor`; `ANM.TOOL.retarget-editor`; `ANM.TOOL.2d-rigging`
+- **Contributes to:** `GAM.SYS.hit-detection`; `ED.UI.curves-timeline`
 - **Not responsible for:** State machines → animation-graphs; IK → ik-procedural-animation
-- **Provides:** — · **Consumes:** C-ANIM, C-COOK?, C-MATH
+- **Provides:** — · **Consumes:** C-ANIM, C-MATH · **Tool-side:** C-COOK, C-EDCMD, C-EDHOST
 - **Expertise:** ACL-class compression, quaternion math, retargeting
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### deformation-skinning
 
-**Skinning & Deformation** · expert · parent: animation-architect · profiles: mobile3d, std3d
+**Skinning & Deformation** · expert · runtime · workstream: simulation · parent: animation-architect · profiles: lite3d, std3d · targets: client, tools
 
 GPU skinning (linear, dual quaternion), morph targets, ML deformers, deformed-geometry acceleration-structure updates, deformation motion vectors.
 
-- **Owns:** `ANM.DEF.skinning`; `ANM.DEF.morphs`; `ANM.DEF.ml`; `ANM.DEF.rt`; `ANM.DEF.motion-vectors`
+- **Owns:** `ANM.DEF.skinning`; `ANM.DEF.morphs`; `ANM.DEF.ml`; `ANM.DEF.rt`; `ANM.DEF.motion-vectors`; `ANM.DEF.crowd`; `ANM.DEF.geometry-cache`
 - **Contributes to:** `RND.LOD.deforming`
 - **Not responsible for:** Cloth → cloth-deformables; Facial solvers → facial-animation
-- **Provides:** — · **Consumes:** C-ANIM, C-RSCENE, C-RG, C-TEMPORAL, C-RT?, C-ML?
+- **Provides:** — · **Consumes:** C-ANIM, C-RSCENE, C-RG, C-TEMPORAL, C-RT?, C-ML?, C-INSTANCES?
 - **Expertise:** compute skinning, blendshapes, ML deformers
-- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-RENDER, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### animation-graphs
 
-**Animation Graphs** · expert · parent: animation-architect · profiles: all
+**Animation Graphs** · expert · runtime · workstream: simulation · parent: animation-architect · profiles: min2d, lite3d, std3d · targets: client, headless-client, server, tools
 
 Animation graphs and state machines, blend spaces, graph compilation and data-driven evaluation, graph debugging and rewind.
 
-- **Owns:** `ANM.GRAPH.graph`; `ANM.GRAPH.blendspaces`; `ANM.GRAPH.compile`; `ANM.GRAPH.debug`
+- **Owns:** `ANM.GRAPH.graph`; `ANM.GRAPH.blendspaces`; `ANM.GRAPH.compile`; `ANM.GRAPH.debug`; `ANM.TOOL.graph-editor`
 - **Not responsible for:** Graph editor UI → graph-editor-framework; Motion matching → motion-synthesis
-- **Provides:** — · **Consumes:** C-ANIM, C-GRAPH?
+- **Provides:** — · **Consumes:** C-ANIM · **Tool-side:** C-EDCMD, C-EDHOST, C-GRAPH
 - **Expertise:** state machines, blend trees, graph compilers
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### motion-synthesis
 
-**Motion Synthesis** · expert · parent: animation-architect · profiles: aaa
+**Motion Synthesis** · expert · runtime · workstream: simulation · parent: animation-architect · profiles: std3d · targets: client, headless-client, server, tools
 
 Motion matching, learned motion matching and neural controllers, pose databases, trajectory prediction and gameplay coupling.
 
-- **Owns:** `ANM.SYN.motion-matching`; `ANM.SYN.learned`; `ANM.SYN.database`; `ANM.SYN.trajectory`
-- **Not responsible for:** ML runtime → ml-inference-runtime; Locomotion gameplay → gameplay-systems-toolkit
-- **Provides:** — · **Consumes:** C-ANIM, C-COOK?, C-ML?
+- **Owns:** `ANM.SYN.motion-matching`; `ANM.SYN.learned`; `ANM.SYN.database`; `ANM.SYN.trajectory`; `ANM.TOOL.pose-db`
+- **Not responsible for:** ML runtime → ml-inference-runtime; Locomotion gameplay → character-movement
+- **Provides:** — · **Consumes:** C-ANIM, C-MOVE?, C-ML? · **Tool-side:** C-COOK, C-EDCMD, C-EDHOST
 - **Expertise:** motion matching, learned animation, mocap processing
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### ik-procedural-animation
 
-**IK, Procedural & Physical Animation** · expert · parent: animation-architect · profiles: std3d
+**IK, Procedural & Physical Animation** · expert · runtime · workstream: simulation · parent: animation-architect · profiles: min2d, lite3d, std3d · targets: client, headless-client, server, tools
 
 IK solvers, foot placement, procedural animation, physical animation and active ragdoll.
 
-- **Owns:** `ANM.IK.solvers`; `ANM.IK.feet`; `ANM.IK.procedural`; `ANM.IK.physical`
+- **Owns:** `ANM.IK.solvers`; `ANM.IK.feet`; `ANM.IK.procedural`; `ANM.IK.physical`; `ANM.IK.2d`; `ANM.TOOL.rigging`
+- **Contributes to:** `PHY.TOOL.physics-asset`
 - **Not responsible for:** Rigid-body solver → rigid-body-dynamics; Motion matching → motion-synthesis
-- **Provides:** — · **Consumes:** C-ANIM, C-PHYS
+- **Provides:** — · **Consumes:** C-ANIM, C-PHYS · **Tool-side:** C-EDCMD, C-EDHOST
 - **Expertise:** IK, procedural animation, physics-based character control
-- **Critics (G2):** K-ARCH, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SIM, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### facial-animation
 
-**Facial Animation** · expert · parent: animation-architect · profiles: aaa
+**Facial Animation** · expert · runtime · workstream: simulation · parent: animation-architect · profiles: lite3d, std3d · targets: client, tools
 
 Facial rigs and solvers, audio-driven and ML lip sync, performance-capture import.
 
-- **Owns:** `ANM.FACE.rigs`; `ANM.FACE.lipsync`; `ANM.FACE.capture`
+- **Owns:** `ANM.FACE.rigs`; `ANM.FACE.lipsync`; `ANM.FACE.capture`; `ANM.TOOL.facial`
 - **Not responsible for:** Face rendering → character-rendering; Dialogue playback → audio-content-runtime
-- **Provides:** — · **Consumes:** C-ANIM, C-AUDIO, C-ML?
+- **Provides:** — · **Consumes:** C-ANIM, C-AUDIO?, C-ML?, C-DIALOGUE? · **Tool-side:** C-EDCMD, C-EDHOST
 - **Expertise:** FACS, rig logic, lip sync
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### cinematics-sequencer
 
-**Cinematics & Sequencer** · expert · parent: animation-architect · profiles: client
+**Cinematics & Sequencer** · expert · runtime · workstream: simulation · parent: animation-architect · profiles: all · targets: client, headless-client, server, tools
 
 Timeline/sequencer, camera cuts and cinematic cameras, high-quality movie rendering, cutscene streaming and preloading.
 
-- **Owns:** `ANM.CINE.sequencer`; `ANM.CINE.cameras`; `ANM.CINE.movie-render`; `ANM.CINE.preload`
-- **Contributes to:** `RND.PT.offline`
+- **Owns:** `ANM.CINE.sequencer`; `ANM.CINE.cameras`; `ANM.CINE.movie-render`; `ANM.CINE.preload`; `ANM.CINE.gameplay-takeover`; `ANM.CINE.net-sync`
+- **Contributes to:** `WLD.SPACE.views`; `RND.PT.offline`; `ED.UI.curves-timeline`
 - **Not responsible for:** Gameplay camera → gameplay-systems-toolkit; Path tracer → path-tracing
-- **Provides:** — · **Consumes:** C-ANIM, C-AUDIO, C-RSCENE, C-RES, C-EDCMD?
+- **Provides:** — · **Consumes:** C-AUDIO?, C-RSCENE?, C-RES, C-VIEW, C-GAME?, C-UI?, C-LOC?, C-REP?, C-VIDEO?, C-DIALOGUE?, C-A11Y, C-ANIM? · **Tool-side:** C-EDCMD, C-EDHOST
 - **Expertise:** sequencers, cinematography, virtual production
-- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### audio-architect
 
-**Audio Architect** · lead · parent: engine-architect · profiles: client
+**Audio Architect** · lead · runtime · workstream: audio · parent: engine-architect · profiles: all · targets: client, tools
 
 Audio engine architecture and threading, device backends, voice management and virtualization, middleware decision, audio budgets.
 
-- **Owns:** `AUD.ARCH.engine`; `AUD.ARCH.devices`; `AUD.ARCH.voices`; `AUD.ARCH.middleware`; `AUD.ARCH.budgets`
+- **Owns:** `AUD.ARCH.engine`; `AUD.ARCH.devices`; `AUD.ARCH.voices`; `AUD.ARCH.middleware`; `AUD.ARCH.budgets`; `AUD.ARCH.listeners`; `AUD.ARCH.clock`; `AUD.ARCH.validation`; `AUD.ARCH.offline-render`
+- **Contributes to:** `PLAT.PAL.clocks`; `PLAT.WEB.gestures`; `CORE.JOBS.thread-model`; `CORE.ECS.bridges`; `RND.MEDIA.sync`; `INP.ACT.calibration`; `QA.SIM.audio`
 - **Not responsible for:** DSP algorithms → audio-dsp-mixing; Spatialization → spatial-audio-acoustics
-- **Provides:** C-AUDIO · **Consumes:** C-PAL, C-TASK, C-ECS, C-SPATIAL
+- **Provides:** C-AUDIO · **Consumes:** C-PAL, C-TASK, C-SPATIAL, C-VIEW, C-ECS?, C-SIGNIF?
 - **Expertise:** real-time audio, lock-free audio threads, Wwise/FMOD
-- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### audio-dsp-mixing
 
-**Audio DSP & Mixing** · expert · parent: audio-architect · profiles: client
+**Audio DSP & Mixing** · expert · runtime · workstream: audio · parent: audio-architect · profiles: all · targets: client, tools
 
 Mixer graph and buses, DSP effects and convolution reverb, dynamics and loudness, codecs and decoding, audio streaming, procedural synthesis, voice-chat capture and processing.
 
-- **Owns:** `AUD.DSP.mixer`; `AUD.DSP.effects`; `AUD.DSP.dynamics`; `AUD.DSP.codecs`; `AUD.DSP.streaming`; `AUD.DSP.synthesis`; `AUD.DSP.voip`
+- **Owns:** `AUD.DSP.mixer`; `AUD.DSP.effects`; `AUD.DSP.dynamics`; `AUD.DSP.codecs`; `AUD.DSP.streaming`; `AUD.DSP.synthesis`; `AUD.DSP.voip`; `AUD.DSP.panning`
+- **Contributes to:** `PLAT.SVC.voice-text`; `NET.TRANS.voice`
 - **Not responsible for:** Voice-chat transport → network-transport; Spatialization → spatial-audio-acoustics
-- **Provides:** — · **Consumes:** C-AUDIO, C-RES, C-MATH
+- **Provides:** — · **Consumes:** C-AUDIO, C-RES, C-MATH, C-NETLINK?
 - **Expertise:** DSP, SIMD audio, codecs, loudness standards
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### spatial-audio-acoustics
 
-**Spatial Audio & Acoustics** · expert · parent: audio-architect · profiles: mobile3d, std3d, xr
+**Spatial Audio & Acoustics** · expert · runtime · workstream: audio · parent: audio-architect · profiles: lite3d, std3d, xr · targets: client, tools
 
 Panning and distance, HRTF, ambisonics, object-based output, occlusion and obstruction, acoustic propagation, reverb environments.
 
-- **Owns:** `AUD.SPAT.panning`; `AUD.SPAT.hrtf`; `AUD.SPAT.ambisonics`; `AUD.SPAT.object`; `AUD.SPAT.occlusion`; `AUD.SPAT.propagation`; `AUD.SPAT.environments`
+- **Owns:** `AUD.SPAT.hrtf`; `AUD.SPAT.ambisonics`; `AUD.SPAT.object`; `AUD.SPAT.occlusion`; `AUD.SPAT.propagation`; `AUD.SPAT.environments`
 - **Not responsible for:** Collision queries → collision-detection; Mixer → audio-dsp-mixing
-- **Provides:** — · **Consumes:** C-AUDIO, C-PHYS?, C-RT?
+- **Provides:** — · **Consumes:** C-AUDIO, C-PHYS?, C-RT?, C-ENV?
 - **Expertise:** HRTF, ambisonics, wave acoustics
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### audio-content-runtime
 
-**Audio Content Runtime** · expert · parent: audio-architect · profiles: client
+**Audio Content Runtime** · expert · runtime · workstream: audio · parent: audio-architect · profiles: all · targets: client, tools
 
 Audio event system and parameters, interactive music, dialogue and VO, authoring tool integration, audio-to-haptics.
 
-- **Owns:** `AUD.CONTENT.events`; `AUD.CONTENT.music`; `AUD.CONTENT.dialogue`; `AUD.CONTENT.authoring`; `AUD.CONTENT.haptics`
-- **Contributes to:** `CNT.IMP.audio`; `ANM.FACE.lipsync`; `UI.A11Y.subtitles`
+- **Owns:** `AUD.CONTENT.events`; `AUD.CONTENT.music`; `AUD.CONTENT.dialogue`; `AUD.CONTENT.authoring`; `AUD.CONTENT.haptics`; `AUD.CONTENT.licensed-music`; `AUD.CONTENT.speech`; `AUD.TOOL.designer`
+- **Contributes to:** `CNT.IMP.audio`; `ANM.FACE.lipsync`; `INP.DEV.haptic-assets`; `GAM.FW.streamer-mode`; `GAM.SYS.impacts`; `GAM.NARR.lines`; `GAM.NARR.vo-script`; `UI.A11Y.subtitles`
 - **Not responsible for:** Localization pipeline → localization-i18n; Haptics devices → input-devices-haptics
-- **Provides:** — · **Consumes:** C-AUDIO, C-ASSET, C-LOC, C-GRAPH?
+- **Provides:** — · **Consumes:** C-AUDIO, C-ASSET, C-LOC, C-DIALOGUE?, C-DEVICE?, C-ML?, C-A11Y · **Tool-side:** C-GRAPH, C-EDCMD, C-EDHOST
 - **Expertise:** sound design systems, adaptive music, VO pipelines
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### network-architect
 
-**Network Architect** · lead · parent: engine-architect · profiles: online, server
+**Network Architect** · lead · runtime · workstream: online · parent: engine-architect · profiles: online · targets: client, headless-client, server, tools
 
 Netcode model per game type (authoritative server, lockstep, rollback, P2P/relay), network tick and time, authority model, budgets and scale targets, protocol versioning, sharded worlds evaluation.
 
-- **Owns:** `NET.ARCH.model`; `NET.ARCH.tick`; `NET.ARCH.authority`; `NET.ARCH.budgets`; `NET.ARCH.versioning`; `NET.ARCH.sharding`
-- **Contributes to:** `PLAT.SVC.matchmaking`; `NET.SRV.listen`; `BLD.REL.compat`
-- **Not responsible for:** Transport → network-transport; Replication mechanics → replication; Matchmaking services → platform-online-services
-- **Provides:** C-NET · **Consumes:** C-ECS, C-SER, C-FRAME, C-DET
+- **Owns:** `NET.ARCH.model`; `NET.ARCH.tick`; `NET.ARCH.authority`; `NET.ARCH.budgets`; `NET.ARCH.versioning`; `NET.ARCH.async`; `NET.ARCH.distributed-authority`; `NET.ARCH.connectivity`; `NET.ARCH.validation`; `NET.ARCH.meshing`
+- **Contributes to:** `PLAT.SVC.matchmaking`; `PLAT.XR.anchors`; `CORE.FRAME.sim-schedule`; `WLD.PART.server`; `NET.SRV.listen`; `BLD.REL.compat`; `BLD.REL.end-of-service`; `PRF.METH.model`
+- **Not responsible for:** Transport → network-transport; Replication mechanics → replication; Matchmaking services → platform-services
+- **Provides:** C-NET · **Consumes:** C-FRAME, C-SER, C-DET, C-ID, C-ECS?, C-RELEASE
 - **Expertise:** netcode architectures, distributed systems, latency hiding
-- **Critics (G2):** K-ARCH, K-NET, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-NET, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### network-transport
 
-**Network Transport** · expert · parent: network-architect · profiles: online, server
+**Network Transport** · expert · runtime · workstream: online · parent: network-architect · profiles: online · targets: client, headless-client, server, tools
 
 UDP sockets and platform network APIs, reliability and ordering, fragmentation, congestion control, encryption and authentication, NAT traversal and relays, connection lifecycle, link simulation, QUIC/WebTransport evaluation.
 
-- **Owns:** `NET.TRANS.sockets`; `NET.TRANS.reliability`; `NET.TRANS.mtu`; `NET.TRANS.congestion`; `NET.TRANS.crypto`; `NET.TRANS.nat`; `NET.TRANS.lifecycle`; `NET.TRANS.simulation`; `NET.TRANS.quic`
-- **Contributes to:** `AUD.DSP.voip`; `QA.FUNC.network`
-- **Not responsible for:** What is replicated → replication; Relay service operation → platform-online-services
-- **Provides:** — · **Consumes:** C-PAL, C-TASK, C-SVC?
+- **Owns:** `NET.TRANS.sockets`; `NET.TRANS.reliability`; `NET.TRANS.mtu`; `NET.TRANS.congestion`; `NET.TRANS.crypto`; `NET.TRANS.nat`; `NET.TRANS.lifecycle`; `NET.TRANS.simulation`; `NET.TRANS.quic`; `NET.TRANS.web`; `NET.TRANS.voice`; `NET.TRANS.dos`; `NET.TRANS.platform-requirements`; `NET.DBG.inspect`
+- **Contributes to:** `AUD.DSP.voip`; `NET.SRV.auth`; `ED.ARCH.pie-net`; `QA.FUNC.network`
+- **Not responsible for:** What is replicated → replication; Relay service operation → platform-services
+- **Provides:** C-NETLINK · **Consumes:** C-PAL, C-TASK
+- **Untrusted inputs:** packets
 - **Expertise:** UDP protocols, congestion control, DTLS/QUIC
-- **Critics (G2):** K-ARCH, K-SYSTEMS, K-NET, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-NET, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### replication
 
-**Replication & State Sync** · expert · parent: network-architect · profiles: online, server
+**Replication & State Sync** · expert · runtime · workstream: online · parent: network-architect · profiles: online · targets: client, headless-client, server, tools
 
 Entity and property replication, delta compression and quantization, interest management, prioritization, RPCs, snapshot interpolation, replay recording, network ID mapping.
 
-- **Owns:** `NET.REP.state`; `NET.REP.compression`; `NET.REP.interest`; `NET.REP.priority`; `NET.REP.rpc`; `NET.REP.interpolation`; `NET.REP.replays`; `NET.REP.ids`
-- **Contributes to:** `PHY.DEST.replication`
+- **Owns:** `NET.REP.state`; `NET.REP.compression`; `NET.REP.interest`; `NET.REP.priority`; `NET.REP.rpc`; `NET.REP.interpolation`; `NET.REP.replays`; `NET.REP.ids`; `NET.REP.spectator`; `NET.REP.killcam`; `NET.DBG.profiler`; `NET.DBG.visualize`; `NET.DBG.session-replay`
+- **Contributes to:** `WLD.VOX.edits`; `PHY.DEST.replication`; `ANM.ARCH.net`; `ANM.CINE.net-sync`; `NET.ARCH.distributed-authority`; `NET.SRV.zoning`; `QA.SIM.netsim`; `XC.DET.replay-format`
 - **Not responsible for:** Prediction → prediction-rollback; Transport → network-transport
-- **Provides:** — · **Consumes:** C-NET, C-ECS, C-SER, C-ID
+- **Provides:** C-REP · **Consumes:** C-NET, C-NETLINK, C-ECS?, C-SER, C-ID, C-SPATIAL, C-WORLD?, C-SIGNIF?, C-REPLAY?
+- **Untrusted inputs:** packets
 - **Expertise:** state synchronization, bit packing, interest management
-- **Critics (G2):** K-ARCH, K-NET, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-NET, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### prediction-rollback
 
-**Prediction, Rollback & Lag Compensation** · expert · parent: network-architect · profiles: online, server
+**Prediction, Rollback & Lag Compensation** · expert · runtime · workstream: online · parent: network-architect · profiles: online · targets: client, headless-client, server, tools
 
 Client prediction and reconciliation, rollback netcode, lag compensation, deterministic lockstep, networked physics, clock synchronization.
 
-- **Owns:** `NET.PRED.prediction`; `NET.PRED.rollback`; `NET.PRED.lagcomp`; `NET.PRED.lockstep`; `NET.PRED.physics`; `NET.PRED.clock`
+- **Owns:** `NET.PRED.prediction`; `NET.PRED.rollback`; `NET.PRED.lagcomp`; `NET.PRED.lockstep`; `NET.PRED.physics`; `NET.PRED.clock`; `NET.PRED.input-commands`; `NET.PRED.lockstep-replay`
+- **Contributes to:** `CORE.ECS.snapshot`; `PHY.ARCH.rewind`; `PHY.CTRL.vehicle-net`; `ANM.ARCH.net`; `ANM.RT.pose-history`; `NET.REP.killcam`; `GAM.SYS.predicted-abilities`; `GAM.SYS.hit-detection`; `QA.SIM.netsim`
 - **Not responsible for:** Determinism rules → determinism-replay; Physics solver → rigid-body-dynamics
-- **Provides:** — · **Consumes:** C-NET, C-DET, C-PHYS?, C-INPUT?
+- **Provides:** C-PREDICT · **Consumes:** C-NET, C-REP, C-DET, C-SNAPSHOT, C-INPUT, C-ECS?, C-PHYS?, C-ANIM?
 - **Expertise:** rollback, reconciliation, lag compensation
-- **Critics (G2):** K-ARCH, K-SIM, K-NET, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SIM, K-NET, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### dedicated-server
 
-**Dedicated Servers** · expert · parent: network-architect · profiles: online, server
+**Dedicated Servers** · expert · runtime · workstream: online · parent: network-architect · profiles: online · targets: server, tools
 
 Headless server builds and stripping, tick cost and multi-instance density, fleet orchestration boundary, server observability, listen servers and host migration.
 
-- **Owns:** `NET.SRV.headless`; `NET.SRV.density`; `NET.SRV.orchestration`; `NET.SRV.observability`; `NET.SRV.listen`
-- **Contributes to:** `PLAT.DESK.server-host`; `CORE.FRAME.headless`; `WLD.PART.server`; `QA.FUNC.load`
-- **Not responsible for:** Fleet operation (outside engine scope) → platform-online-services; Server logging substrate → observability-telemetry
-- **Provides:** — · **Consumes:** C-NET, C-FRAME, C-SVC
+- **Owns:** `NET.SRV.headless`; `NET.SRV.density`; `NET.SRV.orchestration`; `NET.SRV.observability`; `NET.SRV.listen`; `NET.SRV.persistence`; `NET.SRV.transactions`; `NET.SRV.auth`; `NET.SRV.zoning`; `NET.SRV.host-os`
+- **Contributes to:** `ARCH.REQ.hardware-tiers`; `CORE.FRAME.headless`; `WLD.PART.server`; `WLD.PART.sim-tiers`; `NET.TRANS.dos`; `ED.ARCH.pie-net`; `BLD.REL.end-of-service`; `QA.FUNC.load`
+- **Not responsible for:** Fleet operation (outside engine scope) → platform-services; Server logging substrate → observability-telemetry
+- **Provides:** — · **Consumes:** C-NET, C-NETLINK, C-FRAME, C-SVC?, C-LIVE, C-WORLD?
 - **Expertise:** headless builds, Linux containers, server performance
-- **Critics (G2):** K-ARCH, K-NET, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-NET, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### gameplay-architect
 
-**Gameplay Framework Architect** · lead · parent: engine-architect · profiles: all
+**Gameplay Framework Architect** · lead · runtime · workstream: gameplay · parent: engine-architect · profiles: all · targets: client, headless-client, server, tools
 
 Gameplay framework: rules, players and possession, extension points and game-module structure, game flow and transitions, local players.
 
-- **Owns:** `GAM.FW.rules`; `GAM.FW.extension`; `GAM.FW.flow`; `GAM.FW.local-players`
-- **Contributes to:** `WLD.MODEL.travel`; `UI.A11Y.assists`
-- **Not responsible for:** Abilities/tags/camera toolkit → gameplay-systems-toolkit; Scripting VM → scripting-runtime; Game-specific code (the game team) → engine-architect
-- **Provides:** C-GAME · **Consumes:** C-ECS, C-INPUT?, C-PHYS, C-ANIM, C-AUDIO?, C-NET?, C-WORLD, C-SAVE
+- **Owns:** `GAM.FW.rules`; `GAM.FW.extension`; `GAM.FW.flow`; `GAM.FW.local-players`; `GAM.FW.control`; `GAM.FW.execution`; `GAM.FW.ui-binding`; `GAM.FW.engagement`; `GAM.FW.objectives`; `GAM.FW.streamer-mode`
+- **Contributes to:** `PLAT.SVC.age-region`; `WLD.MODEL.travel`; `ANM.CINE.gameplay-takeover`; `AUD.ARCH.listeners`; `NET.ARCH.connectivity`; `UI.A11Y.assists`
+- **Not responsible for:** Abilities/tags/volumes toolkit → gameplay-systems-toolkit; Scripting VM → scripting-runtime; Game-specific code → external:game-team
+- **Provides:** C-GAME · **Consumes:** C-ID, C-FRAME, C-TASK, C-ECS?, C-INPUT?, C-PHYS?, C-ANIM?, C-AUDIO?, C-NET?, C-REP?, C-WORLD?, C-SAVE?, C-UI?, C-VIEW?, C-A11Y, C-AIAGENT?
 - **Expertise:** gameplay frameworks, game architecture
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### gameplay-systems-toolkit
 
-**Gameplay Systems Toolkit** · expert · parent: gameplay-architect · profiles: all
+**Gameplay Systems Toolkit** · expert · runtime · workstream: gameplay · parent: gameplay-architect · profiles: all · targets: client, headless-client, server, tools
 
 Reusable gameplay systems: abilities, effects and attributes, gameplay tags, camera system, spawning and pooling, gameplay message routing, photo mode.
 
-- **Owns:** `GAM.SYS.abilities`; `GAM.SYS.tags`; `GAM.SYS.camera`; `GAM.SYS.spawning`; `GAM.SYS.messages`; `GAM.SYS.photo`
+- **Owns:** `GAM.SYS.abilities`; `GAM.SYS.tags`; `GAM.SYS.camera`; `GAM.SYS.spawning`; `GAM.SYS.messages`; `GAM.SYS.photo`; `GAM.SYS.predicted-abilities`; `GAM.SYS.impacts`; `GAM.SYS.volumes`; `GAM.SYS.building`; `GAM.SYS.hit-detection`; `GAM.TOOL.tags-abilities`
+- **Contributes to:** `WLD.SPACE.views`
 - **Not responsible for:** Generic events → entity-object-model; Cinematic cameras → cinematics-sequencer
-- **Provides:** — · **Consumes:** C-GAME, C-NET?, C-INPUT?
+- **Provides:** — · **Consumes:** C-GAME, C-VIEW, C-PHYS?, C-ANIM?, C-AUDIO?, C-DEVICE?, C-PREDICT?, C-REP?, C-INPUT?, C-GAMEDATA, C-A11Y · **Tool-side:** C-EDCMD, C-EDHOST
 - **Expertise:** ability systems, camera design, gameplay tags
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### scripting-runtime
 
-**Scripting Runtime** · expert · parent: gameplay-architect · profiles: all
+**Scripting Runtime** · expert · runtime · workstream: gameplay · parent: gameplay-architect · profiles: all · targets: client, headless-client, server, tools
 
 Scripting language selection, VM embedding and bindings, sandboxing, debugging and profiling, hot reload, visual scripting, AOT/JIT constraints, GC policy.
 
-- **Owns:** `GAM.SCR.selection`; `GAM.SCR.vm`; `GAM.SCR.sandbox`; `GAM.SCR.debug`; `GAM.SCR.reload`; `GAM.SCR.visual`; `GAM.SCR.aot`; `GAM.SCR.gc`
-- **Contributes to:** `CORE.REFL.bindings`
+- **Owns:** `GAM.SCR.selection`; `GAM.SCR.vm`; `GAM.SCR.sandbox`; `GAM.SCR.debug`; `GAM.SCR.reload`; `GAM.SCR.visual`; `GAM.SCR.aot`; `GAM.SCR.gc`; `GAM.SCR.concurrency`; `GAM.SCR.level-scripting`
+- **Contributes to:** `CORE.LIFE.ownership-model`; `CORE.REFL.bindings`; `GAM.SYS.volumes`; `UI.FW.logic`
 - **Not responsible for:** Reflection substrate → reflection-metadata; Graph editor UI → graph-editor-framework
-- **Provides:** C-SCRIPT · **Consumes:** C-REFL, C-GAME, C-RELOAD
+- **Provides:** C-SCRIPT · **Consumes:** C-REFL, C-RELOAD?, C-TASK, C-LIFETIME · **Tool-side:** C-GRAPH
+- **Untrusted inputs:** scripts
 - **Expertise:** VM embedding (Luau, .NET, Wasm), DAP, sandboxing
-- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### navigation-pathfinding
 
-**Navigation & Pathfinding** · expert · parent: gameplay-architect · profiles: min2d, mobile3d, std3d, server
+**Navigation & Pathfinding** · expert · runtime · workstream: gameplay · parent: gameplay-architect · profiles: min2d, lite3d, std3d · targets: client, headless-client, server, tools
 
 Navmesh generation (tiled, runtime rebuild), grid and hierarchical pathfinding, path following, off-mesh links, 3D/volumetric navigation.
 
-- **Owns:** `GAM.AI.navmesh`; `GAM.AI.pathfinding`; `GAM.AI.following`; `GAM.AI.links`; `GAM.AI.volumes`
+- **Owns:** `GAM.AI.navmesh`; `GAM.AI.pathfinding`; `GAM.AI.following`; `GAM.AI.links`; `GAM.AI.volumes`; `GAM.AI.local-avoidance`; `GAM.AI.lanes`; `GAM.TOOL.nav`
+- **Contributes to:** `PLAT.XR.scene`; `WLD.PART.activation`
 - **Not responsible for:** Crowd avoidance → crowd-simulation; Decision making → ai-behavior-perception
-- **Provides:** C-NAV · **Consumes:** C-SPATIAL, C-PHYS, C-WORLD, C-TASK
+- **Provides:** C-NAV · **Consumes:** C-SPATIAL, C-PHYS?, C-WORLD?, C-TASK, C-ENV? · **Tool-side:** C-COOK, C-EDCMD, C-EDHOST
 - **Expertise:** Recast-class navmesh, A*/HPA*, dynamic navigation
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### crowd-simulation
 
-**Crowd Simulation** · expert · parent: gameplay-architect · profiles: openworld
+**Crowd Simulation** · expert · runtime · workstream: gameplay · parent: gameplay-architect · profiles: openworld, massim · targets: client, headless-client, server, tools
 
 Flow fields, crowd avoidance, mass-agent simulation and LOD.
 
-- **Owns:** `GAM.AI.flowfields`; `GAM.AI.avoidance`; `GAM.AI.mass`
-- **Contributes to:** `WLD.SPACE.hashing`
+- **Owns:** `GAM.AI.flowfields`; `GAM.AI.mass`; `GAM.AI.traffic`
+- **Contributes to:** `WLD.PART.sim-tiers`; `WLD.SPACE.hashing`; `ANM.DEF.crowd`; `GAM.AI.lanes`
 - **Not responsible for:** Navmesh → navigation-pathfinding; Individual AI decisions → ai-behavior-perception
 - **Provides:** — · **Consumes:** C-NAV, C-ECS, C-SPATIAL
 - **Expertise:** ORCA/RVO, flow fields, massive agent simulation
-- **Critics (G2):** K-ARCH, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### ai-behavior-perception
 
-**AI Behavior & Perception** · expert · parent: gameplay-architect · profiles: all
+**AI Behavior & Perception** · expert · runtime · workstream: gameplay · parent: gameplay-architect · profiles: all · targets: client, headless-client, server, tools
 
 Decision making (behavior trees, utility, HTN/GOAP, state trees), perception, environment queries, smart objects, AI scheduling and LOD; evaluates learned and LLM-driven agents.
 
-- **Owns:** `GAM.AI.decisions`; `GAM.AI.perception`; `GAM.AI.queries`; `GAM.AI.smart-objects`; `GAM.AI.lod`; `GAM.AI.learned`; `GAM.AI.llm`
+- **Owns:** `GAM.AI.decisions`; `GAM.AI.perception`; `GAM.AI.queries`; `GAM.AI.smart-objects`; `GAM.AI.lod`; `GAM.AI.learned`; `GAM.AI.llm`; `GAM.AI.tactical`; `GAM.TOOL.ai-editors`; `GAM.TOOL.ai-debug`
+- **Contributes to:** `GAM.NARR.barks`; `QA.CERT.genai`; `XC.SEC.genai`
 - **Not responsible for:** Navigation → navigation-pathfinding; ML runtime → ml-inference-runtime
-- **Provides:** — · **Consumes:** C-GAME, C-NAV?, C-SPATIAL, C-PHYS
+- **Provides:** C-AIAGENT · **Consumes:** C-GAME, C-NAV?, C-SPATIAL, C-PHYS?, C-ML?, C-LIVE?, C-DIALOGUE?, C-SIGNIF? · **Tool-side:** C-GRAPH, C-EDCMD, C-EDHOST
+- **Untrusted inputs:** generated-content
 - **Expertise:** game AI, utility theory, HTN planning
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### persistence-save
 
-**Persistence & Save Games** · expert · parent: gameplay-architect · profiles: all
+**Persistence & Save Games** · expert · runtime · workstream: gameplay · parent: gameplay-architect · profiles: all · targets: client, headless-client, server, tools
 
 Save-game model and serialization, save versioning and migration, atomic writes, platform save APIs and quotas, cloud-save sync, persistent world-state deltas, checkpoints.
 
-- **Owns:** `GAM.SAVE.model`; `GAM.SAVE.migration`; `GAM.SAVE.atomic`; `GAM.SAVE.platform`; `GAM.SAVE.cloud`; `GAM.SAVE.world-state`; `GAM.SAVE.checkpoints`
-- **Contributes to:** `PLAT.SVC.cloud-save`
-- **Not responsible for:** Schema evolution mechanism → serialization-schema; Cloud service API → platform-online-services
-- **Provides:** C-SAVE · **Consumes:** C-SER, C-ID, C-SVC, C-WORLD
+- **Owns:** `GAM.SAVE.model`; `GAM.SAVE.migration`; `GAM.SAVE.atomic`; `GAM.SAVE.platform`; `GAM.SAVE.cloud`; `GAM.SAVE.world-state`; `GAM.SAVE.checkpoints`; `GAM.SAVE.settings`; `GAM.SAVE.integrity`
+- **Contributes to:** `PLAT.DESK.os-security`; `PLAT.SVC.cloud-save`; `PLAT.XR.anchors`; `PLAT.WEB.storage`; `CORE.SCALE.autodetect`; `WLD.VOX.edits`; `NET.SRV.persistence`; `GAM.FW.objectives`; `GAM.NARR.facts`
+- **Not responsible for:** Schema evolution mechanism → serialization-schema; Cloud service API → platform-services
+- **Provides:** C-SAVE · **Consumes:** C-SER, C-ID, C-SVC?, C-WORLD?, C-CFG
+- **Untrusted inputs:** saves, cloud-saves
 - **Expertise:** save systems, crash-safe writes, data migration
-- **Critics (G2):** K-ARCH, K-NET, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-NET, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### ui-architect
 
-**UI Architect** · lead · parent: engine-architect · profiles: client
+**UI Architect** · lead · runtime · workstream: ui · parent: engine-architect · profiles: all · targets: client, tools
 
 UI architecture (retained with data binding for game UI, immediate for developer UI), layout, styling, focus and navigation, animation, in-world UI, designer tool logic, UI performance.
 
-- **Owns:** `UI.FW.architecture`; `UI.FW.layout`; `UI.FW.styling`; `UI.FW.focus`; `UI.FW.animation`; `UI.FW.world-ui`; `UI.FW.authoring`; `UI.FW.performance`
-- **Contributes to:** `RND.2D.ui-backend`; `INP.ACT.ui-routing`; `UI.A11Y.text-scale`
+- **Owns:** `UI.FW.architecture`; `UI.FW.layout`; `UI.FW.styling`; `UI.FW.focus`; `UI.FW.animation`; `UI.FW.world-ui`; `UI.FW.performance`; `UI.FW.text-scale`; `UI.FW.safe-area`; `UI.FW.rtl-mirroring`; `UI.FW.xr-interaction`; `UI.FW.platform-dialogs`; `UI.FW.a11y-tree`; `UI.FW.logic`; `UI.FW.loading-screens`; `UI.FW.subtitles`; `UI.TOOL.designer`
+- **Contributes to:** `PLAT.PAL.safe-area`; `CORE.REFL.static-default`; `RND.2D.ui-backend`; `INP.ACT.ui-routing`; `GAM.FW.ui-binding`; `ED.UI.toolkit-basis`
 - **Not responsible for:** UI draw backend → render-2d-vector; Text shaping → text-fonts; Editor panels → editor-ui-framework
-- **Provides:** C-UI · **Consumes:** C-REFL, C-INPUT, C-DRAW2D, C-TEXT, C-LOC
+- **Provides:** C-UI · **Consumes:** C-REFL, C-INPUT, C-DRAW2D, C-TEXT, C-LOC, C-A11YRT, C-AUDIO?, C-VIDEO?, C-PAL, C-A11Y · **Tool-side:** C-EDCMD, C-EDHOST
 - **Expertise:** UI frameworks, layout algorithms, MVVM
-- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### text-fonts
 
-**Text & Fonts** · expert · parent: ui-architect · profiles: client
+**Text & Fonts** · expert · runtime · workstream: ui · parent: ui-architect · profiles: all · targets: client, tools
 
 Font loading and fallback, glyph rasterization, shaping, bidi and line breaking, rich text and emoji, text input and IME.
 
-- **Owns:** `UI.TXT.fonts`; `UI.TXT.raster`; `UI.TXT.shaping`; `UI.TXT.bidi`; `UI.TXT.rich`; `UI.TXT.ime`
+- **Owns:** `UI.TXT.fonts`; `UI.TXT.raster`; `UI.TXT.shaping`; `UI.TXT.bidi`; `UI.TXT.rich`; `UI.TXT.ime`; `UI.TXT.font-subsetting`
 - **Not responsible for:** String content → localization-i18n; 2D draw submission → render-2d-vector
-- **Provides:** C-TEXT · **Consumes:** C-TYPES, C-ASSET
+- **Provides:** C-TEXT · **Consumes:** C-TYPES, C-ASSET, C-A11Y
+- **Untrusted inputs:** fonts, chat-text
 - **Expertise:** HarfBuzz, Unicode (UAX #9, #14, #29), SDF/MSDF
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### localization-i18n
 
-**Localization & Internationalization** · expert · parent: ui-architect · profiles: client
+**Localization & Internationalization** · expert · runtime · workstream: ui · parent: ui-architect · profiles: all · targets: client, headless-client, server, tools
 
 String tables, ICU-class message formatting, CLDR locale formatting, localization pipeline, pseudo-localization, localized asset variants, culturalization.
 
-- **Owns:** `UI.LOC.strings`; `UI.LOC.messageformat`; `UI.LOC.cldr`; `UI.LOC.pipeline`; `UI.LOC.pseudo`; `UI.LOC.assets`; `UI.LOC.culturalization`
-- **Contributes to:** `AUD.CONTENT.dialogue`
+- **Owns:** `UI.LOC.strings`; `UI.LOC.messageformat`; `UI.LOC.cldr`; `UI.LOC.pipeline`; `UI.LOC.pseudo`; `UI.LOC.assets`; `UI.LOC.culturalization`; `UI.LOC.language-packs`; `UI.LOC.overflow-validation`
+- **Contributes to:** `AUD.CONTENT.dialogue`; `GAM.NARR.lines`; `GAM.NARR.vo-script`; `UI.FW.rtl-mirroring`
 - **Not responsible for:** Glyph rendering → text-fonts; VO playback → audio-content-runtime
-- **Provides:** C-LOC · **Consumes:** C-ASSET, C-TEXT?, C-COOK?
+- **Provides:** C-LOC · **Consumes:** C-ASSET, C-TEXT?, C-VFS? · **Tool-side:** C-COOK
 - **Expertise:** ICU, CLDR, localization workflows
-- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
 ### editor-architect
 
-**Editor Architect** · lead · parent: engine-architect · profiles: client
+**Editor Architect** · lead · tool · workstream: tools · parent: engine-architect · profiles: all · targets: tools
 
 Editor architecture: process model (in- vs out-of-process runtime), editor/runtime data separation, transactions and undo/redo, selection, extension API and tool scripting, play-in-editor isolation, remote live editing, headless editor, large-project performance.
 
-- **Owns:** `ED.ARCH.process`; `ED.ARCH.separation`; `ED.ARCH.transactions`; `ED.ARCH.selection`; `ED.ARCH.extension`; `ED.ARCH.pie`; `ED.ARCH.remote`; `ED.ARCH.headless`; `ED.ARCH.scale`
+- **Owns:** `ED.ARCH.process`; `ED.ARCH.separation`; `ED.ARCH.transactions`; `ED.ARCH.selection`; `ED.ARCH.extension`; `ED.ARCH.pie`; `ED.ARCH.remote`; `ED.ARCH.headless`; `ED.ARCH.scale`; `ED.ARCH.recovery`; `ED.ARCH.pie-net`; `ED.ARCH.agent-api`; `ED.ARCH.discipline-workflows`
+- **Contributes to:** `PLAT.PAL.devlink`; `CORE.LIFE.ipc`; `CNT.COOK.on-demand`; `PHY.TOOL.simulate-in-editor`; `PRF.METH.pipeline-budgets`; `PRF.BENCH.tools`; `PRF.LOAD.editor`; `XC.SEC.dev-trust`
 - **Not responsible for:** Panels and inspectors → editor-ui-framework; World viewport tools → world-editor-viewport; Source control → collaboration-version-control
-- **Provides:** C-EDCMD · **Consumes:** C-REFL, C-SER, C-ASSET, C-WORLD, C-PLUGIN, C-UI?
+- **Provides:** C-EDCMD · **Consumes:** C-REFL, C-SER, C-ASSET, C-WORLD, C-PLUGIN, C-UI?, C-IPC, C-NET?, C-REP?
 - **Expertise:** editor architecture, command pattern, tool UX
-- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### editor-ui-framework
 
-**Editor UI Framework** · expert · parent: editor-architect · profiles: client
+**Editor UI Framework** · expert · tool · workstream: tools · parent: editor-architect · profiles: all · targets: tools
 
 Tool UI toolkit (docking, panels), reflection-driven inspectors, asset browser, immediate-mode developer UI, editor UX standards.
 
-- **Owns:** `ED.UI.toolkit`; `ED.UI.inspectors`; `ED.UI.asset-browser`; `ED.UI.imgui`; `ED.UI.ux`
-- **Contributes to:** `CORE.REFL.properties`; `UI.FW.authoring`
+- **Owns:** `ED.UI.toolkit`; `ED.UI.inspectors`; `ED.UI.asset-browser`; `ED.UI.ux`; `ED.UI.asset-editor-host`; `ED.UI.thumbnails`; `ED.UI.curves-timeline`; `ED.UI.tabular`; `ED.UI.toolkit-basis`
+- **Contributes to:** `CORE.REFL.properties`; `RND.ARCH.editor-rendering`; `RND.TOOL.material-editor`; `GAM.TOOL.data`; `UI.TOOL.designer`; `ED.DEBUG.imgui`; `QA.FUNC.editor`
 - **Not responsible for:** Game UI → ui-architect; Graph editors → graph-editor-framework
-- **Provides:** — · **Consumes:** C-EDCMD, C-REFL, C-DRAW2D, C-TEXT
+- **Provides:** C-EDHOST · **Consumes:** C-EDCMD, C-REFL, C-DRAW2D, C-TEXT, C-DEVUI?
 - **Expertise:** tool UI, Dear ImGui-class toolkits, UX research
-- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### world-editor-viewport
 
-**World Editor & Viewport** · expert · parent: editor-architect · profiles: client
+**World Editor & Viewport** · expert · tool · workstream: tools · parent: editor-architect · profiles: all · targets: tools
 
 Viewport and navigation, gizmos, snapping and placement, partition-aware world editing, spline tools, environment tool-mode hosting.
 
-- **Owns:** `ED.WORLD.viewport`; `ED.WORLD.gizmos`; `ED.WORLD.placement`; `ED.WORLD.partitioned`; `ED.WORLD.splines`; `ED.WORLD.modes`
-- **Contributes to:** `WLD.ENV.terrain-tools`; `ED.ARCH.pie`
+- **Owns:** `ED.WORLD.viewport`; `ED.WORLD.gizmos`; `ED.WORLD.placement`; `ED.WORLD.partitioned`; `ED.WORLD.splines`; `ED.WORLD.modes`; `ED.WORLD.preview-scenes`; `ED.WORLD.blockout`; `ED.WORLD.ld-utilities`; `ED.WORLD.2d-mode`
+- **Contributes to:** `CNT.COOK.geometry-ops`; `WLD.TOOL.prefabs`; `WLD.TOOL.foliage`; `WLD.TOOL.water`; `WLD.TOOL.sky-weather`; `WLD.TOOL.pcg`; `WLD.TOOL.terrain`; `RND.ARCH.editor-rendering`; `RND.TOOL.lighting`; `RND.TOOL.tilemap-sprite`; `ED.ARCH.pie`
 - **Not responsible for:** Terrain tool logic → terrain; World format → world-data-model
-- **Provides:** — · **Consumes:** C-EDCMD, C-WORLD, C-RSCENE, C-SPATIAL
+- **Provides:** — · **Consumes:** C-EDCMD, C-EDHOST, C-WORLD, C-RSCENE, C-SPATIAL, C-VIEW
 - **Expertise:** 3D manipulation UX, large-world editing
-- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### graph-editor-framework
 
-**Graph Editor Framework** · expert · parent: editor-architect · profiles: client
+**Graph Editor Framework** · expert · tool · workstream: tools · parent: editor-architect · profiles: all · targets: tools
 
 Shared node-graph editor for material, animation, VFX, audio, PCG and visual-script graphs: framework, compile/validation contract, debugging, diff and merge.
 
 - **Owns:** `ED.GRAPH.framework`; `ED.GRAPH.compile`; `ED.GRAPH.debug`; `ED.GRAPH.diff`
-- **Contributes to:** `RND.MAT.graph`; `RND.VFX.graph`; `GAM.SCR.visual`
-- **Not responsible for:** Each domain's graph semantics → material-system
+- **Contributes to:** `RND.MAT.graph`; `RND.VFX.graph`; `RND.TOOL.material-editor`; `RND.TOOL.vfx-editor`; `ANM.TOOL.graph-editor`; `AUD.TOOL.designer`; `GAM.SCR.visual`; `GAM.TOOL.ai-editors`; `GAM.TOOL.dialogue`
+- **Not responsible for:** Each domain's graph semantics → material-system, animation-graphs, vfx-particles, audio-content-runtime, procedural-generation, scripting-runtime, ai-behavior-perception, narrative-dialogue
 - **Provides:** C-GRAPH · **Consumes:** C-EDCMD, C-SER
 - **Expertise:** node editors, graph compilers, visual diff
-- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### collaboration-version-control
 
-**Collaboration & Version Control** · expert · parent: editor-architect · profiles: client
+**Collaboration & Version Control** · expert · tool · workstream: tools · parent: editor-architect · profiles: all · targets: tools
 
 Source-control integration, locking and checkout, multi-user concurrent editing, merge tooling for scene and asset data, content review, large-binary storage strategy.
 
-- **Owns:** `ED.COLLAB.vcs`; `ED.COLLAB.locking`; `ED.COLLAB.multiuser`; `ED.COLLAB.merge`; `ED.COLLAB.review`; `ED.COLLAB.binaries`
-- **Contributes to:** `CORE.SER.text`; `WLD.MODEL.file-per-object`; `ED.GRAPH.diff`
+- **Owns:** `ED.COLLAB.vcs`; `ED.COLLAB.locking`; `ED.COLLAB.multiuser`; `ED.COLLAB.merge`; `ED.COLLAB.review`; `ED.COLLAB.binaries`; `ED.COLLAB.partial-sync`
+- **Contributes to:** `CORE.SER.text`; `WLD.MODEL.file-per-object`; `ED.GRAPH.diff`; `BLD.CI.binary-distribution`; `BLD.CI.local-first`
 - **Not responsible for:** Branching model → build-release-architect; File-per-object layout → world-data-model
-- **Provides:** — · **Consumes:** C-EDCMD, C-SER, C-ASSET
+- **Provides:** — · **Consumes:** C-EDCMD, C-SER, C-ASSET, C-RELEASE
 - **Expertise:** Perforce, Git LFS, CRDT/OT for editing
-- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### visual-debugging-tools
 
-**Visual Debugging Tools** · expert · parent: editor-architect · profiles: all
+**Visual Debugging Tools** · expert · runtime · workstream: tools · parent: editor-architect · profiles: all · targets: client, headless-client, server, tools
 
 Debug draw API, in-game console and cheats, runtime entity inspector and gameplay debugger, visual logger and rewind, debug menus and overlays.
 
-- **Owns:** `ED.DEBUG.draw`; `ED.DEBUG.console`; `ED.DEBUG.inspector`; `ED.DEBUG.visual-log`; `ED.DEBUG.menus`
-- **Contributes to:** `CORE.ECS.debug`; `RND.ARCH.debug-modes`; `ANM.GRAPH.debug`; `ED.GRAPH.debug`; `OBS.LOG.stats`
+- **Owns:** `ED.DEBUG.draw`; `ED.DEBUG.console`; `ED.DEBUG.inspector`; `ED.DEBUG.visual-log`; `ED.DEBUG.menus`; `ED.DEBUG.imgui`
+- **Contributes to:** `CORE.ECS.debug`; `RND.ARCH.debug-modes`; `RND.SHADER.gpu-debug-draw`; `PHY.TOOL.visual-debugger`; `ANM.GRAPH.debug`; `ANM.TOOL.pose-db`; `NET.DBG.visualize`; `GAM.TOOL.ai-debug`; `GAM.TOOL.nav`; `ED.ARCH.agent-api`; `ED.GRAPH.debug`; `OBS.LOG.stats`; `XC.DET.replay-format`; `XC.SEC.testing`
 - **Not responsible for:** Logging and traces → observability-telemetry; Render buffer visualization → render-architect
-- **Provides:** — · **Consumes:** C-INSTR, C-ECS, C-DRAW2D?, C-RSCENE?, C-DET?
+- **Provides:** C-DEVUI · **Consumes:** C-INSTR, C-ECS?, C-DRAW2D?, C-RSCENE?, C-REPLAY?, C-IPC
 - **Expertise:** debug tooling, visual logging
-- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### ai-assisted-authoring
 
-**AI-Assisted Authoring** · expert · parent: editor-architect · profiles: aaa
+**AI-Assisted Authoring** · expert · tool · workstream: tools · parent: editor-architect · profiles: all · targets: tools
 
 Evaluates and integrates AI-assisted authoring: generative asset tools, editor copilots, ML-assisted retopology/rigging/UV/LOD, provenance and licensing of generated content.
 
-- **Owns:** `ED.AI.generative`; `ED.AI.processing`; `ED.AI.provenance`
+- **Owns:** `ED.AI.generative`; `ED.AI.provenance`; `ED.AI.evaluation`
+- **Contributes to:** `CNT.ID.rights`; `CNT.COOK.ml-assisted`; `XC.SEC.genai`
 - **Not responsible for:** Runtime inference → ml-inference-runtime; License compliance sign-off → certification-compliance
 - **Provides:** — · **Consumes:** C-EDCMD, C-ASSET, C-ML?
 - **Expertise:** generative models, tool integration, content provenance
-- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### build-release-architect
 
-**Build & Release Architect** · lead · parent: engine-architect · profiles: all
+**Build & Release Architect** · lead · process · workstream: release · parent: engine-architect · profiles: all
 
 Build and release architecture: branching and merge model, engine release management and versioning, orchestration of the code → content → package pipeline.
 
-- **Owns:** `BLD.CI.branching`; `BLD.CI.versioning`; `BLD.CI.orchestration`
-- **Contributes to:** `XC.EXT.lts`
+- **Owns:** `BLD.CI.branching`; `BLD.CI.versioning`; `BLD.CI.title-branching`; `BLD.CI.backports`; `BLD.REL.archival`
+- **Contributes to:** `XC.SEC.vuln-response`; `XC.EXT.lts`
 - **Not responsible for:** Build system implementation → build-system-toolchains; CI pipelines → ci-cd-automation; Packaging → packaging-release-patching
-- **Provides:** — · **Consumes:** C-BUILD, C-PKG, C-COOK
+- **Provides:** C-RELEASE · **Consumes:** C-BUILD, C-PKG · **Tool-side:** C-COOK
 - **Expertise:** release engineering, branching strategies
-- **Critics (G2):** K-ARCH, K-TOOLS, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### build-system-toolchains
 
-**Build System & Toolchains** · expert · parent: build-release-architect · profiles: all
+**Build System & Toolchains** · expert · tool · workstream: release · parent: build-release-architect · profiles: all · targets: tools
 
 Build graph, compiler and toolchain matrix, C++ modules/unity/PCH, compile caching and distribution, codegen integration, third-party dependencies, static analysis, build configurations.
 
-- **Owns:** `BLD.SYS.graph`; `BLD.SYS.toolchains`; `BLD.SYS.compile-speed`; `BLD.SYS.caching`; `BLD.SYS.codegen`; `BLD.SYS.third-party`; `BLD.SYS.static-analysis`; `BLD.SYS.configs`
-- **Contributes to:** `PLAT.CON.devkit`; `PRF.CPU.compiler`; `XC.SEC.supply-chain`
+- **Owns:** `BLD.SYS.graph`; `BLD.SYS.toolchains`; `BLD.SYS.compile-speed`; `BLD.SYS.caching`; `BLD.SYS.codegen`; `BLD.SYS.third-party`; `BLD.SYS.static-analysis`; `BLD.SYS.configs`; `BLD.SYS.platform-sdks`
+- **Contributes to:** `ARCH.REQ.platform-matrix`; `ARCH.ORG.write-sets`; `PLAT.PAL.confidential-extensions`; `PLAT.CON.devkit`; `CORE.LIFE.interop`; `BLD.REL.archival`; `PRF.METH.pipeline-budgets`; `XC.SEC.supply-chain`; `XC.SEC.hardening`
 - **Not responsible for:** CI orchestration → ci-cd-automation; Supply-chain policy → security-engineering
 - **Provides:** C-BUILD · **Consumes:** —
 - **Expertise:** CMake/FASTBuild/Bazel-class systems, Clang/MSVC, remote execution
-- **Critics (G2):** K-ARCH, K-TOOLS, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### ci-cd-automation
 
-**CI/CD & Automation** · expert · parent: build-release-architect · profiles: all
+**CI/CD & Automation** · expert · tool · workstream: release · parent: build-release-architect · profiles: all · targets: tools
 
 CI pipelines, build farm and artifact storage, pre-submit and merge gating, symbol servers, device-farm orchestration, developer CLI and automation.
 
-- **Owns:** `BLD.CI.pipelines`; `BLD.CI.farm`; `BLD.CI.gating`; `BLD.CI.symbols`; `BLD.CI.devices`; `BLD.CI.cli`
-- **Contributes to:** `RND.SHADER.cache`; `ED.ARCH.headless`; `ED.COLLAB.binaries`; `QA.STRAT.flaky`; `PRF.METH.gates`; `PRF.BENCH.regression`; `OBS.CRASH.symbolication`; `XC.SEC.secrets`
+- **Owns:** `BLD.CI.pipelines`; `BLD.CI.farm`; `BLD.CI.gating`; `BLD.CI.symbols`; `BLD.CI.devices`; `BLD.CI.cli`; `BLD.CI.orchestration`; `BLD.CI.binary-distribution`; `BLD.CI.build-distribution`; `BLD.CI.local-first`
+- **Contributes to:** `ARCH.REQ.platform-matrix`; `ARCH.ORG.bootstrap`; `ARCH.ORG.triage`; `CNT.COOK.world-build`; `CNT.COOK.shared-cache`; `CNT.COOK.gpu-steps`; `CNT.VAL.submit-gate`; `RND.SHADER.cache`; `ED.ARCH.headless`; `ED.COLLAB.binaries`; `QA.STRAT.flaky`; `QA.STRAT.integration`; `QA.AGENT.test-integrity`; `PRF.METH.gates`; `PRF.BENCH.regression`; `PRF.LOAD.hitch-gate`; `OBS.CRASH.symbolication`; `XC.DET.conformance`; `XC.SEC.secrets`; `XC.SEC.agent-boundary`; `XC.SEC.testing`
 - **Not responsible for:** What tests exist → test-architect; Perf thresholds → performance-architect
 - **Provides:** — · **Consumes:** C-BUILD, C-COOK
 - **Expertise:** CI systems, build farms, artifact management
-- **Critics (G2):** K-ARCH, K-TOOLS, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### packaging-release-patching
 
-**Packaging, Patching & Release** · expert · parent: build-release-architect · profiles: all
+**Packaging, Patching & Release** · expert · tool · workstream: release · parent: build-release-architect · profiles: all · targets: tools
 
 Platform packaging and signing, store-submission artifacts, delta/chunk patching, DLC, install-on-demand, client/server/content version compatibility, CDN boundary, release rollback.
 
-- **Owns:** `BLD.REL.packaging`; `BLD.REL.submission`; `BLD.REL.patching`; `BLD.REL.dlc`; `BLD.REL.on-demand`; `BLD.REL.compat`; `BLD.REL.cdn`; `BLD.REL.rollback`
-- **Contributes to:** `RES.PKG.install-layout`
+- **Owns:** `BLD.REL.packaging`; `BLD.REL.submission`; `BLD.REL.patching`; `BLD.REL.dlc`; `BLD.REL.on-demand`; `BLD.REL.compat`; `BLD.REL.cdn`; `BLD.REL.rollback`; `BLD.REL.api-redist`; `BLD.REL.engine-distribution`; `BLD.REL.staged-rollout`; `BLD.REL.end-of-service`
+- **Contributes to:** `PLAT.WEB.delivery`; `RES.PKG.install-layout`; `CNT.VAL.audit`; `NET.ARCH.versioning`; `UI.LOC.language-packs`; `BLD.CI.build-distribution`; `XC.SEC.vuln-response`; `XC.SEC.key-custody`
 - **Not responsible for:** Package runtime format → package-formats-vfs; Certification tracking → certification-compliance
-- **Provides:** C-PKG · **Consumes:** C-VFS, C-BUILD, C-SVC, C-COOK
+- **Provides:** C-PKG · **Consumes:** C-VFS, C-BUILD, C-SVC, C-COOK, C-RELEASE
 - **Expertise:** platform packaging, binary diffing, content delivery
-- **Critics (G2):** K-ARCH, K-NET, K-TOOLS, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-QUALITY
+- **Critics (G2):** K-ARCH, K-NET, K-TOOLS, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
+
+### runtime-scalability
+
+**Runtime Scalability & Governor** · expert · runtime · workstream: foundation · parent: core-runtime-architect · profiles: all · targets: client, headless-client, server, tools
+
+Runtime scalability machinery: device-profile application, the registry of scalability knobs and actuators, first-run hardware auto-detect, and the closed-loop runtime governor that consumes frame-time, thermal/power and memory-pressure signals and drives registered actuators (dynamic resolution, significance, VFX, animation rate, worker count) with priorities and hysteresis.
+
+- **Owns:** `CORE.SCALE.profiles`; `CORE.SCALE.governor`; `CORE.SCALE.actuators`; `CORE.SCALE.autodetect`
+- **Contributes to:** `PLAT.PAL.power`; `PLAT.PAL.performance-modes`; `GAM.SAVE.settings`; `PRF.METH.field`
+- **Not responsible for:** Budget numbers and tier definitions → performance-architect; Hardware→tier device database → platform-architect; Each actuator's own implementation → owning-skill
+- **Provides:** C-SCALE · **Consumes:** C-CFG, C-PAL, C-INSTR, C-TASK
+- **Expertise:** control systems, adaptive performance APIs (ADPF, Apple thermal state), scalability design
+- **Critics (G2):** K-ARCH, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
+
+### voxel-worlds
+
+**Voxel & Buildable Worlds** · expert · runtime · workstream: world · parent: world-architect · profiles: sandbox · targets: client, headless-client, server, tools
+
+Chunked voxel/block worlds end to end: sparse storage and compression, meshing and remeshing on edit, runtime edit replication and persistence hand-off, block light propagation.
+
+- **Owns:** `WLD.VOX.storage`; `WLD.VOX.meshing`; `WLD.VOX.edits`; `WLD.VOX.lighting`
+- **Contributes to:** `RND.GEO.dynamic-mesh`; `GAM.SYS.building`
+- **Not responsible for:** Player construction gameplay (snapping, structural integrity) → gameplay-systems-toolkit; Heightfield terrain → terrain; Replication mechanics → replication
+- **Provides:** — · **Consumes:** C-WORLD, C-ENV, C-SPATIAL, C-RES, C-RSCENE?, C-PHYS?, C-REP?, C-SAVE? · **Implements:** C-ENV
+- **Expertise:** sparse voxel structures, surface extraction (greedy, surface nets, dual contouring), edit replication
+- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
+
+### gpu-platform-architect
+
+**GPU Platform Architect** · lead · runtime · workstream: rendering · parent: engine-architect · profiles: all · targets: client, tools
+
+GPU platform architecture shared by every renderer tier: layering of RHI, GPU memory, render graph, shader system, ray-query and inference infrastructure; the GPU feature-tier model (binding, pipeline-state, queue, mesh, RT, tensor tiers) and API baselines per hardware tier; task-based parallel command recording.
+
+- **Owns:** `RND.GPU.layering`; `RND.GPU.tiers`; `RND.GPU.recording`
+- **Not responsible for:** Rendering pipeline and features → render-architect; Individual API backends → rhi-d3d12, rhi-vulkan, rhi-metal, rhi-webgpu; Frames in flight / thread existence → frame-orchestration
+- **Provides:** C-GPUTIER · **Consumes:** C-RHI, C-PAL
+- **Expertise:** explicit graphics APIs, GPU architecture across vendors, API evolution tracking
+- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
+
+### rhi-d3d12
+
+**RHI D3D12 backend** · expert · runtime · workstream: rendering · parent: gpu-platform-architect · profiles: all · targets: client, tools · platforms: pc
+
+Implements C-RHI on D3D12 (Agility SDK features: enhanced barriers, work graphs, SM 6.x, GPU upload heaps); owns its validation-layer runs and vendor/driver quirks.
+
+- **Owns:** `RND.RHI.d3d12`; `RND.RHI.d3d12-validation`; `RND.RHI.d3d12-quirks`
+- **Contributes to:** `BLD.REL.api-redist`
+- **Not responsible for:** RHI abstraction & capability model → rhi-core; Other API backends → rhi-core
+- **Provides:** — · **Consumes:** C-PAL, C-SYNC, C-GPUTIER · **Implements:** C-RHI
+- **Expertise:** D3D12, Agility SDK, DXGI
+- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
+
+### rhi-vulkan
+
+**RHI Vulkan backend** · expert · runtime · workstream: rendering · parent: gpu-platform-architect · profiles: all · targets: client, tools · platforms: pc, mobile, xr-standalone
+
+Implements C-RHI on Vulkan (profiles incl. Android Baseline, descriptor buffers/heaps, synchronization2, dynamic rendering); owns its validation-layer runs and vendor/driver quirks.
+
+- **Owns:** `RND.RHI.vulkan`; `RND.RHI.vulkan-validation`; `RND.RHI.vulkan-quirks`
+- **Not responsible for:** RHI abstraction & capability model → rhi-core; Other API backends → rhi-core
+- **Provides:** — · **Consumes:** C-PAL, C-SYNC, C-GPUTIER · **Implements:** C-RHI
+- **Expertise:** Vulkan, SPIR-V, Android GPU drivers
+- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
+
+### rhi-metal
+
+**RHI Metal backend** · expert · runtime · workstream: rendering · parent: gpu-platform-architect · profiles: all · targets: client, tools · platforms: pc, mobile
+
+Implements C-RHI on Metal 3/4 (argument buffers, residency sets, MTL4 command model); owns its validation-layer runs and vendor/driver quirks.
+
+- **Owns:** `RND.RHI.metal`; `RND.RHI.metal-validation`; `RND.RHI.metal-quirks`
+- **Not responsible for:** RHI abstraction & capability model → rhi-core; Other API backends → rhi-core
+- **Provides:** — · **Consumes:** C-PAL, C-SYNC, C-GPUTIER · **Implements:** C-RHI
+- **Expertise:** Metal, Apple GPU families
+- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
+
+### rhi-webgpu
+
+**RHI WebGPU backend** · expert · runtime · workstream: rendering · parent: gpu-platform-architect · profiles: all · targets: client, tools · platforms: web
+
+Implements C-RHI on WebGPU (bind groups, implicit sync, limits tiers); owns its validation-layer runs and vendor/driver quirks.
+
+- **Owns:** `RND.RHI.webgpu`; `RND.RHI.webgpu-validation`; `RND.RHI.webgpu-quirks`
+- **Contributes to:** `PLAT.WEB.webgpu-target`
+- **Not responsible for:** RHI abstraction & capability model → rhi-core; Other API backends → rhi-core
+- **Provides:** — · **Consumes:** C-PAL, C-SYNC, C-GPUTIER · **Implements:** C-RHI
+- **Expertise:** WebGPU, WGSL, browser GPU processes
+- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
+
+### media-playback
+
+**Media & Video Playback** · expert · runtime · workstream: rendering · parent: render-architect · profiles: all · targets: client, tools
+
+Pre-rendered video playback end to end: hardware/software decode backends, A/V sync against the audio clock, video surfaces for UI, world and cinematics, HDR video, package streaming.
+
+- **Owns:** `RND.MEDIA.decode`; `RND.MEDIA.sync`; `RND.MEDIA.surfaces`; `RND.MEDIA.hdr`; `RND.MEDIA.middleware`
+- **Contributes to:** `UI.FW.loading-screens`
+- **Not responsible for:** Movie rendering (producing video) → cinematics-sequencer; Audio mixing → audio-dsp-mixing
+- **Provides:** C-VIDEO · **Consumes:** C-IO, C-RES, C-GPUMEM, C-AUDIO, C-FRAME, C-RG
+- **Untrusted inputs:** media-decoders
+- **Expertise:** video codecs (AV1/HEVC/H.264), hardware decoders, A/V sync
+- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
+
+### vehicle-physics
+
+**Vehicle Physics** · expert · runtime · workstream: simulation · parent: physics-architect · profiles: vehicles · targets: client, headless-client, server, tools
+
+Vehicle dynamics: wheeled vehicles (tires, suspension, drivetrain), aerodynamic surfaces and flight models, orbital mechanics, watercraft hydrodynamics, vehicle-specific prediction and force-feedback sources.
+
+- **Owns:** `PHY.CTRL.vehicles`; `PHY.CTRL.vehicle-net`; `PHY.CTRL.aero`; `PHY.CTRL.orbital`; `PHY.CTRL.watercraft`
+- **Contributes to:** `PHY.TOOL.tuning`; `INP.DEV.force-feedback`; `GAM.AI.traffic`
+- **Not responsible for:** Character controllers → character-physics; Generic buoyancy → rigid-body-dynamics; Netcode model → prediction-rollback
+- **Provides:** — · **Consumes:** C-PHYS, C-DET, C-ENV?, C-DEVICE?, C-PREDICT?
+- **Expertise:** tire models (Pacejka, brush), flight dynamics, orbital mechanics
+- **Critics (G2):** K-ARCH, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
+
+### physics-tools
+
+**Physics Tools** · expert · tool · workstream: simulation · parent: physics-architect · profiles: min2d, lite3d, std3d · targets: tools
+
+Physics authoring and debugging tools: collision authoring, physics-asset/ragdoll and constraint editors, the physics visual debugger/recorder, simulate-in-editor, vehicle and controller tuning, 2D collision-shape editing.
+
+- **Owns:** `PHY.TOOL.collision-authoring`; `PHY.TOOL.physics-asset`; `PHY.TOOL.visual-debugger`; `PHY.TOOL.simulate-in-editor`; `PHY.TOOL.tuning`; `PHY.TOOL.2d-shapes`
+- **Not responsible for:** Collision algorithms → collision-detection; Editor host & transactions → editor-architect
+- **Provides:** — · **Consumes:** C-EDCMD, C-EDHOST, C-PHYS, C-INSTR, C-REPLAY?
+- **Expertise:** physics debugging, tool UX, ragdoll setup
+- **Critics (G2):** K-ARCH, K-SIM, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
+
+### character-movement
+
+**Character Movement** · expert · runtime · workstream: gameplay · parent: gameplay-architect · profiles: min2d, lite3d, std3d · targets: client, headless-client, server, tools
+
+Character movement as one system at the junction of input, physics, animation and netcode: movement modes, step/slope rules, root-motion consumption and authority, networked predicted/reconciled movement with a resimulatable move API, mount/vehicle transitions, 2D platformer movement.
+
+- **Owns:** `GAM.MOVE.modes`; `GAM.MOVE.networked`; `GAM.MOVE.root-motion`; `GAM.MOVE.transitions`; `GAM.MOVE.platformer`
+- **Not responsible for:** Collide-and-slide controller primitive → character-physics; Generic prediction machinery → prediction-rollback; Animation selection → motion-synthesis
+- **Provides:** C-MOVE · **Consumes:** C-GAME, C-PHYS, C-INPUT, C-ANIM?, C-PREDICT?, C-DET
+- **Expertise:** character movement, movement netcode, game feel
+- **Critics (G2):** K-ARCH, K-SIM, K-NET, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
+
+### gameplay-data
+
+**Gameplay Data & Tuning** · expert · runtime · workstream: gameplay · parent: gameplay-architect · profiles: all · targets: client, headless-client, server, tools
+
+Designer-owned data: typed data tables and row references, curve assets, tuning assets with inheritance and per-platform/difficulty variants, spreadsheet round-trip, balance simulation, and live data hotfixes through remote overrides.
+
+- **Owns:** `GAM.DATA.tables`; `GAM.DATA.curves`; `GAM.DATA.tuning`; `GAM.DATA.spreadsheets`; `GAM.DATA.balance-sim`; `GAM.DATA.hotfix`; `GAM.TOOL.data`
+- **Contributes to:** `ED.UI.tabular`
+- **Not responsible for:** Serialization mechanics → serialization-schema; Remote-config service → online-services-liveops; Tabular editing widgets → editor-ui-framework
+- **Provides:** C-GAMEDATA · **Consumes:** C-REFL, C-ASSET, C-SER, C-LIVE?, C-CFG · **Tool-side:** C-EDCMD, C-EDHOST
+- **Expertise:** data-driven design, balancing, spreadsheet pipelines
+- **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
+
+### narrative-dialogue
+
+**Narrative & Dialogue** · expert · runtime · workstream: gameplay · parent: gameplay-architect · profiles: all · targets: client, headless-client, server, tools
+
+The dialogue line model and narrative runtime shared by VO, subtitles, lip sync, localization, cinematics and AI: line database with stable IDs, branching dialogue runtime and narrative-middleware interchange, narrative fact store with save/replication participation, barks and response rules, recording scripts and placeholder VO.
+
+- **Owns:** `GAM.NARR.lines`; `GAM.NARR.branching`; `GAM.NARR.middleware`; `GAM.NARR.facts`; `GAM.NARR.barks`; `GAM.NARR.vo-script`; `GAM.TOOL.dialogue`
+- **Contributes to:** `AUD.CONTENT.dialogue`; `GAM.FW.objectives`
+- **Not responsible for:** Quest content → external:game-team; VO playback → audio-content-runtime; String formatting → localization-i18n
+- **Provides:** C-DIALOGUE · **Consumes:** C-LOC, C-SER, C-ID, C-SAVE?, C-REP?, C-A11Y · **Tool-side:** C-EDCMD, C-EDHOST, C-GRAPH
+- **Expertise:** dialogue systems, response rules, Ink/Yarn/articy interchange, VO pipelines
+- **Critics (G2):** K-ARCH, K-NET, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
+
+### reference-games
+
+**Reference Games** · expert · process · workstream: governance · parent: program-orchestration · profiles: all
+
+The reference-game ladder (one representative game per configuration) used as milestone and release gate, representative production-scale content sets, and the internal playtest and dogfood loop.
+
+- **Owns:** `QA.REF.ladder`; `QA.REF.content`; `QA.REF.dogfood`
+- **Contributes to:** `ARCH.ORG.milestones`; `QA.STRAT.release-criteria`; `PRF.BENCH.scale-content`
+- **Not responsible for:** Teaching samples → developer-experience-docs; Benchmark harness → perf-benchmarking
+- **Provides:** — · **Consumes:** —
+- **Expertise:** game production, content production, playtesting
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
+
+### platform-web
+
+**Web Platform** · expert · runtime · workstream: platform · parent: platform-architect · profiles: minimal, min2d, lite3d · targets: client, tools · platforms: web
+
+Web target (WASM + WebGPU): threads and cross-origin isolation, memory limits, OPFS/IndexedDB storage, HTTP streaming delivery, user-gesture rules for audio/pointer/fullscreen, browser transport constraints.
+
+- **Owns:** `PLAT.WEB.runtime`; `PLAT.WEB.storage`; `PLAT.WEB.delivery`; `PLAT.WEB.gestures`; `PLAT.WEB.webgpu-target`
+- **Contributes to:** `NET.TRANS.web`
+- **Not responsible for:** WebGPU backend → rhi-webgpu; Browser transports → network-transport
+- **Provides:** — · **Consumes:** C-PAL
+- **Expertise:** WebAssembly, browser platform APIs, web delivery
+- **Critics (G2):** K-ARCH, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
+
+### online-services-liveops
+
+**Online Services & Live Ops** · expert · runtime · workstream: platform · parent: platform-architect · profiles: all · targets: client, headless-client, server, tools
+
+Integration boundary to third-party and own online backends and live operations: matchmaking/lobby/session boundary, remote config and feature flags, live events and experiments, service-hosted voice/text chat sessions, moderation (UGC, chat, generated content), wallet and ads boundaries, trusted time, remote generative-AI/inference boundary, service emulators and outage injection for tests.
+
+- **Owns:** `PLAT.SVC.matchmaking`; `PLAT.SVC.remote-config`; `PLAT.SVC.moderation`; `PLAT.SVC.voice-text`; `PLAT.SVC.trusted-time`; `PLAT.SVC.genai-boundary`; `PLAT.SVC.emulation`; `PLAT.LIVE.events`; `PLAT.LIVE.experiments`; `PLAT.COMM.currency`; `PLAT.COMM.ads`
+- **Contributes to:** `PLAT.PAL.device-db`; `NET.ARCH.async`; `UI.A11Y.comms`; `BLD.REL.staged-rollout`; `BLD.REL.end-of-service`; `OBS.LOG.analytics`; `XC.SEC.incident`; `XC.SEC.genai`
+- **Not responsible for:** First-party platform services → platform-services; Backend implementation → external:backend; Game-server hosting → dedicated-server
+- **Provides:** C-LIVE · **Consumes:** C-PAL, C-TASK, C-CFG, C-SVC?
+- **Untrusted inputs:** remote-config, chat-text, generated-content
+- **Expertise:** online service APIs, live operations, experimentation
+- **Critics (G2):** K-ARCH, K-NET, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
+
+### memory-performance
+
+**Memory Performance** · expert · process · workstream: performance · parent: performance-architect · profiles: all
+
+Memory as its own performance discipline: whole-process CPU+GPU+UMA footprint analysis per tier, snapshot capture and diffing, content-level attribution per asset/cell/feature, transition peak analysis, fragmentation over time; reviewer for the memory-usage obligation.
+
+- **Owns:** `PRF.MEM.footprint`; `PRF.MEM.snapshots`; `PRF.MEM.attribution`; `PRF.MEM.peaks`
+- **Not responsible for:** Allocator mechanisms → memory-allocators; Budget numbers → performance-architect
+- **Provides:** — · **Consumes:** —
+- **Expertise:** memory profiling (PIX, Razor-class, Memory Insights), fragmentation analysis, console memory
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
+
+### simulation-validation
+
+**Simulation & Systems Validation** · expert · process · workstream: quality · parent: test-architect · profiles: all
+
+Runs the objective validation that domain owners define for simulation-class systems: physics stability and reference suites, simulation golden traces, animation error suites, audio offline-render suites, and deterministic network simulation for prediction/replication correctness, mirroring what render-validation does for rendering.
+
+- **Owns:** `QA.SIM.stability-suite`; `QA.SIM.golden-traces`; `QA.SIM.netsim`; `QA.SIM.animation`; `QA.SIM.audio`
+- **Not responsible for:** Defining each domain's oracles → owning-skill; Determinism matrix definition → determinism-replay
+- **Provides:** — · **Consumes:** —
+- **Expertise:** simulation testing, deterministic simulation testing, numerical error metrics
+- **Critics (G2):** K-ARCH, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
+
+### engine-product-management
+
+**Engine Product Management** · orchestrator · process · workstream: governance · parent: engine-architect · profiles: all
+
+The engine as a product for game teams: roadmap and prioritization across game-team requirements, bug and feature intake with triage SLAs, release notes and upgrade guides, the customer-project corpus that validates each engine release, and the engine licensing model.
+
+- **Owns:** `ARCH.PROD.roadmap`; `ARCH.PROD.intake`; `ARCH.PROD.release-notes`; `ARCH.PROD.customer-corpus`; `ARCH.PROD.licensing-model`
+- **Not responsible for:** Architecture decisions → engine-architect; Work scheduling → program-orchestration; Engine release mechanics → build-release-architect
+- **Provides:** C-PROD · **Consumes:** —
+- **Expertise:** product management, developer relations, release management
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC

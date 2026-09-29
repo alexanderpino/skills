@@ -28,15 +28,15 @@ Architectural completeness and subsystem boundaries: ownership overlaps, missing
 Graphics architecture and currency of rendering techniques; GPU-driven, bindless, explicit-API assumptions; scalability from 2D mobile to path tracing.
 
 - Stages: G1, G2, S1, S2, S3, S4
-- Scope: subtree:render-architect, render-validation, gpu-performance, terrain, vegetation-foliage, water-ocean, atmosphere-weather, deformation-skinning, xr-runtime, ml-inference-runtime
+- Scope: subtree:render-architect, render-validation, gpu-performance, terrain, vegetation-foliage, water-ocean, atmosphere-weather, deformation-skinning, xr-runtime, ml-inference-runtime, subtree:gpu-platform-architect, media-playback, voxel-worlds, platform-console
 - Checks: no draw-call-centric or DX11-era assumptions; render graph owns sync and aliasing; technique maturity labels are honest; scale-down path exists for each feature
 
 ### K-SYSTEMS · Systems Critic
 
 Concurrency, memory, scheduling, IO and low-level architecture.
 
-- Stages: G1, G2, S1, S2, S3
-- Scope: subtree:core-runtime-architect, subtree:resource-streaming-architect, observability-telemetry, crash-diagnostics, determinism-replay, hot-reload-iteration, rhi-core, gpu-memory-resources, render-graph-scheduling, audio-architect, network-transport, ml-inference-runtime, subtree:world-architect
+- Stages: G1, G2, S1, S2, S3, S4
+- Scope: subtree:core-runtime-architect, subtree:resource-streaming-architect, observability-telemetry, crash-diagnostics, determinism-replay, hot-reload-iteration, rhi-core, gpu-memory-resources, render-graph-scheduling, audio-architect, network-transport, ml-inference-runtime, subtree:world-architect, subtree:gpu-platform-architect, runtime-scalability, media-playback
 - Checks: no single-thread-first assumptions; explicit ownership and lifetimes; synchronization minimized and justified; async IO end to end; heterogeneous cores and NUMA considered
 
 ### K-SIM · Physics & Simulation Critic
@@ -44,7 +44,7 @@ Concurrency, memory, scheduling, IO and low-level architecture.
 Simulation domains: physics, destruction, fluids, cloth, crowds, large-scale simulation, determinism of simulation.
 
 - Stages: G1, G2, S1, S2, S3, S4
-- Scope: subtree:physics-architect, crowd-simulation, ik-procedural-animation, prediction-rollback, determinism-replay, procedural-generation, water-ocean, vfx-particles
+- Scope: subtree:physics-architect, crowd-simulation, ik-procedural-animation, prediction-rollback, determinism-replay, procedural-generation, water-ocean, vfx-particles, character-movement, simulation-validation, voxel-worlds
 - Checks: stepping and sync with frame phases are explicit; determinism levels are declared; simulation LOD exists for large scales; build-vs-integrate evidence
 
 ### K-NET · Networking Critic
@@ -52,7 +52,7 @@ Simulation domains: physics, destruction, fluids, cloth, crowds, large-scale sim
 Online and multiplayer architecture: models, replication, prediction, servers, security, online-service boundaries.
 
 - Stages: G1, G2, S1, S2, S3, S4
-- Scope: subtree:network-architect, anti-cheat-integrity, platform-online-services, destruction-fracture, persistence-save, packaging-release-patching
+- Scope: subtree:network-architect, anti-cheat-integrity, platform-services, destruction-fracture, persistence-save, packaging-release-patching, character-movement, online-services-liveops, narrative-dialogue
 - Checks: netcode model matches game type; authority and trust explicit; bandwidth and scale budgets; version compatibility; service boundaries clear
 
 ### K-TOOLS · Tools & Editor Critic
@@ -60,15 +60,15 @@ Online and multiplayer architecture: models, replication, prediction, servers, s
 Production tooling and content workflows: editor, pipeline, collaboration, iteration speed.
 
 - Stages: G1, G2, S1, S2, S3, S4
-- Scope: subtree:editor-architect, subtree:content-pipeline-architect, hot-reload-iteration, developer-experience-docs, ui-architect, terrain, procedural-generation, cinematics-sequencer, scripting-runtime, world-data-model, subtree:build-release-architect
+- Scope: subtree:editor-architect, subtree:content-pipeline-architect, hot-reload-iteration, developer-experience-docs, ui-architect, terrain, procedural-generation, cinematics-sequencer, scripting-runtime, world-data-model, subtree:build-release-architect, owns-area:TOOL, kind:tool
 - Checks: tooling as thorough as runtime; undo/transactions universal; large teams can collaborate without lock contention; iteration time measured; pipeline deterministic and cached
 
 ### K-PLATFORM · Platform Critic
 
 Hardware, operating systems, consoles, graphics APIs, packaging and platform requirements.
 
-- Stages: G1, G2, S1, S2, S4
-- Scope: subtree:platform-architect, rhi-core, subtree:build-release-architect, certification-compliance, async-io-storage, crash-diagnostics
+- Stages: G1, G2, S1, S2, S4, S3
+- Scope: subtree:platform-architect, rhi-core, subtree:build-release-architect, certification-compliance, async-io-storage, crash-diagnostics, rhi-d3d12, rhi-vulkan, rhi-metal, rhi-webgpu
 - Checks: PAL is the only platform-specific layer; console, mobile and web constraints represented; certification requirements traced; packaging and patching per platform
 
 ### K-PERF · Performance Critic
@@ -76,7 +76,7 @@ Hardware, operating systems, consoles, graphics APIs, packaging and platform req
 Scalability bottlenecks: serialization points, excess synchronization, cache inefficiency, GPU stalls, bandwidth, poor asymptotics.
 
 - Stages: G1, G2, S2, S3, S4
-- Scope: all, subtree:performance-architect, subtree:world-architect
+- Scope: all, subtree:performance-architect, subtree:world-architect, runtime-scalability
 - Checks: budgets exist for each subsystem; benchmarks include realistic workloads; no hidden global sync points; asymptotics stated for world-scale data
 
 ### K-PROD · Production Critic
@@ -84,7 +84,7 @@ Scalability bottlenecks: serialization points, excess synchronization, cache ine
 Could a real team ship games with this: workflows, content scale, team scale, schedules, live operations.
 
 - Stages: G1, G2, S4
-- Scope: all, tier:orchestrator, developer-experience-docs, subtree:build-release-architect
+- Scope: all, tier:orchestrator, developer-experience-docs, subtree:build-release-architect, engine-product-management, reference-games
 - Checks: content creators are first-class; features have an owner through ship; live-ops and patching covered; scale-down keeps small teams productive
 
 ### K-FUTURE · Future-Technology Critic
@@ -107,153 +107,180 @@ Exactly one responsibility: find engine capabilities or engineering disciplines 
 
 Find accidental legacy architecture: central sequential update loops, deep inheritance, global state, hot-path virtual dispatch, CPU-driven rendering, coarse locks, global renderer sync, frame-tied lifetimes, universal scene graphs, synchronous IO/loading, single-thread-first design, OpenGL/DX11 assumptions, monoliths. A flagged pattern needs justification, not removal.
 
-- Stages: G1, G2, S1, S2, S3
+- Stages: G1, G2, S1, S2, S3, S4
 - Scope: all
-- Checks: each flagged pattern either absent or justified by an ADR
+- Checks: each pattern in data/legacy-patterns.json absent or justified by an ADR
 
 ### K-GAMEPLAY · Game Systems & Content Critic
 
 Animation, audio, AI, gameplay framework, UI, text, localization and accessibility: whether game teams get what they need.
 
-- Stages: G1, G2, S1, S2, S4
-- Scope: subtree:animation-architect, subtree:audio-architect, subtree:gameplay-architect, subtree:ui-architect, accessibility, input-system, input-devices-haptics, character-vehicle-physics
+- Stages: G1, G2, S1, S2, S4, S3
+- Scope: subtree:animation-architect, subtree:audio-architect, subtree:gameplay-architect, subtree:ui-architect, accessibility, input-system, input-devices-haptics, character-physics, cinematics-sequencer
 - Checks: designers and animators have authoring paths; accessibility and localization built in, not bolted on; gameplay extension points
 
-### K-QUALITY · Quality & Security Critic
+### K-TEST · Testing & Validation Critic
 
-Testing, validation, robustness and security: can an independent critic objectively determine correctness.
+Validation, oracles, determinism and concurrency testing, agent-output integrity: can an independent critic objectively decide correctness?
 
-- Stages: G1, G2, S3, S4
-- Scope: all, subtree:test-architect, subtree:security-engineering, subtree:api-lifecycle-migration
-- Checks: each skill has objective validation; untrusted inputs fuzzed; determinism and concurrency tested; security boundaries explicit
+- Stages: G1, G2, S1, S2, S3, S4
+- Scope: all, subtree:test-architect, subtree:performance-architect
+- Checks: each skill has objective validation with an independent oracle; tests cannot be weakened silently; determinism & concurrency testable via seams; evidence bundle defined for S3/S4
+
+### K-SEC · Security Critic
+
+Threat model, trust boundaries, memory safety, supply chain, privacy, incident response — reviewed at design time as well as in code.
+
+- Stages: G1, G2, S1, S2, S3, S4
+- Scope: all, subtree:security-engineering, network-transport, scripting-runtime, modding-ugc, plugin-system, serialization-schema, package-formats-vfs, persistence-save, platform-services, online-services-liveops, packaging-release-patching, ci-cd-automation, build-system-toolchains, observability-telemetry, crash-diagnostics, editor-architect, ai-assisted-authoring, ai-behavior-perception, dedicated-server, asset-import-interchange
+- Checks: every untrusted input has a validating owner and a fuzz target; trust boundaries explicit; hardening & key custody; privacy of telemetry, crash and player data
 
 ## Coverage matrix (stage G2 — which critics review which SKILL.md)
 
-| Skill | ARCH | RENDER | SYSTEMS | SIM | NET | TOOLS | PLATFORM | PERF | PROD | FUTURE | COMPLETE | LEGACY | GAMEPLAY | QUALITY |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| engine-architect | ◆ |  |  |  |  |  |  | · | ◆ | · | · | · |  | · |
-| architecture-governance | ◆ |  |  |  |  |  |  | · | ◆ | · | · | · |  | · |
-| program-orchestration | ◆ |  |  |  |  |  |  | · | ◆ | · | · | · |  | · |
-| research-evidence | ◆ |  |  |  |  |  |  | · | · | · | · | · |  | · |
-| performance-architect | · |  |  |  |  |  |  | ◆ | · | · | · | · |  | · |
-| perf-benchmarking | · |  |  |  |  |  |  | ◆ | · | · | · | · |  | · |
-| cpu-performance | · |  |  |  |  |  |  | ◆ | · | · | · | · |  | · |
-| gpu-performance | · | ◆ |  |  |  |  |  | ◆ | · | · | · | · |  | · |
-| loading-streaming-performance | · |  |  |  |  |  |  | ◆ | · | · | · | · |  | · |
-| test-architect | · |  |  |  |  |  |  | · | · | · | · | · |  | ◆ |
-| render-validation | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | ◆ |
-| functional-automation-soak | · |  |  |  |  |  |  | · | · | · | · | · |  | ◆ |
-| robustness-fuzzing | · |  |  |  |  |  |  | · | · | · | · | · |  | ◆ |
-| certification-compliance | · |  |  |  |  |  | ◆ | · | · | · | · | · |  | ◆ |
-| security-engineering | · |  |  |  |  |  |  | · | · | · | · | · |  | ◆ |
-| anti-cheat-integrity | · |  |  |  | ◆ |  |  | · | · | · | · | · |  | ◆ |
-| observability-telemetry | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · |
-| crash-diagnostics | · |  | ◆ |  |  |  | ◆ | · | · | · | · | · |  | · |
-| determinism-replay | · |  | ◆ | ◆ |  |  |  | · | · | · | · | · |  | · |
-| hot-reload-iteration | · |  | ◆ |  |  | ◆ |  | · | · | · | · | · |  | · |
-| accessibility | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · |
-| api-lifecycle-migration | ◆ |  |  |  |  |  |  | · | · | · | · | · |  | ◆ |
-| plugin-system | ◆ |  |  |  |  |  |  | · | · | · | · | · |  | ◆ |
-| modding-ugc | ◆ |  |  |  |  |  |  | · | · | · | · | · |  | ◆ |
-| developer-experience-docs | ◆ |  |  |  |  | ◆ |  | · | ◆ | · | · | · |  | · |
-| ml-inference-runtime | · | ◆ | ◆ |  |  |  |  | · | · | · | · | · |  | · |
-| core-runtime-architect | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · |
-| math-simd-numerics | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · |
-| memory-allocators | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · |
-| containers-core-types | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · |
-| concurrency-primitives | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · |
-| job-system-task-graph | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · |
-| frame-orchestration | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · |
-| entity-object-model | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · |
-| ecs-runtime | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · |
-| reflection-metadata | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · |
-| serialization-schema | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · |
-| platform-architect | · |  |  |  |  |  | ◆ | · | · | · | · | · |  | · |
-| platform-desktop | · |  |  |  |  |  | ◆ | · | · | · | · | · |  | · |
-| platform-console | · |  |  |  |  |  | ◆ | · | · | · | · | · |  | · |
-| platform-mobile-portable | · |  |  |  |  |  | ◆ | · | · | · | · | · |  | · |
-| platform-online-services | · |  |  |  | ◆ |  | ◆ | · | · | · | · | · |  | · |
-| input-system | · |  |  |  |  |  | ◆ | · | · | · | · | · | ◆ | · |
-| input-devices-haptics | · |  |  |  |  |  | ◆ | · | · | · | · | · | ◆ | · |
-| xr-runtime | · | ◆ |  |  |  |  | ◆ | · | · | · | · | · |  | · |
-| content-pipeline-architect | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · |
-| asset-import-interchange | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · |
-| asset-cook-processors | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · |
-| resource-streaming-architect | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · |
-| async-io-storage | · |  | ◆ |  |  |  | ◆ | · | · | · | · | · |  | · |
-| package-formats-vfs | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · |
-| world-architect | ◆ |  | ◆ |  |  |  |  | ◆ | · | · | · | · |  | · |
-| world-data-model | ◆ |  | ◆ |  |  | ◆ |  | ◆ | · | · | · | · |  | · |
-| spatial-transforms | ◆ |  | ◆ |  |  |  |  | ◆ | · | · | · | · |  | · |
-| terrain | ◆ | ◆ | ◆ |  |  | ◆ |  | ◆ | · | · | · | · |  | · |
-| vegetation-foliage | ◆ | ◆ | ◆ |  |  |  |  | ◆ | · | · | · | · |  | · |
-| water-ocean | ◆ | ◆ | ◆ | ◆ |  |  |  | ◆ | · | · | · | · |  | · |
-| atmosphere-weather | ◆ | ◆ | ◆ |  |  |  |  | ◆ | · | · | · | · |  | · |
-| procedural-generation | ◆ |  | ◆ | ◆ |  | ◆ |  | ◆ | · | · | · | · |  | · |
-| render-architect | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · |
-| rhi-core | · | ◆ | ◆ |  |  |  | ◆ | · | · | · | · | · |  | · |
-| gpu-memory-resources | · | ◆ | ◆ |  |  |  |  | · | · | · | · | · |  | · |
-| render-graph-scheduling | · | ◆ | ◆ |  |  |  |  | · | · | · | · | · |  | · |
-| shader-system | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · |
-| material-system | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · |
-| gpu-driven-pipeline | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · |
-| virtualized-geometry-lod | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · |
-| texture-streaming-vt | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · |
-| direct-lighting-shadows | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · |
-| global-illumination | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · |
-| ray-tracing-infrastructure | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · |
-| path-tracing | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · |
-| reconstruction-upscaling | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · |
-| post-color-hdr | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · |
-| translucency-decals | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · |
-| character-rendering | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · |
-| render-2d-vector | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · |
-| vfx-particles | · | ◆ |  | ◆ |  |  |  | · | · | · | · | · |  | · |
-| physics-architect | · |  |  | ◆ |  |  |  | · | · | · | · | · |  | · |
-| collision-detection | · |  |  | ◆ |  |  |  | · | · | · | · | · |  | · |
-| rigid-body-dynamics | · |  |  | ◆ |  |  |  | · | · | · | · | · |  | · |
-| character-vehicle-physics | · |  |  | ◆ |  |  |  | · | · | · | · | · | ◆ | · |
-| cloth-deformables | · |  |  | ◆ |  |  |  | · | · | · | · | · |  | · |
-| destruction-fracture | · |  |  | ◆ | ◆ |  |  | · | · | · | · | · |  | · |
-| fluid-simulation | · |  |  | ◆ |  |  |  | · | · | · | · | · |  | · |
-| physics-2d | · |  |  | ◆ |  |  |  | · | · | · | · | · |  | · |
-| animation-architect | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · |
-| animation-runtime | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · |
-| deformation-skinning | · | ◆ |  |  |  |  |  | · | · | · | · | · | ◆ | · |
-| animation-graphs | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · |
-| motion-synthesis | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · |
-| ik-procedural-animation | · |  |  | ◆ |  |  |  | · | · | · | · | · | ◆ | · |
-| facial-animation | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · |
-| cinematics-sequencer | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · |
-| audio-architect | · |  | ◆ |  |  |  |  | · | · | · | · | · | ◆ | · |
-| audio-dsp-mixing | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · |
-| spatial-audio-acoustics | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · |
-| audio-content-runtime | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · |
-| network-architect | · |  |  |  | ◆ |  |  | · | · | · | · | · |  | · |
-| network-transport | · |  | ◆ |  | ◆ |  |  | · | · | · | · | · |  | · |
-| replication | · |  |  |  | ◆ |  |  | · | · | · | · | · |  | · |
-| prediction-rollback | · |  |  | ◆ | ◆ |  |  | · | · | · | · | · |  | · |
-| dedicated-server | · |  |  |  | ◆ |  |  | · | · | · | · | · |  | · |
-| gameplay-architect | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · |
-| gameplay-systems-toolkit | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · |
-| scripting-runtime | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · |
-| navigation-pathfinding | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · |
-| crowd-simulation | · |  |  | ◆ |  |  |  | · | · | · | · | · | ◆ | · |
-| ai-behavior-perception | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · |
-| persistence-save | · |  |  |  | ◆ |  |  | · | · | · | · | · | ◆ | · |
-| ui-architect | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · |
-| text-fonts | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · |
-| localization-i18n | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · |
-| editor-architect | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · |
-| editor-ui-framework | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · |
-| world-editor-viewport | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · |
-| graph-editor-framework | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · |
-| collaboration-version-control | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · |
-| visual-debugging-tools | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · |
-| ai-assisted-authoring | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · |
-| build-release-architect | · |  |  |  |  | ◆ | ◆ | · | ◆ | · | · | · |  | · |
-| build-system-toolchains | · |  |  |  |  | ◆ | ◆ | · | ◆ | · | · | · |  | · |
-| ci-cd-automation | · |  |  |  |  | ◆ | ◆ | · | ◆ | · | · | · |  | · |
-| packaging-release-patching | · |  |  |  | ◆ | ◆ | ◆ | · | ◆ | · | · | · |  | · |
+| Skill | ARCH | RENDER | SYSTEMS | SIM | NET | TOOLS | PLATFORM | PERF | PROD | FUTURE | COMPLETE | LEGACY | GAMEPLAY | TEST | SEC |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| engine-architect | ◆ |  |  |  |  |  |  | · | ◆ | · | · | · |  | · | · |
+| architecture-governance | ◆ |  |  |  |  |  |  | · | ◆ | · | · | · |  | · | · |
+| program-orchestration | ◆ |  |  |  |  |  |  | · | ◆ | · | · | · |  | · | · |
+| research-evidence | ◆ |  |  |  |  |  |  | · | · | · | · | · |  | · | · |
+| performance-architect | · |  |  |  |  |  |  | ◆ | · | · | · | · |  | ◆ | · |
+| perf-benchmarking | · |  |  |  |  |  |  | ◆ | · | · | · | · |  | ◆ | · |
+| cpu-performance | · |  |  |  |  |  |  | ◆ | · | · | · | · |  | ◆ | · |
+| gpu-performance | · | ◆ |  |  |  |  |  | ◆ | · | · | · | · |  | ◆ | · |
+| loading-streaming-performance | · |  |  |  |  |  |  | ◆ | · | · | · | · |  | ◆ | · |
+| test-architect | · |  |  |  |  |  |  | · | · | · | · | · |  | ◆ | · |
+| render-validation | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | ◆ | · |
+| functional-automation-soak | · |  |  |  |  |  |  | · | · | · | · | · |  | ◆ | · |
+| robustness-fuzzing | · |  |  |  |  |  |  | · | · | · | · | · |  | ◆ | · |
+| certification-compliance | · |  |  |  |  |  | ◆ | · | · | · | · | · |  | ◆ | · |
+| security-engineering | · |  |  |  |  |  |  | · | · | · | · | · |  | · | ◆ |
+| anti-cheat-integrity | · |  |  |  | ◆ |  |  | · | · | · | · | · |  | · | ◆ |
+| observability-telemetry | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | ◆ |
+| crash-diagnostics | · |  | ◆ |  |  |  | ◆ | · | · | · | · | · |  | · | ◆ |
+| determinism-replay | · |  | ◆ | ◆ |  |  |  | · | · | · | · | · |  | · | · |
+| hot-reload-iteration | · |  | ◆ |  |  | ◆ |  | · | · | · | · | · |  | · | · |
+| accessibility | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · | · |
+| api-lifecycle-migration | ◆ |  |  |  |  |  |  | · | · | · | · | · |  | · | · |
+| plugin-system | ◆ |  |  |  |  |  |  | · | · | · | · | · |  | · | ◆ |
+| modding-ugc | ◆ |  |  |  |  |  |  | · | · | · | · | · |  | · | ◆ |
+| developer-experience-docs | ◆ |  |  |  |  | ◆ |  | · | ◆ | · | · | · |  | · | · |
+| ml-inference-runtime | · | ◆ | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
+| core-runtime-architect | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
+| math-simd-numerics | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
+| memory-allocators | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
+| containers-core-types | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
+| concurrency-primitives | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
+| job-system-task-graph | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
+| frame-orchestration | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
+| entity-object-model | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
+| ecs-runtime | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
+| reflection-metadata | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
+| serialization-schema | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | ◆ |
+| platform-architect | · |  |  |  |  |  | ◆ | · | · | · | · | · |  | · | · |
+| platform-desktop | · |  |  |  |  |  | ◆ | · | · | · | · | · |  | · | · |
+| platform-console | · | ◆ |  |  |  |  | ◆ | · | · | · | · | · |  | · | · |
+| platform-mobile | · |  |  |  |  |  | ◆ | · | · | · | · | · |  | · | · |
+| platform-services | · |  |  |  | ◆ |  | ◆ | · | · | · | · | · |  | · | ◆ |
+| input-system | · |  |  |  |  |  | ◆ | · | · | · | · | · | ◆ | · | · |
+| input-devices-haptics | · |  |  |  |  |  | ◆ | · | · | · | · | · | ◆ | · | · |
+| xr-runtime | · | ◆ |  |  |  |  | ◆ | · | · | · | · | · |  | · | · |
+| content-pipeline-architect | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
+| asset-import-interchange | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · | ◆ |
+| asset-cook-processors | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
+| resource-streaming-architect | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
+| async-io-storage | · |  | ◆ |  |  |  | ◆ | · | · | · | · | · |  | · | · |
+| package-formats-vfs | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | ◆ |
+| world-architect | ◆ |  | ◆ |  |  |  |  | ◆ | · | · | · | · |  | · | · |
+| world-data-model | ◆ |  | ◆ |  |  | ◆ |  | ◆ | · | · | · | · |  | · | · |
+| spatial-transforms | ◆ |  | ◆ |  |  |  |  | ◆ | · | · | · | · |  | · | · |
+| terrain | ◆ | ◆ | ◆ |  |  | ◆ |  | ◆ | · | · | · | · |  | · | · |
+| vegetation-foliage | ◆ | ◆ | ◆ |  |  | ◆ |  | ◆ | · | · | · | · |  | · | · |
+| water-ocean | ◆ | ◆ | ◆ | ◆ |  | ◆ |  | ◆ | · | · | · | · |  | · | · |
+| atmosphere-weather | ◆ | ◆ | ◆ |  |  | ◆ |  | ◆ | · | · | · | · |  | · | · |
+| procedural-generation | ◆ |  | ◆ | ◆ |  | ◆ |  | ◆ | · | · | · | · |  | · | · |
+| render-architect | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · | · |
+| rhi-core | · | ◆ | ◆ |  |  |  | ◆ | · | · | · | · | · |  | · | · |
+| gpu-memory-resources | · | ◆ | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
+| render-graph-scheduling | · | ◆ | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
+| shader-system | · | ◆ | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
+| material-system | · | ◆ |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
+| geometry-pipeline | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · | · |
+| virtualized-geometry-lod | · | ◆ |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
+| texture-streaming-vt | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · | · |
+| direct-lighting-shadows | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · | · |
+| global-illumination | · | ◆ |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
+| ray-tracing-infrastructure | · | ◆ | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
+| path-tracing | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · | · |
+| reconstruction-upscaling | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · | · |
+| post-color-hdr | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · | · |
+| translucency-decals | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · | · |
+| character-rendering | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · | · |
+| render-2d-vector | · | ◆ |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
+| vfx-particles | · | ◆ |  | ◆ |  | ◆ |  | · | · | · | · | · |  | · | · |
+| physics-architect | · |  |  | ◆ |  |  |  | · | · | · | · | · |  | · | · |
+| collision-detection | · |  |  | ◆ |  |  |  | · | · | · | · | · |  | · | · |
+| rigid-body-dynamics | · |  |  | ◆ |  |  |  | · | · | · | · | · |  | · | · |
+| character-physics | · |  |  | ◆ |  |  |  | · | · | · | · | · | ◆ | · | · |
+| cloth-deformables | · |  |  | ◆ |  |  |  | · | · | · | · | · |  | · | · |
+| destruction-fracture | · |  |  | ◆ | ◆ | ◆ |  | · | · | · | · | · |  | · | · |
+| fluid-simulation | · |  |  | ◆ |  |  |  | · | · | · | · | · |  | · | · |
+| physics-2d | · |  |  | ◆ |  |  |  | · | · | · | · | · |  | · | · |
+| animation-architect | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · | · |
+| animation-runtime | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
+| deformation-skinning | · | ◆ |  |  |  |  |  | · | · | · | · | · | ◆ | · | · |
+| animation-graphs | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
+| motion-synthesis | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
+| ik-procedural-animation | · |  |  | ◆ |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
+| facial-animation | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
+| cinematics-sequencer | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
+| audio-architect | · |  | ◆ |  |  |  |  | · | · | · | · | · | ◆ | · | · |
+| audio-dsp-mixing | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · | · |
+| spatial-audio-acoustics | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · | · |
+| audio-content-runtime | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
+| network-architect | · |  |  |  | ◆ |  |  | · | · | · | · | · |  | · | · |
+| network-transport | · |  | ◆ |  | ◆ |  |  | · | · | · | · | · |  | · | ◆ |
+| replication | · |  |  |  | ◆ |  |  | · | · | · | · | · |  | · | · |
+| prediction-rollback | · |  |  | ◆ | ◆ |  |  | · | · | · | · | · |  | · | · |
+| dedicated-server | · |  |  |  | ◆ |  |  | · | · | · | · | · |  | · | ◆ |
+| gameplay-architect | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · | · |
+| gameplay-systems-toolkit | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
+| scripting-runtime | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | ◆ |
+| navigation-pathfinding | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
+| crowd-simulation | · |  |  | ◆ |  |  |  | · | · | · | · | · | ◆ | · | · |
+| ai-behavior-perception | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | ◆ |
+| persistence-save | · |  |  |  | ◆ |  |  | · | · | · | · | · | ◆ | · | ◆ |
+| ui-architect | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
+| text-fonts | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · | · |
+| localization-i18n | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · | · |
+| editor-architect | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · | ◆ |
+| editor-ui-framework | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
+| world-editor-viewport | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
+| graph-editor-framework | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
+| collaboration-version-control | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
+| visual-debugging-tools | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
+| ai-assisted-authoring | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · | ◆ |
+| build-release-architect | · |  |  |  |  | ◆ | ◆ | · | ◆ | · | · | · |  | · | · |
+| build-system-toolchains | · |  |  |  |  | ◆ | ◆ | · | ◆ | · | · | · |  | · | ◆ |
+| ci-cd-automation | · |  |  |  |  | ◆ | ◆ | · | ◆ | · | · | · |  | · | ◆ |
+| packaging-release-patching | · |  |  |  | ◆ | ◆ | ◆ | · | ◆ | · | · | · |  | · | ◆ |
+| runtime-scalability | · |  | ◆ |  |  |  |  | ◆ | · | · | · | · |  | · | · |
+| voxel-worlds | ◆ | ◆ | ◆ | ◆ |  |  |  | ◆ | · | · | · | · |  | · | · |
+| gpu-platform-architect | · | ◆ | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
+| rhi-d3d12 | · | ◆ | ◆ |  |  |  | ◆ | · | · | · | · | · |  | · | · |
+| rhi-vulkan | · | ◆ | ◆ |  |  |  | ◆ | · | · | · | · | · |  | · | · |
+| rhi-metal | · | ◆ | ◆ |  |  |  | ◆ | · | · | · | · | · |  | · | · |
+| rhi-webgpu | · | ◆ | ◆ |  |  |  | ◆ | · | · | · | · | · |  | · | · |
+| media-playback | · | ◆ | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
+| vehicle-physics | · |  |  | ◆ |  |  |  | · | · | · | · | · |  | · | · |
+| physics-tools | · |  |  | ◆ |  | ◆ |  | · | · | · | · | · |  | · | · |
+| character-movement | · |  |  | ◆ | ◆ |  |  | · | · | · | · | · | ◆ | · | · |
+| gameplay-data | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
+| narrative-dialogue | · |  |  |  | ◆ | ◆ |  | · | · | · | · | · | ◆ | · | · |
+| reference-games | · |  |  |  |  |  |  | · | ◆ | · | · | · |  | · | · |
+| platform-web | · |  |  |  |  |  | ◆ | · | · | · | · | · |  | · | · |
+| online-services-liveops | · |  |  |  | ◆ |  | ◆ | · | · | · | · | · |  | · | ◆ |
+| memory-performance | · |  |  |  |  |  |  | ◆ | · | · | · | · |  | ◆ | · |
+| simulation-validation | · |  |  | ◆ |  |  |  | · | · | · | · | · |  | ◆ | · |
+| engine-product-management | ◆ |  |  |  |  |  |  | · | ◆ | · | · | · |  | · | · |
 
 ◆ domain critic (specifically scoped) · · universal critic

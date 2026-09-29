@@ -72,7 +72,11 @@ def dep_graph(m):
     for s in m.skill_order:
         for cid, opt in m.deps(s, include_universal=False):
             consumers.setdefault(cid, []).append(s + ("?" if opt else ""))
-    out.append("## Contracts\n\nFan-in counts explicit consumers (universal contracts are consumed implicitly by every runtime skill or every skill). "
+    out.append("## Layered contract graph\n\n")
+    for L in (0, 1, 2, 3, 4, 5, "P"):
+        ids = [c for c in m.contracts if m.contract(c)["layer"] == L]
+        out.append(f"- **L{L}** ({len(ids)}): " + ", ".join(f"`{c}`" for c in ids) + "\n")
+    out.append("\n## Contracts\n\nFan-in counts explicit consumers (universal contracts are consumed implicitly by every runtime skill or every skill). "
                "High fan-in contracts are the **critical architectural contracts**: they are designed first, versioned under `C-API`, and changed only through the change-request protocol in `C-ORCH`.\n\n")
     out.append("| Contract | Layer | Owner | Requires | Fan-in | Summary |\n|---|---|---|---|---|---|\n")
     rows = []
@@ -91,7 +95,7 @@ def dep_graph(m):
         out.append(f"- `{cid}` ({len(consumers[cid])} consumers) — {m.contract(cid)['name']}: {', '.join(sorted(consumers[cid]))}\n")
 
     out.append("\n## Runtime coupling cycles\n\n")
-    comps = sccs(edges)
+    comps = sccs(m.skill_edges(include_universal=False, include_optional=False, code_only=True))
     if comps:
         out.append("Required-edge cycles between skills. Each must be mediated by a frame phase or event contract, never by a direct call:\n\n")
         for comp in comps:
@@ -99,13 +103,13 @@ def dep_graph(m):
     else:
         out.append("None among required edges.\n")
 
-    out.append("\n## Per-skill dependencies\n\n| Skill | Provides | Consumes (required) | Consumes (optional) | Depends on skills |\n|---|---|---|---|---|\n")
+    out.append("\n## Per-skill dependencies\n\n| Skill | Provides | Runtime (required) | Runtime (optional) | Tool-side | Depends on skills |\n|---|---|---|---|---|---|\n")
     for s in m.skill_order:
         sk = m.skill(s)
-        req = [c for c, o in m.deps(s) if not o]
-        opt = [c for c, o in m.deps(s) if o]
-        dep_sk = sorted(m.skill_edges(False, True)[s])
-        out.append(f"| {s} | {', '.join(sk['provides']) or '—'} | {', '.join(req) or '—'} | {', '.join(opt) or '—'} | {', '.join(dep_sk) or '—'} |\n")
+        req = [d for d in sk["consumes"] if not m.parse_dep(d)[1]]
+        opt = [d for d in sk["consumes"] if m.parse_dep(d)[1]]
+        dep_sk = sorted(m.skill_edges(False, True, include_tool=True)[s])
+        out.append(f"| {s} | {', '.join(sk['provides']) or '—'} | {', '.join(req) or '—'} | {', '.join(opt) or '—'} | {', '.join(sk['tool_consumes']) or '—'} | {', '.join(dep_sk) or '—'} |\n")
     return "".join(out)
 
 
@@ -120,33 +124,57 @@ def hierarchy(m):
     def walk(s, depth):
         sk = m.skill(s)
         tag = {"orchestrator": "[O]", "cross-cutting": "[X]", "lead": "[L]", "expert": "   "}[sk["tier"]]
-        out.append(f"{'    ' * depth}{tag} {s}  ({len(m.owned_caps(s))})\n")
+        kind = {"runtime": "", "tool": " ·tool", "process": " ·process"}[sk["kind"]]
+        out.append(f"{'    ' * depth}{tag} {s}  ({len(m.owned_caps(s))}){kind}\n")
         for ch in m.children(s):
             walk(ch, depth + 1)
     root = [s for s in m.skill_order if m.skill(s)["parent"] is None][0]
     walk(root, 0)
-    out.append("```\n\n`[O]` orchestrator · `[X]` cross-cutting discipline · `[L]` domain lead · (n) = capabilities owned.\n\n")
+    out.append("```\n\n`[O]` orchestrator · `[X]` cross-cutting discipline · `[L]` domain lead · (n) = capabilities owned · "
+               "·tool = ships only in the tools target · ·process = organizational, never in a build.\n\n")
+    ws = {}
+    for s_ in m.skill_order:
+        ws.setdefault(m.skill(s_).get("workstream", "—"), []).append(s_)
+    out.append("## Workstreams\n\nIntegration groups used for delegated arbitration and staffing (`ARCH.ORG.escalation`, `ARCH.ORG.staffing`).\n\n")
+    for w, members in ws.items():
+        out.append(f"- **{w}** ({len(members)}): {', '.join(members)}\n")
 
-    out.append("## Configuration profiles (scale-down proof)\n\n")
-    out.append("A configuration is a base profile plus add-ons. `check.py` proves every configuration is closed under its required dependencies, so a small configuration never drags in a large subsystem.\n\n")
+    out.append("\n## Configurations (scale-down proof)\n\n")
+    out.append("A configuration is a point on three independent axes: scale/feature **profiles** (a base plus add-ons), a "
+               "build **target** (client, headless-client, server, tools) and target **platforms**. `check.py` proves every "
+               "configuration closed under its required dependencies (process skills excluded: they are organizational), "
+               "and that contracts needing an implementer (the RHI) have one on every platform.\n\n")
+    out.append("| Configuration | Profiles | Target | Platforms | Build skills | Capabilities |\n|---|---|---|---|---|---|\n")
+    for n, c in m.configurations.items():
+        ncap = sum(1 for cid in m.caps if m.cap_in_configuration(cid, n))
+        out.append(f"| {n} | {', '.join(c['profiles'])} | {c['target']} | {', '.join(c.get('platforms', []))} | {len(m.members(n))} | {ncap} |\n")
+    out.append("\n### Membership matrix\n\n")
     names = list(m.configurations)
     out.append("| Skill | " + " | ".join(names) + " |\n|---|" + "---|" * len(names) + "\n")
     for s in m.skill_order:
-        out.append(f"| {s} | " + " | ".join("●" if m.in_configuration(s, m.configurations[n]) else "" for n in names) + " |\n")
-    out.append("| **total** | " + " | ".join(str(sum(m.in_configuration(s, m.configurations[n]) for s in m.skill_order)) for n in names) + " |\n")
+        if m.skill(s)["kind"] == "process":
+            continue
+        out.append(f"| {s} | " + " | ".join("●" if m.in_configuration(s, n) else "" for n in names) + " |\n")
+    out.append("| **total** | " + " | ".join(str(len(m.members(n))) for n in names) + " |\n")
 
     out.append("\n## Skill cards\n")
     for s in m.skill_order:
         sk = m.skill(s)
-        out.append(f"\n### {s}\n\n**{sk['name']}** · {sk['tier']} · parent: {sk['parent'] or '—'} · profiles: {', '.join(sk['profiles'])}\n\n")
+        plats = f" · platforms: {', '.join(sk['platforms'])}" if sk.get("platforms") else ""
+        tg = f" · targets: {', '.join(sk['targets'])}" if sk["targets"] else ""
+        out.append(f"\n### {s}\n\n**{sk['name']}** · {sk['tier']} · {sk['kind']} · workstream: {sk.get('workstream','—')} · parent: {sk['parent'] or '—'} · profiles: {', '.join(sk['profiles'])}{tg}{plats}\n\n")
         out.append(f"{sk['purpose']}\n\n")
         owned = m.owned_caps(s)
         out.append("- **Owns:** " + "; ".join(f"`{c['id']}`" for c in owned) + "\n")
         contrib = m.contributed_caps(s)
         if contrib:
             out.append("- **Contributes to:** " + "; ".join(f"`{c['id']}`" for c in contrib) + "\n")
-        out.append("- **Not responsible for:** " + "; ".join(f"{w} → {o}" for w, o in sk["non_responsibilities"]) + "\n")
-        out.append(f"- **Provides:** {', '.join(sk['provides']) or '—'} · **Consumes:** {', '.join(sk['consumes']) or '—'}\n")
+        out.append("- **Not responsible for:** " + "; ".join(f"{w} → {', '.join(o) if isinstance(o, list) else o}" for w, o in sk["non_responsibilities"]) + "\n")
+        out.append(f"- **Provides:** {', '.join(sk['provides']) or '—'} · **Consumes:** {', '.join(sk['consumes']) or '—'}"
+                   + (f" · **Tool-side:** {', '.join(sk['tool_consumes'])}" if sk['tool_consumes'] else "")
+                   + (f" · **Implements:** {', '.join(sk['implements'])}" if sk['implements'] else "") + "\n")
+        if sk.get("untrusted_inputs"):
+            out.append(f"- **Untrusted inputs:** {', '.join(sk['untrusted_inputs'])}\n")
         out.append(f"- **Expertise:** {', '.join(sk['expertise'])}\n")
         out.append(f"- **Critics (G2):** {', '.join(m.critics_for(s, 'G2'))}\n")
     return "".join(out)
@@ -203,12 +231,36 @@ def critic_matrix(m):
     return "".join(out)
 
 
+def radar_legacy_milestones(m):
+    out = [BANNER, "# 09 · Technology Radar, Legacy Patterns & Milestones\n\n"]
+    out.append("## Technology radar\n\nEvery non-established capability is on the radar with an owner, evidence, a revisit/promotion trigger and a fallback (`check.py` enforces it). Non-goals are recorded explicitly.\n\n")
+    out.append("| Technology | Class | Owner | Capabilities | Evidence | Revisit when | Fallback |\n|---|---|---|---|---|---|---|\n")
+    for e in sorted(m.radar_doc["entries"], key=lambda e: "ESMX".index(e["class"]) if e["class"] in "ESMX" else 9):
+        caps = "non-goal" if e.get("non_goal") else ", ".join(f"`{c}`" for c in e["capabilities"])
+        out.append(f"| {e['tech']} | {MATURITY[e['class']]} | {e['owner']} | {caps} | {e['evidence']} | {e['revisit']} | {e.get('fallback','—')} |\n")
+    out.append("\n## Anti-legacy pattern catalogue\n\nA pattern is not forbidden. If it appears, the justification owner must record an ADR. K-LEGACY checks this at G2 and S1–S4.\n\n")
+    out.append("| ID | Pattern | Detection hint | Default stance | Justification owner |\n|---|---|---|---|---|\n")
+    for p in m.legacy_doc["patterns"]:
+        out.append(f"| {p['id']} | {p['pattern']} | {p['detection']} | {p['default_stance']} | {p['justification_owner']} |\n")
+    out.append("\n## Milestones (walking skeleton → AAA)\n\n`check.py` proves each milestone closed over its own and earlier milestones' build skills, and places every build skill in exactly one milestone.\n\n")
+    for ms in m.milestone_doc["milestones"]:
+        out.append(f"### {ms['id']} · {ms['name']} ({len(ms['skills'])} skills; configuration `{ms['configuration']}`)\n\n")
+        out.append(f"**Exit criteria:** {ms['exit']}\n\n")
+        if ms.get("contracts_frozen"):
+            out.append(f"**Contracts frozen:** {', '.join(ms['contracts_frozen'])}\n\n")
+        if ms.get("contracts_draft"):
+            out.append(f"**Contracts drafted:** {', '.join(ms['contracts_draft'])}\n\n")
+        out.append("Skills: " + ", ".join(ms["skills"]) + "\n\n")
+    return "".join(out)
+
+
 VIEWS = {
     "01-capability-map.md": cap_map,
     "02-skill-dependency-graph.md": dep_graph,
     "03-skill-hierarchy.md": hierarchy,
     "04-cross-cutting.md": crosscutting,
     "05-critic-framework.md": critic_matrix,
+    "09-radar-legacy-milestones.md": radar_legacy_milestones,
 }
 
 

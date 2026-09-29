@@ -1,68 +1,1127 @@
 {
-  "_doc": "Architectural contracts. Skills depend on contracts, never directly on another skill's internals. layer: 0 platform, 1 foundation, 2 engine services, 3 subsystems, 4 game framework, 5 tools; 'P' = process contract (not code). 'requires' = build-level interface dependencies; must be acyclic and point to the same or a lower layer. 'universal': 'runtime' = implicitly consumed by every runtime skill; 'all' = implicitly consumed by every skill.",
-  "contracts": [
-    {"id": "C-PAL", "layer": 0, "owner": "platform-architect", "name": "Platform abstraction layer", "summary": "OS services, CPU/GPU capability discovery, windowing, lifecycle events. No platform #ifdefs above this line.", "requires": []},
-    {"id": "C-ERR", "layer": 1, "owner": "core-runtime-architect", "name": "Error & failure model", "summary": "Result types, assertion tiers, fatal vs recoverable, degradation rules.", "requires": ["C-PAL"], "universal": "runtime"},
-    {"id": "C-MOD", "layer": 1, "owner": "core-runtime-architect", "name": "Module & lifecycle", "summary": "Module descriptors, init dependency graph, service registration, shutdown order.", "requires": ["C-PAL", "C-ERR"]},
-    {"id": "C-CFG", "layer": 1, "owner": "core-runtime-architect", "name": "Configuration & cvars", "summary": "Layered config sources, typed cvars, change notification, per-device overrides.", "requires": ["C-PAL"]},
-    {"id": "C-MATH", "layer": 1, "owner": "math-simd-numerics", "name": "Math & numeric conventions", "summary": "Vector/matrix types, precision classes, deterministic-math variants, convention enforcement.", "requires": []},
-    {"id": "C-MEM", "layer": 1, "owner": "memory-allocators", "name": "Allocation & memory accounting", "summary": "Allocator interface, tagging, budgets hooks, OOM behavior.", "requires": ["C-PAL"], "universal": "runtime"},
-    {"id": "C-TYPES", "layer": 1, "owner": "containers-core-types", "name": "Core types & containers", "summary": "Container, string, hash and ownership types used across the engine.", "requires": ["C-MEM"]},
-    {"id": "C-SYNC", "layer": 1, "owner": "concurrency-primitives", "name": "Concurrency primitives & thread-safety annotations", "summary": "Atomics, locks, lock-free queues, reclamation, annotation conventions.", "requires": ["C-PAL"]},
-    {"id": "C-TASK", "layer": 1, "owner": "job-system-task-graph", "name": "Task graph & job API", "summary": "Task creation, dependencies, priorities, blocking rules, completion integration.", "requires": ["C-SYNC", "C-MEM"]},
-    {"id": "C-INSTR", "layer": 1, "owner": "observability-telemetry", "name": "Instrumentation", "summary": "Log/trace/metric API; zero cost when compiled out; trace format.", "requires": ["C-PAL"], "universal": "runtime"},
-    {"id": "C-CRASH", "layer": 1, "owner": "crash-diagnostics", "name": "Crash & diagnostic hooks", "summary": "Crash context annotations, breadcrumbs, watchdog registration.", "requires": ["C-PAL", "C-INSTR"], "universal": "runtime"},
-    {"id": "C-DET", "layer": 1, "owner": "determinism-replay", "name": "Determinism", "summary": "Determinism levels, FP rules, ordered execution rules, state-hash hooks.", "requires": ["C-MATH"]},
-    {"id": "C-BUDGET", "layer": 1, "owner": "performance-architect", "name": "Budgets & scalability profiles", "summary": "Per-subsystem budgets per tier, device profiles, scalability hooks, perf gate thresholds.", "requires": ["C-CFG"], "universal": "runtime"},
-    {"id": "C-PLUGIN", "layer": 1, "owner": "plugin-system", "name": "Plugin descriptor & loading", "summary": "Plugin manifest, dependency resolution, load phases, ABI tags.", "requires": ["C-MOD"]},
-    {"id": "C-FRAME", "layer": 2, "owner": "frame-orchestration", "name": "Frame, tick phases & time", "summary": "Phase list, sync points, time domains, fixed-step, pipelining depth.", "requires": ["C-TASK"]},
-    {"id": "C-ID", "layer": 2, "owner": "entity-object-model", "name": "Identity & references", "summary": "Entity IDs, GUIDs, reference kinds, lifetime rules, events.", "requires": ["C-TYPES"]},
-    {"id": "C-ECS", "layer": 2, "owner": "ecs-runtime", "name": "ECS", "summary": "Components, queries, systems, access declarations, command buffers.", "requires": ["C-ID", "C-TASK", "C-FRAME"]},
-    {"id": "C-REFL", "layer": 2, "owner": "reflection-metadata", "name": "Reflection & type metadata", "summary": "Type registry, properties, attributes, dynamic invocation.", "requires": ["C-TYPES"]},
-    {"id": "C-SER", "layer": 2, "owner": "serialization-schema", "name": "Serialization & schema evolution", "summary": "Formats, versioning, upgraders, canonical form, untrusted-input rules.", "requires": ["C-REFL"]},
-    {"id": "C-IO", "layer": 2, "owner": "async-io-storage", "name": "Async IO", "summary": "IO requests, priorities, deadlines, completions, decompression targets.", "requires": ["C-PAL", "C-TASK"]},
-    {"id": "C-VFS", "layer": 2, "owner": "package-formats-vfs", "name": "Package & VFS mounts", "summary": "Package format, mount layering, chunk IDs, integrity.", "requires": ["C-IO", "C-SER"]},
-    {"id": "C-ASSET", "layer": 2, "owner": "content-pipeline-architect", "name": "Asset identity & references", "summary": "Asset IDs, soft/hard references, dependency declaration, registry queries.", "requires": ["C-SER", "C-ID"]},
-    {"id": "C-RES", "layer": 2, "owner": "resource-streaming-architect", "name": "Resource lifetime & streaming requests", "summary": "Handles, request priority/deadline, residency callbacks, budgets, fallbacks.", "requires": ["C-ASSET", "C-VFS", "C-MEM"]},
-    {"id": "C-RELOAD", "layer": 2, "owner": "hot-reload-iteration", "name": "Hot reload", "summary": "Change notifications, invalidation, state preservation hooks.", "requires": ["C-RES", "C-MOD"]},
-    {"id": "C-SPATIAL", "layer": 2, "owner": "spatial-transforms", "name": "Transforms & spatial queries", "summary": "Transform representation incl. large-world coordinates, hierarchy, generic spatial queries.", "requires": ["C-MATH", "C-ECS"]},
-    {"id": "C-RHI", "layer": 2, "owner": "rhi-core", "name": "Render hardware interface", "summary": "Devices, queues, command lists, sync, bindless, PSOs, presentation.", "requires": ["C-PAL", "C-MEM", "C-SYNC"]},
-    {"id": "C-GPUMEM", "layer": 2, "owner": "gpu-memory-resources", "name": "GPU resources & memory", "summary": "Resource creation, heaps, residency, upload/readback, lifetime.", "requires": ["C-RHI"]},
-    {"id": "C-ML", "layer": 2, "owner": "ml-inference-runtime", "name": "ML inference", "summary": "Model format, inference invocation on GPU/CPU, budgets, precision.", "requires": ["C-RHI", "C-TASK"]},
-    {"id": "C-WORLD", "layer": 3, "owner": "world-architect", "name": "World partition & streaming cells", "summary": "Cells, streaming sources, world data activation, simulation LOD signals.", "requires": ["C-SPATIAL", "C-RES"]},
-    {"id": "C-RG", "layer": 3, "owner": "render-graph-scheduling", "name": "Render graph", "summary": "Pass/resource declaration, queues, history resources, readback.", "requires": ["C-RHI", "C-GPUMEM"]},
-    {"id": "C-SHADER", "layer": 3, "owner": "shader-system", "name": "Shader interface & interop", "summary": "Shader modules, permutations, binding layouts, interop headers.", "requires": ["C-RHI"]},
-    {"id": "C-MATIF", "layer": 3, "owner": "material-system", "name": "Material interface", "summary": "Material parameters, shading model inputs, material domains.", "requires": ["C-SHADER"]},
-    {"id": "C-RSCENE", "layer": 3, "owner": "render-architect", "name": "Render scene & render features", "summary": "Render proxies, world→render sync, feature registration, views.", "requires": ["C-RG", "C-SPATIAL", "C-MATIF"]},
-    {"id": "C-TEMPORAL", "layer": 3, "owner": "reconstruction-upscaling", "name": "Temporal data", "summary": "Motion vectors, jitter, history validity, reactive masks, resolution scaling.", "requires": ["C-RG"]},
-    {"id": "C-RT", "layer": 3, "owner": "ray-tracing-infrastructure", "name": "Ray-tracing scene", "summary": "Acceleration structures, instance data, hit-group/material binding, update policy.", "requires": ["C-RSCENE"]},
-    {"id": "C-TEXT", "layer": 3, "owner": "text-fonts", "name": "Text layout & glyphs", "summary": "Shaped glyph runs, font fallback, glyph atlas/curve data.", "requires": ["C-TYPES"]},
-    {"id": "C-DRAW2D", "layer": 3, "owner": "render-2d-vector", "name": "2D draw lists", "summary": "Batched 2D/vector/text draw submission used by UI, 2D games, debug overlays.", "requires": ["C-RG", "C-SHADER", "C-TEXT"]},
-    {"id": "C-PHYS", "layer": 3, "owner": "physics-architect", "name": "Physics world & scene queries", "summary": "Bodies, shapes, queries, contact events, stepping phases.", "requires": ["C-SPATIAL", "C-ECS"]},
-    {"id": "C-ANIM", "layer": 3, "owner": "animation-architect", "name": "Animation pose output", "summary": "Pose buffers, root motion, animation events, physics/render hand-off.", "requires": ["C-ECS", "C-SPATIAL"]},
-    {"id": "C-AUDIO", "layer": 3, "owner": "audio-architect", "name": "Audio emitters & events", "summary": "Emitter/listener data, event triggering, parameters, busses.", "requires": ["C-ECS", "C-SPATIAL"]},
-    {"id": "C-INPUT", "layer": 3, "owner": "input-system", "name": "Input actions", "summary": "Action values, contexts, device/user association, timestamps.", "requires": ["C-PAL", "C-FRAME"]},
-    {"id": "C-NET", "layer": 3, "owner": "network-architect", "name": "Replication & authority", "summary": "Replicated state declaration, authority, prediction hooks, net ticks.", "requires": ["C-ECS", "C-SER", "C-FRAME"]},
-    {"id": "C-SVC", "layer": 3, "owner": "platform-online-services", "name": "Platform & online services", "summary": "Async service calls, identity tokens, entitlements, sessions.", "requires": ["C-PAL", "C-TASK"]},
-    {"id": "C-LOC", "layer": 3, "owner": "localization-i18n", "name": "Localized strings", "summary": "String IDs, formatting, locale switching.", "requires": ["C-ASSET"]},
-    {"id": "C-UI", "layer": 3, "owner": "ui-architect", "name": "UI widgets & binding", "summary": "Widget model, data binding, focus, layout.", "requires": ["C-REFL", "C-INPUT", "C-DRAW2D", "C-TEXT", "C-LOC"]},
-    {"id": "C-NAV", "layer": 3, "owner": "navigation-pathfinding", "name": "Navigation queries", "summary": "Path requests, navmesh/grid queries, dynamic obstacles.", "requires": ["C-SPATIAL", "C-PHYS"]},
-    {"id": "C-GAME", "layer": 4, "owner": "gameplay-architect", "name": "Gameplay framework extension", "summary": "Game module entry points, rules, players, extension hooks.", "requires": ["C-ECS", "C-PHYS", "C-ANIM", "C-WORLD"]},
-    {"id": "C-SCRIPT", "layer": 4, "owner": "scripting-runtime", "name": "Script bindings", "summary": "Binding generation, sandbox limits, script lifecycle.", "requires": ["C-REFL", "C-GAME"]},
-    {"id": "C-SAVE", "layer": 4, "owner": "persistence-save", "name": "Save games", "summary": "Save participation, versioned save records, async save/load.", "requires": ["C-SER", "C-ID"]},
-    {"id": "C-COOK", "layer": 5, "owner": "content-pipeline-architect", "name": "Cook-step processors", "summary": "Processor inputs, cache keys, determinism, platform variants.", "requires": ["C-ASSET", "C-SER", "C-TASK"]},
-    {"id": "C-EDCMD", "layer": 5, "owner": "editor-architect", "name": "Editor commands & tool extension", "summary": "Transactions, undo/redo, selection, tool registration.", "requires": ["C-REFL", "C-SER"]},
-    {"id": "C-GRAPH", "layer": 5, "owner": "graph-editor-framework", "name": "Graph authoring & compilation", "summary": "Node/pin model, validation, compilation hooks for domain graphs.", "requires": ["C-EDCMD"]},
-    {"id": "C-BUILD", "layer": 5, "owner": "build-system-toolchains", "name": "Build description", "summary": "Targets, configurations, toolchains, codegen steps.", "requires": []},
-    {"id": "C-PKG", "layer": 5, "owner": "packaging-release-patching", "name": "Release packages & patches", "summary": "Package manifests, patch/DLC chunks, version compatibility.", "requires": ["C-VFS", "C-BUILD"]},
-
-    {"id": "C-ARCH", "layer": "P", "owner": "engine-architect", "name": "Architecture, layering & profiles", "summary": "Layer rules, contract registry, configuration profiles, conventions.", "requires": [], "universal": "all"},
-    {"id": "C-ADR", "layer": "P", "owner": "architecture-governance", "name": "ADR & fitness functions", "summary": "ADR template incl. revisit conditions; automated architectural checks.", "requires": [], "universal": "all"},
-    {"id": "C-EVID", "layer": "P", "owner": "research-evidence", "name": "Evidence grading", "summary": "Source tiers, maturity classes, claim standards.", "requires": [], "universal": "all"},
-    {"id": "C-ORCH", "layer": "P", "owner": "program-orchestration", "name": "Agent coordination protocol", "summary": "Ownership ledger, change requests, integration order, critic gates.", "requires": [], "universal": "all"},
-    {"id": "C-TEST", "layer": "P", "owner": "test-architect", "name": "Test & validation definition of done", "summary": "Required test kinds per skill, determinism of tests, coverage policy.", "requires": [], "universal": "all"},
-    {"id": "C-API", "layer": "P", "owner": "api-lifecycle-migration", "name": "API stability & deprecation", "summary": "Public vs internal APIs, versioning, deprecation windows, upgraders.", "requires": [], "universal": "all"},
-    {"id": "C-TRUST", "layer": "P", "owner": "security-engineering", "name": "Trust boundaries", "summary": "Untrusted inputs list, validation obligations, sandbox rules.", "requires": [], "universal": "all"},
-    {"id": "C-A11Y", "layer": "P", "owner": "accessibility", "name": "Accessibility requirements", "summary": "Mapped guideline requirements per player-facing feature.", "requires": []}
-  ]
+ "_doc": "Architectural contracts. Skills depend on contracts, never directly on another skill's internals. layer: 0 platform, 1 foundation, 2 engine services, 3 subsystems, 4 game framework, 5 tools; 'P' = process contract (not code). 'requires' = build-level interface dependencies; must be acyclic and point to the same or a lower layer. 'universal': 'runtime' = implicitly consumed by every runtime skill; 'all' = implicitly consumed by every skill.",
+ "contracts": [
+  {
+   "id": "C-PAL",
+   "layer": 0,
+   "owner": "platform-architect",
+   "name": "Platform abstraction layer",
+   "summary": "OS services, CPU/GPU capability discovery and device database, windowing, display & safe area, lifecycle and system events (memory pressure, thermal/power, network reachability, audio endpoint, locale, OS accessibility settings, overlay/focus, storage, page size), clocks and clock-domain correlation, processes/pipes/shared memory/dev sockets, HTTP(S)/TLS client, permissions, thread creation/affinity/QoS and main-thread dispatch. Platform code lives only in the PAL or in a registered platform backend slot.",
+   "requires": [
+    "C-BASE"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-ERR",
+   "layer": 1,
+   "owner": "core-runtime-architect",
+   "name": "Error & failure model",
+   "summary": "Result types, assertion tiers, fatal vs recoverable, degradation rules.",
+   "requires": [
+    "C-BASE"
+   ],
+   "universal": "runtime",
+   "conformance": true
+  },
+  {
+   "id": "C-MOD",
+   "layer": 1,
+   "owner": "core-runtime-architect",
+   "name": "Module & lifecycle",
+   "summary": "Module descriptors, serial bootstrap then parallel init dependency graph, service registration, shutdown order, declarative self-registration (no central tables).",
+   "requires": [
+    "C-ERR",
+    "C-TASK"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-CFG",
+   "layer": 1,
+   "owner": "core-runtime-architect",
+   "name": "Configuration & cvars",
+   "summary": "Layered config sources (defaults, platform, device profile, remote/live, user) with precedence, typed cvars read through versioned immutable snapshots latched at sync points, queued change notification.",
+   "requires": [
+    "C-BASE"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-MATH",
+   "layer": 1,
+   "owner": "math-simd-numerics",
+   "name": "Math & numeric conventions",
+   "summary": "Vector/matrix types, precision classes, deterministic-math variants, fixed and scalable (vector-length-agnostic) SIMD kernels, convention enforcement.",
+   "requires": [],
+   "conformance": true
+  },
+  {
+   "id": "C-MEM",
+   "layer": 1,
+   "owner": "memory-allocators",
+   "name": "Allocation & memory accounting",
+   "summary": "Allocator interface, tagging, budgets hooks, OOM behavior.",
+   "requires": [
+    "C-BASE"
+   ],
+   "universal": "runtime",
+   "conformance": true
+  },
+  {
+   "id": "C-TYPES",
+   "layer": 1,
+   "owner": "containers-core-types",
+   "name": "Core types & containers",
+   "summary": "Containers, strings, versioned stable hashing, general-purpose compression codecs, vetted cryptographic primitives wrapper, ownership/view types.",
+   "requires": [
+    "C-MEM"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-SYNC",
+   "layer": 1,
+   "owner": "concurrency-primitives",
+   "name": "Concurrency primitives & thread-safety annotations",
+   "summary": "Atomics, locks, lock-free queues, safe reclamation, thread-safety annotation conventions, OS-waitable completion tokens that IO/GPU fences plug into.",
+   "requires": [
+    "C-BASE"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-TASK",
+   "layer": 1,
+   "owner": "job-system-task-graph",
+   "name": "Task graph & job API",
+   "summary": "Task creation, dependencies, priorities/QoS, blocking rules, completion-token integration, process-wide thread inventory with pinned/affinity lanes and middleware adapters, serial deterministic test mode and schedule-perturbation hooks, task tracing.",
+   "requires": [
+    "C-SYNC",
+    "C-MEM"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-INSTR",
+   "layer": 1,
+   "owner": "observability-telemetry",
+   "name": "Instrumentation",
+   "summary": "Log/trace/metric API; zero cost when compiled out; trace format.",
+   "requires": [
+    "C-BASE"
+   ],
+   "universal": "runtime",
+   "conformance": true
+  },
+  {
+   "id": "C-CRASH",
+   "layer": 1,
+   "owner": "crash-diagnostics",
+   "name": "Crash & diagnostic hooks",
+   "summary": "Crash context annotations, breadcrumbs, watchdog registration.",
+   "requires": [
+    "C-BASE",
+    "C-INSTR"
+   ],
+   "universal": "runtime",
+   "conformance": true
+  },
+  {
+   "id": "C-DET",
+   "layer": 1,
+   "owner": "determinism-replay",
+   "name": "Determinism",
+   "summary": "Determinism levels, floating-point rules, ordered-execution rules, state-hash hooks.",
+   "requires": [
+    "C-MATH"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-BUDGET",
+   "layer": "P",
+   "owner": "performance-architect",
+   "name": "Budgets & performance gates",
+   "summary": "Budget numbers per hardware tier × configuration × refresh class, derived from the performance model; perf gate thresholds.",
+   "requires": [],
+   "universal": "all"
+  },
+  {
+   "id": "C-PLUGIN",
+   "layer": 1,
+   "owner": "plugin-system",
+   "name": "Plugin descriptor & loading",
+   "summary": "Plugin manifest, dependency resolution, load phases, ABI tags.",
+   "requires": [
+    "C-MOD"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-FRAME",
+   "layer": 2,
+   "owner": "frame-orchestration",
+   "name": "Frame, tick phases & time",
+   "summary": "Time domains and multi-rate cadences, pipelining depth, the minimal set of named global sync points, frame-wide access declarations (ECS components and registered service resources) from which ordering is derived, the canonical simulation schedule, injectable test clock.",
+   "requires": [
+    "C-TASK"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-ID",
+   "layer": 2,
+   "owner": "entity-object-model",
+   "name": "Identity & references",
+   "summary": "Entity IDs, GUIDs, reference kinds, lifetime rules, events.",
+   "requires": [
+    "C-TYPES"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-ECS",
+   "layer": 2,
+   "owner": "ecs-runtime",
+   "name": "ECS",
+   "summary": "Components, queries, systems, access declarations, command buffers.",
+   "requires": [
+    "C-ID",
+    "C-TASK",
+    "C-FRAME"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-REFL",
+   "layer": 2,
+   "owner": "reflection-metadata",
+   "name": "Reflection & type metadata",
+   "summary": "Type registry, properties, attributes, dynamic invocation.",
+   "requires": [
+    "C-TYPES"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-SER",
+   "layer": 2,
+   "owner": "serialization-schema",
+   "name": "Serialization & schema evolution",
+   "summary": "Formats, versioning, upgraders, canonical form, untrusted-input rules.",
+   "requires": [
+    "C-REFL"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-IO",
+   "layer": 2,
+   "owner": "async-io-storage",
+   "name": "Async IO",
+   "summary": "IO requests, priorities, deadlines, completions, decompression targets.",
+   "requires": [
+    "C-PAL",
+    "C-TASK"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-VFS",
+   "layer": 2,
+   "owner": "package-formats-vfs",
+   "name": "Package & VFS mounts",
+   "summary": "Package format, mount layering (base, patch, DLC, mods, remote), chunk IDs, integrity; codec per target constrained by available hardware decompressors.",
+   "requires": [
+    "C-IO",
+    "C-SER"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-ASSET",
+   "layer": 2,
+   "owner": "content-pipeline-architect",
+   "name": "Asset identity & references",
+   "summary": "Asset IDs, soft/hard references, dependency declaration, registry queries.",
+   "requires": [
+    "C-SER",
+    "C-ID"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-RES",
+   "layer": 2,
+   "owner": "resource-streaming-architect",
+   "name": "Resource lifetime & streaming requests",
+   "summary": "Resource handles and explicit lifetime; load requests with priority/deadline; the staged load pipeline (IO → decompress → fixup → GPU upload → publish) that every resource type implements; pool registration, pressure signals and shrink-by-deadline requests; residency notifications drained at a declared C-FRAME phase; fallbacks.",
+   "requires": [
+    "C-ASSET",
+    "C-VFS",
+    "C-MEM"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-RELOAD",
+   "layer": 2,
+   "owner": "hot-reload-iteration",
+   "name": "Hot reload",
+   "summary": "Change notifications, invalidation, state preservation hooks.",
+   "requires": [
+    "C-RES",
+    "C-MOD"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-SPATIAL",
+   "layer": 2,
+   "owner": "spatial-transforms",
+   "name": "Transforms & spatial queries",
+   "summary": "Transform representation incl. large-world coordinates, hierarchy, generic spatial queries, per-phase change sets (moved/attached/teleported) consumed by all spatial replicas.",
+   "requires": [
+    "C-MATH",
+    "C-ID"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-RHI",
+   "layer": 2,
+   "owner": "rhi-core",
+   "name": "Render hardware interface",
+   "summary": "Devices, queues and command recording, completion tokens, binding-model tier (bindless / descriptor-buffer / bind-group), pipeline-state-model tier (monolithic PSO / libraries / shader objects / state-object programs), GPU-generated work primitives, presentation, implicit-sync backends; the RHI consumes C-PRESENT to report present feedback.",
+   "requires": [
+    "C-PAL",
+    "C-MEM",
+    "C-SYNC"
+   ],
+   "needs_implementer": true,
+   "conformance": true
+  },
+  {
+   "id": "C-GPUMEM",
+   "layer": 2,
+   "owner": "gpu-memory-resources",
+   "name": "GPU resources & memory",
+   "summary": "Resource creation, heaps, residency, upload/readback, lifetime.",
+   "requires": [
+    "C-RHI"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-ML",
+   "layer": 2,
+   "owner": "ml-inference-runtime",
+   "name": "ML inference",
+   "summary": "Model format and packaging, CPU and NPU backends, async invocation, precision classes, budgets.",
+   "requires": [
+    "C-TASK",
+    "C-MEM"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-WORLD",
+   "layer": 3,
+   "owner": "world-architect",
+   "name": "World partition & streaming cells",
+   "summary": "Cells, streaming sources, world data activation in budgeted, time-sliced batches with bulk registration.",
+   "requires": [
+    "C-SPATIAL",
+    "C-RES"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-RG",
+   "layer": 3,
+   "owner": "render-graph-scheduling",
+   "name": "Render graph",
+   "summary": "Pass/resource declaration, queues, history resources, readback, dynamic GPU-generated work nodes; barrier output mapped or elided on implicit-sync backends.",
+   "requires": [
+    "C-RHI",
+    "C-GPUMEM"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-SHADER",
+   "layer": 3,
+   "owner": "shader-system",
+   "name": "Shader interface & interop",
+   "summary": "Shader modules, permutations and budgets, binding layouts generated per binding tier, interop headers, neural/tensor intrinsics tier.",
+   "requires": [
+    "C-RHI"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-MATIF",
+   "layer": 3,
+   "owner": "material-system",
+   "name": "Material interface",
+   "summary": "Material parameters, shading model inputs, material domains.",
+   "requires": [
+    "C-SHADER"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-RSCENE",
+   "layer": 3,
+   "owner": "render-architect",
+   "name": "Render scene & render features",
+   "summary": "Render features and views, render-scene data streams extracted as change-tracked deltas (no per-object proxy mirror; CPU cost O(changes)), feature registration with minimum GPU tier, non-mesh primitive kinds.",
+   "requires": [
+    "C-RG",
+    "C-SPATIAL",
+    "C-MATIF"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-TEMPORAL",
+   "layer": 3,
+   "owner": "reconstruction-upscaling",
+   "name": "Temporal data",
+   "summary": "Motion vectors, jitter, history validity, reactive/transparency masks, resolution scaling; motion-vector obligations for every moving/animated surface; UI/HUD separation for frame generation; depth+motion submission for XR spacewarp.",
+   "requires": [
+    "C-RG"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-RT",
+   "layer": 3,
+   "owner": "ray-tracing-infrastructure",
+   "name": "Ray queries",
+   "summary": "Ray-query contract with hardware and software (SDF/BVH compute) backends: acceleration structures, instance data, hit/material binding, update policy.",
+   "requires": [
+    "C-RSCENE"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-TEXT",
+   "layer": 3,
+   "owner": "text-fonts",
+   "name": "Text layout & glyphs",
+   "summary": "Shaped glyph runs, font fallback, glyph atlas/curve data.",
+   "requires": [
+    "C-TYPES"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-DRAW2D",
+   "layer": 3,
+   "owner": "render-2d-vector",
+   "name": "2D draw lists",
+   "summary": "Batched 2D/vector/text draw submission used by UI, 2D games, debug overlays.",
+   "requires": [
+    "C-RG",
+    "C-SHADER",
+    "C-TEXT"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-PHYS",
+   "layer": 3,
+   "owner": "physics-architect",
+   "name": "Physics world & scene queries",
+   "summary": "Bodies, shapes, queries (handle-addressed, batched), contact events with budgets, stepping phases, batch add/remove O(batch), snapshot/restore/resimulate participation, collider history for rewind.",
+   "requires": [
+    "C-SPATIAL",
+    "C-FRAME",
+    "C-ID"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-ANIM",
+   "layer": 3,
+   "owner": "animation-architect",
+   "name": "Animation pose output",
+   "summary": "Pose output and control input (parameters, action/montage requests, instance lifetime), root motion, animation events, pose history for rewind, network-sync hooks, physics/render hand-off.",
+   "requires": [
+    "C-SPATIAL",
+    "C-ID"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-AUDIO",
+   "layer": 3,
+   "owner": "audio-architect",
+   "name": "Audio emitters & events",
+   "summary": "Emitter/listener data (multiple listeners), event triggering, parameters, busses, the sample-accurate audio clock exposed to gameplay.",
+   "requires": [
+    "C-SPATIAL",
+    "C-ID"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-INPUT",
+   "layer": 3,
+   "owner": "input-system",
+   "name": "Input actions",
+   "summary": "Action definitions and values, tick-stamped input-command frames and their serialization (all targets incl. server); device binding contexts are client-side.",
+   "requires": [
+    "C-FRAME"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-NET",
+   "layer": 3,
+   "owner": "network-architect",
+   "name": "Netcode model & authority policy",
+   "summary": "Netcode model per game type, authority model, net tick and time policy, compatibility window and handshake policy.",
+   "requires": [
+    "C-FRAME",
+    "C-ID"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-SVC",
+   "layer": 3,
+   "owner": "platform-services",
+   "name": "Platform services",
+   "summary": "Identity tokens, entitlements & commerce, privileges, social graph, achievements, leaderboards, cloud save, region/age policy.",
+   "requires": [
+    "C-PAL",
+    "C-TASK"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-LOC",
+   "layer": 3,
+   "owner": "localization-i18n",
+   "name": "Localized strings",
+   "summary": "String IDs, formatting, locale switching.",
+   "requires": [
+    "C-ASSET"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-UI",
+   "layer": 3,
+   "owner": "ui-architect",
+   "name": "UI widgets & binding",
+   "summary": "Widget model, data binding, focus, layout.",
+   "requires": [
+    "C-REFL",
+    "C-INPUT",
+    "C-DRAW2D",
+    "C-TEXT",
+    "C-LOC"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-NAV",
+   "layer": 3,
+   "owner": "navigation-pathfinding",
+   "name": "Navigation queries",
+   "summary": "Path requests, navmesh/grid queries, dynamic obstacles.",
+   "requires": [
+    "C-SPATIAL"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-GAME",
+   "layer": 4,
+   "owner": "gameplay-architect",
+   "name": "Gameplay framework extension",
+   "summary": "Game module entry points, rules/session state, data-oriented control binding (input source or AI → controlled entity), scheduled gameplay systems, extension hooks.",
+   "requires": [
+    "C-ID",
+    "C-FRAME"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-SCRIPT",
+   "layer": 3,
+   "owner": "scripting-runtime",
+   "name": "Script bindings",
+   "summary": "Binding generation, sandbox limits, script lifecycle.",
+   "requires": [
+    "C-REFL"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-SAVE",
+   "layer": 3,
+   "owner": "persistence-save",
+   "name": "Save games",
+   "summary": "Save participation, versioned save records, async save/load.",
+   "requires": [
+    "C-SER",
+    "C-ID"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-COOK",
+   "layer": 5,
+   "owner": "content-pipeline-architect",
+   "name": "Cook-step processors",
+   "summary": "Processor inputs, cache keys, determinism class (bit-exact / tolerance / pinned-artifact), platform variants, world-scope steps, per-asset on-demand invocation, validation hooks.",
+   "requires": [
+    "C-ASSET",
+    "C-SER",
+    "C-TASK"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-EDCMD",
+   "layer": 5,
+   "owner": "editor-architect",
+   "name": "Editor commands & tool extension",
+   "summary": "Transactions, undo/redo, selection, tool registration.",
+   "requires": [
+    "C-REFL",
+    "C-SER"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-GRAPH",
+   "layer": 5,
+   "owner": "graph-editor-framework",
+   "name": "Graph authoring & compilation",
+   "summary": "Node/pin model, validation, compilation hooks for domain graphs.",
+   "requires": [
+    "C-EDCMD"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-BUILD",
+   "layer": 5,
+   "owner": "build-system-toolchains",
+   "name": "Build description",
+   "summary": "Targets, configurations, toolchains, codegen steps.",
+   "requires": [],
+   "conformance": true
+  },
+  {
+   "id": "C-PKG",
+   "layer": 5,
+   "owner": "packaging-release-patching",
+   "name": "Release packages & patches",
+   "summary": "Package manifests, patch/DLC chunks, version compatibility.",
+   "requires": [
+    "C-VFS",
+    "C-BUILD"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-ARCH",
+   "layer": "P",
+   "owner": "engine-architect",
+   "name": "Architecture, layering & profiles",
+   "summary": "Layer rules, contract registry, configuration profiles, conventions.",
+   "requires": [],
+   "universal": "all"
+  },
+  {
+   "id": "C-ADR",
+   "layer": "P",
+   "owner": "architecture-governance",
+   "name": "ADR & fitness functions",
+   "summary": "ADR template incl. revisit conditions; automated architectural checks.",
+   "requires": [],
+   "universal": "all"
+  },
+  {
+   "id": "C-EVID",
+   "layer": "P",
+   "owner": "research-evidence",
+   "name": "Evidence grading",
+   "summary": "Source tiers, maturity classes, claim standards.",
+   "requires": [],
+   "universal": "all"
+  },
+  {
+   "id": "C-ORCH",
+   "layer": "P",
+   "owner": "program-orchestration",
+   "name": "Agent coordination protocol",
+   "summary": "Ownership ledger with access classes; write sets by module convention (src/<skill-id>/, tools/<skill-id>/; tests owned by the test-owning skill); shared-file protocol; contributor semantics (review + change request, never direct writes); change requests; integration order and milestones; human-gate tasks; failure triage; per-change provenance; critic gates with calibration and independent adjudication.",
+   "requires": [],
+   "universal": "all"
+  },
+  {
+   "id": "C-TEST",
+   "layer": "P",
+   "owner": "test-architect",
+   "name": "Test & validation definition of done",
+   "summary": "Required test kinds per skill, test determinism, coverage & mutation thresholds, the evidence bundle an implementer hands to S3/S4 critics, oracle independence, conformance suites owned by contract owners with consumer-driven additions.",
+   "requires": [],
+   "universal": "all"
+  },
+  {
+   "id": "C-API",
+   "layer": "P",
+   "owner": "api-lifecycle-migration",
+   "name": "API stability & deprecation",
+   "summary": "Public vs internal APIs, versioning, deprecation windows, upgraders.",
+   "requires": [],
+   "universal": "all"
+  },
+  {
+   "id": "C-TRUST",
+   "layer": "P",
+   "owner": "security-engineering",
+   "name": "Trust boundaries",
+   "summary": "Untrusted inputs list, validation obligations, sandbox rules.",
+   "requires": [],
+   "universal": "all"
+  },
+  {
+   "id": "C-A11Y",
+   "layer": "P",
+   "owner": "accessibility",
+   "name": "Accessibility requirements",
+   "summary": "Mapped guideline requirements per player-facing feature.",
+   "requires": []
+  },
+  {
+   "id": "C-BASE",
+   "layer": 0,
+   "owner": "platform-architect",
+   "name": "Bootstrap base",
+   "summary": "Raw page allocator, raw log/assert/abort sink, monotonic clock, raw thread primitives and late-bound hook tables that higher layers install (allocator, log sink, assert handler, crash annotator). Depends on nothing.",
+   "requires": [],
+   "conformance": true
+  },
+  {
+   "id": "C-LIFETIME",
+   "layer": 1,
+   "owner": "core-runtime-architect",
+   "name": "Ownership & retirement",
+   "summary": "Engine-wide ownership and cross-thread reference rules; deferred-destruction/retirement service keyed to completion tokens (task completion, frames in flight, GPU fences).",
+   "requires": [
+    "C-SYNC"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-IPC",
+   "layer": 2,
+   "owner": "core-runtime-architect",
+   "name": "Engine IPC",
+   "summary": "Process model and IPC/RPC transport for editor↔runtime, tool workers, crash handler, profiler and script debugger; dev-only port security.",
+   "requires": [
+    "C-PAL",
+    "C-TASK"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-SCALE",
+   "layer": 1,
+   "owner": "runtime-scalability",
+   "name": "Scalability & governor",
+   "summary": "Device-profile knobs, scalability cvars, budget query/report API, actuator registration and governor control signals.",
+   "requires": [
+    "C-CFG"
+   ],
+   "universal": "runtime",
+   "conformance": true
+  },
+  {
+   "id": "C-FLOW",
+   "layer": 2,
+   "owner": "frame-orchestration",
+   "name": "Cross-subsystem data channels",
+   "summary": "Versioned snapshots, double/triple-buffered hand-off, mailboxes and multi-rate resampling between subsystems; producer/consumer declared per channel. The default for runtime data flow; global barriers need an ADR.",
+   "requires": [
+    "C-FRAME"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-PRESENT",
+   "layer": 2,
+   "owner": "frame-orchestration",
+   "name": "Present timeline",
+   "summary": "Present timeline and display-time prediction, latency markers, interposed presenters (frame generation, XR compositor, cloud encoder), GPU-frame-complete and present-feedback sink implemented by the RHI (dependency inversion).",
+   "requires": [
+    "C-FRAME"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-SNAPSHOT",
+   "layer": 2,
+   "owner": "determinism-replay",
+   "name": "Frame-state snapshot & resimulation",
+   "summary": "Snapshot/restore, resimulate N ticks, history ring, per-participant cost declaration.",
+   "requires": [
+    "C-FRAME",
+    "C-SER"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-REPLAY",
+   "layer": 3,
+   "owner": "determinism-replay",
+   "name": "Replay container & streams",
+   "summary": "Replay container, timeline, stream registration (input, replication, visual log, animation debug, external/nondeterministic inputs) and cross-build versioning.",
+   "requires": [
+    "C-SNAPSHOT",
+    "C-SER"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-VIEW",
+   "layer": 2,
+   "owner": "spatial-transforms",
+   "name": "Views & view arbitration",
+   "summary": "View registry: view sources (gameplay camera, cinematic, editor, photo mode, XR pose) with priority/blend stack and shake/FOV channels, per-local-player views, view origin for LWC rebasing; derived listener and streaming-source signals for sinks.",
+   "requires": [
+    "C-SPATIAL"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-SIGNIF",
+   "layer": 2,
+   "owner": "world-architect",
+   "name": "Significance & simulation tiers",
+   "summary": "Per-entity significance, simulation tier and update budget, computed once from views/players (all players on a server) and consumed by each domain's LOD policy.",
+   "requires": [
+    "C-VIEW"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-ENV",
+   "layer": 3,
+   "owner": "world-architect",
+   "name": "Environment queries",
+   "summary": "Environment query service: ground height/surface type, water surface/volume (height, velocity, depth, body id), wind field, weather parameters, deformation deltas; implemented by terrain, water, atmosphere and voxel providers; headless-capable.",
+   "requires": [
+    "C-SPATIAL"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-GPUTIER",
+   "layer": 2,
+   "owner": "gpu-platform-architect",
+   "name": "GPU feature tiers",
+   "summary": "Named GPU feature tiers (binding model, pipeline-state model, queue topology, mesh/RT/tensor support, memory model) and the API baseline each tier maps to; render features declare the minimum tier they need.",
+   "requires": [
+    "C-RHI"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-INSTANCES",
+   "layer": 3,
+   "owner": "geometry-pipeline",
+   "name": "Instance scene",
+   "summary": "Persistent instance/primitive handles, batched add/remove/update with delta upload (cost O(changes)), instance data layout shared with the ray-tracing instance builder; served by both CPU and GPU submission paths.",
+   "requires": [
+    "C-RG",
+    "C-GPUMEM"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-GEOLOD",
+   "layer": 3,
+   "owner": "virtualized-geometry-lod",
+   "name": "Geometry LOD & page residency",
+   "summary": "Cluster/LOD selection and page residency for raster, shadow and ray-tracing consumers.",
+   "requires": [
+    "C-RG"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-VT",
+   "layer": 3,
+   "owner": "texture-streaming-vt",
+   "name": "Texture residency & virtual texturing",
+   "summary": "Texture residency requests, VT page tables/feedback and allocation for terrain, materials and runtime-composited textures.",
+   "requires": [
+    "C-RG",
+    "C-GPUMEM"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-LIGHT",
+   "layer": 3,
+   "owner": "direct-lighting-shadows",
+   "name": "Direct lighting sampling",
+   "summary": "Light lists (clustered or stochastic), shadow lookups, light units, many-light sampling API for any shading point incl. translucency, volumes and particles.",
+   "requires": [
+    "C-RSCENE"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-GI",
+   "layer": 3,
+   "owner": "global-illumination",
+   "name": "Indirect lighting sampling",
+   "summary": "Indirect diffuse/specular sampling for any shading point (incl. translucent and volumetric), probes, sky/environment lighting.",
+   "requires": [
+    "C-RSCENE"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-ATMOS",
+   "layer": 3,
+   "owner": "atmosphere-weather",
+   "name": "Atmosphere & participating media",
+   "summary": "Aerial perspective, froxel/local media volumes, cloud shadows, weather-driven global material parameters.",
+   "requires": [
+    "C-RSCENE"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-VIDEO",
+   "layer": 3,
+   "owner": "media-playback",
+   "name": "Video surfaces",
+   "summary": "Video playback sessions, surfaces as textures, timing against the audio clock.",
+   "requires": [
+    "C-RG"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-DEVICE",
+   "layer": 2,
+   "owner": "input-devices-haptics",
+   "name": "Input devices & haptics",
+   "summary": "Device enumeration, raw state and events with timestamps, device↔platform-user pairing, haptic, trigger-effect and LED output, virtual device injection for automation.",
+   "requires": [
+    "C-PAL"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-NETLINK",
+   "layer": 2,
+   "owner": "network-transport",
+   "name": "Network links & sessions",
+   "summary": "Sessions, channels, reliability/ordering classes, send budgets, link statistics, connection events; used by replication, voice, rollback input exchange and telemetry streams.",
+   "requires": [
+    "C-PAL",
+    "C-TASK"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-REP",
+   "layer": 3,
+   "owner": "replication",
+   "name": "Replication",
+   "summary": "Replicated state declaration, relevancy hooks, RPCs, net IDs, batch registration, replay and spectator streams.",
+   "requires": [
+    "C-NETLINK",
+    "C-SER",
+    "C-ID"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-PREDICT",
+   "layer": 3,
+   "owner": "prediction-rollback",
+   "name": "Prediction & rollback",
+   "summary": "Predicted/rollback-able state registration, tick-stamped input history, resimulation hooks, rewind queries, cosmetic-effect suppression during resim.",
+   "requires": [
+    "C-REP",
+    "C-DET",
+    "C-SNAPSHOT",
+    "C-INPUT"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-MOVE",
+   "layer": 4,
+   "owner": "character-movement",
+   "name": "Character movement",
+   "summary": "Movement modes, move requests, resimulatable move API, root-motion hand-off.",
+   "requires": [
+    "C-PHYS",
+    "C-GAME"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-GAMEDATA",
+   "layer": 3,
+   "owner": "gameplay-data",
+   "name": "Gameplay data",
+   "summary": "Data tables, curve assets, tuning assets with overrides, live override layer.",
+   "requires": [
+    "C-REFL",
+    "C-ASSET"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-DIALOGUE",
+   "layer": 3,
+   "owner": "narrative-dialogue",
+   "name": "Dialogue lines & narrative state",
+   "summary": "Line records (speaker, text per locale, VO per locale, timing, lip-sync data), conditions, playback requests, narrative fact store.",
+   "requires": [
+    "C-LOC",
+    "C-ID"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-AIAGENT",
+   "layer": 4,
+   "owner": "ai-behavior-perception",
+   "name": "AI decision-provider extension point",
+   "summary": "Optional decision providers (learned policies, LLM agents) with budget, timeout, moderation and authored fallback.",
+   "requires": [
+    "C-GAME"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-A11YRT",
+   "layer": 3,
+   "owner": "accessibility",
+   "name": "Accessibility runtime",
+   "summary": "Caption/subtitle submission, screen-reader announcements and accessibility-tree ingestion, TTS/STT, accessibility settings and change events.",
+   "requires": [
+    "C-TEXT"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-DEVUI",
+   "layer": 3,
+   "owner": "visual-debugging-tools",
+   "name": "Developer UI",
+   "summary": "Immediate-mode developer UI and debug menus available in development builds on every target.",
+   "requires": [
+    "C-DRAW2D"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-EDHOST",
+   "layer": 5,
+   "owner": "editor-ui-framework",
+   "name": "Editor host",
+   "summary": "Asset-editor host, preview-scene registration, thumbnail providers, inspector customization, tool-mode registration, shared curve/timeline widgets.",
+   "requires": [
+    "C-EDCMD"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-LIVE",
+   "layer": 3,
+   "owner": "online-services-liveops",
+   "name": "Online & live-ops services",
+   "summary": "Sessions/matchmaking tickets, remote config, events/experiments, chat sessions, moderation, generative/inference service calls with quotas, trusted time, service emulation.",
+   "requires": [
+    "C-PAL",
+    "C-TASK"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-XRVIEW",
+   "layer": 3,
+   "owner": "xr-runtime",
+   "name": "XR views",
+   "summary": "View poses, projections, foveation maps, compositor layers and spacewarp depth/motion submission.",
+   "requires": [
+    "C-VIEW"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-MLGPU",
+   "layer": 3,
+   "owner": "ml-inference-runtime",
+   "name": "GPU inference",
+   "summary": "Inference as a render-graph pass under async-compute and budget scheduling; weights for in-shader networks.",
+   "requires": [
+    "C-RG",
+    "C-ML"
+   ],
+   "conformance": true
+  },
+  {
+   "id": "C-CERT",
+   "layer": "P",
+   "owner": "certification-compliance",
+   "name": "External requirements register",
+   "summary": "Register of external requirements per program (console cert, Steam Deck Verified, store review, law) each mapped to an owning capability; owners must satisfy their entries.",
+   "requires": [],
+   "universal": "all"
+  },
+  {
+   "id": "C-PERF",
+   "layer": "P",
+   "owner": "performance-architect",
+   "name": "Performance findings protocol",
+   "summary": "Finding format (hypothesis, capture, attribution, expected gain), routing as a change request to the owning skill, time-boxed territory loans recorded in the ledger.",
+   "requires": [],
+   "universal": "all"
+  },
+  {
+   "id": "C-BENCH",
+   "layer": "P",
+   "owner": "perf-benchmarking",
+   "name": "Benchmark registration",
+   "summary": "Benchmark registration, metric schema, C-BUDGET line reference, warm-up and variance rules, required hardware tier, replay-driven runs.",
+   "requires": [],
+   "universal": "all"
+  },
+  {
+   "id": "C-PROD",
+   "layer": "P",
+   "owner": "engine-product-management",
+   "name": "Engine roadmap & intake",
+   "summary": "Roadmap priorities consumed by work decomposition, intake/triage SLAs, release-note obligations.",
+   "requires": []
+  },
+  {
+   "id": "C-RELEASE",
+   "layer": "P",
+   "owner": "build-release-architect",
+   "name": "Release model",
+   "summary": "Branch model, release trains, version identifiers, client/server/content compatibility keys, LTS and hotfix streams.",
+   "requires": []
+  }
+ ]
 }

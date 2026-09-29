@@ -24,11 +24,23 @@ data/*.json ──render──▶ docs/01-05 (+ 00 rationale)
 4. **Disposition.** The builder assigns each finding one disposition: **accept** (change applied, commit referenced), **reject** (with a technical reason recorded), or **merge** (a duplicate of another finding). Dispositions are recorded in `gauntlet/round-N/dispositions.md`.
 5. **Revise, re-gate, re-render.** Every accepted change that is structural is also expressed in data, so the next gate checks it. A missing brief term becomes a `seed-map.json` entry.
 
+## Adjudication (added in round 1, K-QUALITY-4)
+
+The builder does not get the last word on its own rejections. Every finding dispositioned **reject** or **partial** goes to a fresh-context **adjudicator**. The adjudicator receives the finding, the disposition text and the current data, but not the builder's other reasoning. It rules **uphold** (the disposition resolves the material problem) or **overturn** (the problem is still materially open). An overturned finding counts as an open accepted finding of its original severity and must be fixed in the next revision. Rulings are recorded in `gauntlet/round-N/adjudication.md`.
+
+## Critic calibration (added in round 1, K-QUALITY-4)
+
+From round 2 on, critics review a **seeded copy** of the framework in the scratchpad, not the repository. Before the round, the orchestrator plants 10–15 defects that `check.py` cannot see: omissions, overlaps, wrong owners, dishonest maturity labels, legacy stances and wrong platform tags. Each seed sits inside a specific critic's mandate. The seed list is sealed in `gauntlet/round-N/seeds.md` and is written only after the round.
+
+- A round **counts toward convergence only if the union of critics finds at least 80% of the seeds**, and each scoped critic finds the seeds in its own mandate at least once over two consecutive rounds.
+- Findings that hit a seed are removed before dispositions. The real framework never contained the seed.
+- A critic that misses its own seed twice in a row is re-briefed or replaced.
+
 ## Convergence (stop rule)
 
 The loop stops only when both hold:
 
-- **A.** In one full round, all critics produce **zero accepted blocker or major findings**.
+- **A.** In one full, *calibrated* round, all critics produce **zero accepted or adjudicator-overturned blocker or major findings**.
 - **B.** The **Completeness Critic** produces zero accepted material omissions in **two consecutive rounds**. Each round uses a fresh instance with no memory of the previous one.
 
 A re-raised finding that was rejected earlier counts as non-material unless it brings new evidence. A fixed round count is never a stop reason. If a round still has accepted blocker or major findings, another round runs.
