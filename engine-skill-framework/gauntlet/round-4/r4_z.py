@@ -14,6 +14,10 @@ def apply(ed, tagged=True):
             c = ctr[cid]
             f = max([placed.get(c["owner"], 0), placed.get(c.get("oracle_author"), 0)]
                     + [frozen.get(r, 0) for r in c["requires"]])
+            cons = [placed[x["id"]] for x in ed.doc["skill"]["skills"] if x["id"] in placed and x["id"] != c["owner"]
+                    and cid in {d.rstrip("?").split("@")[0] for d in x.get("consumes", []) + x.get("tool_consumes", [])}]
+            if cons:
+                f = max(f, min(cons))
             # never after a dependant that is already frozen
             deps = [frozen[d] for d, x in ctr.items() if cid in x["requires"] and d in frozen]
             if deps and f > min(deps):
