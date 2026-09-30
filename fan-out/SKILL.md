@@ -187,10 +187,13 @@ that changes mid-run is the same fault as a brief that changes mid-run.
     {
       "id": "ecs-query",
       "summary": "Rewrite Query iteration over archetype chunks",
+      "task": "Iterate chunk by chunk instead of entity by entity.\nKeep Query's public signature; only its internals change.",
+      "context": "Query is hot in the render loop; store.h's chunk layout is stable.",
       "strategy": "worktree",
       "strategy_reason": "runs the ECS test suite",
       "owns": ["src/ecs/query.cpp", "src/ecs/query.h"],
       "reads": ["src/ecs/store.h"],
+      "out_of_scope": ["caching query results between frames"],
       "must_not": ["change the public Store API"],
       "provides": [{"symbol": "each",
                     "contract": "`Query::each(Fn)` calls Fn once per live entity, chunk order"}],
@@ -203,10 +206,13 @@ that changes mid-run is the same fault as a brief that changes mid-run.
 
 | Field | What it fixes |
 |---|---|
-| `summary` | One line: the slice's job, or in `compete` its constraint |
+| `summary` | One line: the slice's job, or in `compete` its constraint. It follows `YOUR SLICE:` |
+| `task` | The lane's task description: what to do, the approach where it matters, the cases to cover. Text, newlines allowed |
+| `context` | What this lane needs to know that the others do not: who calls its code, what is fragile, why it is shaped this way. Text |
 | `strategy`, `strategy_reason` | The lane's isolation (next section), and why — decided per lane, so it is recorded |
-| `owns` | The only paths this lane may write. A trailing `/` owns a directory |
-| `reads` | Context the lane should read and must not write |
+| `owns` | The lane's scope: the only paths it may write. A trailing `/` owns a directory |
+| `reads` | Files the lane should read for context and must not write |
+| `out_of_scope` | What this lane must not take on — work, not files ("no caching"). Other lanes' files are added to it automatically |
 | `must_not` | Prohibitions for this lane alone. Run-wide ones go in the brief |
 | `provides` | Symbols other lanes build against, each with a contract stated as an observation |
 | `consumes` | Symbols this lane builds against, naming the providing lane |
@@ -215,9 +221,16 @@ that changes mid-run is the same fault as a brief that changes mid-run.
 
 What the fields are for:
 
-- **Everything that differs between agents lives here, never in the brief.** Scope, files,
-  prohibitions for one lane: all of it is per-agent text, and `fanout.py delta` renders it
-  below the `---` where it cannot touch the cached prefix.
+- **Everything that differs between agents lives here, never in the brief.** Task,
+  context, scope, what is out of scope, prohibitions for one lane: all of it is per-agent
+  text, and `fanout.py delta` renders it below the `---` where it cannot touch the cached
+  prefix. The brief and the plan split the same things by reach: the brief's *Goal*,
+  *Context*, *Out of scope* and *Must not* hold for every agent, the plan's `task`,
+  `context`, `owns`, `out_of_scope` and `must_not` for one lane.
+- **`task` is where a partition builder learns its job.** `summary` is one line and it is
+  enough for a `compete` constraint; a partition lane with nothing more gets a slogan, and
+  `plan` warns about it. Write the task as you would brief a colleague on that one part:
+  what, the approach where it matters, the cases that must be covered.
 - **A contract is what lets a coupled pair stay split.** When `plan` finds `DEP` between
   two slices, merging is the default. The alternative is to pin the edge: the provider
   lists the symbol under `provides` with its contract, the consumer lists it under
@@ -341,9 +354,10 @@ python scripts/fanout.py delta <slice-id>   # the block below the '---', per bui
 
 `lane` creates each worktree (branch `fanout/<run-id>/<slice-id>`, from the base commit),
 prepares the patch location, and lists what a fresh worktree will lack. `delta` renders a
-lane's per-agent block from the sealed plan: its slice line, isolation instructions, what
-it may write, what it reads, what belongs to other lanes, the hotspots, its prohibitions,
-the contracts it provides and consumes, and its done-when. Paste its output verbatim; do
+lane's per-agent block from the sealed plan, always in this order: its slice line, task,
+context, isolation instructions, scope (what it may write), what it reads, out of scope
+(its own entries, then every file another lane owns), the hotspots, its prohibitions, the
+contracts it provides and consumes, and its done-when. Empty fields are left out. Paste its output verbatim; do
 not hand-write a delta, because a hand-written one drifts from the plan that trespass and
 integration will hold the lane to.
 
@@ -431,8 +445,8 @@ Then read <run-dir>/rubric.md.
 Judge exactly one artifact: <run-dir>/candidates/<slice-id>.md
 Its files are in <lane root: the worktree, the materialized patch, or the main tree>;
 read and run them there, and anchor findings with paths relative to that root. Judge
-the lane against its own scope and contracts:
-<output of `fanout.py delta <slice-id>`, from "Isolation:" on>
+the lane against its own task, scope and contracts:
+<output of `fanout.py delta <slice-id>`, without its leading "---">
 If the brief names a visual surface, open <run-dir>/renders/<slice-id>/r1/ and judge
 what you see there. Do not read any other candidate.
 Write your verdict to <run-dir>/verdicts/<slice-id>.json in this schema:

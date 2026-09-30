@@ -18,8 +18,9 @@ Before spawning anything:
 
 1. Decide `partition` vs `compete`. If the task doesn't clearly imply one, ask — once,
    briefly. It's the one choice that's expensive to get wrong.
-2. Write the allocation plan in `slices.json`: per slice what it owns, reads and must not
-   do, the contracts it provides and consumes, its done-when, and an isolation strategy
+2. Write the allocation plan in `slices.json`: per slice its task and context, what it
+   owns (scope), reads, leaves out of scope and must not do, the contracts it provides and
+   consumes, its done-when, and an isolation strategy
    (`worktree`, `patch`, `shared`, `read-only`) with one line of reason — decided per lane,
    for this run. Files every lane would touch go under `hotspots`, owned by nobody.
 3. Run `fanout.py plan` to validate the plan and measure coupling, and merge what it

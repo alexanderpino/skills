@@ -199,10 +199,13 @@ SLICES_TEMPLATE = {
         {
             "id": "",
             "summary": "",
+            "task": "",
+            "context": "",
             "strategy": "",
             "strategy_reason": "",
             "owns": [],
             "reads": [],
+            "out_of_scope": [],
             "must_not": [],
             "provides": [],
             "consumes": [],
@@ -333,8 +336,11 @@ def load_plan(d: Path, synthesis: bool = True) -> dict:
     for s in slices:
         if "owns" not in s and "files" in s:
             s["owns"] = s["files"]
-        for key in ("owns", "reads", "must_not", "provides", "consumes", "done_when"):
+        for key in ("owns", "reads", "out_of_scope", "must_not", "provides", "consumes",
+                    "done_when"):
             s.setdefault(key, [])
+        for key in ("task", "context"):
+            s.setdefault(key, "")
     plan["slices"] = slices
     plan.setdefault("hotspots", [])
     return plan
@@ -397,6 +403,19 @@ def validate_plan(plan: dict, mode: str) -> tuple:
     ids = [s.get("id", "") for s in plan["slices"]]
     hot = hotspot_paths(plan)
 
+    # Shape first: every check below assumes text is text and lists are lists.
+    for s in plan["slices"]:
+        tag = s.get("id") or "(no id)"
+        for key in ("summary", "task", "context", "strategy", "strategy_reason"):
+            if not isinstance(s.get(key, ""), str):
+                errors.append(f"{tag}: {key} must be text (one string, newlines allowed)")
+        for key in ("owns", "reads", "out_of_scope", "must_not", "provides", "consumes",
+                    "done_when"):
+            if not isinstance(s[key], list):
+                errors.append(f"{tag}: {key} must be a list")
+    if errors:
+        return errors, warnings
+
     if len(slices) < 2:
         warnings.append("fewer than two slices — a fan-out of one is a single agent")
     for s in plan["slices"]:
@@ -410,6 +429,8 @@ def validate_plan(plan: dict, mode: str) -> tuple:
             errors.append(f"{tag}: duplicate id")
         if not (s.get("summary") or "").strip():
             errors.append(f"{tag}: no summary — in compete mode this is the constraint")
+        if mode == "partition" and not s.get("synthesis") and not s["task"].strip():
+            warnings.append(f"{tag}: no task — the builder gets only the one-line summary")
         strategy = s.get("strategy", "")
         if strategy not in STRATEGIES:
             errors.append(f"{tag}: strategy must be one of {', '.join(STRATEGIES)}")
@@ -1274,13 +1295,13 @@ def cmd_plan(args) -> None:
         print(f"  ERROR: {e}")
     print()
 
+    if errors:
+        sys.exit("fix the plan before its coupling can be measured")
     if mode == "compete":
         # Competing lanes own the same files on purpose; coupling between them is the
         # point of the mode, not a defect. Isolation is what keeps them apart.
         print("compete mode: lanes share their files by design, so coupling is not measured.\n"
               "Each lane needs its own isolation — worktree, patch or read-only.")
-        if errors:
-            sys.exit(1)
         return
     if len(slices) < 2:
         sys.exit("need at least two slices to measure coupling")
@@ -1413,9 +1434,6 @@ def cmd_plan(args) -> None:
               "less than the brief each agent would read. Stop here and do the task\n"
               "directly, unless most of the work is new files this count cannot see.")
 
-    if errors:
-        sys.exit(1)
-
 
 def ignored_hint() -> list:
     """Ignored paths present in the main tree — what a fresh worktree will lack."""
@@ -1547,22 +1565,30 @@ def lane_block(d: Path, plan: dict, spec: dict, mode: str) -> list:
     sid, strategy = spec["id"], spec["strategy"]
     info = seal_info(d)
     root = lane_dir(d, sid) if strategy == "worktree" else Path(".")
-    out = [f"YOUR SLICE: {sid} — {spec['summary']}", ""]
-    out.append(f"Isolation: {strategy}. " + STRATEGY_TEXT[strategy].format(
-        root=root.resolve(), patch=patch_file(d, sid).resolve(),
-        base=(info.get("base") or "?")[:12]))
+    out = [f"YOUR SLICE: {sid} — {spec['summary']}"]
 
     def listing(title, items):
         if items:
             out.extend(["", title] + [f"  - {x}" for x in items])
 
+    def text(title, body):
+        if body.strip():
+            out.extend(["", title] + [f"  {line}".rstrip() for line in body.strip().splitlines()])
+
+    text("Task:", spec["task"])
+    text("Context:", spec["context"])
+    out.extend(["", f"Isolation: {strategy}. " + STRATEGY_TEXT[strategy].format(
+        root=root.resolve(), patch=patch_file(d, sid).resolve(),
+        base=(info.get("base") or "?")[:12])])
+
     if strategy != "read-only":
         listing("Scope — you may write:", spec["owns"])
     listing("Read for context — do not write:", spec["reads"])
+    others = []
     if mode == "partition":
-        others = [f"{e} ({o['id']})" for o in plan["slices"]
+        others = [f"{e} (owned by {o['id']})" for o in plan["slices"]
                   if o is not spec and not o.get("synthesis") for e in o["owns"]]
-        listing("Out of scope — owned by other lanes, do not write:", others)
+    listing("Out of scope — do not do, and do not write:", spec["out_of_scope"] + others)
     listing("Hotspots — no lane writes these; list what you need under "
             "'Hotspot entries' in your report:", hotspot_paths(plan))
     listing("Must not:", spec["must_not"])
