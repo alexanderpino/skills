@@ -28,3 +28,8 @@ Round 3 was paused mid-critique (usage limit). Everything needed to continue is 
    ```
    Keep the critics blind: the copy must not contain `gauntlet/round-*`, and critics must not be pointed at this repository.
 3. After all critics report: copy their `K-*.md` into this directory, open `seeded/seeds.sealed.json`, score recall into `seeds.md` / `seed_hits.json`, then disposition and revise with `r3_*.py` parts and `apply.py` (base `fd20381`).
+
+
+## Saved state and new sessions
+
+While the round-3 workflow is unfinished, its journal is also on branch `claude/engine-skill-framework-checkpoints`. In a **new** session run `python3 scripts/checkpoint.py --restore` (files land in `workflow/restored/`); `resumeFromRunId` only works in the session that started the workflow, so instead read the finished results from the journal and re-run only the missing verifiers (K-TEST-9..17 and all K-SEC findings) in a small workflow. Delete the branch with `--clear` once the results are committed here.

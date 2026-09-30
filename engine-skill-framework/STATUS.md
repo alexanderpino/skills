@@ -1,5 +1,7 @@
 # Engine skill framework — phase 1 status
 
+> New session? Read `CLAUDE.md` in this directory first (saved workflow state, restore command, rules).
+
 Branch: `claude/engine-skill-framework-phase1` (no PR). Phase 1 (G1) answers "do we have everything, with the right boundaries?". **No SKILL.md is written until G1 converges** (then G2, see `docs/08-phase-2-plan.md`).
 
 ## Where G1 stands

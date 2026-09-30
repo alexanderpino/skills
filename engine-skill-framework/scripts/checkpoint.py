@@ -4,7 +4,7 @@
 Why a separate branch: it never collides with the working branch, and each push replaces a single commit
 (force-with-lease), so a large, growing journal does not bloat history.
 
-Usage: python3 scripts/checkpoint.py [--interval 600] [--once] [--round 3] [--clear]
+Usage: python3 scripts/checkpoint.py [--interval 600] [--once] [--round 3] [--clear] [--restore]
        Pushes only when the watched files changed since the last push. Run --clear after a workflow has finished and
        its results are committed to the working branch: it deletes the checkpoint branch (remote + local) and worktree.
 Env:   WF_DIR   workflow transcript dir (default: newest under ~/.claude/projects/*/subagents/workflows/)
@@ -85,13 +85,33 @@ def clear():
     print("cleared" if r.returncode == 0 else f"remote delete failed: {r.stderr.strip()}")
 
 
+def restore(rnd):
+    """New session: fetch the checkpoint branch (if it still exists) into gauntlet/round-N/workflow/restored/."""
+    r = run("git", "fetch", "-q", "origin", BRANCH, check=False)
+    if r.returncode != 0:
+        print("no checkpoint branch on the remote (nothing unfinished, or already cleared)")
+        return
+    dest = os.path.join(REPO, "engine-skill-framework", "gauntlet", f"round-{rnd}", "workflow", "restored")
+    os.makedirs(dest, exist_ok=True)
+    pre = f"engine-skill-framework/gauntlet/round-{rnd}/workflow/checkpoint"
+    files = run("git", "ls-tree", "-r", "--name-only", f"origin/{BRANCH}", pre, check=False).stdout.split()
+    for f in files:
+        blob = subprocess.run(["git", "show", f"origin/{BRANCH}:{f}"], cwd=REPO, capture_output=True).stdout
+        with open(os.path.join(dest, os.path.basename(f)), "wb") as fh:
+            fh.write(blob)
+    print(f"restored {len(files)} files to {dest}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--interval", type=int, default=600)
     ap.add_argument("--once", action="store_true")
     ap.add_argument("--round", type=int, default=3)
     ap.add_argument("--clear", action="store_true")
+    ap.add_argument("--restore", action="store_true")
     a = ap.parse_args()
+    if a.restore:
+        return restore(a.round)
     if a.clear:
         return clear()
     last = None
