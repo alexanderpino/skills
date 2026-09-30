@@ -1,0 +1,8229 @@
+{
+ "_doc": "Skill graph (schema v1). kind: runtime | tool | process. Runtime skills ship in builds; tool skills ship only in the tools target; process skills are organizational and outside build closure. targets: build targets a runtime skill ships in. platforms: platform-specific skills only. consumes: runtime-side contract dependencies ('?' optional, '@C-Y' = consumed by the module that provides C-Y). tool_consumes: editor/cook-side dependencies (tools target only). implements: contracts this skill implements without owning (e.g. RHI backends). workstream: integration group.",
+ "profiles": {
+  "base": {
+   "minimal": "UI-, card- or narrative-centric games without a physics world",
+   "min2d": "Small 2D games (sprite/tile renderer, 2D physics)",
+   "lite3d": "Lightweight 3D: mobile, portable, 2.5D, stylized; CPU-submitted rendering tier",
+   "std3d": "Modern 3D on PC/console (GPU-driven rendering tier)"
+  },
+  "addons": {
+   "openworld": "Large streamed worlds",
+   "online": "Server-authoritative real-time multiplayer (replication + prediction)",
+   "aaa": "High-end AAA feature set",
+   "xr": "VR / MR",
+   "ugc": "Mods & user-generated content",
+   "massim": "Large-scale agent simulation (RTS, colony, city, crowds)",
+   "sandbox": "Voxel / buildable sandbox worlds",
+   "vehicles": "Vehicle simulation (wheeled, flight, space)",
+   "team-large": "Large production team infrastructure (multi-user, distributed builds, farms)",
+   "online-lockstep": "Deterministic lockstep command networking (RTS, sims)",
+   "online-rollback": "Input-exchange rollback networking (fighting, P2P action)",
+   "online-async": "Asynchronous / turn-based backend-mediated play (no real-time transport)",
+   "experimental": "Opt-in experimental (X/S) capabilities",
+   "team-mid": "Studios of about 10–150 people (shared DDC, tool telemetry, small-session multi-user)",
+   "persistent-world": "Persistent multi-server worlds (zoning, meshing, hand-off, leases, transactions)",
+   "hwrt": "Hardware ray tracing required (RT-only lighting paths, RT+tensor console baseline); no raster fallback is validated in these configurations",
+   "ml": "Runtime ML features (on-device inference, OS models, ML upscaling)"
+  }
+ },
+ "configurations": {
+  "minimal-client": {
+   "profiles": [
+    "minimal"
+   ],
+   "target": "client",
+   "platforms": [
+    "pc",
+    "console",
+    "mobile",
+    "web"
+   ]
+  },
+  "indie-2d-client": {
+   "profiles": [
+    "min2d"
+   ],
+   "target": "client",
+   "platforms": [
+    "pc",
+    "console",
+    "mobile",
+    "web"
+   ]
+  },
+  "indie-2d-tools": {
+   "profiles": [
+    "min2d"
+   ],
+   "target": "tools",
+   "platforms": [
+    "pc"
+   ],
+   "target_platforms": [
+    "pc",
+    "console",
+    "mobile",
+    "web"
+   ]
+  },
+  "indie-2d-online-moddable-client": {
+   "profiles": [
+    "min2d",
+    "online",
+    "ugc"
+   ],
+   "target": "client",
+   "platforms": [
+    "pc",
+    "console",
+    "mobile"
+   ]
+  },
+  "indie-2d-online-moddable-server": {
+   "profiles": [
+    "min2d",
+    "online",
+    "ugc"
+   ],
+   "target": "server",
+   "platforms": [
+    "server-host"
+   ]
+  },
+  "rts-2d-massim-client": {
+   "profiles": [
+    "min2d",
+    "massim",
+    "online-lockstep"
+   ],
+   "target": "client",
+   "platforms": [
+    "pc"
+   ]
+  },
+  "lite-3d-mobile-client": {
+   "profiles": [
+    "lite3d"
+   ],
+   "target": "client",
+   "platforms": [
+    "mobile"
+   ]
+  },
+  "lite-3d-mobile-online-client": {
+   "profiles": [
+    "lite3d",
+    "online"
+   ],
+   "target": "client",
+   "platforms": [
+    "mobile"
+   ]
+  },
+  "standard-3d-client": {
+   "profiles": [
+    "std3d"
+   ],
+   "target": "client",
+   "platforms": [
+    "pc",
+    "console"
+   ]
+  },
+  "standard-3d-tools": {
+   "profiles": [
+    "std3d"
+   ],
+   "target": "tools",
+   "platforms": [
+    "pc"
+   ],
+   "target_platforms": [
+    "pc",
+    "console",
+    "mobile"
+   ]
+  },
+  "open-world-client": {
+   "profiles": [
+    "std3d",
+    "openworld"
+   ],
+   "target": "client",
+   "platforms": [
+    "pc",
+    "console"
+   ]
+  },
+  "online-3d-client": {
+   "profiles": [
+    "std3d",
+    "online"
+   ],
+   "target": "client",
+   "platforms": [
+    "pc",
+    "console"
+   ]
+  },
+  "online-3d-server": {
+   "profiles": [
+    "std3d",
+    "online"
+   ],
+   "target": "server",
+   "platforms": [
+    "server-host"
+   ]
+  },
+  "online-3d-bot-client": {
+   "profiles": [
+    "std3d",
+    "online"
+   ],
+   "target": "headless-client",
+   "platforms": [
+    "server-host"
+   ]
+  },
+  "racing-3d-client": {
+   "profiles": [
+    "std3d",
+    "vehicles"
+   ],
+   "target": "client",
+   "platforms": [
+    "pc",
+    "console"
+   ]
+  },
+  "rts-3d-massim-client": {
+   "profiles": [
+    "std3d",
+    "massim",
+    "online-lockstep"
+   ],
+   "target": "client",
+   "platforms": [
+    "pc"
+   ]
+  },
+  "sandbox-online-server": {
+   "profiles": [
+    "std3d",
+    "sandbox",
+    "online",
+    "persistent-world"
+   ],
+   "target": "server",
+   "platforms": [
+    "server-host"
+   ]
+  },
+  "xr-standalone-client": {
+   "profiles": [
+    "lite3d",
+    "xr",
+    "ml"
+   ],
+   "target": "client",
+   "platforms": [
+    "xr-standalone"
+   ]
+  },
+  "xr-pc-client": {
+   "profiles": [
+    "std3d",
+    "xr",
+    "ml"
+   ],
+   "target": "client",
+   "platforms": [
+    "pc"
+   ]
+  },
+  "aaa-open-world-online-client": {
+   "profiles": [
+    "std3d",
+    "openworld",
+    "online",
+    "aaa",
+    "ugc",
+    "vehicles",
+    "team-large",
+    "persistent-world",
+    "ml"
+   ],
+   "target": "client",
+   "platforms": [
+    "pc",
+    "console"
+   ]
+  },
+  "aaa-open-world-online-server": {
+   "profiles": [
+    "std3d",
+    "openworld",
+    "online",
+    "aaa",
+    "ugc",
+    "vehicles",
+    "team-large",
+    "persistent-world",
+    "ml"
+   ],
+   "target": "server",
+   "platforms": [
+    "server-host"
+   ]
+  },
+  "aaa-open-world-online-tools": {
+   "profiles": [
+    "std3d",
+    "openworld",
+    "online",
+    "aaa",
+    "ugc",
+    "vehicles",
+    "team-large",
+    "persistent-world",
+    "ml"
+   ],
+   "target": "tools",
+   "platforms": [
+    "pc"
+   ],
+   "target_platforms": [
+    "pc",
+    "console",
+    "server-host"
+   ]
+  },
+  "sandbox-2d-client": {
+   "profiles": [
+    "min2d",
+    "sandbox"
+   ],
+   "target": "client",
+   "platforms": [
+    "pc"
+   ]
+  },
+  "xr-console-client": {
+   "profiles": [
+    "std3d",
+    "xr",
+    "ml"
+   ],
+   "target": "client",
+   "platforms": [
+    "console"
+   ]
+  },
+  "lite-3d-portable-console-client": {
+   "profiles": [
+    "lite3d"
+   ],
+   "target": "client",
+   "platforms": [
+    "console"
+   ]
+  },
+  "fighting-2d-rollback-client": {
+   "profiles": [
+    "min2d",
+    "online-rollback"
+   ],
+   "target": "client",
+   "platforms": [
+    "pc",
+    "console"
+   ]
+  },
+  "mobile-async-client": {
+   "profiles": [
+    "minimal",
+    "online-async"
+   ],
+   "target": "client",
+   "platforms": [
+    "mobile"
+   ]
+  },
+  "coop-3d-listen-client": {
+   "profiles": [
+    "std3d",
+    "online"
+   ],
+   "target": "client",
+   "platforms": [
+    "pc",
+    "console"
+   ]
+  },
+  "indie-2d-online-web-client": {
+   "profiles": [
+    "min2d",
+    "online"
+   ],
+   "target": "client",
+   "platforms": [
+    "web"
+   ]
+  },
+  "online-3d-console-client": {
+   "profiles": [
+    "std3d",
+    "online"
+   ],
+   "target": "client",
+   "platforms": [
+    "console"
+   ]
+  },
+  "minimal-tools": {
+   "profiles": [
+    "minimal"
+   ],
+   "target": "tools",
+   "platforms": [
+    "pc"
+   ],
+   "target_platforms": [
+    "pc",
+    "mobile",
+    "web"
+   ]
+  },
+  "lite-3d-mobile-tools": {
+   "profiles": [
+    "lite3d"
+   ],
+   "target": "tools",
+   "platforms": [
+    "pc"
+   ],
+   "target_platforms": [
+    "mobile"
+   ]
+  },
+  "online-3d-tools": {
+   "profiles": [
+    "std3d",
+    "online"
+   ],
+   "target": "tools",
+   "platforms": [
+    "pc"
+   ],
+   "target_platforms": [
+    "pc",
+    "console",
+    "server-host"
+   ]
+  },
+  "aaa-experimental-client": {
+   "profiles": [
+    "std3d",
+    "openworld",
+    "online",
+    "aaa",
+    "experimental",
+    "ml"
+   ],
+   "target": "client",
+   "platforms": [
+    "pc"
+   ]
+  },
+  "standard-3d-team-tools": {
+   "profiles": [
+    "std3d",
+    "online",
+    "team-mid"
+   ],
+   "target": "tools",
+   "platforms": [
+    "pc"
+   ],
+   "target_platforms": [
+    "pc",
+    "console",
+    "server-host"
+   ]
+  },
+  "fighting-2d-rollback-tools": {
+   "profiles": [
+    "min2d",
+    "online-rollback"
+   ],
+   "target": "tools",
+   "platforms": [
+    "pc"
+   ],
+   "target_platforms": [
+    "pc",
+    "console"
+   ]
+  },
+  "rts-massim-lockstep-tools": {
+   "profiles": [
+    "min2d",
+    "massim",
+    "online-lockstep"
+   ],
+   "target": "tools",
+   "platforms": [
+    "pc"
+   ],
+   "target_platforms": [
+    "pc"
+   ]
+  },
+  "mobile-async-validator": {
+   "profiles": [
+    "minimal",
+    "online-async"
+   ],
+   "target": "headless-client",
+   "platforms": [
+    "server-host"
+   ]
+  },
+  "rt-required-3d-client": {
+   "profiles": [
+    "std3d",
+    "aaa",
+    "hwrt",
+    "ml"
+   ],
+   "target": "client",
+   "platforms": [
+    "pc",
+    "console"
+   ]
+  }
+ },
+ "skills": [
+  {
+   "id": "engine-architect",
+   "name": "Game Engine Chief Architect",
+   "tier": "orchestrator",
+   "parent": null,
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Owns the engine's overall architecture: requirements and configuration profiles, layering and module boundaries, the contract registry, global conventions, build/integrate/buy decisions and cross-domain arbitration. Final authority on the boundaries between skills.",
+   "non_responsibilities": [
+    [
+     "Running the ADR, fitness-function and anti-legacy process",
+     "architecture-governance"
+    ],
+    [
+     "Scheduling work across agents and the ownership ledger",
+     "program-orchestration"
+    ],
+    [
+     "Architecture inside a domain (e.g. shading-path choice)",
+     "render-architect"
+    ]
+   ],
+   "provides": [
+    "C-ARCH"
+   ],
+   "consumes": [
+    "C-PROD"
+   ],
+   "expertise": [
+    "engine architecture",
+    "requirements engineering",
+    "trade-off analysis",
+    "architecture views"
+   ],
+   "kind": "process",
+   "targets": [],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "governance"
+  },
+  {
+   "id": "architecture-governance",
+   "name": "Architecture Governance",
+   "tier": "orchestrator",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Runs architecture as an evidence-backed, governed process: ADR lifecycle with revisit conditions, technology radar with maturity tiers and promotion criteria, automated fitness functions (layering, dependency direction, contract conformance), anti-legacy review, coding standard.",
+   "non_responsibilities": [
+    [
+     "Making the architecture decisions themselves",
+     "engine-architect"
+    ],
+    [
+     "Grading sources and running spikes",
+     "research-evidence"
+    ],
+    [
+     "Test definition of done",
+     "test-architect"
+    ]
+   ],
+   "provides": [
+    "C-ADR"
+   ],
+   "consumes": [],
+   "expertise": [
+    "ADRs",
+    "fitness functions",
+    "static dependency analysis",
+    "technology radar"
+   ],
+   "kind": "process",
+   "targets": [],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "assurance"
+  },
+  {
+   "id": "program-orchestration",
+   "name": "Engine Program Orchestration",
+   "tier": "orchestrator",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Turns architecture into coordinated multi-agent work: decomposes milestones into tasks by skill territory, keeps the ownership ledger and territory locks, sequences integration through vertical slices, routes contract change requests, and schedules critic gates.",
+   "non_responsibilities": [
+    [
+     "Deciding architecture",
+     "engine-architect"
+    ],
+    [
+     "CI mechanics",
+     "ci-cd-automation"
+    ],
+    [
+     "Release versioning",
+     "build-release-architect"
+    ],
+    [
+     "Adjudicating findings & calibrating critics",
+     "architecture-governance"
+    ]
+   ],
+   "provides": [
+    "C-ORCH"
+   ],
+   "consumes": [
+    "C-PROD"
+   ],
+   "expertise": [
+    "multi-agent coordination",
+    "work breakdown",
+    "integration planning",
+    "critical-path analysis"
+   ],
+   "kind": "process",
+   "targets": [],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "governance",
+   "untrusted_inputs": [
+    "external-reports",
+    "inter-agent-messages",
+    "triage-artifacts"
+   ]
+  },
+  {
+   "id": "research-evidence",
+   "name": "Research & Evidence",
+   "tier": "cross-cutting",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Research discipline for every major decision: finds and grades authoritative evidence (production talks, platform docs, peer-reviewed work, reproducible benchmarks), classifies techniques as established / emerging / experimental / speculative, and runs spikes where literature is thin.",
+   "non_responsibilities": [
+    [
+     "Making the decision (the owning skill does, via an ADR)",
+     "architecture-governance"
+    ],
+    [
+     "Benchmark infrastructure",
+     "perf-benchmarking"
+    ]
+   ],
+   "provides": [
+    "C-EVID"
+   ],
+   "consumes": [],
+   "expertise": [
+    "literature review",
+    "SIGGRAPH/GDC/HPG corpus",
+    "source provenance",
+    "experimental design"
+   ],
+   "kind": "process",
+   "targets": [],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "governance",
+   "untrusted_inputs": [
+    "web-sources"
+   ]
+  },
+  {
+   "id": "performance-architect",
+   "name": "Performance Architect",
+   "tier": "cross-cutting",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Owns performance as a discipline: the hypothesis → instrumentation → measurement → optimization → regression-test loop, budgets per subsystem and hardware tier, the scalability / device-profile framework, and performance gates.",
+   "non_responsibilities": [
+    [
+     "Optimizing subsystem code (via C-PERF findings)",
+     "owning-skill"
+    ],
+    [
+     "Instrumentation API",
+     "observability-telemetry"
+    ],
+    [
+     "Benchmark harness",
+     "perf-benchmarking"
+    ],
+    [
+     "Runtime scalability machinery",
+     "runtime-scalability"
+    ]
+   ],
+   "provides": [
+    "C-BUDGET",
+    "C-PERF"
+   ],
+   "consumes": [
+    "C-PROD"
+   ],
+   "expertise": [
+    "performance methodology",
+    "budgeting",
+    "scalability design"
+   ],
+   "kind": "process",
+   "targets": [],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "performance"
+  },
+  {
+   "id": "perf-benchmarking",
+   "name": "Benchmarking & Performance Regression",
+   "tier": "expert",
+   "parent": "performance-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Benchmark harnesses (micro and representative-workload scenes), automated capture, statistical analysis (variance, significance), regression detection and bisection, dashboards.",
+   "non_responsibilities": [
+    [
+     "Setting budgets",
+     "performance-architect"
+    ],
+    [
+     "CI infrastructure",
+     "ci-cd-automation"
+    ]
+   ],
+   "provides": [
+    "C-BENCH"
+   ],
+   "consumes": [
+    "C-INSTR",
+    "C-BUDGET",
+    "C-AUTOMATION"
+   ],
+   "expertise": [
+    "benchmark statistics",
+    "workload design",
+    "change-point detection"
+   ],
+   "kind": "process",
+   "targets": [],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "performance"
+  },
+  {
+   "id": "cpu-performance",
+   "name": "CPU Performance Engineering",
+   "tier": "expert",
+   "parent": "performance-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "CPU microarchitecture-level optimization and review: cache and memory-access patterns, vectorization audits, contention and false sharing, hybrid-core and power-aware tuning, PGO/LTO.",
+   "non_responsibilities": [
+    [
+     "Owning subsystem code",
+     "owning-skill"
+    ],
+    [
+     "Math library",
+     "math-simd-numerics"
+    ],
+    [
+     "Scheduler design",
+     "job-system-task-graph"
+    ],
+    [
+     "Changing subsystem code (findings route via C-PERF)",
+     "owning-skill"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-INSTR",
+    "C-BUDGET",
+    "C-TASK"
+   ],
+   "expertise": [
+    "x86-64 and ARM microarchitecture",
+    "VTune/uProf/Superluminal",
+    "SIMD",
+    "compiler optimization"
+   ],
+   "kind": "process",
+   "targets": [],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "performance"
+  },
+  {
+   "id": "gpu-performance",
+   "name": "GPU Performance Engineering",
+   "tier": "expert",
+   "parent": "performance-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "GPU performance analysis and review: occupancy, bandwidth, cache behavior, barrier and async-compute overlap, vendor tools across PC, console and mobile, GPU power.",
+   "non_responsibilities": [
+    [
+     "Render graph scheduling design",
+     "render-graph-scheduling"
+    ],
+    [
+     "Shader authoring for features",
+     "render-architect"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-INSTR",
+    "C-BUDGET",
+    "C-RG",
+    "C-RHI"
+   ],
+   "expertise": [
+    "GPU architecture (RDNA, Ada/Blackwell, Xe, Apple, Mali/Adreno)",
+    "PIX/RGP/Nsight",
+    "shader optimization"
+   ],
+   "kind": "process",
+   "targets": [],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "performance"
+  },
+  {
+   "id": "loading-streaming-performance",
+   "name": "Loading, Hitch & Pacing Performance",
+   "tier": "expert",
+   "parent": "performance-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "End-to-end load time, startup time and hitch elimination (PSO compilation, streaming stalls, GC pauses, synchronous waits), IO throughput analysis; steady-state frame pacing and input-to-photon latency analysis.",
+   "non_responsibilities": [
+    [
+     "IO backend implementation",
+     "async-io-storage"
+    ],
+    [
+     "PSO cache implementation",
+     "rhi-core"
+    ],
+    [
+     "Streaming policy",
+     "resource-streaming-architect"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-INSTR",
+    "C-BUDGET",
+    "C-IO",
+    "C-RES"
+   ],
+   "expertise": [
+    "IO profiling",
+    "frame-time distribution analysis",
+    "shader compilation stutter"
+   ],
+   "kind": "process",
+   "targets": [],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "performance"
+  },
+  {
+   "id": "test-architect",
+   "name": "Test Architect",
+   "tier": "cross-cutting",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Test strategy and architecture: per-subsystem test pyramid, frameworks, the test definition of done every skill must meet, contract tests, test content, coverage and mutation policy, flakiness policy.",
+   "non_responsibilities": [
+    [
+     "Running pipelines",
+     "ci-cd-automation"
+    ],
+    [
+     "Performance regression",
+     "perf-benchmarking"
+    ],
+    [
+     "Rendering image validation",
+     "render-validation"
+    ]
+   ],
+   "provides": [
+    "C-TEST"
+   ],
+   "consumes": [],
+   "expertise": [
+    "test strategy",
+    "contract testing",
+    "mutation testing",
+    "test determinism"
+   ],
+   "kind": "process",
+   "targets": [],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "quality"
+  },
+  {
+   "id": "render-validation",
+   "name": "Rendering Validation",
+   "tier": "expert",
+   "parent": "test-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Rendering correctness validation: golden-image tests with perceptual metrics, tolerances per GPU/driver, comparisons against the reference path tracer, graphics API validation in CI.",
+   "non_responsibilities": [
+    [
+     "Fixing rendering features",
+     "render-architect"
+    ],
+    [
+     "Material furnace tests (defines them; this skill runs them)",
+     "material-system"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-RG",
+    "C-RHI",
+    "C-RSCENE",
+    "C-RT?",
+    "C-SCENETEX",
+    "C-AUTOMATION",
+    "C-PTREF?",
+    "C-DRAW2D?",
+    "C-TEXT?",
+    "C-PRESENT"
+   ],
+   "expertise": [
+    "image metrics (FLIP, SSIM)",
+    "GPU nondeterminism",
+    "reference rendering"
+   ],
+   "kind": "process",
+   "targets": [],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "quality"
+  },
+  {
+   "id": "functional-automation-soak",
+   "name": "Functional Automation & Soak",
+   "tier": "expert",
+   "parent": "test-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Game-level automation: scripted and bot playthroughs, smoke/boot tests, soak and stability runs (memory growth, leaks), hardware/OS compatibility matrix, network harnesses and server load tests.",
+   "non_responsibilities": [
+    [
+     "Unit test frameworks",
+     "test-architect"
+    ],
+    [
+     "Device-farm infrastructure",
+     "ci-cd-automation"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-GAME?",
+    "C-INPUT?",
+    "C-NET?",
+    "C-AUTOMATION"
+   ],
+   "expertise": [
+    "game automation",
+    "bots",
+    "long-run stability analysis"
+   ],
+   "kind": "process",
+   "targets": [],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "quality"
+  },
+  {
+   "id": "robustness-fuzzing",
+   "name": "Robustness & Fuzzing",
+   "tier": "expert",
+   "parent": "test-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Robustness engineering: fuzzing every untrusted-input parser (assets, packets, saves, scripts, mods), sanitizer build policy, fault injection (IO errors, OOM, device lost), concurrency stress and schedule perturbation.",
+   "non_responsibilities": [
+    [
+     "Threat model",
+     "security-engineering"
+    ],
+    [
+     "Fixing parsers",
+     "owning-skill"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-SER",
+    "C-IO"
+   ],
+   "expertise": [
+    "libFuzzer/AFL++",
+    "sanitizers",
+    "fault injection",
+    "TSan"
+   ],
+   "kind": "process",
+   "targets": [],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "quality",
+   "fuzz_targets": [
+    "admin-commands",
+    "assets",
+    "auth-tickets",
+    "automation-commands",
+    "browser-bridge",
+    "chat-text",
+    "client-integrity-reports",
+    "client-rpcs",
+    "clipboard-dragdrop",
+    "cloud-saves",
+    "collab-session",
+    "config-layers",
+    "crash-uploads",
+    "dcc-live-link",
+    "decompressors",
+    "dev-endpoints",
+    "device-db-updates",
+    "editor-plugins",
+    "fonts",
+    "generated-content",
+    "imported-dcc-files",
+    "input-commands",
+    "invites-deep-links",
+    "ipc-messages",
+    "launch-args",
+    "logged-untrusted-strings",
+    "media-decoders",
+    "ml-models",
+    "mods",
+    "packets",
+    "patch-manifests",
+    "peer-inputs",
+    "peer-state-hashes",
+    "player-model-prompts",
+    "procedural-asset-eval",
+    "project-tool-code",
+    "push-payloads",
+    "remote-config",
+    "replays",
+    "replicated-state",
+    "saves",
+    "scripts",
+    "server-pushed-content",
+    "service-responses",
+    "shader-caches",
+    "shared-ddc",
+    "store-notifications",
+    "telemetry-batches",
+    "transaction-requests",
+    "ugc-graphs",
+    "user-images",
+    "voice-streams",
+    "web-content"
+   ]
+  },
+  {
+   "id": "certification-compliance",
+   "name": "Certification & Compliance",
+   "tier": "expert",
+   "parent": "test-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Tracks and pre-validates external requirements: platform certification (TRC/XR/Lotcheck class), age ratings, privacy law, accessibility law (CVAA, EAA), third-party licenses and SBOM, photosensitivity testing.",
+   "non_responsibilities": [
+    [
+     "Implementing platform features",
+     "platform-architect"
+    ],
+    [
+     "Implementing accessibility features",
+     "accessibility"
+    ]
+   ],
+   "provides": [
+    "C-CERT"
+   ],
+   "consumes": [
+    "C-A11Y?",
+    "C-SVC"
+   ],
+   "expertise": [
+    "platform requirements",
+    "privacy law",
+    "accessibility law",
+    "license compliance"
+   ],
+   "kind": "process",
+   "targets": [],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "quality"
+  },
+  {
+   "id": "security-engineering",
+   "name": "Security Engineering",
+   "tier": "cross-cutting",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Threat modeling and trust boundaries for every untrusted input, secure-coding and memory-safety policy, supply-chain security, secrets, anti-tamper boundary, mod/UGC sandbox policy.",
+   "non_responsibilities": [
+    [
+     "Cheat detection",
+     "anti-cheat-integrity"
+    ],
+    [
+     "Fuzzing campaigns",
+     "robustness-fuzzing"
+    ],
+    [
+     "Transport encryption implementation",
+     "network-transport"
+    ],
+    [
+     "Privacy engineering",
+     "privacy-data-protection"
+    ],
+    [
+     "Crypto and signed-artifact code",
+     "security-runtime"
+    ]
+   ],
+   "provides": [
+    "C-TRUST"
+   ],
+   "consumes": [],
+   "expertise": [
+    "threat modeling (STRIDE)",
+    "memory safety",
+    "SLSA/SBOM"
+   ],
+   "kind": "process",
+   "targets": [],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "quality",
+   "untrusted_inputs": [
+    "vuln-reports"
+   ]
+  },
+  {
+   "id": "anti-cheat-integrity",
+   "name": "Anti-Cheat & Game Integrity",
+   "tier": "expert",
+   "parent": "security-engineering",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Cheat resistance for online games: server-authoritative validation patterns (movement, hits, economy), rate limiting, anomaly signals, integration boundary for client anti-cheat middleware.",
+   "non_responsibilities": [
+    [
+     "Replication design",
+     "replication"
+    ],
+    [
+     "Transport encryption",
+     "network-transport"
+    ]
+   ],
+   "provides": [
+    "C-INTEGRITY"
+   ],
+   "consumes": [
+    "C-NET?",
+    "C-PREDICT?",
+    "C-PHYS?",
+    "C-SVC?",
+    "C-LIVE?",
+    "C-SRVDATA?",
+    "C-ML?"
+   ],
+   "expertise": [
+    "cheat taxonomies",
+    "server validation",
+    "anomaly detection"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "online",
+   "untrusted_inputs": [
+    "client-integrity-reports"
+   ]
+  },
+  {
+   "id": "observability-telemetry",
+   "name": "Observability & Telemetry",
+   "tier": "cross-cutting",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Instrumentation substrate: structured logging, trace zones (CPU, GPU, IO, memory), counters and metrics, profiler integrations, in-game stats, development and live telemetry with privacy consent; zero cost when compiled out.",
+   "non_responsibilities": [
+    [
+     "Crash capture",
+     "crash-diagnostics"
+    ],
+    [
+     "Debug drawing and consoles",
+     "visual-debugging-tools"
+    ],
+    [
+     "Perf budgets",
+     "performance-architect"
+    ]
+   ],
+   "provides": [
+    "C-INSTR"
+   ],
+   "consumes": [
+    "C-PAL",
+    "C-BASE",
+    "C-SYNC"
+   ],
+   "expertise": [
+    "low-overhead tracing",
+    "Tracy/Perfetto formats",
+    "telemetry pipelines"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "foundation",
+   "untrusted_inputs": [
+    "logged-untrusted-strings",
+    "telemetry-batches"
+   ],
+   "dev_surfaces": [
+    "remote diagnostics"
+   ]
+  },
+  {
+   "id": "crash-diagnostics",
+   "name": "Crash & Hang Diagnostics",
+   "tier": "cross-cutting",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Crash, hang and GPU-fault capture and reporting: minidumps, symbolication, bucketing and triage, GPU crash dumps, watchdogs, OOM reports, assert reporting.",
+   "non_responsibilities": [
+    [
+     "Emitting GPU breadcrumbs",
+     "rhi-core"
+    ],
+    [
+     "Symbol server infrastructure",
+     "ci-cd-automation"
+    ]
+   ],
+   "provides": [
+    "C-CRASH"
+   ],
+   "consumes": [
+    "C-PAL",
+    "C-BASE",
+    "C-INSTR"
+   ],
+   "expertise": [
+    "minidumps",
+    "DRED/Aftermath/RGD",
+    "crash bucketing"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "foundation",
+   "untrusted_inputs": [
+    "crash-uploads",
+    "ipc-messages",
+    "player-feedback",
+    "triage-artifacts"
+   ]
+  },
+  {
+   "id": "determinism-replay",
+   "name": "Determinism & Replay",
+   "tier": "cross-cutting",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Defines determinism levels (none, same-binary, cross-platform) per subsystem and the floating-point and parallel-execution rules that achieve them; owns input/state record-replay and desync detection.",
+   "non_responsibilities": [
+    [
+     "Rollback netcode",
+     "prediction-rollback"
+    ],
+    [
+     "Deterministic math implementation",
+     "math-simd-numerics"
+    ]
+   ],
+   "provides": [
+    "C-DET",
+    "C-SNAPSHOT",
+    "C-REPLAY"
+   ],
+   "consumes": [
+    "C-MATH",
+    "C-TASK",
+    "C-SER@C-SNAPSHOT",
+    "C-FRAME@C-SNAPSHOT"
+   ],
+   "expertise": [
+    "IEEE-754 reproducibility",
+    "deterministic scheduling",
+    "state hashing"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "foundation",
+   "untrusted_inputs": [
+    "peer-state-hashes",
+    "replays"
+   ]
+  },
+  {
+   "id": "hot-reload-iteration",
+   "name": "Hot Reload & Iteration",
+   "tier": "cross-cutting",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Owns the reload protocol (change detection, dependency invalidation, state preservation) that assets, shaders, scripts, config and C++ live coding plug into; measures edit → see latency.",
+   "non_responsibilities": [
+    [
+     "Each system's own reload implementation (via C-RELOAD)",
+     "owning-skill"
+    ],
+    [
+     "Build system",
+     "build-system-toolchains"
+    ]
+   ],
+   "provides": [
+    "C-RELOAD"
+   ],
+   "consumes": [
+    "C-RES",
+    "C-MOD",
+    "C-REFL"
+   ],
+   "expertise": [
+    "live coding",
+    "state migration",
+    "iteration-time measurement"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-BUILD"
+   ],
+   "implements": [],
+   "workstream": "foundation",
+   "untrusted_inputs": [
+    "dev-endpoints"
+   ],
+   "dev_surfaces": [
+    "live coding",
+    "reload endpoint"
+   ]
+  },
+  {
+   "id": "accessibility",
+   "name": "Accessibility",
+   "tier": "cross-cutting",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Maps XAG/GAG and legal requirements to engine features and owns subtitles and captions, screen-reader/TTS/STT hooks, colorblind and contrast modes, text scaling, motion and photosensitivity options, assist hooks, and their validation.",
+   "non_responsibilities": [
+    [
+     "Input remapping implementation",
+     "input-system"
+    ],
+    [
+     "UI layout engine & subtitle presentation",
+     "ui-architect"
+    ],
+    [
+     "Colorblind passes",
+     "post-color-hdr"
+    ],
+    [
+     "Legal compliance sign-off",
+     "certification-compliance"
+    ]
+   ],
+   "provides": [
+    "C-A11Y",
+    "C-A11YRT"
+   ],
+   "consumes": [
+    "C-TEXT",
+    "C-PAL",
+    "C-DIALOGUE?",
+    "C-AUDIO?"
+   ],
+   "expertise": [
+    "game accessibility guidelines",
+    "assistive tech APIs",
+    "inclusive design"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "ui"
+  },
+  {
+   "id": "api-lifecycle-migration",
+   "name": "API Lifecycle & Engine Migration",
+   "tier": "cross-cutting",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Public API surface, semantic versioning and deprecation, ABI policy, engine-upgrade tooling (codemods, data upgraders) and LTS policy, so projects can move across engine versions.",
+   "non_responsibilities": [
+    [
+     "Data schema mechanisms",
+     "serialization-schema"
+    ],
+    [
+     "Plugin loading",
+     "plugin-system"
+    ]
+   ],
+   "provides": [
+    "C-API"
+   ],
+   "consumes": [
+    "C-SER",
+    "C-REFL",
+    "C-RELEASE",
+    "C-PROD"
+   ],
+   "expertise": [
+    "API design",
+    "semver",
+    "clang tooling codemods"
+   ],
+   "kind": "process",
+   "targets": [],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "governance",
+   "writes_code": true
+  },
+  {
+   "id": "plugin-system",
+   "name": "Plugin System",
+   "tier": "expert",
+   "parent": "core-runtime-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Plugin architecture: manifests, discovery, dependency resolution, load phases, binary vs source plugins, isolation, distribution format.",
+   "non_responsibilities": [
+    [
+     "Mods & UGC",
+     "modding-ugc"
+    ],
+    [
+     "Module linking internals",
+     "core-runtime-architect"
+    ]
+   ],
+   "provides": [
+    "C-PLUGIN"
+   ],
+   "consumes": [
+    "C-MOD",
+    "C-BASE",
+    "C-API",
+    "C-SIGN"
+   ],
+   "expertise": [
+    "plugin architectures",
+    "dynamic loading",
+    "ABI stability"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "foundation",
+   "untrusted_inputs": [
+    "editor-plugins",
+    "mods",
+    "project-tool-code"
+   ]
+  },
+  {
+   "id": "modding-ugc",
+   "name": "Modding & UGC",
+   "tier": "expert",
+   "parent": "gameplay-architect",
+   "profiles": [
+    "ugc"
+   ],
+   "purpose": "Mod and UGC support: mod SDK, content overrides via VFS layering, sandboxed mod scripting, UGC upload and moderation boundaries, mod compatibility across patches.",
+   "non_responsibilities": [
+    [
+     "Sandbox policy",
+     "security-engineering"
+    ],
+    [
+     "Script VM",
+     "scripting-runtime"
+    ]
+   ],
+   "provides": [
+    "C-EDIT"
+   ],
+   "consumes": [
+    "C-VFS",
+    "C-SCRIPT",
+    "C-PLUGIN",
+    "C-SVC",
+    "C-SIGN",
+    "C-SHADER?",
+    "C-CMD",
+    "C-NETSESSION?"
+   ],
+   "expertise": [
+    "mod ecosystems",
+    "sandboxing",
+    "content overrides"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-COOK"
+   ],
+   "implements": [],
+   "workstream": "gameplay",
+   "untrusted_inputs": [
+    "mods",
+    "player-model-prompts",
+    "server-pushed-content",
+    "ugc-graphs"
+   ],
+   "authoring": "Authoring through XC.EXT.mod-editor and XC.EXT.player-creation."
+  },
+  {
+   "id": "developer-experience-docs",
+   "name": "Developer Experience & Documentation",
+   "tier": "cross-cutting",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Documentation and developer experience: API reference, architecture docs, the sample-project ladder (2D → open-world online) that doubles as integration tests, templates, onboarding, doc testing, error-message standards, DX metrics; documentation and learning for content creators as well as programmers.",
+   "non_responsibilities": [
+    [
+     "ADR records",
+     "architecture-governance"
+    ],
+    [
+     "Iteration-time tooling",
+     "hot-reload-iteration"
+    ]
+   ],
+   "provides": [],
+   "consumes": [],
+   "expertise": [
+    "technical writing",
+    "docs-as-code",
+    "sample design",
+    "DX metrics"
+   ],
+   "kind": "process",
+   "targets": [],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "governance"
+  },
+  {
+   "id": "ml-inference-runtime",
+   "name": "ML Inference Runtime",
+   "tier": "expert",
+   "parent": "core-runtime-architect",
+   "profiles": [
+    "ml"
+   ],
+   "purpose": "Runtime neural-network inference shared by neural rendering, animation, audio and AI: GPU (matrix/tensor intrinsics tier) and CPU backends, model packaging and quantization, scheduling within frame budgets, determinism characteristics.",
+   "non_responsibilities": [
+    [
+     "Vendor upscalers",
+     "reconstruction-upscaling"
+    ],
+    [
+     "In-shader (fused) networks",
+     "shader-system"
+    ],
+    [
+     "Neural feature design",
+     "owning-skill"
+    ],
+    [
+     "Model training",
+     "external:ml-training"
+    ],
+    [
+     "GPU queue/budget arbitration of C-MLGPU work",
+     "render-graph-scheduling"
+    ]
+   ],
+   "provides": [
+    "C-ML",
+    "C-MLGPU"
+   ],
+   "consumes": [
+    "C-TASK",
+    "C-RHI?@C-MLGPU",
+    "C-RG?@C-MLGPU",
+    "C-PAL",
+    "C-FRAME",
+    "C-RES"
+   ],
+   "expertise": [
+    "inference engines",
+    "quantization",
+    "matrix/tensor intrinsics",
+    "ONNX"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "foundation",
+   "untrusted_inputs": [
+    "ml-models"
+   ]
+  },
+  {
+   "id": "core-runtime-architect",
+   "name": "Core Runtime Architect",
+   "tier": "lead",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Core runtime architecture: layering within core, module system and engine lifecycle (parallel boot, init graph, shutdown), configuration and cvars, error-handling and failure model, language and compiler feature policy.",
+   "non_responsibilities": [
+    [
+     "Allocator design",
+     "memory-allocators"
+    ],
+    [
+     "Scheduler",
+     "job-system-task-graph"
+    ],
+    [
+     "Frame loop",
+     "frame-orchestration"
+    ]
+   ],
+   "provides": [
+    "C-MOD",
+    "C-CFG",
+    "C-ERR",
+    "C-IPC"
+   ],
+   "consumes": [
+    "C-PAL",
+    "C-BASE",
+    "C-MEM",
+    "C-TYPES",
+    "C-SYNC",
+    "C-TASK",
+    "C-INSTR"
+   ],
+   "expertise": [
+    "C++/Rust systems programming",
+    "module systems",
+    "error models"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "foundation",
+   "untrusted_inputs": [
+    "config-layers",
+    "ipc-messages",
+    "launch-args"
+   ]
+  },
+  {
+   "id": "math-simd-numerics",
+   "name": "Math, SIMD & Numerics",
+   "tier": "expert",
+   "parent": "core-runtime-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Math and numerics: SIMD linear algebra, geometry and intersection primitives, computational geometry, numerical robustness, mixed and double precision, deterministic math, RNG and noise, curves, quantized formats, SPMD kernels with ISA dispatch.",
+   "non_responsibilities": [
+    [
+     "Coordinate conventions decision",
+     "engine-architect"
+    ],
+    [
+     "Determinism rules",
+     "determinism-replay"
+    ]
+   ],
+   "provides": [
+    "C-MATH"
+   ],
+   "consumes": [
+    "C-PAL"
+   ],
+   "expertise": [
+    "numerical analysis",
+    "SIMD (SSE/AVX2/AVX-512/NEON/SVE)",
+    "computational geometry"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "foundation"
+  },
+  {
+   "id": "memory-allocators",
+   "name": "Memory & Allocators",
+   "tier": "expert",
+   "parent": "core-runtime-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Memory management: virtual memory, allocator families, thread-local and NUMA-aware allocation, tagging and attribution, budget enforcement mechanisms, fragmentation control, memory debugging, OOM policy, UMA accounting.",
+   "non_responsibilities": [
+    [
+     "GPU heaps",
+     "gpu-memory-resources"
+    ],
+    [
+     "Budget numbers",
+     "performance-architect"
+    ]
+   ],
+   "provides": [
+    "C-MEM"
+   ],
+   "consumes": [
+    "C-PAL",
+    "C-BASE",
+    "C-SYNC"
+   ],
+   "expertise": [
+    "allocator design",
+    "virtual memory",
+    "TLSF",
+    "memory profiling"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "foundation"
+  },
+  {
+   "id": "containers-core-types",
+   "name": "Containers & Core Types",
+   "tier": "expert",
+   "parent": "core-runtime-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Containers and core types: cache-friendly containers (open-addressing maps, inline and SoA containers, rings), strings and UTF-8, interned names, hashing, bit utilities, algorithms, explicit-ownership and view types.",
+   "non_responsibilities": [
+    [
+     "Concurrent containers",
+     "concurrency-primitives"
+    ],
+    [
+     "Entity handles",
+     "entity-object-model"
+    ]
+   ],
+   "provides": [
+    "C-TYPES"
+   ],
+   "consumes": [
+    "C-MEM",
+    "C-BASE"
+   ],
+   "expertise": [
+    "data structures",
+    "hashing",
+    "Unicode basics"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "foundation",
+   "untrusted_inputs": [
+    "decompressors"
+   ]
+  },
+  {
+   "id": "concurrency-primitives",
+   "name": "Concurrency Primitives",
+   "tier": "expert",
+   "parent": "core-runtime-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Memory model and atomics, synchronization primitives, lock-free and wait-free structures, safe memory reclamation and the engine retirement service (C-LIFETIME), thread-safety annotations and model checking; reviewer for concurrent code engine-wide.",
+   "non_responsibilities": [
+    [
+     "Scheduling",
+     "job-system-task-graph"
+    ],
+    [
+     "Concurrency test campaigns",
+     "robustness-fuzzing"
+    ]
+   ],
+   "provides": [
+    "C-SYNC",
+    "C-LIFETIME"
+   ],
+   "consumes": [
+    "C-PAL",
+    "C-BASE"
+   ],
+   "expertise": [
+    "C++ memory model",
+    "lock-free algorithms",
+    "futexes",
+    "Relacy/CDSChecker-style checking"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "foundation"
+  },
+  {
+   "id": "job-system-task-graph",
+   "name": "Job System & Task Graph",
+   "tier": "expert",
+   "parent": "core-runtime-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Task-parallel execution: work-stealing scheduler, dependency task graphs, fibers and C++20 coroutines, priorities and QoS, heterogeneous-core and NUMA placement, IO/GPU completion integration, parallel algorithms, blocking policy.",
+   "non_responsibilities": [
+    [
+     "Frame phase layout",
+     "frame-orchestration"
+    ],
+    [
+     "IO backends",
+     "async-io-storage"
+    ]
+   ],
+   "provides": [
+    "C-TASK"
+   ],
+   "consumes": [
+    "C-SYNC",
+    "C-PAL",
+    "C-BASE",
+    "C-MEM"
+   ],
+   "expertise": [
+    "work stealing",
+    "fibers",
+    "coroutines",
+    "hybrid CPU scheduling"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "foundation"
+  },
+  {
+   "id": "frame-orchestration",
+   "name": "Frame Orchestration & Time",
+   "tier": "expert",
+   "parent": "core-runtime-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "The engine loop expressed as a task graph: frame pipelining across simulation, render and GPU, tick phases and sync points, fixed-step simulation with interpolation, time domains, latency and pacing control.",
+   "non_responsibilities": [
+    [
+     "Swapchain presentation",
+     "rhi-core"
+    ],
+    [
+     "ECS query/storage semantics",
+     "ecs-runtime"
+    ]
+   ],
+   "provides": [
+    "C-FRAME",
+    "C-FLOW",
+    "C-PRESENT"
+   ],
+   "consumes": [
+    "C-TASK",
+    "C-CFG",
+    "C-PAL"
+   ],
+   "expertise": [
+    "frame pipelining",
+    "latency analysis",
+    "fixed timestep"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "foundation"
+  },
+  {
+   "id": "entity-object-model",
+   "name": "Object Model & Identity",
+   "tier": "expert",
+   "parent": "core-runtime-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Object-model strategy and identity: generational entity IDs, stable GUIDs, hard/soft/weak references, the hybrid-model policy stating which data lives in ECS vs services vs asset objects vs UI, events and messaging.",
+   "non_responsibilities": [
+    [
+     "ECS storage and queries",
+     "ecs-runtime"
+    ],
+    [
+     "Asset references",
+     "content-pipeline-architect"
+    ],
+    [
+     "Network IDs",
+     "replication"
+    ]
+   ],
+   "provides": [
+    "C-ID"
+   ],
+   "consumes": [
+    "C-TYPES",
+    "C-SYNC",
+    "C-LIFETIME"
+   ],
+   "expertise": [
+    "object models",
+    "handle systems",
+    "lifetime design"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "foundation"
+  },
+  {
+   "id": "ecs-runtime",
+   "name": "ECS Runtime",
+   "tier": "expert",
+   "parent": "core-runtime-architect",
+   "profiles": [
+    "min2d",
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "ECS: storage (archetype chunks or sparse sets, chosen by ADR), queries, change detection, structural changes and command buffers, lowering systems to frame access declarations, ECS-specific ambiguity diagnostics, relationships, singletons, authoring → runtime baking, debugging.",
+   "non_responsibilities": [
+    [
+     "World partition",
+     "world-architect"
+    ],
+    [
+     "Transform propagation",
+     "spatial-transforms"
+    ],
+    [
+     "Object-model policy",
+     "entity-object-model"
+    ]
+   ],
+   "provides": [
+    "C-ECS"
+   ],
+   "consumes": [
+    "C-ID",
+    "C-TASK",
+    "C-FRAME",
+    "C-REFL?",
+    "C-SNAPSHOT",
+    "C-RELOAD?"
+   ],
+   "expertise": [
+    "ECS architectures",
+    "data-oriented design",
+    "parallel scheduling"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-COOK"
+   ],
+   "implements": [],
+   "workstream": "foundation"
+  },
+  {
+   "id": "reflection-metadata",
+   "name": "Reflection & Metadata",
+   "tier": "expert",
+   "parent": "core-runtime-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Type registry, reflection generation (codegen now, C++26 static reflection when toolchains allow), attributes, the property system, script-binding substrate, dynamic invocation.",
+   "non_responsibilities": [
+    [
+     "Serialization formats",
+     "serialization-schema"
+    ],
+    [
+     "Editor widgets",
+     "editor-ui-framework"
+    ],
+    [
+     "Script VM",
+     "scripting-runtime"
+    ]
+   ],
+   "provides": [
+    "C-REFL"
+   ],
+   "consumes": [
+    "C-TYPES"
+   ],
+   "expertise": [
+    "metaprogramming",
+    "code generation",
+    "C++26 reflection"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "foundation"
+  },
+  {
+   "id": "serialization-schema",
+   "name": "Serialization & Schema Evolution",
+   "tier": "expert",
+   "parent": "core-runtime-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Binary and text formats, schema evolution and upgraders, in-place loadable layouts, canonical deterministic serialization, portability, and validation of untrusted input.",
+   "non_responsibilities": [
+    [
+     "Package containers",
+     "package-formats-vfs"
+    ],
+    [
+     "Network bit packing",
+     "replication"
+    ],
+    [
+     "Save-game semantics",
+     "persistence-save"
+    ]
+   ],
+   "provides": [
+    "C-SER",
+    "C-CMD"
+   ],
+   "consumes": [
+    "C-REFL",
+    "C-TYPES"
+   ],
+   "expertise": [
+    "schema evolution",
+    "binary formats",
+    "parsers for untrusted input"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "foundation",
+   "untrusted_inputs": [
+    "assets",
+    "packets",
+    "saves"
+   ]
+  },
+  {
+   "id": "platform-architect",
+   "name": "Platform Architect",
+   "tier": "lead",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Platform abstraction layer interfaces and policy (implemented per platform by the platform experts): OS services, CPU/GPU capability discovery, windowing, process lifecycle, device database, and evaluation of new targets (web, cloud streaming).",
+   "non_responsibilities": [
+    [
+     "Graphics API backends",
+     "rhi-core"
+    ],
+    [
+     "Store and online services",
+     "platform-services"
+    ],
+    [
+     "Toolchains",
+     "build-system-toolchains"
+    ]
+   ],
+   "provides": [
+    "C-PAL",
+    "C-BASE",
+    "C-TARGETPLAT"
+   ],
+   "consumes": [],
+   "expertise": [
+    "OS internals (Windows, Linux, macOS)",
+    "porting",
+    "CPU topology"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "platform",
+   "dev_surfaces": [
+    "devlink"
+   ],
+   "untrusted_inputs": [
+    "clipboard-dragdrop",
+    "device-db-updates"
+   ]
+  },
+  {
+   "id": "platform-desktop",
+   "name": "Desktop & Handheld PC Platforms",
+   "tier": "expert",
+   "parent": "platform-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Windows, Linux, SteamOS and macOS integration: display modes, HDR and VRR capability, DPI, OS-specific IO and scheduling behavior, handheld-PC specifics.",
+   "non_responsibilities": [
+    [
+     "HDR signal encoding",
+     "post-color-hdr"
+    ],
+    [
+     "Swapchain",
+     "rhi-core"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-BASE"
+   ],
+   "expertise": [
+    "Win32/GameInput",
+    "Linux/Proton",
+    "macOS"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [
+    "C-PAL",
+    "C-TARGETPLAT"
+   ],
+   "workstream": "platform",
+   "platforms": [
+    "pc"
+   ],
+   "untrusted_inputs": [
+    "launch-args"
+   ],
+   "authoring": "OS integration has no designer-authored content."
+  },
+  {
+   "id": "platform-console",
+   "name": "Console Platforms",
+   "tier": "expert",
+   "parent": "platform-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Console-class integration from platform-holder documentation: OS and memory model (UMA), suspend/resume, multi-user model, devkit workflows, platform requirements feeding certification.",
+   "non_responsibilities": [
+    [
+     "Certification tracking",
+     "certification-compliance"
+    ],
+    [
+     "Console graphics API backends",
+     "rhi-console"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-BASE"
+   ],
+   "expertise": [
+    "console architectures",
+    "platform requirements",
+    "UMA memory"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [
+    "C-PAL",
+    "C-SVC",
+    "C-TARGETPLAT"
+   ],
+   "workstream": "platform",
+   "platforms": [
+    "console"
+   ],
+   "access": "nda:per-platform-holder",
+   "instances": "one agent per platform-holder family",
+   "untrusted_inputs": [
+    "launch-args"
+   ],
+   "authoring": "Platform integration; content authored in domain editors."
+  },
+  {
+   "id": "platform-mobile",
+   "name": "Mobile Platforms",
+   "tier": "expert",
+   "parent": "platform-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "iOS and Android (incl. Android-based standalone XR and visionOS app lifecycle) integration: app lifecycle, thermal/power signal backends for the runtime governor, tile-based GPU implications, frame pacing, storage, notifications, deep links.",
+   "non_responsibilities": [
+    [
+     "Render-graph TBDR optimizations",
+     "render-graph-scheduling"
+    ],
+    [
+     "Touch input",
+     "input-devices-haptics"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-BASE"
+   ],
+   "expertise": [
+    "Android/iOS",
+    "mobile GPUs",
+    "power management"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [
+    "C-PAL",
+    "C-TARGETPLAT"
+   ],
+   "workstream": "platform",
+   "platforms": [
+    "mobile",
+    "xr-standalone"
+   ],
+   "untrusted_inputs": [
+    "invites-deep-links",
+    "launch-args",
+    "push-payloads"
+   ],
+   "authoring": "Platform integration; mobile preview via RND.TOOL.scalability-preview."
+  },
+  {
+   "id": "platform-services",
+   "name": "Platform Services",
+   "tier": "expert",
+   "parent": "platform-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "First-party platform and store services: identity and sign-in, achievements and presence, entitlements and commerce through first-party stores, privileges and parental controls, social graph and invites, block/mute and text filtering, crossplay policy, leaderboards, cloud-save APIs, media capture, age and region policy enforcement.",
+   "non_responsibilities": [
+    [
+     "Third-party/own backend & live-ops boundaries",
+     "online-services-liveops"
+    ],
+    [
+     "Game-server hosting",
+     "dedicated-server"
+    ],
+    [
+     "Save-game content",
+     "persistence-save"
+    ],
+    [
+     "Backend implementation",
+     "external:backend"
+    ]
+   ],
+   "provides": [
+    "C-SVC"
+   ],
+   "consumes": [
+    "C-PAL",
+    "C-TASK",
+    "C-CFG",
+    "C-INTEGRITY?"
+   ],
+   "expertise": [
+    "platform SDKs",
+    "online service APIs",
+    "auth tokens"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [
+    "C-NETLINK"
+   ],
+   "workstream": "platform",
+   "untrusted_inputs": [
+    "invites-deep-links",
+    "service-responses",
+    "store-notifications",
+    "web-content"
+   ],
+   "authoring": "Service integration; content authored by the games' tooling."
+  },
+  {
+   "id": "input-system",
+   "name": "Input Actions",
+   "tier": "expert",
+   "parent": "platform-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Action-level input: mapping and context stacks, rebinding, buffering and latency accounting, local-multiplayer assignment, accessibility input options, UI navigation routing, per-device glyphs, recording and replay.",
+   "non_responsibilities": [
+    [
+     "Device drivers and haptics",
+     "input-devices-haptics"
+    ],
+    [
+     "UI focus logic",
+     "ui-architect"
+    ]
+   ],
+   "provides": [
+    "C-INPUT"
+   ],
+   "consumes": [
+    "C-DEVICE?",
+    "C-FRAME",
+    "C-SER",
+    "C-A11Y",
+    "C-FLOW",
+    "C-A11YRT?",
+    "C-LOC?",
+    "C-RELOAD?"
+   ],
+   "expertise": [
+    "input systems",
+    "latency measurement",
+    "remapping UX"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "platform"
+  },
+  {
+   "id": "input-devices-haptics",
+   "name": "Input Devices & Haptics",
+   "tier": "expert",
+   "parent": "platform-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Device layer: keyboard/mouse raw input, gamepads, touch and gestures, motion sensors, pen, hotplug and user pairing, haptics (rumble, HD haptics, adaptive triggers).",
+   "non_responsibilities": [
+    [
+     "Action mapping",
+     "input-system"
+    ],
+    [
+     "XR controllers",
+     "xr-runtime"
+    ]
+   ],
+   "provides": [
+    "C-DEVICE"
+   ],
+   "consumes": [
+    "C-PAL"
+   ],
+   "expertise": [
+    "HID",
+    "GameInput/SDL-class APIs",
+    "haptics"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "platform"
+  },
+  {
+   "id": "xr-runtime",
+   "name": "XR Runtime",
+   "tier": "expert",
+   "parent": "platform-architect",
+   "profiles": [
+    "xr"
+   ],
+   "purpose": "XR integration: OpenXR, stereo/multiview rendering hooks, foveation, reprojection and latency, XR input and hand tracking, comfort and safety requirements.",
+   "non_responsibilities": [
+    [
+     "Render pipeline",
+     "render-architect"
+    ],
+    [
+     "Generic input actions",
+     "input-system"
+    ]
+   ],
+   "provides": [
+    "C-XRVIEW"
+   ],
+   "consumes": [
+    "C-PAL",
+    "C-INPUT",
+    "C-FRAME",
+    "C-PRESENT",
+    "C-VIEW",
+    "C-DEVICE",
+    "C-TEMPORAL?",
+    "C-A11Y",
+    "C-COLOR?"
+   ],
+   "expertise": [
+    "OpenXR",
+    "stereo rendering",
+    "motion-to-photon latency"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDVIEW"
+   ],
+   "implements": [],
+   "workstream": "platform",
+   "authoring": "XR content is authored in domain editors; PLAT.XR.editor-preview covers headset preview."
+  },
+  {
+   "id": "content-pipeline-architect",
+   "name": "Content Pipeline Architect",
+   "tier": "lead",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Asset identity and the content pipeline: asset registry and dependency graph, deterministic incremental per-platform cooking, the cook-step contract, derived-data cache and content-addressed store, distributed cooking, content validation.",
+   "non_responsibilities": [
+    [
+     "Format-specific builders (shaders, animation, clusters…)",
+     "shader-system"
+    ],
+    [
+     "Runtime loading",
+     "resource-streaming-architect"
+    ],
+    [
+     "Import formats",
+     "asset-import-interchange"
+    ]
+   ],
+   "provides": [
+    "C-ASSET",
+    "C-COOK"
+   ],
+   "consumes": [
+    "C-SER",
+    "C-TASK",
+    "C-REFL"
+   ],
+   "expertise": [
+    "build systems for data",
+    "content-addressed storage",
+    "incremental computation"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-ML?",
+    "C-TARGETPLAT"
+   ],
+   "implements": [],
+   "workstream": "content",
+   "untrusted_inputs": [
+    "shared-ddc"
+   ]
+  },
+  {
+   "id": "asset-import-interchange",
+   "name": "Asset Import & Interchange",
+   "tier": "expert",
+   "parent": "content-pipeline-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Importers and interchange: glTF, FBX, OpenUSD, texture and audio source formats, MaterialX/OpenPBR, DCC live link, reimport and source tracking, scan data.",
+   "non_responsibilities": [
+    [
+     "Cooking",
+     "content-pipeline-architect"
+    ],
+    [
+     "Material model",
+     "material-system"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-ASSET",
+    "C-COOK"
+   ],
+   "expertise": [
+    "glTF",
+    "FBX SDK",
+    "OpenUSD",
+    "MaterialX"
+   ],
+   "kind": "tool",
+   "targets": [
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "content",
+   "untrusted_inputs": [
+    "dcc-live-link",
+    "imported-dcc-files",
+    "procedural-asset-eval"
+   ]
+  },
+  {
+   "id": "asset-cook-processors",
+   "name": "Asset Cook Processors",
+   "tier": "expert",
+   "parent": "content-pipeline-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Generic processors: texture processing and GPU texture-compression encoding, mesh optimization, hosting of collision and other domain builders under the cook contract.",
+   "non_responsibilities": [
+    [
+     "Cluster DAG building",
+     "virtualized-geometry-lod"
+    ],
+    [
+     "Animation compression",
+     "animation-runtime"
+    ],
+    [
+     "Shader compilation",
+     "shader-system"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-COOK",
+    "C-MATH",
+    "C-ML?"
+   ],
+   "expertise": [
+    "BCn/ASTC encoders",
+    "mesh optimization",
+    "image processing"
+   ],
+   "kind": "tool",
+   "targets": [
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "content"
+  },
+  {
+   "id": "resource-streaming-architect",
+   "name": "Resource & Streaming Architect",
+   "tier": "lead",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Runtime resource model: handles and explicit lifetime, load requests with priority and deadline, dependency-aware loading, the streaming manager (budgets, eviction, prediction), fallbacks, no-stall loading.",
+   "non_responsibilities": [
+    [
+     "IO backends",
+     "async-io-storage"
+    ],
+    [
+     "Package format",
+     "package-formats-vfs"
+    ],
+    [
+     "Texture-specific streaming",
+     "texture-streaming-vt"
+    ]
+   ],
+   "provides": [
+    "C-RES"
+   ],
+   "consumes": [
+    "C-ASSET",
+    "C-VFS",
+    "C-IO",
+    "C-TASK",
+    "C-GPUMEM?",
+    "C-FRAME",
+    "C-LIFETIME"
+   ],
+   "expertise": [
+    "streaming systems",
+    "cache eviction",
+    "async loading"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "content"
+  },
+  {
+   "id": "async-io-storage",
+   "name": "Async IO & Storage",
+   "tier": "expert",
+   "parent": "resource-streaming-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Async IO: io_uring, IOCP, DirectStorage and console backends, IO scheduling and queue depth, GPU decompression, memory-mapped IO, file-system abstraction, error handling.",
+   "non_responsibilities": [
+    [
+     "Streaming decisions",
+     "resource-streaming-architect"
+    ],
+    [
+     "Codec choice",
+     "package-formats-vfs"
+    ]
+   ],
+   "provides": [
+    "C-IO"
+   ],
+   "consumes": [
+    "C-PAL",
+    "C-TASK",
+    "C-GPUMEM?"
+   ],
+   "expertise": [
+    "NVMe",
+    "io_uring",
+    "DirectStorage",
+    "IO scheduling"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "content",
+   "untrusted_inputs": [
+    "service-responses"
+   ]
+  },
+  {
+   "id": "package-formats-vfs",
+   "name": "Package Formats & VFS",
+   "tier": "expert",
+   "parent": "resource-streaming-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Package/container format and chunking, codec selection, VFS mount layering (base, patch, DLC, mods), encryption and signing, install-chunk layout.",
+   "non_responsibilities": [
+    [
+     "Patch generation",
+     "packaging-release-patching"
+    ],
+    [
+     "Relocatable data layout",
+     "serialization-schema"
+    ]
+   ],
+   "provides": [
+    "C-VFS"
+   ],
+   "consumes": [
+    "C-IO",
+    "C-SER",
+    "C-SIGN"
+   ],
+   "expertise": [
+    "archive formats",
+    "compression codecs",
+    "content integrity"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "content",
+   "untrusted_inputs": [
+    "assets",
+    "decompressors"
+   ]
+  },
+  {
+   "id": "world-architect",
+   "name": "World Architect",
+   "tier": "lead",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "World representation strategy (data-oriented, no universal scene graph), partitioning and streaming cells, streaming sources, HLOD strategy, simulation LOD and significance, large-world coordinate policy, level transitions, server-side world streaming.",
+   "non_responsibilities": [
+    [
+     "World document format",
+     "world-data-model"
+    ],
+    [
+     "Transform math",
+     "spatial-transforms"
+    ],
+    [
+     "HLOD mesh generation",
+     "virtualized-geometry-lod"
+    ]
+   ],
+   "provides": [
+    "C-WORLD",
+    "C-SIGNIF",
+    "C-ENV"
+   ],
+   "consumes": [
+    "C-SPATIAL",
+    "C-RES",
+    "C-ECS?",
+    "C-VIEW",
+    "C-FRAME"
+   ],
+   "expertise": [
+    "open-world streaming",
+    "spatial partitioning",
+    "significance systems"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-COOK"
+   ],
+   "implements": [],
+   "workstream": "world"
+  },
+  {
+   "id": "world-data-model",
+   "name": "World Data Model",
+   "tier": "expert",
+   "parent": "world-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "World and level documents, prefabs with nested overrides and variants, data layers, one-file-per-object layout for collaboration, level instances.",
+   "non_responsibilities": [
+    [
+     "Serialization mechanics",
+     "serialization-schema"
+    ],
+    [
+     "Source-control workflows",
+     "collaboration-version-control"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-WORLD",
+    "C-SER",
+    "C-ASSET",
+    "C-ID",
+    "C-RELOAD?"
+   ],
+   "expertise": [
+    "prefab systems",
+    "override resolution",
+    "mergeable data design"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-EDVIEW",
+    "C-VCS"
+   ],
+   "implements": [],
+   "workstream": "world"
+  },
+  {
+   "id": "spatial-transforms",
+   "name": "Transforms & Spatial Queries",
+   "tier": "expert",
+   "parent": "world-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Transform representation and parallel hierarchy propagation, attachments, large-world coordinates implementation, generic spatial index and query service for non-physics consumers, spatial hashing.",
+   "non_responsibilities": [
+    [
+     "Physics broadphase",
+     "collision-detection"
+    ],
+    [
+     "GPU culling",
+     "geometry-pipeline"
+    ]
+   ],
+   "provides": [
+    "C-SPATIAL",
+    "C-VIEW"
+   ],
+   "consumes": [
+    "C-MATH",
+    "C-ECS?",
+    "C-TASK",
+    "C-ID",
+    "C-FRAME"
+   ],
+   "expertise": [
+    "transform hierarchies",
+    "BVH/grids",
+    "precision management"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "world",
+   "authoring": "Transforms are edited through world-editor-viewport gizmos (C-EDVIEW)."
+  },
+  {
+   "id": "terrain",
+   "name": "Terrain",
+   "tier": "expert",
+   "parent": "world-architect",
+   "profiles": [
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "Terrain end-to-end: representation, rendering, material layering, sculpt/paint tool logic, runtime deformation, collision data hand-off.",
+   "non_responsibilities": [
+    [
+     "Virtual texturing core",
+     "texture-streaming-vt"
+    ],
+    [
+     "Viewport hosting",
+     "world-editor-viewport"
+    ],
+    [
+     "Collision algorithms",
+     "collision-detection"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-WORLD?",
+    "C-RSCENE?",
+    "C-PHYS?",
+    "C-RES",
+    "C-MATIF?",
+    "C-ENV",
+    "C-INSTANCES?",
+    "C-VT?",
+    "C-RG?",
+    "C-GEOLOD?",
+    "C-TEMPORAL?",
+    "C-PCG?"
+   ],
+   "expertise": [
+    "terrain LOD",
+    "heightfield processing",
+    "virtual texturing"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-EDVIEW"
+   ],
+   "implements": [
+    "C-ENV"
+   ],
+   "workstream": "world"
+  },
+  {
+   "id": "vegetation-foliage",
+   "name": "Vegetation & Foliage",
+   "tier": "expert",
+   "parent": "world-architect",
+   "profiles": [
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "Vegetation instancing and rendering, procedural placement rules, wind and interaction, vegetation-specific LOD.",
+   "non_responsibilities": [
+    [
+     "Generic PCG framework",
+     "procedural-generation"
+    ],
+    [
+     "Impostor generation",
+     "virtualized-geometry-lod"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-WORLD?",
+    "C-RSCENE?",
+    "C-RES",
+    "C-ENV?",
+    "C-INSTANCES?",
+    "C-TEMPORAL?",
+    "C-MATIF?",
+    "C-GEOLOD?",
+    "C-RT?",
+    "C-LIGHT?",
+    "C-PCG?"
+   ],
+   "expertise": [
+    "foliage rendering",
+    "wind animation",
+    "instancing"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-EDVIEW"
+   ],
+   "implements": [],
+   "workstream": "world"
+  },
+  {
+   "id": "water-ocean",
+   "name": "Water & Ocean",
+   "tier": "expert",
+   "parent": "world-architect",
+   "profiles": [
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "Ocean spectral simulation, rivers, lakes and shorelines, water surface rendering, water queries for buoyancy.",
+   "non_responsibilities": [
+    [
+     "Buoyancy dynamics",
+     "rigid-body-dynamics"
+    ],
+    [
+     "Volumetric & particle fluid solvers",
+     "fluid-simulation"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-WORLD?",
+    "C-RSCENE?",
+    "C-RG?",
+    "C-ENV",
+    "C-LIGHT?",
+    "C-GI?",
+    "C-TEMPORAL?",
+    "C-SCENETEX?",
+    "C-LIGHTENV?",
+    "C-TRANSLUCENT?"
+   ],
+   "expertise": [
+    "FFT ocean",
+    "water rendering",
+    "shallow-water models"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-EDVIEW"
+   ],
+   "implements": [
+    "C-ENV"
+   ],
+   "workstream": "world"
+  },
+  {
+   "id": "atmosphere-weather",
+   "name": "Atmosphere, Volumetrics & Weather",
+   "tier": "expert",
+   "parent": "world-architect",
+   "profiles": [
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "Sky and atmospheric scattering, volumetric clouds, volumetric fog and local media, weather state and surface response, time of day.",
+   "non_responsibilities": [
+    [
+     "Sky lighting capture for GI",
+     "global-illumination"
+    ],
+    [
+     "Translucency compositing",
+     "translucency-decals"
+    ]
+   ],
+   "provides": [
+    "C-ATMOS"
+   ],
+   "consumes": [
+    "C-RSCENE?",
+    "C-RG?",
+    "C-FRAME",
+    "C-ENV",
+    "C-LIGHT?",
+    "C-TEMPORAL?",
+    "C-VFX?"
+   ],
+   "expertise": [
+    "atmospheric scattering",
+    "volumetric rendering",
+    "weather systems"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-EDVIEW"
+   ],
+   "implements": [
+    "C-ENV",
+    "C-LIGHTENV"
+   ],
+   "workstream": "world"
+  },
+  {
+   "id": "procedural-generation",
+   "name": "Procedural Content Generation",
+   "tier": "expert",
+   "parent": "world-architect",
+   "profiles": [
+    "min2d",
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "Deterministic graph-based PCG framework usable in editor and at stream-in, placement and scattering rules, grammar and constraint methods; evaluates ML generation.",
+   "non_responsibilities": [
+    [
+     "Foliage-specific rules",
+     "vegetation-foliage"
+    ],
+    [
+     "Graph editor UI",
+     "graph-editor-framework"
+    ]
+   ],
+   "provides": [
+    "C-PCG"
+   ],
+   "consumes": [
+    "C-DET",
+    "C-ML?",
+    "C-INSTANCES?",
+    "C-WORLD?",
+    "C-SPATIAL"
+   ],
+   "expertise": [
+    "PCG",
+    "WFC",
+    "deterministic generation"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-COOK",
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-GRAPH",
+    "C-EDVIEW"
+   ],
+   "implements": [],
+   "workstream": "world"
+  },
+  {
+   "id": "render-architect",
+   "name": "Render Architect",
+   "tier": "lead",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Rendering architecture: pipeline organization, shading-path choice (forward+, deferred, visibility buffer), render-feature contract, render scene and world→render sync, scalability tiers from 2D mobile to path-traced, multi-view, debug modes.",
+   "non_responsibilities": [
+    [
+     "API backends",
+     "gpu-platform-architect"
+    ],
+    [
+     "Pass scheduling",
+     "render-graph-scheduling"
+    ],
+    [
+     "Individual features (GI, shadows…)",
+     "owning-skill"
+    ],
+    [
+     "Render threading / command-recording model",
+     "gpu-platform-architect"
+    ]
+   ],
+   "provides": [
+    "C-RSCENE",
+    "C-SCENETEX",
+    "C-LIGHTENV"
+   ],
+   "consumes": [
+    "C-RG",
+    "C-SPATIAL",
+    "C-MATIF",
+    "C-FRAME",
+    "C-FLOW",
+    "C-VIEW",
+    "C-GPUTIER",
+    "C-ECS?",
+    "C-XRVIEW?",
+    "C-A11Y"
+   ],
+   "expertise": [
+    "real-time rendering architecture",
+    "GPU-driven pipelines",
+    "scalability"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "rendering"
+  },
+  {
+   "id": "rhi-core",
+   "name": "RHI Core",
+   "tier": "expert",
+   "parent": "gpu-platform-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Render hardware interface over D3D12, Vulkan, Metal, console APIs and WebGPU: queues and command recording, synchronization, bindless descriptors, PSOs and PSO caching, presentation, capability tiers, GPU crash breadcrumbs, driver workarounds.",
+   "non_responsibilities": [
+    [
+     "GPU memory allocation",
+     "gpu-memory-resources"
+    ],
+    [
+     "Barrier planning",
+     "render-graph-scheduling"
+    ],
+    [
+     "Shader compilation",
+     "shader-system"
+    ],
+    [
+     "Per-API backend code",
+     [
+      "rhi-d3d12",
+      "rhi-vulkan",
+      "rhi-metal",
+      "rhi-webgpu",
+      "rhi-console"
+     ]
+    ]
+   ],
+   "provides": [
+    "C-RHI"
+   ],
+   "consumes": [
+    "C-PAL",
+    "C-SYNC",
+    "C-PRESENT",
+    "C-FRAME"
+   ],
+   "expertise": [
+    "D3D12",
+    "Vulkan",
+    "Metal",
+    "GPU synchronization"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "rendering",
+   "untrusted_inputs": [
+    "shader-caches"
+   ]
+  },
+  {
+   "id": "gpu-memory-resources",
+   "name": "GPU Memory & Resources",
+   "tier": "expert",
+   "parent": "gpu-platform-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "GPU heaps and suballocation, residency and overcommit, upload/readback rings, sparse/reserved resources, GPU memory budgeting and defragmentation, lifetimes decoupled from frame boundaries.",
+   "non_responsibilities": [
+    [
+     "Transient aliasing plans",
+     "render-graph-scheduling"
+    ],
+    [
+     "Texture streaming policy",
+     "texture-streaming-vt"
+    ]
+   ],
+   "provides": [
+    "C-GPUMEM"
+   ],
+   "consumes": [
+    "C-RHI",
+    "C-GPUTIER",
+    "C-LIFETIME"
+   ],
+   "expertise": [
+    "D3D12MA/VMA-class allocators",
+    "residency",
+    "sparse resources"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "rendering"
+  },
+  {
+   "id": "render-graph-scheduling",
+   "name": "Render Graph & GPU Scheduling",
+   "tier": "expert",
+   "parent": "gpu-platform-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Render graph declaration and compilation, automatic barriers, transient aliasing, async compute and multi-queue scheduling, TBDR pass merging, history resources, work-graph integration, general GPU compute, readback contract.",
+   "non_responsibilities": [
+    [
+     "Heap allocation",
+     "gpu-memory-resources"
+    ],
+    [
+     "Feature passes",
+     "render-architect"
+    ]
+   ],
+   "provides": [
+    "C-RG"
+   ],
+   "consumes": [
+    "C-RHI",
+    "C-GPUMEM",
+    "C-TASK",
+    "C-RES",
+    "C-IO?"
+   ],
+   "expertise": [
+    "frame graphs",
+    "GPU scheduling",
+    "work graphs"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "rendering"
+  },
+  {
+   "id": "shader-system",
+   "name": "Shader System",
+   "tier": "expert",
+   "parent": "gpu-platform-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Shading language and dialect, compilation toolchain, permutations, reflection and binding layouts, interop headers, caches and distributed compilation, hot reload, shader debugging, PSO-list gathering.",
+   "non_responsibilities": [
+    [
+     "Material graphs",
+     "material-system"
+    ],
+    [
+     "Runtime PSO cache",
+     "rhi-core"
+    ]
+   ],
+   "provides": [
+    "C-SHADER"
+   ],
+   "consumes": [
+    "C-RHI",
+    "C-GPUTIER",
+    "C-ML?",
+    "C-RELOAD?",
+    "C-RES"
+   ],
+   "expertise": [
+    "HLSL",
+    "Slang",
+    "DXC/SPIR-V",
+    "permutation management"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-COOK"
+   ],
+   "implements": [],
+   "workstream": "rendering",
+   "untrusted_inputs": [
+    "shader-caches",
+    "ugc-graphs"
+   ]
+  },
+  {
+   "id": "material-system",
+   "name": "Material System",
+   "tier": "expert",
+   "parent": "render-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Material model (OpenPBR-class, layered), material graph → shader code generation, instances and parameters, quality tiers, material validation; evaluates neural materials.",
+   "non_responsibilities": [
+    [
+     "BRDF research reference",
+     "research-evidence"
+    ],
+    [
+     "Graph editor UI",
+     "graph-editor-framework"
+    ],
+    [
+     "Shader compiler",
+     "shader-system"
+    ]
+   ],
+   "provides": [
+    "C-MATIF"
+   ],
+   "consumes": [
+    "C-SHADER",
+    "C-ASSET",
+    "C-MLGPU?",
+    "C-GPUTIER",
+    "C-LIGHTENV?",
+    "C-RELOAD?",
+    "C-VT"
+   ],
+   "expertise": [
+    "PBR",
+    "OpenPBR/MaterialX",
+    "shader codegen"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-GRAPH"
+   ],
+   "implements": [],
+   "workstream": "rendering"
+  },
+  {
+   "id": "geometry-pipeline",
+   "name": "Geometry Submission Pipeline",
+   "tier": "expert",
+   "parent": "render-architect",
+   "profiles": [
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "Instance scene and geometry submission for every 3D tier: persistent instance data with batched delta updates, the CPU-culled batched/instanced path (first-class on TBDR/mobile and lite3d), and the GPU-driven path (GPU culling, indirect/mesh shaders, visibility buffer) for desktop/console tiers.",
+   "non_responsibilities": [
+    [
+     "Cluster LOD",
+     "virtualized-geometry-lod"
+    ],
+    [
+     "Render-scene contract",
+     "render-architect"
+    ]
+   ],
+   "provides": [
+    "C-INSTANCES"
+   ],
+   "consumes": [
+    "C-RSCENE",
+    "C-RG",
+    "C-SHADER",
+    "C-GPUMEM",
+    "C-GPUTIER",
+    "C-GEOLOD?",
+    "C-TEMPORAL?",
+    "C-RES",
+    "C-SCENETEX",
+    "C-TRANSLUCENT?",
+    "C-MATIF",
+    "C-VT?"
+   ],
+   "expertise": [
+    "GPU culling",
+    "mesh shaders",
+    "ExecuteIndirect",
+    "CPU culling & instanced batching",
+    "TBDR/mobile GPU submission best practice (Mali/Adreno/Apple)"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-COOK"
+   ],
+   "implements": [],
+   "workstream": "rendering"
+  },
+  {
+   "id": "virtualized-geometry-lod",
+   "name": "Virtualized Geometry & LOD",
+   "tier": "expert",
+   "parent": "render-architect",
+   "profiles": [
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "All geometric LOD: cluster hierarchies and virtualized geometry, cluster DAG building, software micro-polygon rasterization, cluster streaming, discrete LOD, HLOD proxies and impostors, deforming-geometry LOD, displacement.",
+   "non_responsibilities": [
+    [
+     "HLOD strategy",
+     "world-architect"
+    ],
+    [
+     "Generic mesh optimization",
+     "asset-cook-processors"
+    ],
+    [
+     "RT acceleration structures",
+     "ray-tracing-infrastructure"
+    ]
+   ],
+   "provides": [
+    "C-GEOLOD"
+   ],
+   "consumes": [
+    "C-RSCENE",
+    "C-RG",
+    "C-RES",
+    "C-RT?",
+    "C-INSTANCES",
+    "C-MATIF"
+   ],
+   "expertise": [
+    "mesh simplification",
+    "cluster LOD",
+    "software rasterization"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-COOK",
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "rendering"
+  },
+  {
+   "id": "texture-streaming-vt",
+   "name": "Textures & Virtual Texturing",
+   "tier": "expert",
+   "parent": "render-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Runtime texture formats, mip streaming, sampler-feedback streaming, virtual texturing, streaming-friendly cooked layout; evaluates neural texture compression.",
+   "non_responsibilities": [
+    [
+     "Texture encoding in cook",
+     "asset-cook-processors"
+    ],
+    [
+     "Streaming manager",
+     "resource-streaming-architect"
+    ]
+   ],
+   "provides": [
+    "C-VT"
+   ],
+   "consumes": [
+    "C-RES",
+    "C-GPUMEM",
+    "C-RG",
+    "C-ML?",
+    "C-MLGPU?",
+    "C-RSCENE",
+    "C-INSTANCES?",
+    "C-VIEW?"
+   ],
+   "expertise": [
+    "virtual texturing",
+    "sampler feedback",
+    "texture compression"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-COOK",
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "rendering",
+   "untrusted_inputs": [
+    "user-images"
+   ]
+  },
+  {
+   "id": "direct-lighting-shadows",
+   "name": "Direct Lighting & Shadows",
+   "tier": "expert",
+   "parent": "render-architect",
+   "profiles": [
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "Light types and physical units, clustered light culling, stochastic many-light sampling, area lights, cascaded, virtual and ray-traced shadows, contact shadows, light profiles.",
+   "non_responsibilities": [
+    [
+     "Indirect lighting",
+     "global-illumination"
+    ],
+    [
+     "Denoisers",
+     "reconstruction-upscaling"
+    ]
+   ],
+   "provides": [
+    "C-LIGHT"
+   ],
+   "consumes": [
+    "C-RSCENE",
+    "C-RG",
+    "C-RT?",
+    "C-TEMPORAL",
+    "C-INSTANCES?",
+    "C-GEOLOD?",
+    "C-SCENETEX",
+    "C-COLOR",
+    "C-LIGHTENV"
+   ],
+   "expertise": [
+    "many-light rendering",
+    "shadow techniques",
+    "ReSTIR DI"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "rendering"
+  },
+  {
+   "id": "global-illumination",
+   "name": "Global Illumination & Reflections",
+   "tier": "expert",
+   "parent": "render-architect",
+   "profiles": [
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "Indirect lighting across tiers: baked lightmaps, probe volumes, screen-space GI and AO, surface/radiance-cache hybrid GI, ReSTIR GI, reflections, sky lighting, specular occlusion, SDF/software ray queries consumed via C-RTAS.",
+   "non_responsibilities": [
+    [
+     "RT infrastructure",
+     "ray-tracing-infrastructure"
+    ],
+    [
+     "Atmosphere model",
+     "atmosphere-weather"
+    ]
+   ],
+   "provides": [
+    "C-GI"
+   ],
+   "consumes": [
+    "C-RSCENE",
+    "C-RG",
+    "C-RT?",
+    "C-TEMPORAL",
+    "C-LIGHT",
+    "C-ATMOS?",
+    "C-MLGPU?",
+    "C-SCENETEX",
+    "C-COLOR",
+    "C-LIGHTENV"
+   ],
+   "expertise": [
+    "real-time GI",
+    "radiance caching",
+    "lightmapping"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-COOK",
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-EDVIEW"
+   ],
+   "implements": [],
+   "workstream": "rendering"
+  },
+  {
+   "id": "ray-tracing-infrastructure",
+   "name": "Ray Tracing Infrastructure",
+   "tier": "expert",
+   "parent": "gpu-platform-architect",
+   "profiles": [
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "Acceleration structure management at scale, inline vs pipeline RT, opacity micromaps, RT LOD, software RT fallback, shader execution reordering, cluster/partitioned acceleration structures.",
+   "non_responsibilities": [
+    [
+     "Lighting algorithms using rays",
+     "global-illumination"
+    ],
+    [
+     "Deformed-geometry updates",
+     "deformation-skinning"
+    ]
+   ],
+   "provides": [
+    "C-RT",
+    "C-RTAS"
+   ],
+   "consumes": [
+    "C-RHI",
+    "C-GPUMEM",
+    "C-GPUTIER",
+    "C-RES",
+    "C-RSCENE@C-RT",
+    "C-RG@C-RT",
+    "C-INSTANCES@C-RT",
+    "C-MATIF@C-RT",
+    "C-GEOLOD?@C-RT"
+   ],
+   "expertise": [
+    "DXR/Vulkan RT",
+    "BVH construction",
+    "RT performance"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "rendering"
+  },
+  {
+   "id": "path-tracing",
+   "name": "Path Tracing",
+   "tier": "expert",
+   "parent": "render-architect",
+   "profiles": [
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "Reference path tracer as ground-truth oracle for validation, real-time path tracing, offline cinematic render mode.",
+   "non_responsibilities": [
+    [
+     "Movie render orchestration",
+     "cinematics-sequencer"
+    ],
+    [
+     "Image comparison tests",
+     "render-validation"
+    ]
+   ],
+   "provides": [
+    "C-PTREF"
+   ],
+   "consumes": [
+    "C-RT?",
+    "C-MATIF",
+    "C-RSCENE",
+    "C-INSTANCES",
+    "C-SCENETEX",
+    "C-LIGHT?",
+    "C-TEMPORAL?"
+   ],
+   "expertise": [
+    "Monte Carlo rendering",
+    "ReSTIR PT",
+    "spectral rendering"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "rendering"
+  },
+  {
+   "id": "reconstruction-upscaling",
+   "name": "Reconstruction, Upscaling & Denoising",
+   "tier": "expert",
+   "parent": "render-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Temporal anti-aliasing and reconstruction, temporal and ML upscalers, frame generation, dynamic resolution, the motion-vector/jitter/history contract, spatiotemporal and ML denoising, variable-rate shading.",
+   "non_responsibilities": [
+    [
+     "Signal-specific sampling",
+     "global-illumination"
+    ],
+    [
+     "Frame pacing",
+     "frame-orchestration"
+    ]
+   ],
+   "provides": [
+    "C-TEMPORAL"
+   ],
+   "consumes": [
+    "C-RG",
+    "C-FRAME",
+    "C-PRESENT",
+    "C-MLGPU?",
+    "C-SCENETEX"
+   ],
+   "expertise": [
+    "TAA/TSR",
+    "DLSS/FSR/XeSS SDKs",
+    "denoisers"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "rendering"
+  },
+  {
+   "id": "post-color-hdr",
+   "name": "Post-Processing, Color & HDR",
+   "tier": "expert",
+   "parent": "render-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Post chain, physical camera and exposure, end-to-end color management (working space, output transforms, OCIO), HDR output and calibration, tonemapping, grading.",
+   "non_responsibilities": [
+    [
+     "Display enumeration",
+     "platform-desktop"
+    ],
+    [
+     "Upscaling",
+     "reconstruction-upscaling"
+    ]
+   ],
+   "provides": [
+    "C-COLOR"
+   ],
+   "consumes": [
+    "C-RG",
+    "C-RHI",
+    "C-CFG",
+    "C-A11Y",
+    "C-PAL",
+    "C-SCENETEX",
+    "C-TEMPORAL",
+    "C-VIEW",
+    "C-A11YRT?"
+   ],
+   "expertise": [
+    "color science",
+    "ACES",
+    "HDR10/PQ",
+    "post effects"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "rendering"
+  },
+  {
+   "id": "translucency-decals",
+   "name": "Translucency & Decals",
+   "tier": "expert",
+   "parent": "render-architect",
+   "profiles": [
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "Transparency and OIT, refraction and distortion, decals, translucent lighting and volumetric integration.",
+   "non_responsibilities": [
+    [
+     "Particle simulation",
+     "vfx-particles"
+    ],
+    [
+     "Volumetric media",
+     "atmosphere-weather"
+    ]
+   ],
+   "provides": [
+    "C-TRANSLUCENT"
+   ],
+   "consumes": [
+    "C-RSCENE",
+    "C-RG",
+    "C-MATIF",
+    "C-LIGHT",
+    "C-GI?",
+    "C-ATMOS?",
+    "C-TEMPORAL",
+    "C-SCENETEX",
+    "C-COLOR",
+    "C-LIGHTENV",
+    "C-VT?"
+   ],
+   "expertise": [
+    "OIT",
+    "decal systems",
+    "translucency sorting"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-EDVIEW"
+   ],
+   "implements": [],
+   "workstream": "rendering"
+  },
+  {
+   "id": "character-rendering",
+   "name": "Character Rendering",
+   "tier": "expert",
+   "parent": "render-architect",
+   "profiles": [
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "Skin subsurface scattering, eyes, strand-based hair and fur rendering, digital-human LOD.",
+   "non_responsibilities": [
+    [
+     "Hair simulation",
+     "cloth-deformables"
+    ],
+    [
+     "Skinning",
+     "deformation-skinning"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-RSCENE",
+    "C-MATIF",
+    "C-ANIM",
+    "C-RG",
+    "C-LIGHT",
+    "C-GI?",
+    "C-SCENETEX",
+    "C-TRANSLUCENT?",
+    "C-TEMPORAL",
+    "C-RT?",
+    "C-INSTANCES?"
+   ],
+   "expertise": [
+    "SSS",
+    "strand rendering",
+    "digital humans"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "rendering"
+  },
+  {
+   "id": "render-2d-vector",
+   "name": "2D, Vector & UI Rendering",
+   "tier": "expert",
+   "parent": "render-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "2D draw backend shared by 2D games, UI and debug overlays: sprites, tilemaps, 2D lighting, vector paths, UI batching/clipping/SDF, HDR compositing, pixel-perfect modes.",
+   "non_responsibilities": [
+    [
+     "Widget model",
+     "ui-architect"
+    ],
+    [
+     "Glyph shaping",
+     "text-fonts"
+    ]
+   ],
+   "provides": [
+    "C-DRAW2D"
+   ],
+   "consumes": [
+    "C-RG",
+    "C-SHADER",
+    "C-TEXT",
+    "C-TEMPORAL?",
+    "C-A11Y",
+    "C-COLOR",
+    "C-RSCENE?",
+    "C-MATIF?",
+    "C-LIGHT?",
+    "C-VT"
+   ],
+   "expertise": [
+    "2D batching",
+    "vector rasterization",
+    "SDF rendering"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-EDVIEW"
+   ],
+   "implements": [],
+   "workstream": "rendering"
+  },
+  {
+   "id": "vfx-particles",
+   "name": "Particles & VFX",
+   "tier": "expert",
+   "parent": "render-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "GPU particle simulation, VFX graph runtime, ribbons/beams/mesh particles, particle collision, VFX budgets and significance.",
+   "non_responsibilities": [
+    [
+     "Physically based fluids",
+     "fluid-simulation"
+    ],
+    [
+     "Translucency sorting",
+     "translucency-decals"
+    ]
+   ],
+   "provides": [
+    "C-VFX"
+   ],
+   "consumes": [
+    "C-RSCENE",
+    "C-RG",
+    "C-PHYS?",
+    "C-LIGHT?",
+    "C-GI?",
+    "C-ATMOS?",
+    "C-TEMPORAL?",
+    "C-ENV?",
+    "C-A11Y",
+    "C-SCENETEX",
+    "C-COLOR",
+    "C-LIGHTENV?",
+    "C-TRANSLUCENT?",
+    "C-MATIF",
+    "C-RELOAD?",
+    "C-ANIM?",
+    "C-VT?",
+    "C-PREDICT?"
+   ],
+   "expertise": [
+    "GPU particles",
+    "VFX authoring",
+    "Niagara/VFX Graph-class systems"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-GRAPH",
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "rendering"
+  },
+  {
+   "id": "physics-architect",
+   "name": "Physics Architect",
+   "tier": "lead",
+   "parent": "engine-architect",
+   "profiles": [
+    "min2d",
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "Physics architecture: build vs integrate decision, physics world representation and ECS integration, stepping and frame sync, determinism levels, physics LOD, materials, GPU offload evaluation; covers both 2D and 3D.",
+   "non_responsibilities": [
+    [
+     "Collision algorithms",
+     "collision-detection"
+    ],
+    [
+     "Solvers",
+     "rigid-body-dynamics"
+    ],
+    [
+     "Networked physics",
+     "prediction-rollback"
+    ]
+   ],
+   "provides": [
+    "C-PHYS"
+   ],
+   "consumes": [
+    "C-SPATIAL",
+    "C-FRAME",
+    "C-DET",
+    "C-TASK",
+    "C-ECS?",
+    "C-RES",
+    "C-SIGNIF?",
+    "C-SNAPSHOT",
+    "C-ENV?",
+    "C-RG?",
+    "C-FLOW",
+    "C-SAVE?",
+    "C-WORLD?",
+    "C-ML?"
+   ],
+   "expertise": [
+    "physics engines (Jolt, PhysX, Havok, Box2D)",
+    "simulation architecture"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "simulation"
+  },
+  {
+   "id": "collision-detection",
+   "name": "Collision Detection & Queries",
+   "tier": "expert",
+   "parent": "physics-architect",
+   "profiles": [
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "Shapes, broadphase, narrowphase and contact manifolds, CCD, scene queries, filtering, mesh/heightfield/SDF collision, collision cooking.",
+   "non_responsibilities": [
+    [
+     "Generic spatial queries",
+     "spatial-transforms"
+    ],
+    [
+     "Dynamics",
+     "rigid-body-dynamics"
+    ],
+    [
+     "Projectile & ballistics logic",
+     "gameplay-systems-toolkit"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-PHYS",
+    "C-MATH",
+    "C-DET",
+    "C-ENV?"
+   ],
+   "expertise": [
+    "GJK/EPA",
+    "BVH broadphase",
+    "robust geometry"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-COOK"
+   ],
+   "implements": [],
+   "workstream": "simulation"
+  },
+  {
+   "id": "rigid-body-dynamics",
+   "name": "Rigid-Body Dynamics",
+   "tier": "expert",
+   "parent": "physics-architect",
+   "profiles": [
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "Integration and constraint solvers, joints, islands and sleeping, parallel solving, stacking stability, kinematic and animated bodies.",
+   "non_responsibilities": [
+    [
+     "Character controllers",
+     "character-physics"
+    ],
+    [
+     "Ragdoll blending",
+     "ik-procedural-animation"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-PHYS",
+    "C-TASK",
+    "C-DET",
+    "C-ANIM?",
+    "C-ENV?",
+    "C-ML?"
+   ],
+   "expertise": [
+    "TGS/XPBD",
+    "constraint solvers",
+    "numerical stability"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [
+    "C-PHYS"
+   ],
+   "workstream": "simulation"
+  },
+  {
+   "id": "character-physics",
+   "name": "Character Physics",
+   "tier": "expert",
+   "parent": "physics-architect",
+   "profiles": [
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "Character controllers (kinematic and dynamic), moving platforms and physical interaction.",
+   "non_responsibilities": [
+    [
+     "Movement modes & networked movement",
+     "character-movement"
+    ],
+    [
+     "Vehicles",
+     "vehicle-physics"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-PHYS",
+    "C-DET",
+    "C-ENV?",
+    "C-SIGNIF?"
+   ],
+   "expertise": [
+    "character controllers"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "simulation"
+  },
+  {
+   "id": "cloth-deformables",
+   "name": "Cloth & Deformables",
+   "tier": "expert",
+   "parent": "physics-architect",
+   "profiles": [
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "Cloth, soft bodies, ropes and cables, hair strand simulation; evaluates ML cloth.",
+   "non_responsibilities": [
+    [
+     "Hair rendering",
+     "character-rendering"
+    ],
+    [
+     "Skinning",
+     "deformation-skinning"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-PHYS",
+    "C-ANIM",
+    "C-RG?",
+    "C-ENV?",
+    "C-DET?",
+    "C-ML?"
+   ],
+   "expertise": [
+    "XPBD",
+    "cloth simulation",
+    "strand dynamics"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "simulation"
+  },
+  {
+   "id": "destruction-fracture",
+   "name": "Destruction & Fracture",
+   "tier": "expert",
+   "parent": "physics-architect",
+   "profiles": [
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "Fracture authoring and precomputation, runtime fracture and debris, destruction replication strategy, propagation to navigation, rendering and audio.",
+   "non_responsibilities": [
+    [
+     "Replication mechanics",
+     "replication"
+    ],
+    [
+     "Navmesh rebuild",
+     "navigation-pathfinding"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-PHYS",
+    "C-RSCENE?",
+    "C-REP?",
+    "C-NAV?",
+    "C-AUDIO?",
+    "C-INSTANCES?",
+    "C-VFX?",
+    "C-WORLD?",
+    "C-SAVE?",
+    "C-SNAPSHOT?",
+    "C-SIGNIF?"
+   ],
+   "expertise": [
+    "Voronoi fracture",
+    "debris management",
+    "destruction networking"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-COOK",
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-EDVIEW"
+   ],
+   "implements": [],
+   "workstream": "simulation"
+  },
+  {
+   "id": "fluid-simulation",
+   "name": "Fluid Simulation",
+   "tier": "expert",
+   "parent": "physics-architect",
+   "profiles": [
+    "aaa",
+    "sandbox",
+    "massim"
+   ],
+   "purpose": "Particle fluids, grid smoke and fire, GPU fluid solvers.",
+   "non_responsibilities": [
+    [
+     "Ocean surface",
+     "water-ocean"
+    ],
+    [
+     "Artistic particles",
+     "vfx-particles"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-PHYS",
+    "C-RG?",
+    "C-RSCENE?",
+    "C-ENV?",
+    "C-DET",
+    "C-TASK",
+    "C-SNAPSHOT?"
+   ],
+   "expertise": [
+    "SPH/FLIP",
+    "Eulerian solvers",
+    "GPU simulation"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "simulation"
+  },
+  {
+   "id": "physics-2d",
+   "name": "2D Physics",
+   "tier": "expert",
+   "parent": "physics-architect",
+   "profiles": [
+    "min2d"
+   ],
+   "purpose": "2D rigid bodies and collision, 2D character controllers, 2D determinism.",
+   "non_responsibilities": [
+    [
+     "3D physics",
+     "rigid-body-dynamics"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-PHYS",
+    "C-DET"
+   ],
+   "expertise": [
+    "Box2D-class solvers",
+    "2D collision"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-EDVIEW"
+   ],
+   "implements": [
+    "C-PHYS"
+   ],
+   "workstream": "simulation"
+  },
+  {
+   "id": "animation-architect",
+   "name": "Animation Architect",
+   "tier": "lead",
+   "parent": "engine-architect",
+   "profiles": [
+    "minimal",
+    "min2d",
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "Animation architecture: data model, parallel evaluation pipeline, animation/physics/gameplay sync and root-motion policy, animation LOD, budgets.",
+   "non_responsibilities": [
+    [
+     "Sampling and blending",
+     "animation-runtime"
+    ],
+    [
+     "Skinning",
+     "deformation-skinning"
+    ]
+   ],
+   "provides": [
+    "C-ANIM"
+   ],
+   "consumes": [
+    "C-SPATIAL",
+    "C-FRAME",
+    "C-TASK",
+    "C-ECS?",
+    "C-PHYS?",
+    "C-NET?",
+    "C-REP?",
+    "C-SNAPSHOT",
+    "C-SIGNIF?",
+    "C-FLOW"
+   ],
+   "expertise": [
+    "animation systems",
+    "pose pipelines"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "simulation"
+  },
+  {
+   "id": "animation-runtime",
+   "name": "Animation Runtime",
+   "tier": "expert",
+   "parent": "animation-architect",
+   "profiles": [
+    "minimal",
+    "min2d",
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "Sampling and decompression, compression, blending/layering/masks/additives, retargeting, curves and notifies, 2D skeletal and flipbook animation.",
+   "non_responsibilities": [
+    [
+     "State machines",
+     "animation-graphs"
+    ],
+    [
+     "IK",
+     "ik-procedural-animation"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-ANIM",
+    "C-MATH",
+    "C-RELOAD?",
+    "C-VFX?",
+    "C-PREDICT?"
+   ],
+   "expertise": [
+    "ACL-class compression",
+    "quaternion math",
+    "retargeting"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-COOK",
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "simulation"
+  },
+  {
+   "id": "deformation-skinning",
+   "name": "Skinning & Deformation",
+   "tier": "expert",
+   "parent": "animation-architect",
+   "profiles": [
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "GPU skinning (linear, dual quaternion), morph targets, ML deformers, deformed-geometry acceleration-structure updates, deformation motion vectors.",
+   "non_responsibilities": [
+    [
+     "Cloth",
+     "cloth-deformables"
+    ],
+    [
+     "Facial solvers",
+     "facial-animation"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-ANIM",
+    "C-RSCENE",
+    "C-RG",
+    "C-TEMPORAL",
+    "C-RT?",
+    "C-ML?",
+    "C-INSTANCES?"
+   ],
+   "expertise": [
+    "compute skinning",
+    "blendshapes",
+    "ML deformers"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-COOK"
+   ],
+   "implements": [],
+   "workstream": "simulation"
+  },
+  {
+   "id": "animation-graphs",
+   "name": "Animation Graphs",
+   "tier": "expert",
+   "parent": "animation-architect",
+   "profiles": [
+    "minimal",
+    "min2d",
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "Animation graphs and state machines, blend spaces, graph compilation and data-driven evaluation, graph debugging and rewind.",
+   "non_responsibilities": [
+    [
+     "Graph editor UI",
+     "graph-editor-framework"
+    ],
+    [
+     "Motion matching",
+     "motion-synthesis"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-ANIM",
+    "C-RELOAD?"
+   ],
+   "expertise": [
+    "state machines",
+    "blend trees",
+    "graph compilers"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-GRAPH"
+   ],
+   "implements": [],
+   "workstream": "simulation"
+  },
+  {
+   "id": "motion-synthesis",
+   "name": "Motion Synthesis",
+   "tier": "expert",
+   "parent": "animation-architect",
+   "profiles": [
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "Motion matching, learned motion matching and neural controllers, pose databases, trajectory prediction and gameplay coupling.",
+   "non_responsibilities": [
+    [
+     "ML runtime",
+     "ml-inference-runtime"
+    ],
+    [
+     "Locomotion gameplay",
+     "character-movement"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-ANIM",
+    "C-ML?"
+   ],
+   "expertise": [
+    "motion matching",
+    "learned animation",
+    "mocap processing"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-COOK",
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "simulation"
+  },
+  {
+   "id": "ik-procedural-animation",
+   "name": "IK, Procedural & Physical Animation",
+   "tier": "expert",
+   "parent": "animation-architect",
+   "profiles": [
+    "min2d",
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "IK solvers, foot placement, procedural animation, physical animation and active ragdoll.",
+   "non_responsibilities": [
+    [
+     "Rigid-body solver",
+     "rigid-body-dynamics"
+    ],
+    [
+     "Motion matching",
+     "motion-synthesis"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-ANIM",
+    "C-PHYS",
+    "C-ML?"
+   ],
+   "expertise": [
+    "IK",
+    "procedural animation",
+    "physics-based character control"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "simulation"
+  },
+  {
+   "id": "facial-animation",
+   "name": "Facial Animation",
+   "tier": "expert",
+   "parent": "animation-architect",
+   "profiles": [
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "Facial rigs and solvers, audio-driven and ML lip sync, performance-capture import.",
+   "non_responsibilities": [
+    [
+     "Face rendering",
+     "character-rendering"
+    ],
+    [
+     "Dialogue playback",
+     "audio-content-runtime"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-ANIM",
+    "C-AUDIO?",
+    "C-ML?",
+    "C-DIALOGUE?"
+   ],
+   "expertise": [
+    "FACS",
+    "rig logic",
+    "lip sync"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "simulation"
+  },
+  {
+   "id": "cinematics-sequencer",
+   "name": "Cinematics & Sequencer",
+   "tier": "expert",
+   "parent": "animation-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Timeline/sequencer, camera cuts and cinematic cameras, high-quality movie rendering, cutscene streaming and preloading.",
+   "non_responsibilities": [
+    [
+     "Gameplay camera",
+     "gameplay-camera"
+    ],
+    [
+     "Path tracer",
+     "path-tracing"
+    ]
+   ],
+   "provides": [
+    "C-SEQ"
+   ],
+   "consumes": [
+    "C-AUDIO?",
+    "C-RSCENE?",
+    "C-RES",
+    "C-VIEW",
+    "C-GAME?",
+    "C-UI?",
+    "C-LOC?",
+    "C-REP?",
+    "C-VIDEO?",
+    "C-DIALOGUE?",
+    "C-A11Y",
+    "C-ANIM?",
+    "C-A11YRT?",
+    "C-SCRIPT?",
+    "C-RELOAD?",
+    "C-VFX?",
+    "C-PTREF?",
+    "C-CAMERA?"
+   ],
+   "expertise": [
+    "sequencers",
+    "cinematography",
+    "virtual production"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "simulation"
+  },
+  {
+   "id": "audio-architect",
+   "name": "Audio Architect",
+   "tier": "lead",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Audio engine architecture and threading, device backends, voice management and virtualization, middleware decision, audio budgets.",
+   "non_responsibilities": [
+    [
+     "DSP algorithms",
+     "audio-dsp-mixing"
+    ],
+    [
+     "Spatialization",
+     "spatial-audio-acoustics"
+    ]
+   ],
+   "provides": [
+    "C-AUDIO"
+   ],
+   "consumes": [
+    "C-PAL",
+    "C-TASK",
+    "C-SPATIAL",
+    "C-VIEW",
+    "C-ECS?",
+    "C-SIGNIF?",
+    "C-FRAME",
+    "C-FLOW"
+   ],
+   "expertise": [
+    "real-time audio",
+    "lock-free audio threads",
+    "Wwise/FMOD"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "audio"
+  },
+  {
+   "id": "audio-dsp-mixing",
+   "name": "Audio DSP & Mixing",
+   "tier": "expert",
+   "parent": "audio-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Mixer graph and buses, DSP effects and convolution reverb, dynamics and loudness, codecs and decoding, audio streaming, procedural synthesis, voice-chat capture and processing.",
+   "non_responsibilities": [
+    [
+     "Voice-chat transport",
+     "network-transport"
+    ],
+    [
+     "Spatialization",
+     "spatial-audio-acoustics"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-AUDIO",
+    "C-RES",
+    "C-MATH",
+    "C-NETLINK?"
+   ],
+   "expertise": [
+    "DSP",
+    "SIMD audio",
+    "codecs",
+    "loudness standards"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "audio",
+   "untrusted_inputs": [
+    "voice-streams"
+   ]
+  },
+  {
+   "id": "spatial-audio-acoustics",
+   "name": "Spatial Audio & Acoustics",
+   "tier": "expert",
+   "parent": "audio-architect",
+   "profiles": [
+    "lite3d",
+    "std3d",
+    "xr"
+   ],
+   "purpose": "HRTF, ambisonics, object-based output, occlusion and obstruction, acoustic propagation, reverb environments.",
+   "non_responsibilities": [
+    [
+     "Collision queries",
+     "collision-detection"
+    ],
+    [
+     "Mixer",
+     "audio-dsp-mixing"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-AUDIO",
+    "C-PHYS?",
+    "C-ENV?",
+    "C-RTAS?"
+   ],
+   "expertise": [
+    "HRTF",
+    "ambisonics",
+    "wave acoustics"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-COOK",
+    "C-EDVIEW"
+   ],
+   "implements": [],
+   "workstream": "audio"
+  },
+  {
+   "id": "audio-content-runtime",
+   "name": "Audio Content Runtime",
+   "tier": "expert",
+   "parent": "audio-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Audio event system and parameters, interactive music, dialogue and VO, authoring tool integration, audio-to-haptics.",
+   "non_responsibilities": [
+    [
+     "Localization pipeline",
+     "localization-i18n"
+    ],
+    [
+     "Haptics devices",
+     "input-devices-haptics"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-AUDIO",
+    "C-ASSET",
+    "C-LOC",
+    "C-DIALOGUE?",
+    "C-DEVICE?",
+    "C-ML?",
+    "C-A11Y",
+    "C-VEHICLE?",
+    "C-A11YRT",
+    "C-RELOAD?",
+    "C-PREDICT?"
+   ],
+   "expertise": [
+    "sound design systems",
+    "adaptive music",
+    "VO pipelines"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-GRAPH",
+    "C-COOK",
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "audio",
+   "untrusted_inputs": [
+    "player-model-prompts"
+   ]
+  },
+  {
+   "id": "network-architect",
+   "name": "Network Architect",
+   "tier": "lead",
+   "parent": "engine-architect",
+   "profiles": [
+    "online",
+    "online-lockstep",
+    "online-rollback",
+    "online-async"
+   ],
+   "purpose": "Netcode model per game type (authoritative server, lockstep, rollback, P2P/relay), network tick and time, authority model, budgets and scale targets, protocol versioning, sharded worlds evaluation.",
+   "non_responsibilities": [
+    [
+     "Transport",
+     "network-transport"
+    ],
+    [
+     "Replication mechanics",
+     "replication"
+    ],
+    [
+     "Matchmaking services",
+     "online-services-liveops"
+    ]
+   ],
+   "provides": [
+    "C-NET"
+   ],
+   "consumes": [
+    "C-FRAME",
+    "C-SER",
+    "C-DET",
+    "C-ID",
+    "C-ECS?",
+    "C-RELEASE"
+   ],
+   "expertise": [
+    "netcode architectures",
+    "distributed systems",
+    "latency hiding"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "online"
+  },
+  {
+   "id": "network-transport",
+   "name": "Network Transport",
+   "tier": "expert",
+   "parent": "network-architect",
+   "profiles": [
+    "online",
+    "online-lockstep",
+    "online-rollback"
+   ],
+   "purpose": "UDP sockets and platform network APIs, reliability and ordering, fragmentation, congestion control, encryption and authentication, NAT traversal and relays, connection lifecycle, link simulation, QUIC/WebTransport evaluation.",
+   "non_responsibilities": [
+    [
+     "What is replicated",
+     "replication"
+    ],
+    [
+     "Relay service operation",
+     "external:backend"
+    ]
+   ],
+   "provides": [
+    "C-NETLINK"
+   ],
+   "consumes": [
+    "C-PAL",
+    "C-TASK",
+    "C-SIGN"
+   ],
+   "expertise": [
+    "UDP protocols",
+    "congestion control",
+    "DTLS/QUIC"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "online",
+   "untrusted_inputs": [
+    "packets"
+   ]
+  },
+  {
+   "id": "replication",
+   "name": "Replication & State Sync",
+   "tier": "expert",
+   "parent": "network-architect",
+   "profiles": [
+    "online"
+   ],
+   "purpose": "Entity and property replication, delta compression and quantization, interest management, prioritization, RPCs, snapshot interpolation, replay recording, network ID mapping.",
+   "non_responsibilities": [
+    [
+     "Prediction",
+     "prediction-rollback"
+    ],
+    [
+     "Transport",
+     "network-transport"
+    ]
+   ],
+   "provides": [
+    "C-REP"
+   ],
+   "consumes": [
+    "C-NET",
+    "C-NETLINK",
+    "C-ECS?",
+    "C-SER",
+    "C-ID",
+    "C-SPATIAL",
+    "C-WORLD?",
+    "C-SIGNIF?",
+    "C-REPLAY?",
+    "C-FLOW",
+    "C-SHARD?",
+    "C-FRAME",
+    "C-TASK",
+    "C-HOSTAUTH?",
+    "C-INTEGRITY?"
+   ],
+   "expertise": [
+    "state synchronization",
+    "bit packing",
+    "interest management"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "online",
+   "untrusted_inputs": [
+    "client-rpcs",
+    "replicated-state"
+   ]
+  },
+  {
+   "id": "prediction-rollback",
+   "name": "Prediction, Rollback & Lag Compensation",
+   "tier": "expert",
+   "parent": "network-architect",
+   "profiles": [
+    "online",
+    "online-lockstep",
+    "online-rollback"
+   ],
+   "purpose": "Client prediction and reconciliation, rollback netcode, lag compensation, deterministic lockstep, networked physics, clock synchronization.",
+   "non_responsibilities": [
+    [
+     "Determinism rules",
+     "determinism-replay"
+    ],
+    [
+     "Physics solver",
+     "rigid-body-dynamics"
+    ]
+   ],
+   "provides": [
+    "C-PREDICT"
+   ],
+   "consumes": [
+    "C-NET",
+    "C-DET",
+    "C-SNAPSHOT",
+    "C-INPUT",
+    "C-ECS?",
+    "C-PHYS?",
+    "C-ANIM?",
+    "C-FRAME",
+    "C-NETLINK",
+    "C-REP?",
+    "C-INTEGRITY?",
+    "C-HOSTAUTH?",
+    "C-NETSESSION"
+   ],
+   "expertise": [
+    "rollback",
+    "reconciliation",
+    "lag compensation"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "online",
+   "untrusted_inputs": [
+    "input-commands",
+    "peer-inputs"
+   ]
+  },
+  {
+   "id": "dedicated-server",
+   "name": "Dedicated Servers",
+   "tier": "expert",
+   "parent": "network-architect",
+   "profiles": [
+    "online"
+   ],
+   "purpose": "Headless server builds and stripping, host lifecycle (C-SERVER) for rolling deploys, tick cost and multi-instance density, overload degradation, per-connection budgets, the authenticated admin surface, fleet orchestration boundary and server observability.",
+   "non_responsibilities": [
+    [
+     "Fleet operation (outside engine scope)",
+     "external:backend"
+    ],
+    [
+     "Server logging substrate",
+     "observability-telemetry"
+    ],
+    [
+     "Sessions & hosting modes",
+     "net-session"
+    ],
+    [
+     "Zoning, persistence & transactions",
+     "server-scaleout-persistence"
+    ]
+   ],
+   "provides": [
+    "C-SERVER"
+   ],
+   "consumes": [
+    "C-NET",
+    "C-NETLINK",
+    "C-FRAME",
+    "C-SVC?",
+    "C-WORLD?",
+    "C-NETSESSION",
+    "C-SHARD?",
+    "C-INTEGRITY",
+    "C-HOSTAUTH",
+    "C-LIVE?"
+   ],
+   "expertise": [
+    "headless builds",
+    "Linux containers",
+    "server performance"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "online",
+   "untrusted_inputs": [
+    "admin-commands"
+   ]
+  },
+  {
+   "id": "gameplay-architect",
+   "name": "Gameplay Framework Architect",
+   "tier": "lead",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Gameplay framework: rules and session state, players and data-oriented control binding (control model per game by ADR B25), extension points and game-module structure, game flow and transitions, local players.",
+   "non_responsibilities": [
+    [
+     "Abilities/tags/volumes toolkit",
+     "gameplay-systems-toolkit"
+    ],
+    [
+     "Scripting VM",
+     "scripting-runtime"
+    ],
+    [
+     "Game-specific code",
+     "external:game-team"
+    ]
+   ],
+   "provides": [
+    "C-GAME"
+   ],
+   "consumes": [
+    "C-ID",
+    "C-FRAME",
+    "C-TASK",
+    "C-ECS?",
+    "C-INPUT?",
+    "C-PHYS?",
+    "C-ANIM?",
+    "C-AUDIO?",
+    "C-NET?",
+    "C-REP?",
+    "C-WORLD?",
+    "C-SAVE?",
+    "C-UI?",
+    "C-VIEW?",
+    "C-A11Y",
+    "C-AIAGENT?",
+    "C-NETSESSION?",
+    "C-SRVDATA?",
+    "C-A11YRT?",
+    "C-SEQ?",
+    "C-CROWD?",
+    "C-AI?",
+    "C-SCRIPT?",
+    "C-DET?",
+    "C-HOSTAUTH?"
+   ],
+   "expertise": [
+    "gameplay frameworks",
+    "game architecture"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "gameplay"
+  },
+  {
+   "id": "gameplay-systems-toolkit",
+   "name": "Gameplay Systems Toolkit",
+   "tier": "expert",
+   "parent": "gameplay-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Reusable gameplay systems: abilities, effects and attributes, gameplay tags, batched deferred spawning (pooling only where measured), gameplay message routing.",
+   "non_responsibilities": [
+    [
+     "Generic events",
+     "entity-object-model"
+    ],
+    [
+     "Cinematic cameras",
+     "cinematics-sequencer"
+    ],
+    [
+     "Gameplay cameras & photo mode",
+     "gameplay-camera"
+    ]
+   ],
+   "provides": [
+    "C-ABILITY"
+   ],
+   "consumes": [
+    "C-GAME",
+    "C-PHYS?",
+    "C-ANIM?",
+    "C-AUDIO?",
+    "C-DEVICE?",
+    "C-PREDICT?",
+    "C-REP?",
+    "C-INPUT?",
+    "C-GAMEDATA",
+    "C-A11Y",
+    "C-EDIT?",
+    "C-INTEGRITY?",
+    "C-A11YRT?",
+    "C-AI?",
+    "C-SCRIPT?",
+    "C-LOC?",
+    "C-DET?",
+    "C-UI?",
+    "C-VIEW?",
+    "C-VFX?",
+    "C-CAMERA?"
+   ],
+   "expertise": [
+    "ability systems",
+    "camera design",
+    "gameplay tags"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "gameplay"
+  },
+  {
+   "id": "scripting-runtime",
+   "name": "Scripting Runtime",
+   "tier": "expert",
+   "parent": "gameplay-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Scripting language selection, VM embedding and bindings, sandboxing, debugging and profiling, hot reload, visual scripting, AOT/JIT constraints, GC policy, VM concurrency model.",
+   "non_responsibilities": [
+    [
+     "Reflection substrate",
+     "reflection-metadata"
+    ],
+    [
+     "Graph editor UI",
+     "graph-editor-framework"
+    ]
+   ],
+   "provides": [
+    "C-SCRIPT"
+   ],
+   "consumes": [
+    "C-REFL",
+    "C-RELOAD?",
+    "C-TASK",
+    "C-LIFETIME",
+    "C-FRAME",
+    "C-ID",
+    "C-ECS?",
+    "C-DET?"
+   ],
+   "expertise": [
+    "VM embedding (Luau, .NET, Wasm)",
+    "DAP",
+    "sandboxing"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-GRAPH",
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "gameplay",
+   "untrusted_inputs": [
+    "scripts"
+   ],
+   "dev_surfaces": [
+    "script debugger (DAP)"
+   ]
+  },
+  {
+   "id": "navigation-pathfinding",
+   "name": "Navigation & Pathfinding",
+   "tier": "expert",
+   "parent": "gameplay-architect",
+   "profiles": [
+    "min2d",
+    "lite3d",
+    "std3d"
+   ],
+   "purpose": "Navmesh generation (tiled, runtime rebuild), grid and hierarchical pathfinding, path following, off-mesh links, 3D/volumetric navigation.",
+   "non_responsibilities": [
+    [
+     "Decision making",
+     "ai-behavior-perception"
+    ],
+    [
+     "Flow-field & mass-agent avoidance",
+     "crowd-simulation"
+    ]
+   ],
+   "provides": [
+    "C-NAV"
+   ],
+   "consumes": [
+    "C-SPATIAL",
+    "C-PHYS?",
+    "C-WORLD?",
+    "C-TASK",
+    "C-ENV?",
+    "C-FRAME",
+    "C-DET?",
+    "C-RELOAD?"
+   ],
+   "expertise": [
+    "Recast-class navmesh",
+    "A*/HPA*",
+    "dynamic navigation"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-COOK",
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-EDVIEW"
+   ],
+   "implements": [],
+   "workstream": "gameplay"
+  },
+  {
+   "id": "crowd-simulation",
+   "name": "Crowd Simulation",
+   "tier": "expert",
+   "parent": "gameplay-architect",
+   "profiles": [
+    "openworld",
+    "massim"
+   ],
+   "purpose": "Flow fields, mass-agent simulation and LOD, traffic; individual-agent local avoidance consumed from C-NAV.",
+   "non_responsibilities": [
+    [
+     "Navmesh",
+     "navigation-pathfinding"
+    ],
+    [
+     "Individual AI decisions",
+     "ai-behavior-perception"
+    ]
+   ],
+   "provides": [
+    "C-CROWD"
+   ],
+   "consumes": [
+    "C-NAV",
+    "C-ECS",
+    "C-SPATIAL",
+    "C-DET",
+    "C-SIGNIF",
+    "C-TASK",
+    "C-PHYS?",
+    "C-SNAPSHOT?",
+    "C-INSTANCES?",
+    "C-ANIM?",
+    "C-AIAGENT?",
+    "C-REP?",
+    "C-VEHICLE?",
+    "C-AI?"
+   ],
+   "expertise": [
+    "mass-scale avoidance variants",
+    "flow fields",
+    "massive agent simulation"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-EDVIEW"
+   ],
+   "implements": [],
+   "workstream": "gameplay"
+  },
+  {
+   "id": "ai-behavior-perception",
+   "name": "AI Behavior & Perception",
+   "tier": "expert",
+   "parent": "gameplay-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Decision making (behavior trees, utility, HTN/GOAP, state trees), perception, environment queries, smart objects, AI scheduling and LOD; evaluates learned and LLM-driven agents.",
+   "non_responsibilities": [
+    [
+     "Navigation",
+     "navigation-pathfinding"
+    ],
+    [
+     "ML runtime",
+     "ml-inference-runtime"
+    ]
+   ],
+   "provides": [
+    "C-AIAGENT",
+    "C-AI"
+   ],
+   "consumes": [
+    "C-GAME",
+    "C-NAV?",
+    "C-SPATIAL",
+    "C-PHYS?",
+    "C-ML?",
+    "C-LIVE?",
+    "C-DIALOGUE?",
+    "C-SIGNIF?",
+    "C-SAVE?",
+    "C-FRAME",
+    "C-FLOW",
+    "C-VEHICLE?",
+    "C-ABILITY?",
+    "C-MOVE?",
+    "C-SCRIPT?",
+    "C-DET?",
+    "C-REP?"
+   ],
+   "expertise": [
+    "game AI",
+    "utility theory",
+    "HTN planning",
+    "ML policy & LLM integration (latency, cost, moderation, fallback)"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-GRAPH",
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "gameplay",
+   "untrusted_inputs": [
+    "generated-content",
+    "player-model-prompts"
+   ]
+  },
+  {
+   "id": "persistence-save",
+   "name": "Persistence & Save Games",
+   "tier": "expert",
+   "parent": "gameplay-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Save-game model and serialization, save versioning and migration, atomic writes, platform save APIs and quotas, cloud-save sync, persistent world-state deltas, checkpoints.",
+   "non_responsibilities": [
+    [
+     "Schema evolution mechanism",
+     "serialization-schema"
+    ],
+    [
+     "Cloud service API",
+     "platform-services"
+    ]
+   ],
+   "provides": [
+    "C-SAVE"
+   ],
+   "consumes": [
+    "C-SER",
+    "C-ID",
+    "C-SVC?",
+    "C-WORLD?",
+    "C-CFG",
+    "C-SRVDATA?",
+    "C-SIGN",
+    "C-LOC?"
+   ],
+   "expertise": [
+    "save systems",
+    "crash-safe writes",
+    "data migration"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "gameplay",
+   "untrusted_inputs": [
+    "cloud-saves",
+    "saves"
+   ],
+   "authoring": "No designer-authored content; save inspection via visual-debugging-tools."
+  },
+  {
+   "id": "ui-architect",
+   "name": "UI Architect",
+   "tier": "lead",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Game UI architecture (retained, change-notified view models with resolved bindings), layout, styling, focus and navigation, animation, in-world UI, designer tool logic, UI performance.",
+   "non_responsibilities": [
+    [
+     "UI draw backend",
+     "render-2d-vector"
+    ],
+    [
+     "Text shaping",
+     "text-fonts"
+    ],
+    [
+     "Editor panels",
+     "editor-ui-framework"
+    ],
+    [
+     "Developer/debug immediate-mode UI",
+     "visual-debugging-tools"
+    ]
+   ],
+   "provides": [
+    "C-UI"
+   ],
+   "consumes": [
+    "C-REFL",
+    "C-INPUT",
+    "C-DRAW2D",
+    "C-TEXT",
+    "C-LOC",
+    "C-A11YRT",
+    "C-AUDIO?",
+    "C-VIDEO?",
+    "C-PAL",
+    "C-A11Y",
+    "C-FRAME",
+    "C-COLOR",
+    "C-TRANSLUCENT?",
+    "C-SCRIPT?",
+    "C-VIEW",
+    "C-RELOAD?",
+    "C-VFX?"
+   ],
+   "expertise": [
+    "UI frameworks",
+    "layout algorithms",
+    "MVVM"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "ui",
+   "untrusted_inputs": [
+    "web-content"
+   ]
+  },
+  {
+   "id": "text-fonts",
+   "name": "Text & Fonts",
+   "tier": "expert",
+   "parent": "ui-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Font loading and fallback, glyph rasterization, shaping, bidi and line breaking, rich text and emoji, text input and IME.",
+   "non_responsibilities": [
+    [
+     "String content",
+     "localization-i18n"
+    ],
+    [
+     "2D draw submission",
+     "render-2d-vector"
+    ]
+   ],
+   "provides": [
+    "C-TEXT"
+   ],
+   "consumes": [
+    "C-TYPES",
+    "C-ASSET",
+    "C-A11Y",
+    "C-PAL",
+    "C-RELOAD?"
+   ],
+   "expertise": [
+    "HarfBuzz",
+    "Unicode (UAX #9, #14, #29)",
+    "SDF/MSDF"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "ui",
+   "untrusted_inputs": [
+    "chat-text",
+    "fonts"
+   ]
+  },
+  {
+   "id": "localization-i18n",
+   "name": "Localization & Internationalization",
+   "tier": "expert",
+   "parent": "ui-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "String tables, ICU-class message formatting, CLDR locale formatting, localization pipeline, pseudo-localization, localized asset variants, culturalization.",
+   "non_responsibilities": [
+    [
+     "Glyph rendering",
+     "text-fonts"
+    ],
+    [
+     "VO playback",
+     "audio-content-runtime"
+    ]
+   ],
+   "provides": [
+    "C-LOC"
+   ],
+   "consumes": [
+    "C-ASSET",
+    "C-TEXT?",
+    "C-VFS?",
+    "C-REFL",
+    "C-RELOAD?"
+   ],
+   "expertise": [
+    "ICU",
+    "CLDR",
+    "localization workflows"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-COOK",
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "implements": [],
+   "workstream": "ui"
+  },
+  {
+   "id": "editor-architect",
+   "name": "Editor Architect",
+   "tier": "lead",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Editor architecture: process model (in- vs out-of-process runtime), editor/runtime data separation, transactions and undo/redo, selection, extension API and tool scripting, play-in-editor isolation, remote live editing, headless editor, large-project performance.",
+   "non_responsibilities": [
+    [
+     "Panels and inspectors",
+     "editor-ui-framework"
+    ],
+    [
+     "World viewport tools",
+     "world-editor-viewport"
+    ],
+    [
+     "Source control",
+     "collaboration-version-control"
+    ]
+   ],
+   "provides": [
+    "C-EDCMD"
+   ],
+   "consumes": [
+    "C-REFL",
+    "C-SER",
+    "C-ASSET",
+    "C-WORLD",
+    "C-PLUGIN",
+    "C-UI?",
+    "C-IPC",
+    "C-NET?",
+    "C-REP?",
+    "C-AUTOMATION",
+    "C-ML?",
+    "C-CMD",
+    "C-NETSESSION?",
+    "C-NETLINK?",
+    "C-PREDICT?",
+    "C-SERVER?"
+   ],
+   "expertise": [
+    "editor architecture",
+    "command pattern",
+    "tool UX"
+   ],
+   "kind": "tool",
+   "targets": [
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-VCS"
+   ],
+   "implements": [],
+   "workstream": "tools",
+   "untrusted_inputs": [
+    "automation-commands",
+    "ipc-messages",
+    "project-tool-code"
+   ]
+  },
+  {
+   "id": "editor-ui-framework",
+   "name": "Editor UI Framework",
+   "tier": "expert",
+   "parent": "editor-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Tool UI toolkit (docking, panels), reflection-driven inspectors, asset browser, hosting of C-DEVUI panels in the editor, editor UX standards.",
+   "non_responsibilities": [
+    [
+     "Game UI",
+     "ui-architect"
+    ],
+    [
+     "Graph editors",
+     "graph-editor-framework"
+    ],
+    [
+     "Developer/debug immediate-mode UI",
+     "visual-debugging-tools"
+    ]
+   ],
+   "provides": [
+    "C-EDHOST"
+   ],
+   "consumes": [
+    "C-EDCMD",
+    "C-REFL",
+    "C-DRAW2D",
+    "C-TEXT",
+    "C-DEVUI?"
+   ],
+   "expertise": [
+    "tool UI",
+    "Dear ImGui-class toolkits",
+    "UX research"
+   ],
+   "kind": "tool",
+   "targets": [
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-VCS"
+   ],
+   "implements": [],
+   "workstream": "tools",
+   "untrusted_inputs": [
+    "clipboard-dragdrop"
+   ]
+  },
+  {
+   "id": "world-editor-viewport",
+   "name": "World Editor & Viewport",
+   "tier": "expert",
+   "parent": "editor-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Viewport and navigation, gizmos, snapping and placement, partition-aware world editing, spline tools, environment tool-mode hosting, blockout and in-editor modeling (geometry kernels via C-COOK).",
+   "non_responsibilities": [
+    [
+     "Terrain tool logic",
+     "terrain"
+    ],
+    [
+     "World format",
+     "world-data-model"
+    ]
+   ],
+   "provides": [
+    "C-EDVIEW"
+   ],
+   "consumes": [
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-WORLD",
+    "C-RSCENE",
+    "C-SPATIAL",
+    "C-VIEW"
+   ],
+   "expertise": [
+    "3D manipulation UX",
+    "large-world editing",
+    "mesh editing / geometry processing"
+   ],
+   "kind": "tool",
+   "targets": [
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-COOK",
+    "C-COLOR"
+   ],
+   "implements": [],
+   "workstream": "tools"
+  },
+  {
+   "id": "graph-editor-framework",
+   "name": "Graph Editor Framework",
+   "tier": "expert",
+   "parent": "editor-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Shared node-graph editor for material, animation, VFX, audio, PCG and visual-script graphs: framework, compile/validation contract, debugging, diff and merge.",
+   "non_responsibilities": [
+    [
+     "Each domain's graph semantics",
+     [
+      "material-system",
+      "animation-graphs",
+      "vfx-particles",
+      "audio-content-runtime",
+      "procedural-generation",
+      "scripting-runtime",
+      "ai-behavior-perception",
+      "narrative-dialogue"
+     ]
+    ]
+   ],
+   "provides": [
+    "C-GRAPH"
+   ],
+   "consumes": [
+    "C-EDCMD",
+    "C-SER"
+   ],
+   "expertise": [
+    "node editors",
+    "graph compilers",
+    "visual diff"
+   ],
+   "kind": "tool",
+   "targets": [
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-VCS"
+   ],
+   "implements": [],
+   "workstream": "tools"
+  },
+  {
+   "id": "collaboration-version-control",
+   "name": "Collaboration & Version Control",
+   "tier": "expert",
+   "parent": "editor-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Source-control integration, locking and checkout, multi-user concurrent editing, merge tooling for scene and asset data, content review, large-binary storage strategy.",
+   "non_responsibilities": [
+    [
+     "Branching model",
+     "build-release-architect"
+    ],
+    [
+     "File-per-object layout",
+     "world-data-model"
+    ]
+   ],
+   "provides": [
+    "C-VCS"
+   ],
+   "consumes": [
+    "C-EDCMD",
+    "C-SER",
+    "C-ASSET",
+    "C-RELEASE",
+    "C-NETLINK?",
+    "C-IPC",
+    "C-CMD"
+   ],
+   "expertise": [
+    "Perforce",
+    "Git LFS",
+    "CRDT/OT for editing"
+   ],
+   "kind": "tool",
+   "targets": [
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "tools",
+   "untrusted_inputs": [
+    "collab-session"
+   ]
+  },
+  {
+   "id": "visual-debugging-tools",
+   "name": "Visual Debugging Tools",
+   "tier": "expert",
+   "parent": "editor-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Debug draw API, in-game console and cheats, runtime entity inspector and gameplay debugger, visual logger and rewind, debug menus and overlays.",
+   "non_responsibilities": [
+    [
+     "Logging and traces",
+     "observability-telemetry"
+    ],
+    [
+     "Render buffer visualization",
+     "render-architect"
+    ]
+   ],
+   "provides": [
+    "C-DEVUI",
+    "C-AUTOMATION"
+   ],
+   "consumes": [
+    "C-INSTR",
+    "C-ECS?",
+    "C-DRAW2D?",
+    "C-RSCENE?",
+    "C-REPLAY?",
+    "C-IPC",
+    "C-GOVERN?",
+    "C-REFL"
+   ],
+   "expertise": [
+    "debug tooling",
+    "visual logging"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "tools",
+   "untrusted_inputs": [
+    "automation-commands"
+   ],
+   "dev_surfaces": [
+    "console & cheats",
+    "automation endpoint"
+   ]
+  },
+  {
+   "id": "ai-assisted-authoring",
+   "name": "AI-Assisted Authoring",
+   "tier": "expert",
+   "parent": "editor-architect",
+   "profiles": [
+    "aaa"
+   ],
+   "purpose": "Evaluates and integrates AI-assisted authoring: generative asset tools, editor copilots, ML-assisted retopology/rigging/UV/LOD, provenance and licensing of generated content.",
+   "non_responsibilities": [
+    [
+     "Runtime inference",
+     "ml-inference-runtime"
+    ],
+    [
+     "License compliance sign-off",
+     "certification-compliance"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-EDCMD",
+    "C-ASSET",
+    "C-ML?"
+   ],
+   "expertise": [
+    "generative models",
+    "tool integration",
+    "content provenance"
+   ],
+   "kind": "tool",
+   "targets": [
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "tools",
+   "untrusted_inputs": [
+    "project-content-to-llm"
+   ]
+  },
+  {
+   "id": "build-release-architect",
+   "name": "Build & Release Architect",
+   "tier": "lead",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Branching and merge model, engine release trains and versioning, title release-branch/content-lock/hotfix streams, LTS backports, shipped-build archival and rebuildability; pipeline architecture (execution by ci-cd-automation).",
+   "non_responsibilities": [
+    [
+     "Build system implementation",
+     "build-system-toolchains"
+    ],
+    [
+     "CI pipelines",
+     "ci-cd-automation"
+    ],
+    [
+     "Packaging",
+     "packaging-release-patching"
+    ],
+    [
+     "Pipeline orchestration",
+     "ci-cd-automation"
+    ]
+   ],
+   "provides": [
+    "C-RELEASE"
+   ],
+   "consumes": [
+    "C-BUILD",
+    "C-PKG",
+    "C-PROD"
+   ],
+   "expertise": [
+    "release engineering",
+    "branching strategies"
+   ],
+   "kind": "process",
+   "targets": [],
+   "tool_consumes": [
+    "C-COOK"
+   ],
+   "implements": [],
+   "workstream": "release"
+  },
+  {
+   "id": "build-system-toolchains",
+   "name": "Build System & Toolchains",
+   "tier": "expert",
+   "parent": "build-release-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Build graph, compiler and toolchain matrix, C++ modules/unity/PCH, compile caching and distribution, codegen integration, third-party dependencies, static analysis, build configurations.",
+   "non_responsibilities": [
+    [
+     "CI orchestration",
+     "ci-cd-automation"
+    ],
+    [
+     "Supply-chain policy",
+     "security-engineering"
+    ]
+   ],
+   "provides": [
+    "C-BUILD"
+   ],
+   "consumes": [],
+   "expertise": [
+    "CMake/FASTBuild/Bazel-class systems",
+    "Clang/MSVC",
+    "remote execution"
+   ],
+   "kind": "tool",
+   "targets": [
+    "tools"
+   ],
+   "tool_consumes": [],
+   "implements": [],
+   "workstream": "release",
+   "untrusted_inputs": [
+    "third-party-source"
+   ]
+  },
+  {
+   "id": "ci-cd-automation",
+   "name": "CI/CD & Automation",
+   "tier": "expert",
+   "parent": "build-release-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "CI pipelines, build farm and artifact storage, pre-submit and merge gating, symbol servers, device-farm orchestration, developer CLI and automation.",
+   "non_responsibilities": [
+    [
+     "What tests exist",
+     "test-architect"
+    ],
+    [
+     "Perf thresholds",
+     "performance-architect"
+    ]
+   ],
+   "provides": [],
+   "consumes": [
+    "C-BUILD",
+    "C-COOK",
+    "C-AUTOMATION"
+   ],
+   "expertise": [
+    "CI systems",
+    "build farms",
+    "artifact management"
+   ],
+   "kind": "tool",
+   "targets": [
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-VCS"
+   ],
+   "implements": [],
+   "workstream": "release",
+   "untrusted_inputs": [
+    "triage-artifacts"
+   ]
+  },
+  {
+   "id": "packaging-release-patching",
+   "name": "Packaging, Patching & Release",
+   "tier": "expert",
+   "parent": "build-release-architect",
+   "profiles": [
+    "all"
+   ],
+   "purpose": "Platform packaging and signing, store-submission artifacts, delta/chunk patching, DLC, install-on-demand, client/server/content version compatibility, CDN boundary, release rollback.",
+   "non_responsibilities": [
+    [
+     "Package runtime format",
+     "package-formats-vfs"
+    ],
+    [
+     "Certification tracking",
+     "certification-compliance"
+    ]
+   ],
+   "provides": [
+    "C-PKG"
+   ],
+   "consumes": [
+    "C-VFS",
+    "C-BUILD",
+    "C-SVC",
+    "C-COOK",
+    "C-RELEASE"
+   ],
+   "expertise": [
+    "platform packaging",
+    "binary diffing",
+    "content delivery"
+   ],
+   "kind": "tool",
+   "targets": [
+    "tools"
+   ],
+   "tool_consumes": [
+    "C-TARGETPLAT"
+   ],
+   "implements": [],
+   "workstream": "release",
+   "untrusted_inputs": [
+    "patch-manifests"
+   ]
+  },
+  {
+   "id": "runtime-scalability",
+   "name": "Runtime Scalability & Governor",
+   "tier": "expert",
+   "parent": "core-runtime-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "workstream": "foundation",
+   "purpose": "Runtime scalability machinery: device-profile application, the registry of scalability knobs and actuators, first-run hardware auto-detect, and the closed-loop runtime governor that consumes frame-time, thermal/power and memory-pressure signals and drives registered actuators (dynamic resolution, significance, VFX, animation rate, worker count) with priorities and hysteresis.",
+   "non_responsibilities": [
+    [
+     "Budget numbers and tier definitions",
+     "performance-architect"
+    ],
+    [
+     "Hardware→tier device database",
+     "platform-architect"
+    ],
+    [
+     "Each actuator's own implementation",
+     "owning-skill"
+    ]
+   ],
+   "consumes": [
+    "C-CFG",
+    "C-PAL",
+    "C-INSTR",
+    "C-TASK",
+    "C-PRESENT@C-GOVERN",
+    "C-RES@C-GOVERN",
+    "C-GPUMEM?@C-GOVERN",
+    "C-FRAME@C-GOVERN"
+   ],
+   "expertise": [
+    "control systems",
+    "adaptive performance APIs (ADPF, Apple thermal state)",
+    "scalability design"
+   ],
+   "tool_consumes": [],
+   "provides": [
+    "C-SCALE",
+    "C-GOVERN"
+   ],
+   "implements": []
+  },
+  {
+   "id": "voxel-worlds",
+   "name": "Voxel & Buildable Worlds",
+   "tier": "expert",
+   "parent": "world-architect",
+   "profiles": [
+    "sandbox"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "workstream": "world",
+   "purpose": "Chunked voxel/block worlds end to end: sparse storage and compression, meshing and remeshing on edit, runtime edit replication and persistence hand-off, block light propagation.",
+   "non_responsibilities": [
+    [
+     "Heightfield terrain",
+     "terrain"
+    ],
+    [
+     "Replication mechanics",
+     "replication"
+    ],
+    [
+     "Structural integrity & collapse",
+     "destruction-fracture"
+    ]
+   ],
+   "consumes": [
+    "C-WORLD",
+    "C-ENV",
+    "C-SPATIAL",
+    "C-RES",
+    "C-RSCENE?",
+    "C-REP?",
+    "C-SAVE?",
+    "C-PCG",
+    "C-PHYS",
+    "C-SRVDATA?"
+   ],
+   "implements": [
+    "C-ENV"
+   ],
+   "expertise": [
+    "sparse voxel structures",
+    "surface extraction (greedy, surface nets, dual contouring)",
+    "edit replication"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-EDVIEW"
+   ],
+   "provides": []
+  },
+  {
+   "id": "gpu-platform-architect",
+   "name": "GPU Platform Architect",
+   "tier": "lead",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "workstream": "rendering",
+   "purpose": "GPU platform architecture shared by every renderer tier: layering of RHI, GPU memory, render graph, shader system, ray-query and inference infrastructure; the GPU feature-tier model (binding, pipeline-state, queue, mesh, RT, tensor tiers) and API baselines per hardware tier; task-based parallel command recording.",
+   "non_responsibilities": [
+    [
+     "Rendering pipeline and features",
+     "render-architect"
+    ],
+    [
+     "Individual API backends",
+     [
+      "rhi-d3d12",
+      "rhi-vulkan",
+      "rhi-metal",
+      "rhi-webgpu"
+     ]
+    ],
+    [
+     "Frames in flight / thread existence",
+     "frame-orchestration"
+    ],
+    [
+     "Thread inventory (which threads exist)",
+     "job-system-task-graph"
+    ]
+   ],
+   "consumes": [
+    "C-RHI",
+    "C-PAL"
+   ],
+   "expertise": [
+    "explicit graphics APIs",
+    "GPU architecture across vendors",
+    "API evolution tracking"
+   ],
+   "tool_consumes": [],
+   "provides": [
+    "C-GPUTIER"
+   ],
+   "implements": []
+  },
+  {
+   "id": "rhi-d3d12",
+   "name": "RHI D3D12 backend",
+   "tier": "expert",
+   "parent": "gpu-platform-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "platforms": [
+    "pc"
+   ],
+   "workstream": "rendering",
+   "purpose": "Implements C-RHI on D3D12 (Agility SDK features: enhanced barriers, work graphs, SM 6.x, GPU upload heaps); owns its validation-layer runs and vendor/driver quirks.",
+   "non_responsibilities": [
+    [
+     "RHI abstraction & capability model",
+     "rhi-core"
+    ],
+    [
+     "Other API backends",
+     "rhi-core"
+    ]
+   ],
+   "consumes": [
+    "C-PAL",
+    "C-SYNC",
+    "C-GPUTIER"
+   ],
+   "implements": [
+    "C-RHI"
+   ],
+   "expertise": [
+    "D3D12",
+    "Agility SDK",
+    "DXGI"
+   ],
+   "tool_consumes": [],
+   "provides": [],
+   "variants": [
+    "pc:win-x64",
+    "pc:win-arm64"
+   ]
+  },
+  {
+   "id": "rhi-vulkan",
+   "name": "RHI Vulkan backend",
+   "tier": "expert",
+   "parent": "gpu-platform-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "platforms": [
+    "pc",
+    "mobile",
+    "xr-standalone"
+   ],
+   "workstream": "rendering",
+   "purpose": "Implements C-RHI on Vulkan (profiles incl. Android Baseline, descriptor buffers/heaps, synchronization2, dynamic rendering); owns its validation-layer runs and vendor/driver quirks.",
+   "non_responsibilities": [
+    [
+     "RHI abstraction & capability model",
+     "rhi-core"
+    ],
+    [
+     "Other API backends",
+     "rhi-core"
+    ]
+   ],
+   "consumes": [
+    "C-PAL",
+    "C-SYNC",
+    "C-GPUTIER"
+   ],
+   "implements": [
+    "C-RHI"
+   ],
+   "expertise": [
+    "Vulkan",
+    "SPIR-V",
+    "Android GPU drivers"
+   ],
+   "tool_consumes": [],
+   "provides": [],
+   "variants": [
+    "pc:win-x64",
+    "pc:win-arm64",
+    "pc:linux-steamos",
+    "pc:macos",
+    "mobile:android",
+    "xr-standalone:android-xr"
+   ]
+  },
+  {
+   "id": "rhi-metal",
+   "name": "RHI Metal backend",
+   "tier": "expert",
+   "parent": "gpu-platform-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "platforms": [
+    "pc",
+    "mobile",
+    "xr-standalone"
+   ],
+   "workstream": "rendering",
+   "purpose": "Implements C-RHI on Metal 3/4 (argument buffers, residency sets, MTL4 command model); owns its validation-layer runs and vendor/driver quirks.",
+   "non_responsibilities": [
+    [
+     "RHI abstraction & capability model",
+     "rhi-core"
+    ],
+    [
+     "Other API backends",
+     "rhi-core"
+    ]
+   ],
+   "consumes": [
+    "C-PAL",
+    "C-SYNC",
+    "C-GPUTIER"
+   ],
+   "implements": [
+    "C-RHI"
+   ],
+   "expertise": [
+    "Metal",
+    "Apple GPU families"
+   ],
+   "tool_consumes": [],
+   "provides": [],
+   "variants": [
+    "pc:macos",
+    "mobile:ios",
+    "xr-standalone:visionos"
+   ]
+  },
+  {
+   "id": "rhi-webgpu",
+   "name": "RHI WebGPU backend",
+   "tier": "expert",
+   "parent": "gpu-platform-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "platforms": [
+    "web"
+   ],
+   "workstream": "rendering",
+   "purpose": "Implements C-RHI on WebGPU (bind groups, implicit sync, limits tiers); owns its validation-layer runs and vendor/driver quirks.",
+   "non_responsibilities": [
+    [
+     "RHI abstraction & capability model",
+     "rhi-core"
+    ],
+    [
+     "Other API backends",
+     "rhi-core"
+    ]
+   ],
+   "consumes": [
+    "C-PAL",
+    "C-SYNC",
+    "C-GPUTIER"
+   ],
+   "implements": [
+    "C-RHI"
+   ],
+   "expertise": [
+    "WebGPU",
+    "WGSL",
+    "browser GPU processes"
+   ],
+   "tool_consumes": [],
+   "provides": []
+  },
+  {
+   "id": "media-playback",
+   "name": "Media & Video Playback",
+   "tier": "expert",
+   "parent": "render-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "workstream": "rendering",
+   "purpose": "Pre-rendered video playback end to end: hardware/software decode backends, A/V sync against the audio clock, video surfaces for UI, world and cinematics, HDR video, package streaming.",
+   "non_responsibilities": [
+    [
+     "Movie rendering (producing video)",
+     "cinematics-sequencer"
+    ],
+    [
+     "Audio mixing",
+     "audio-dsp-mixing"
+    ]
+   ],
+   "consumes": [
+    "C-IO",
+    "C-RES",
+    "C-GPUMEM",
+    "C-AUDIO",
+    "C-FRAME",
+    "C-RG",
+    "C-COLOR?"
+   ],
+   "expertise": [
+    "video codecs (AV1/HEVC/H.264)",
+    "hardware decoders",
+    "A/V sync"
+   ],
+   "tool_consumes": [
+    "C-COOK"
+   ],
+   "provides": [
+    "C-VIDEO"
+   ],
+   "implements": [],
+   "untrusted_inputs": [
+    "media-decoders"
+   ]
+  },
+  {
+   "id": "vehicle-physics",
+   "name": "Vehicle Physics",
+   "tier": "expert",
+   "parent": "physics-architect",
+   "profiles": [
+    "vehicles"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "workstream": "simulation",
+   "purpose": "Vehicle dynamics: wheeled vehicles (tires, suspension, drivetrain), aerodynamic surfaces and flight models, orbital mechanics, watercraft hydrodynamics, vehicle-specific prediction and force-feedback sources.",
+   "non_responsibilities": [
+    [
+     "Character controllers",
+     "character-physics"
+    ],
+    [
+     "Generic buoyancy",
+     "rigid-body-dynamics"
+    ],
+    [
+     "Netcode model",
+     "prediction-rollback"
+    ]
+   ],
+   "consumes": [
+    "C-PHYS",
+    "C-DET",
+    "C-ENV?",
+    "C-DEVICE?",
+    "C-PREDICT?",
+    "C-SIGNIF?"
+   ],
+   "expertise": [
+    "tire models (Pacejka, brush)",
+    "flight dynamics",
+    "orbital mechanics"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "provides": [
+    "C-VEHICLE"
+   ],
+   "implements": []
+  },
+  {
+   "id": "physics-tools",
+   "name": "Physics Tools",
+   "tier": "expert",
+   "parent": "physics-architect",
+   "profiles": [
+    "min2d",
+    "lite3d",
+    "std3d"
+   ],
+   "kind": "tool",
+   "targets": [
+    "tools"
+   ],
+   "workstream": "simulation",
+   "purpose": "Cross-cutting physics tooling: collision authoring, physics-asset/ragdoll and constraint editors, the physics visual debugger/recorder and simulate-in-editor. Domain tuning tools stay with their domain skills (vehicle, controller, 2D shapes, fracture, cloth, fluids).",
+   "non_responsibilities": [
+    [
+     "Collision algorithms",
+     "collision-detection"
+    ],
+    [
+     "Editor host & transactions",
+     "editor-architect"
+    ]
+   ],
+   "consumes": [
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-PHYS",
+    "C-INSTR",
+    "C-REPLAY"
+   ],
+   "expertise": [
+    "physics debugging",
+    "tool UX",
+    "ragdoll setup"
+   ],
+   "tool_consumes": [
+    "C-EDVIEW"
+   ],
+   "provides": [],
+   "implements": []
+  },
+  {
+   "id": "character-movement",
+   "name": "Character Movement",
+   "tier": "expert",
+   "parent": "gameplay-architect",
+   "profiles": [
+    "min2d",
+    "lite3d",
+    "std3d"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "workstream": "gameplay",
+   "purpose": "Character movement as one system at the junction of input, physics, animation and netcode: movement modes, step/slope rules, root-motion consumption and authority, networked predicted/reconciled movement with a resimulatable move API, mount/vehicle transitions, 2D platformer movement.",
+   "non_responsibilities": [
+    [
+     "Collide-and-slide controller primitive",
+     "character-physics"
+    ],
+    [
+     "Generic prediction machinery",
+     "prediction-rollback"
+    ],
+    [
+     "Animation selection",
+     [
+      "animation-graphs",
+      "motion-synthesis"
+     ]
+    ]
+   ],
+   "consumes": [
+    "C-GAME",
+    "C-PHYS",
+    "C-INPUT",
+    "C-ANIM?",
+    "C-PREDICT?",
+    "C-DET",
+    "C-VEHICLE?",
+    "C-INTEGRITY?",
+    "C-CAMERA?",
+    "C-GAMEDATA"
+   ],
+   "expertise": [
+    "character movement",
+    "movement netcode",
+    "game feel"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-EDVIEW"
+   ],
+   "provides": [
+    "C-MOVE"
+   ],
+   "implements": []
+  },
+  {
+   "id": "gameplay-data",
+   "name": "Gameplay Data & Tuning",
+   "tier": "expert",
+   "parent": "gameplay-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "workstream": "gameplay",
+   "purpose": "Designer-owned data: typed data tables and row references, curve assets, tuning assets with inheritance and per-platform/difficulty variants, spreadsheet round-trip, balance simulation, and live data hotfixes through remote overrides.",
+   "non_responsibilities": [
+    [
+     "Serialization mechanics",
+     "serialization-schema"
+    ],
+    [
+     "Remote-config service",
+     "online-services-liveops"
+    ],
+    [
+     "Tabular editing widgets",
+     "editor-ui-framework"
+    ]
+   ],
+   "consumes": [
+    "C-REFL",
+    "C-ASSET",
+    "C-SER",
+    "C-LIVE?",
+    "C-CFG",
+    "C-LOC?",
+    "C-DET?",
+    "C-RELOAD?"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-VCS"
+   ],
+   "expertise": [
+    "data-driven design",
+    "balancing",
+    "spreadsheet pipelines"
+   ],
+   "provides": [
+    "C-GAMEDATA"
+   ],
+   "implements": []
+  },
+  {
+   "id": "narrative-dialogue",
+   "name": "Narrative & Dialogue",
+   "tier": "expert",
+   "parent": "gameplay-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "workstream": "gameplay",
+   "purpose": "The dialogue line model and narrative runtime shared by VO, subtitles, lip sync, localization, cinematics and AI: line database with stable IDs, branching dialogue runtime and narrative-middleware interchange, narrative fact store with save/replication participation, barks and response rules, recording scripts and placeholder VO.",
+   "non_responsibilities": [
+    [
+     "Quest content",
+     "external:game-team"
+    ],
+    [
+     "VO playback",
+     "audio-content-runtime"
+    ],
+    [
+     "String formatting",
+     "localization-i18n"
+    ]
+   ],
+   "consumes": [
+    "C-LOC",
+    "C-SER",
+    "C-ID",
+    "C-SAVE?",
+    "C-REP?",
+    "C-A11Y",
+    "C-A11YRT?",
+    "C-GAMEDATA?",
+    "C-SCRIPT?"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-GRAPH"
+   ],
+   "expertise": [
+    "dialogue systems",
+    "response rules",
+    "Ink/Yarn/articy interchange",
+    "VO pipelines"
+   ],
+   "provides": [
+    "C-DIALOGUE"
+   ],
+   "implements": []
+  },
+  {
+   "id": "reference-games",
+   "name": "Reference Games",
+   "tier": "expert",
+   "parent": "test-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "workstream": "quality",
+   "purpose": "The reference-game ladder (one representative game per configuration) used as milestone and release gate: reference-game code written only against the public API, production-scale content acquired or generated with a rights manifest, upkeep across engine releases, and the internal playtest and dogfood loop.",
+   "non_responsibilities": [
+    [
+     "Teaching samples",
+     "developer-experience-docs"
+    ],
+    [
+     "Benchmark harness",
+     "perf-benchmarking"
+    ]
+   ],
+   "consumes": [
+    "C-GAME",
+    "C-INPUT?",
+    "C-UI?",
+    "C-SCRIPT?",
+    "C-GAMEDATA?",
+    "C-API"
+   ],
+   "expertise": [
+    "game production",
+    "content production",
+    "playtesting"
+   ],
+   "tool_consumes": [],
+   "provides": [],
+   "implements": []
+  },
+  {
+   "id": "platform-web",
+   "name": "Web Platform",
+   "tier": "expert",
+   "parent": "platform-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "platforms": [
+    "web"
+   ],
+   "workstream": "platform",
+   "purpose": "Web target (WASM + WebGPU): threads and cross-origin isolation, memory limits, OPFS/IndexedDB storage, HTTP streaming delivery, user-gesture rules for audio/pointer/fullscreen, browser transport constraints.",
+   "non_responsibilities": [
+    [
+     "WebGPU backend",
+     "rhi-webgpu"
+    ],
+    [
+     "Browser transports",
+     "network-transport"
+    ]
+   ],
+   "consumes": [
+    "C-BASE"
+   ],
+   "expertise": [
+    "WebAssembly",
+    "browser platform APIs",
+    "web delivery"
+   ],
+   "tool_consumes": [],
+   "provides": [],
+   "implements": [
+    "C-PAL",
+    "C-TARGETPLAT"
+   ],
+   "untrusted_inputs": [
+    "browser-bridge"
+   ],
+   "authoring": "Platform integration; web preview via the standard editor play mode."
+  },
+  {
+   "id": "online-services-liveops",
+   "name": "Online Services & Live Ops",
+   "tier": "expert",
+   "parent": "platform-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "workstream": "platform",
+   "purpose": "Integration boundary to third-party and own online backends and live operations: matchmaking/lobby/session boundary, remote config and feature flags, live events and experiments, service-hosted voice/text chat sessions, moderation (UGC, chat, generated content), wallet and ads boundaries, trusted time, remote generative-AI/inference boundary, service emulators and outage injection for tests.",
+   "non_responsibilities": [
+    [
+     "First-party platform services",
+     "platform-services"
+    ],
+    [
+     "Backend implementation",
+     "external:backend"
+    ],
+    [
+     "Game-server hosting",
+     "dedicated-server"
+    ]
+   ],
+   "consumes": [
+    "C-PAL",
+    "C-TASK",
+    "C-CFG",
+    "C-SVC?",
+    "C-SIGN",
+    "C-A11YRT?"
+   ],
+   "expertise": [
+    "online service APIs",
+    "live operations",
+    "experimentation"
+   ],
+   "tool_consumes": [],
+   "provides": [
+    "C-LIVE"
+   ],
+   "implements": [
+    "C-NETLINK"
+   ],
+   "untrusted_inputs": [
+    "chat-text",
+    "generated-content",
+    "player-model-prompts",
+    "remote-config",
+    "service-responses"
+   ],
+   "authoring": "Live-ops configuration is data through C-GAMEDATA tooling."
+  },
+  {
+   "id": "memory-performance",
+   "name": "Memory Performance",
+   "tier": "expert",
+   "parent": "performance-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "process",
+   "targets": [],
+   "workstream": "performance",
+   "purpose": "Memory as its own performance discipline: whole-process CPU+GPU+UMA footprint analysis per tier, snapshot capture and diffing, content-level attribution per asset/cell/feature, transition peak analysis, fragmentation over time; reviewer for the memory-usage obligation.",
+   "non_responsibilities": [
+    [
+     "Allocator mechanisms",
+     "memory-allocators"
+    ],
+    [
+     "Budget numbers",
+     "performance-architect"
+    ]
+   ],
+   "expertise": [
+    "memory profiling (PIX, Razor-class, Memory Insights)",
+    "fragmentation analysis",
+    "console memory"
+   ],
+   "consumes": [
+    "C-MEM",
+    "C-RES",
+    "C-GPUMEM?",
+    "C-INSTR",
+    "C-BUDGET"
+   ],
+   "tool_consumes": [],
+   "provides": [],
+   "implements": []
+  },
+  {
+   "id": "simulation-validation",
+   "name": "Simulation & Systems Validation",
+   "tier": "expert",
+   "parent": "test-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "process",
+   "targets": [],
+   "workstream": "quality",
+   "purpose": "Runs the objective validation that domain owners define for simulation-class systems: physics stability and reference suites, simulation golden traces, animation error suites, audio offline-render suites, and deterministic network simulation for prediction/replication correctness, mirroring what render-validation does for rendering.",
+   "non_responsibilities": [
+    [
+     "Domain scenario definitions",
+     [
+      "physics-architect",
+      "animation-architect",
+      "audio-architect",
+      "network-architect"
+     ]
+    ],
+    [
+     "Determinism matrix definition",
+     "determinism-replay"
+    ]
+   ],
+   "expertise": [
+    "simulation testing",
+    "deterministic simulation testing",
+    "numerical error metrics"
+   ],
+   "consumes": [
+    "C-PHYS",
+    "C-ANIM",
+    "C-AUDIO",
+    "C-NET?",
+    "C-REPLAY"
+   ],
+   "tool_consumes": [],
+   "provides": [],
+   "implements": []
+  },
+  {
+   "id": "engine-product-management",
+   "name": "Engine Product Management",
+   "tier": "orchestrator",
+   "parent": "engine-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "process",
+   "targets": [],
+   "workstream": "governance",
+   "purpose": "The engine as a product for game teams: roadmap and prioritization across game-team requirements, bug and feature intake with triage SLAs, release notes and upgrade guides, the customer-project corpus that validates each engine release, and the engine licensing model.",
+   "non_responsibilities": [
+    [
+     "Architecture decisions",
+     "engine-architect"
+    ],
+    [
+     "Work scheduling",
+     "program-orchestration"
+    ],
+    [
+     "Engine release mechanics",
+     "build-release-architect"
+    ]
+   ],
+   "expertise": [
+    "product management",
+    "developer relations",
+    "release management"
+   ],
+   "consumes": [],
+   "tool_consumes": [],
+   "provides": [
+    "C-PROD"
+   ],
+   "implements": [],
+   "untrusted_inputs": [
+    "external-reports",
+    "player-feedback"
+   ]
+  },
+  {
+   "id": "online-performance",
+   "name": "Online & Server Performance",
+   "tier": "expert",
+   "parent": "performance-architect",
+   "profiles": [
+    "online",
+    "online-lockstep",
+    "online-rollback"
+   ],
+   "kind": "process",
+   "targets": [],
+   "workstream": "performance",
+   "purpose": "Independent analysis of online cost: bandwidth per player/entity/property against network budgets, server tick cost and instance density, cost per concurrent user, and load-test analysis reconciled with the capacity model; routes findings via C-PERF.",
+   "non_responsibilities": [
+    [
+     "Network profiler instrument",
+     "replication"
+    ],
+    [
+     "Server implementation",
+     "dedicated-server"
+    ],
+    [
+     "Load-test execution",
+     "functional-automation-soak"
+    ]
+   ],
+   "expertise": [
+    "network bandwidth analysis",
+    "server capacity planning",
+    "load-test statistics"
+   ],
+   "consumes": [
+    "C-INSTR",
+    "C-BUDGET",
+    "C-NET",
+    "C-REP?",
+    "C-PREDICT?"
+   ],
+   "tool_consumes": [],
+   "provides": [],
+   "implements": []
+  },
+  {
+   "id": "systems-simulation",
+   "name": "Systems Simulation",
+   "tier": "expert",
+   "parent": "gameplay-architect",
+   "profiles": [
+    "massim",
+    "sandbox"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "workstream": "gameplay",
+   "purpose": "Simulation substrates of colony, city, factory and sandbox games: grid/field simulation, flow networks, time acceleration with budgeted catch-up, and snapshot/save of very large simulation state; deterministic for lockstep.",
+   "non_responsibilities": [
+    [
+     "Mass agents & traffic",
+     "crowd-simulation"
+    ],
+    [
+     "Cellular fluids",
+     "fluid-simulation"
+    ],
+    [
+     "Game rules",
+     "external:game"
+    ]
+   ],
+   "expertise": [
+    "cellular automata & diffusion",
+    "graph flow solvers",
+    "incremental simulation"
+   ],
+   "consumes": [
+    "C-DET",
+    "C-ECS",
+    "C-TASK",
+    "C-FRAME",
+    "C-SIGNIF?",
+    "C-SNAPSHOT?",
+    "C-SAVE?"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
+   "provides": [],
+   "implements": []
+  },
+  {
+   "id": "platform-server-host",
+   "name": "Server Host Platform",
+   "tier": "expert",
+   "parent": "platform-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "server",
+    "headless-client",
+    "tools"
+   ],
+   "platforms": [
+    "server-host"
+   ],
+   "workstream": "platform",
+   "implements": [
+    "C-PAL",
+    "C-TARGETPLAT"
+   ],
+   "purpose": "Server-host PAL implementation: containerized Linux and ARM64 hosts, cgroup-aware CPU and memory discovery, NUMA on large instances, signal/termination handling, no display or GPU, orchestrator health integration at the OS level.",
+   "non_responsibilities": [
+    [
+     "Server gameplay & lifecycle",
+     "dedicated-server"
+    ],
+    [
+     "Fleet operation",
+     "external:backend"
+    ]
+   ],
+   "expertise": [
+    "Linux containers & cgroups",
+    "server CPU topology",
+    "ARM64 server ISAs"
+   ],
+   "consumes": [
+    "C-BASE"
+   ],
+   "tool_consumes": [],
+   "provides": [],
+   "authoring": "Server-host OS integration; no authored content."
+  },
+  {
+   "id": "rhi-console",
+   "name": "Console RHI Backends",
+   "tier": "expert",
+   "parent": "gpu-platform-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "tools"
+   ],
+   "platforms": [
+    "console"
+   ],
+   "workstream": "rendering",
+   "implements": [
+    "C-RHI"
+   ],
+   "access": "nda:per-platform-holder",
+   "instances": "one agent per platform-holder family",
+   "purpose": "Implements C-RHI on each console graphics API from licensed platform-holder documentation; owns its validation runs, GPU-crash tooling integration and quirks. Instantiated per platform holder so NDA access stays per holder.",
+   "non_responsibilities": [
+    [
+     "RHI abstraction & capability model",
+     "rhi-core"
+    ],
+    [
+     "Console OS integration",
+     "platform-console"
+    ],
+    [
+     "Shared D3D12 code base (Xbox-class backend reuses it)",
+     "rhi-d3d12"
+    ]
+   ],
+   "expertise": [
+    "console GPU APIs (licensed)",
+    "UMA GPU memory",
+    "console GPU debugging tools"
+   ],
+   "consumes": [
+    "C-PAL",
+    "C-SYNC",
+    "C-GPUTIER"
+   ],
+   "tool_consumes": [],
+   "provides": []
+  },
+  {
+   "id": "net-session",
+   "name": "Network Sessions",
+   "tier": "expert",
+   "parent": "network-architect",
+   "profiles": [
+    "online",
+    "online-lockstep",
+    "online-rollback"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "workstream": "online",
+   "purpose": "The network session lifecycle in every hosting mode (dedicated, listen, P2P host, relay): handshake with compatibility and auth, load-gated join, late-join baseline, reconnect within a grace window, server-driven travel, host migration, disconnect reasons; turns matchmaking results into connections.",
+   "non_responsibilities": [
+    [
+     "Transport links",
+     "network-transport"
+    ],
+    [
+     "State replication",
+     "replication"
+    ],
+    [
+     "Headless server builds & density",
+     "dedicated-server"
+    ]
+   ],
+   "expertise": [
+    "connection state machines",
+    "session security",
+    "host migration"
+   ],
+   "consumes": [
+    "C-NETLINK",
+    "C-NET",
+    "C-FRAME",
+    "C-SVC?",
+    "C-LIVE?",
+    "C-WORLD?",
+    "C-REP?"
+   ],
+   "untrusted_inputs": [
+    "auth-tickets",
+    "packets",
+    "server-pushed-content"
+   ],
+   "tool_consumes": [],
+   "provides": [
+    "C-NETSESSION",
+    "C-HOSTAUTH"
+   ],
+   "implements": []
+  },
+  {
+   "id": "server-scaleout-persistence",
+   "name": "Server Scale-out & Persistence",
+   "tier": "expert",
+   "parent": "network-architect",
+   "profiles": [
+    "persistent-world"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "server",
+    "tools"
+   ],
+   "workstream": "online",
+   "purpose": "Multi-server worlds and authoritative persistence: zoning and instancing with player hand-off, cross-server messaging and entity migration, seamless meshing (experimental), write-behind persistence with leases and live schema migration, idempotent economy transactions.",
+   "non_responsibilities": [
+    [
+     "Headless builds, density & host lifecycle",
+     "dedicated-server"
+    ],
+    [
+     "Backend database operation",
+     "external:backend"
+    ],
+    [
+     "Local save format",
+     "persistence-save"
+    ]
+   ],
+   "expertise": [
+    "distributed consistency",
+    "authority transfer",
+    "idempotent transactions"
+   ],
+   "consumes": [
+    "C-NET",
+    "C-REP",
+    "C-WORLD",
+    "C-SER",
+    "C-SERVER",
+    "C-SAVE?"
+   ],
+   "untrusted_inputs": [
+    "store-notifications",
+    "transaction-requests"
+   ],
+   "tool_consumes": [],
+   "provides": [
+    "C-SHARD",
+    "C-SRVDATA"
+   ],
+   "implements": []
+  },
+  {
+   "id": "test-runtime-harness",
+   "name": "Test Runtime Harness",
+   "tier": "expert",
+   "parent": "test-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "workstream": "foundation",
+   "purpose": "Test infrastructure that ships as code on every target: unit/integration test framework, on-device test runner and result reporting, fixtures, and the fault-point registry that owners implement fault injection against.",
+   "non_responsibilities": [
+    [
+     "Test strategy & definition of done",
+     "test-architect"
+    ],
+    [
+     "Fuzz/fault campaign policy",
+     "robustness-fuzzing"
+    ],
+    [
+     "CI pipelines",
+     "ci-cd-automation"
+    ]
+   ],
+   "expertise": [
+    "test frameworks",
+    "on-device test execution",
+    "fault injection seams"
+   ],
+   "consumes": [
+    "C-BASE",
+    "C-PAL",
+    "C-SYNC",
+    "C-MEM"
+   ],
+   "tool_consumes": [],
+   "provides": [
+    "C-TESTHOST"
+   ],
+   "implements": []
+  },
+  {
+   "id": "security-runtime",
+   "name": "Security Runtime",
+   "tier": "expert",
+   "parent": "security-engineering",
+   "profiles": [
+    "all"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "server",
+    "tools"
+   ],
+   "workstream": "foundation",
+   "purpose": "Security-critical runtime code shared by every verifier: vetted crypto primitives and CSPRNG, the signed-artifact envelope, trust-root store, key rotation/revocation, anti-rollback version floors and algorithm agility.",
+   "non_responsibilities": [
+    [
+     "Security policy & threat model",
+     "security-engineering"
+    ],
+    [
+     "Key custody",
+     "security-engineering"
+    ]
+   ],
+   "expertise": [
+    "applied cryptography",
+    "code signing (TUF/Uptane class)",
+    "constant-time code"
+   ],
+   "consumes": [
+    "C-BASE",
+    "C-TYPES",
+    "C-PAL"
+   ],
+   "tool_consumes": [],
+   "provides": [
+    "C-SIGN"
+   ],
+   "implements": []
+  },
+  {
+   "id": "privacy-data-protection",
+   "name": "Privacy & Data Protection",
+   "tier": "expert",
+   "parent": "security-engineering",
+   "profiles": [
+    "all"
+   ],
+   "kind": "process",
+   "targets": [],
+   "workstream": "quality",
+   "purpose": "Privacy as its own discipline: privacy engineering, data inventory and sensitivity classes, retention, data-subject rights, consent policy for telemetry and analytics, privacy review of every skill handling personal data.",
+   "non_responsibilities": [
+    [
+     "Consent mechanism implementation",
+     "observability-telemetry"
+    ],
+    [
+     "Regulatory tracking",
+     "certification-compliance"
+    ]
+   ],
+   "expertise": [
+    "GDPR/CCPA/COPPA engineering",
+    "data minimization",
+    "privacy review"
+   ],
+   "consumes": [
+    "C-TRUST"
+   ],
+   "tool_consumes": [],
+   "provides": [],
+   "implements": []
+  },
+  {
+   "id": "gameplay-camera",
+   "name": "Gameplay Camera",
+   "tier": "expert",
+   "parent": "gameplay-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "runtime",
+   "targets": [
+    "client",
+    "headless-client",
+    "tools"
+   ],
+   "workstream": "gameplay",
+   "purpose": "Gameplay camera as its own discipline: camera rigs and modes as C-VIEW sources, blending, collision and occlusion handling, framing, 2D cameras (dead zones, parallax, pixel snapping), comfort and accessibility motion options, photo mode.",
+   "non_responsibilities": [
+    [
+     "View arbitration",
+     "spatial-transforms"
+    ],
+    [
+     "Cinematic cameras",
+     "cinematics-sequencer"
+    ],
+    [
+     "XR head pose",
+     "xr-runtime"
+    ]
+   ],
+   "expertise": [
+    "real-time cameras (Haigh-Hutchinson)",
+    "camera feel & comfort",
+    "2D camera design"
+   ],
+   "consumes": [
+    "C-VIEW",
+    "C-GAME",
+    "C-PHYS?",
+    "C-INPUT?",
+    "C-A11YRT?",
+    "C-RELOAD?"
+   ],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-EDVIEW"
+   ],
+   "provides": [
+    "C-CAMERA"
+   ],
+   "implements": []
+  },
+  {
+   "id": "pipeline-performance",
+   "name": "Pipeline Performance",
+   "tier": "expert",
+   "parent": "performance-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "process",
+   "targets": [],
+   "workstream": "performance",
+   "purpose": "Independent analysis of production-pipeline performance: distributed-cook utilization and critical path, DDC miss root causes, shader permutation compile cost, C++/native build critical path and header cost, CI wall-clock; routes findings via C-PERF.",
+   "non_responsibilities": [
+    [
+     "Pipeline implementation",
+     "build-release-architect"
+    ],
+    [
+     "Benchmark harness",
+     "perf-benchmarking"
+    ],
+    [
+     "Editor implementation",
+     "editor-architect"
+    ]
+   ],
+   "expertise": [
+    "build and cook profiling",
+    "critical-path analysis",
+    "cache hit-rate analysis"
+   ],
+   "consumes": [
+    "C-INSTR",
+    "C-BUDGET",
+    "C-BENCH"
+   ],
+   "tool_consumes": [],
+   "provides": [],
+   "implements": []
+  }
+ ],
+ "platform_variants": {
+  "pc": [
+   "win-x64",
+   "win-arm64",
+   "linux-steamos",
+   "macos"
+  ],
+  "mobile": [
+   "ios",
+   "android"
+  ],
+  "xr-standalone": [
+   "android-xr",
+   "visionos"
+  ],
+  "server-host": [
+   "linux-x64",
+   "linux-arm64"
+  ]
+ }
+}

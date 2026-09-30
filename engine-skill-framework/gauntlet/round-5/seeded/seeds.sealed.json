@@ -1,0 +1,150 @@
+[
+ {
+  "id": "S01",
+  "critic": "K-ARCH",
+  "file": "capabilities.json",
+  "target": "CORE.FRAME.channels",
+  "before": "Cross-subsystem data channels (C-FLOW)",
+  "after": "Cross-subsystem data channels (C-FLOW) incl. gameplay event dispatch, subscriptions and delivery ordering",
+  "defect": "Frame-orchestration capability now also claims gameplay event dispatch/subscription, overlapping entity-object-model CORE.OBJ.events and GAM.SYS.messages ownership."
+ },
+ {
+  "id": "S02",
+  "critic": "K-RENDER",
+  "file": "capabilities.json (+ radar.json class kept in sync)",
+  "target": "RND.GI.restir",
+  "before": "M",
+  "after": "E",
+  "defect": "ReSTIR/path-traced GI labelled established while its direct-lighting sibling RND.LIGHT.stochastic is emerging and std3d-only; maturity inflated."
+ },
+ {
+  "id": "S03",
+  "critic": "K-SYSTEMS",
+  "file": "capabilities.json",
+  "target": "CORE.JOBS.degenerate",
+  "before": "Shipping inline/cooperative mode: the same task graph on 0–2 workers, no blocking waits on host threads, yield to the host event loop",
+  "after": "Shipping inline/cooperative mode: the same task graph on 0–2 workers; blocking waits on the host thread allowed for IO completion; yield to the host event loop between frames",
+  "defect": "Inline mode now permits blocking waits on the host thread, contradicting RES.MGMT.no-stall and the web/host-loop requirement of no blocking on host threads."
+ },
+ {
+  "id": "S04",
+  "critic": "K-SIM",
+  "file": "contracts.json",
+  "target": "C-PHYS",
+  "before": "Bodies, shapes, queries (handle-addressed, batched), contact events with budgets, stepping phases, batch add/remove O(batch), snapshot/restore/resimulate participation, collider history for rewind; world instances and local simulation spaces; conformance: restore + resimulate N ticks reproduces the state hash at the declared determinism level; backends (in-house 2D, in-house 3D, or middleware behind the integration layer PHY.ARCH.middleware-layer) implement it; every configuration that requires it contains one; substep policy hook whose outputs are recorded or deterministic; active-set/change-set output for replication; contact events are delivered as batched, filtered outputs (no per-body synchronous callbacks)",
+  "after": "Bodies, shapes, queries (handle-addressed, batched), contact events with budgets, stepping phases, batch add/remove O(batch), snapshot/restore/resimulate participation, collider history for rewind; world instances and local simulation spaces; conformance: restore + resimulate N ticks reproduces the state hash at the declared determinism level; backends (in-house 2D, in-house 3D, or middleware behind the integration layer PHY.ARCH.middleware-layer) implement it; every configuration that requires it contains one; substep policy hook whose outputs are recorded or deterministic; active-set/change-set output for replication; contact events are delivered per body through step-time callbacks so gameplay can react and modify bodies during the step, with optional batching",
+  "defect": "C-PHYS summary specifies per-body step-time callbacks with mid-step mutation, contradicting PHY.ARCH.events (batched change sets, deferred mutations) and the active-set/change-set output."
+ },
+ {
+  "id": "S05",
+  "critic": "K-NET",
+  "file": "contracts.json",
+  "target": "C-SERVER",
+  "before": "Host process and fleet lifecycle (allocate, ready, health, drain, shutdown), instance metadata, authenticated admin command surface; per-connection budgets and overload live in C-HOSTAUTH.",
+  "after": "Host process and fleet lifecycle (allocate, ready, health, drain, shutdown), instance metadata, authenticated admin command surface; per-connection budgets, overload state and kick/ban primitives are enforced by the server host.",
+  "defect": "C-SERVER claims per-connection budgets/overload/kick-ban, which C-HOSTAUTH (net-session) owns in every host mode; two contracts now describe the same responsibility with different owners."
+ },
+ {
+  "id": "S06",
+  "critic": "K-TOOLS",
+  "file": "capabilities.json",
+  "target": "ED.ARCH.transactions",
+  "before": "Command / transaction / undo-redo system; serializable diff-based commands",
+  "after": "Command / transaction / undo-redo system; each undo step stores a full copy of the affected scene or asset state",
+  "defect": "Undo model described as full-state copies per step, contradicting serializable diff-based commands in CORE.SER.commands and multi-user merge/journal needs."
+ },
+ {
+  "id": "S07",
+  "critic": "K-PLATFORM",
+  "file": "skills.json",
+  "target": "rhi-d3d12.platforms",
+  "before": [
+   "pc"
+  ],
+  "after": [
+   "pc",
+   "mobile"
+  ],
+  "defect": "D3D12 backend tagged as available on mobile platforms (iOS/Android), where it does not exist."
+ },
+ {
+  "id": "S08",
+  "critic": "K-PERF",
+  "file": "capabilities.json",
+  "target": "PRF.METH.budgets",
+  "before": "Budgets per hardware tier × configuration × refresh class; per-tier simulation step budgets tied to PHY.ARCH.budget-degradation; percentile frame-time, hitch, startup/transition, traversal and latency lines",
+  "after": "Budgets per hardware tier × configuration × refresh class; per-tier simulation step budgets tied to PHY.ARCH.budget-degradation; average frame-time, startup/transition, traversal and latency lines",
+  "defect": "Frame-time budgets defined on averages with percentile and hitch lines dropped, contradicting PRF.LOAD.pacing-latency and PRF.LOAD.hitch-gate which gate on percentiles and hitches."
+ },
+ {
+  "id": "S09",
+  "critic": "K-PROD",
+  "file": "milestones.json",
+  "target": "M4.exit",
+  "before": "Online reference games per netcode family: dedicated-server shooter with prediction and lag compensation, listen-server co-op, desync-free 2 h lockstep soak, web transports; bot load test; packet/handshake fuzzing, DoS test, server-authority review and external pen test (human gate; gates XC.SEC.server-validation, XC.SEC.info-hiding, XC.SEC.incident, NET.SRV.admin, NET.SRV.transactions, PLAT.COMM.receipts; XC.SEC.testing validates); patch + DLC + staged rollout + rollback executed on the online reference game. Perf: bandwidth per player within budget and latency gated; server density is gated at M6 (PRF.NET.server-density).",
+  "after": "Online reference games per netcode family: dedicated-server shooter with prediction and lag compensation, listen-server co-op, desync-free 2 h lockstep soak, web transports; bot load test; packet/handshake fuzzing, DoS test, server-authority review and external pen test (human gate; gates XC.SEC.server-validation, XC.SEC.info-hiding, XC.SEC.incident, NET.SRV.admin, NET.SRV.transactions, PLAT.COMM.receipts; XC.SEC.testing validates); patch + DLC + staged rollout + rollback executed on the online reference game. Perf: bandwidth per player within budget and latency gated; server density is gated at M4 (PRF.NET.server-density).",
+  "defect": "M4 exit says server density is gated at M4 while the gate list and M6 carry PRF.NET.server-density; schedule for density validation is misstated."
+ },
+ {
+  "id": "S10",
+  "critic": "K-FUTURE",
+  "file": "capabilities.json",
+  "target": "RND.SHADER.neural",
+  "before": "In-shader small-network evaluation (matrix-vector/tensor intrinsics tier; API-neutral; standalone-dispatch fallback via C-MLGPU)",
+  "after": "In-shader small-network evaluation (single-vendor cooperative-vector tier; no standalone-dispatch fallback)",
+  "defect": "Neural shader evaluation tied to one vendor tier with no fallback, contradicting API-neutral tensor/feature-bit policy in C-RHI/C-GPUTIER and the C-MLGPU fallback."
+ },
+ {
+  "id": "S11",
+  "critic": "K-COMPLETE",
+  "file": "capabilities.json",
+  "target": "QA.SIM.navigation",
+  "before": [
+   "QA.SIM.navigation",
+   "Navigation/AI validation runs (navmesh connectivity, path optimality)",
+   "simulation-validation",
+   "E",
+   [
+    "navigation-pathfinding"
+   ]
+  ],
+  "after": null,
+  "defect": "Navigation/AI validation runs capability removed although every other simulation domain has a QA.SIM.* validation capability and GAM.AI.validation supplies only hooks."
+ },
+ {
+  "id": "S12",
+  "critic": "K-LEGACY",
+  "file": "capabilities.json",
+  "target": "RND.ARCH.scene-sync",
+  "before": "Simulation→render extraction: change-tracked, parallel, versioned delta streams (CPU cost O(changes))",
+  "after": "Simulation→render extraction: per-frame mirrored copy of every scene object handed to the render side, versioned per frame (CPU cost O(scene objects))",
+  "defect": "Extraction described as a per-object mirror copied every frame (O(scene)), reintroducing the render-proxy mirror that L14 and C-RSCENE forbid, in neutral wording."
+ },
+ {
+  "id": "S13",
+  "critic": "K-GAMEPLAY",
+  "file": "capabilities.json",
+  "target": "UI.FW.architecture",
+  "before": "Game UI architecture: retained UI with change-notified view models and compiled/resolved bindings (no per-frame polling)",
+  "after": "Game UI architecture: retained UI with view models refreshed by per-frame property polling through string-keyed bindings",
+  "defect": "UI architecture reverts to per-frame polling and string-keyed bindings, contradicting UI.FW.logic (resolved handlers), GAM.FW.ui-binding and CORE.REFL.static-default."
+ },
+ {
+  "id": "S14",
+  "critic": "K-TEST",
+  "file": "capabilities.json",
+  "target": "QA.STRAT.flaky",
+  "before": "Flaky-test management: quarantine counts as a skip under QA.AGENT.test-integrity (governed approval, owner, mandatory expiry)",
+  "after": "Flaky-test management: automatic quarantine after repeated failures and rerun-based clearing, quarantined tests excluded from gate results",
+  "defect": "Flaky policy makes quarantine automatic and gate-excluding, contradicting QA.AGENT.test-integrity (quarantine is a skip needing governed approval, owner and expiry)."
+ },
+ {
+  "id": "S15",
+  "critic": "K-SEC",
+  "file": "untrusted-inputs.json",
+  "target": "user-images.validating_owner",
+  "before": "texture-streaming-vt",
+  "after": "ui-architect",
+  "defect": "Runtime player-supplied images are validated by ui-architect instead of texture-streaming-vt, which owns RND.TEX.runtime-decode (skill registration moved to match)."
+ }
+]

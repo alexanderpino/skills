@@ -1,0 +1,137 @@
+[
+ {
+  "id": "S01",
+  "critic": "K-ARCH",
+  "file": "contracts.json",
+  "target": "C-PRESENT",
+  "before": "Present timeline and display-time prediction, latency markers, interposed presenters (frame generation, XR compositor), GPU-frame-complete and present-feedback sink implemented by the RHI (dependency inversion); shipping-grade GPU-frame-time and present-feedback signals that do not depend on C-INSTR.",
+  "after": "Present timeline and display-time prediction, latency markers, interposed presenters (frame generation, XR compositor), GPU-frame-complete and present-feedback sink implemented by the frame orchestrator itself; shipping-grade GPU-frame-time and present-feedback signals that do not depend on C-INSTR.",
+  "defect": "C-PRESENT summary says the frame orchestrator implements the present-feedback sink, contradicting C-RHI which says the RHI implements it (dependency inversion lost)."
+ },
+ {
+  "id": "S02",
+  "critic": "K-RENDER",
+  "file": "capabilities.json",
+  "target": "RND.PT.realtime",
+  "before": "M (radar entry present)",
+  "after": "E (radar entry removed)",
+  "defect": "Real-time ReSTIR-class path tracing is labelled established and dropped from the radar although it is still emerging and RT-tier dependent."
+ },
+ {
+  "id": "S03",
+  "critic": "K-SYSTEMS",
+  "file": "capabilities.json",
+  "target": "PLAT.PAL.cpu-topology",
+  "before": "CPU topology & feature discovery (hybrid cores, SMT, caches, NUMA, ISA)",
+  "after": "CPU topology & feature discovery (ISA extensions, cache sizes)",
+  "defect": "Hybrid (P/E) cores, SMT and NUMA discovery dropped from the PAL topology capability, leaving the job system nothing to consume for heterogeneous placement and NUMA scheduling."
+ },
+ {
+  "id": "S04",
+  "critic": "K-SIM",
+  "file": "capabilities.json",
+  "target": "PHY.FLUID.gpu",
+  "before": "M (listed in radar entry Particle & GPU fluids)",
+  "after": "E (removed from radar entry)",
+  "defect": "GPU fluid solvers labelled established production and removed from the radar though sibling fluid capabilities remain emerging."
+ },
+ {
+  "id": "S05",
+  "critic": "K-NET",
+  "file": "capabilities.json",
+  "target": "NET.TRANS.crypto",
+  "before": "Encryption & connection authentication",
+  "after": "Encryption, connection authentication & auth-ticket / service-identity validation",
+  "defect": "Transport crypto capability now claims auth-ticket and service-identity validation, silently duplicating NET.SESS.auth owned by net-session."
+ },
+ {
+  "id": "S06",
+  "critic": "K-TOOLS",
+  "file": "capabilities.json",
+  "target": "ED.COLLAB.binaries",
+  "before": "[\"ED.COLLAB.binaries\", \"Large binary storage strategy\", \"collaboration-version-control\", \"E\", [\"ci-cd-automation\"]]",
+  "after": "[\"ED.COLLAB.binaries\", \"Large binary storage strategy\", \"ci-cd-automation\", \"E\", [\"collaboration-version-control\"]]",
+  "defect": "Large-binary storage strategy (depot/LFS/partial sync) is owned by ci-cd-automation instead of collaboration-version-control, which owns the sibling depot and partial-sync capabilities."
+ },
+ {
+  "id": "S07",
+  "critic": "K-PLATFORM",
+  "file": "skills.json",
+  "target": "rhi-vulkan",
+  "before": "['pc:win-x64', 'pc:win-arm64', 'pc:linux-steamos', 'mobile:android', 'xr-standalone:android-xr']",
+  "after": "['pc:win-x64', 'pc:win-arm64', 'pc:linux-steamos', 'pc:macos', 'mobile:android', 'xr-standalone:android-xr']",
+  "defect": "Vulkan backend is tagged with the pc:macos variant, which belongs to rhi-metal (no native Vulkan on macOS), so the platform matrix double-claims that variant."
+ },
+ {
+  "id": "S08",
+  "critic": "K-PERF",
+  "file": "capabilities.json",
+  "target": "PRF.METH.asymptotics",
+  "before": "Declared asymptotic cost per world-scale dimension (incl. replicated entities and connections) for every runtime skill",
+  "after": "Declared asymptotic cost per world-scale dimension for every runtime skill",
+  "defect": "Replicated entities and connection counts removed from the declared asymptotics, so server/network scaling has no required asymptotic declaration."
+ },
+ {
+  "id": "S09",
+  "critic": "K-PROD",
+  "file": "milestones.json",
+  "target": "M4 gate BLD.REL.rollback",
+  "before": "QA.STRAT.release-criteria",
+  "after": "QA.FUNC.soak",
+  "defect": "Rollback gate is validated by a generic soak run that never exercises a rollback, instead of an independent release-criteria/rollback drill."
+ },
+ {
+  "id": "S10",
+  "critic": "K-FUTURE",
+  "file": "contracts.json",
+  "target": "C-RHI",
+  "before": "Devices, queues and command recording, completion tokens, binding-model tier (bindless / descriptor-buffer / bind-group), pipeline-state-model tier (monolithic PSO / libraries / shader objects / state-object programs), GPU-generated work primitives, presentation, implicit-sync backends; the RHI consumes C-PRESENT to report present feedback; shipping-grade GPU timestamp signal for the governor; optional tensor/matrix resource types and weight-layout conversion tier (reviewed by ml-inference-runtime before freeze).",
+  "after": "Devices, queues and command recording, completion tokens, binding-model tier (bindless / descriptor-buffer / bind-group), pipeline-state-model tier (monolithic PSO / libraries / shader objects), GPU-generated work primitives, presentation, implicit-sync backends; the RHI consumes C-PRESENT to report present feedback; shipping-grade GPU timestamp signal for the governor; optional tensor/matrix resource types and weight-layout conversion tier (reviewed by ml-inference-runtime before freeze).",
+  "defect": "C-RHI pipeline-state-model tier no longer lists state-object programs, so the contract has no seat for work graphs / GPU-generated program graphs (RND.RHI.work-graph-programs)."
+ },
+ {
+  "id": "S11",
+  "critic": "K-COMPLETE",
+  "file": "capabilities.json",
+  "target": "UI.A11Y.motion",
+  "before": "[\"UI.A11Y.motion\", \"Motion reduction & photosensitivity options\", \"accessibility\", \"E\"]",
+  "after": "(removed)",
+  "defect": "Motion-reduction and photosensitivity capability removed from the map although the accessibility skill purpose and legal requirements still assume it; no owner remains."
+ },
+ {
+  "id": "S12",
+  "critic": "K-LEGACY",
+  "file": "capabilities.json",
+  "target": "CORE.FRAME.sim-schedule",
+  "before": "Canonical simulation dependency order (partial order over declared access; total order only where C-DET requires it)",
+  "after": "Canonical simulation subsystem update order (fixed sequence per tick; declared access used only for validation)",
+  "defect": "Derived dependency ordering replaced by a fixed hand-authored subsystem sequence, i.e. the central sequential update loop reintroduced in neutral wording."
+ },
+ {
+  "id": "S13",
+  "critic": "K-GAMEPLAY",
+  "file": "capabilities.json",
+  "target": "AUD.CONTENT.dialogue",
+  "before": "[\"AUD.CONTENT.dialogue\", \"VO playback & ducking for C-DIALOGUE lines\", \"audio-content-runtime\", \"E\", [\"localization-i18n\", \"narrative-dialogue\"]]",
+  "after": "[\"AUD.CONTENT.dialogue\", \"VO playback & ducking for C-DIALOGUE lines\", \"narrative-dialogue\", \"E\", [\"localization-i18n\", \"audio-content-runtime\"]]",
+  "defect": "Voice-over playback and ducking owned by narrative-dialogue instead of audio-content-runtime (owner of voices, ducking and the audio event system)."
+ },
+ {
+  "id": "S14",
+  "critic": "K-TEST",
+  "file": "milestones.json",
+  "target": "M3 gate QA.RENDER.reference-validation",
+  "before": "QA.AGENT.oracle-change-control",
+  "after": "QA.FUNC.compat",
+  "defect": "The reference path-tracer validation gate is validated by the generic compat corpus, which has no reference-image oracle, so the reference renderer is effectively unvalidated."
+ },
+ {
+  "id": "S15",
+  "critic": "K-SEC",
+  "file": "untrusted-inputs.json",
+  "target": "chat-text",
+  "before": "{\"id\": \"chat-text\", \"validating_owner\": \"online-services-liveops\", \"parser_owners\": [\"text-fonts\"], \"trust\": \"hostile-remote\", \"mode\": \"harness\", \"limits\": \"length/rate\"}",
+  "after": "{\"id\": \"chat-text\", \"validating_owner\": \"text-fonts\", \"parser_owners\": [\"online-services-liveops\"], \"trust\": \"hostile-remote\", \"mode\": \"harness\", \"limits\": \"length/rate\"}",
+  "defect": "Hostile-remote chat text is validated by text-fonts (a renderer) while the online-services owner is demoted to parser; validation/moderation ownership is wrong."
+ }
+]

@@ -1,0 +1,102 @@
+{
+ "S01": [
+  "K-ARCH-6",
+  "K-SIM-2",
+  "K-SIM-3"
+ ],
+ "S02": [
+  "K-RENDER-1",
+  "K-RENDER-10",
+  "K-LEGACY-5",
+  "K-LEGACY-12"
+ ],
+ "S03": [
+  "K-ARCH-10",
+  "K-LEGACY-3",
+  "K-LEGACY-12",
+  "K-PERF-2",
+  "K-SYSTEMS-1"
+ ],
+ "S04": [
+  "K-ARCH-8",
+  "K-SIM-1",
+  "K-LEGACY-2",
+  "K-LEGACY-12",
+  "K-LEGACY-16",
+  "K-NET-15",
+  "K-SYSTEMS-3"
+ ],
+ "S05": [
+  "K-LEGACY-9"
+ ],
+ "S06": [
+  "K-ARCH-4",
+  "K-ARCH-9",
+  "K-SEC-3",
+  "K-TOOLS-2",
+  "K-LEGACY-4",
+  "K-LEGACY-12",
+  "K-PERF-4"
+ ],
+ "S07": [
+  "K-ARCH-11",
+  "K-SEC-14",
+  "K-FUTURE-10",
+  "K-PLATFORM-4",
+  "K-LEGACY-11",
+  "K-PERF-11",
+  "K-SYSTEMS-4"
+ ],
+ "S08": [
+  "K-ARCH-13",
+  "K-LEGACY-7",
+  "K-LEGACY-12",
+  "K-PERF-1",
+  "K-SYSTEMS-8"
+ ],
+ "S09": [
+  "K-ARCH-20",
+  "K-SEC-2",
+  "K-TEST-12",
+  "K-PLATFORM-5",
+  "K-LEGACY-8",
+  "K-LEGACY-12",
+  "K-PROD-2",
+  "K-PROD-3",
+  "K-PROD-4"
+ ],
+ "S10": [
+  "K-RENDER-7",
+  "K-FUTURE-3"
+ ],
+ "S11": [
+  "K-RENDER-2",
+  "K-COMPLETE-1"
+ ],
+ "S12": [
+  "K-ARCH-7",
+  "K-LEGACY-1",
+  "K-LEGACY-12",
+  "K-LEGACY-16",
+  "K-PERF-3",
+  "K-SYSTEMS-2"
+ ],
+ "S13": [
+  "K-ARCH-12",
+  "K-GAMEPLAY-1",
+  "K-LEGACY-10",
+  "K-LEGACY-12",
+  "K-PROD-7"
+ ],
+ "S14": [
+  "K-ARCH-14",
+  "K-TEST-5",
+  "K-LEGACY-6",
+  "K-LEGACY-12"
+ ],
+ "S15": [
+  "K-SEC-1",
+  "K-TEST-11",
+  "K-PLATFORM-11"
+ ]
+}
