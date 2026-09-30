@@ -32,7 +32,7 @@ The rules produced **154 skills** (round 2 added sessions, server scale-out, ser
 
 The configuration-closure proof therefore measures *engine* scale-down separately from the organization that builds the engine.
 
-**Workstreams** (foundation, platform, content, world, rendering, simulation, audio, online, gameplay, UI, tools, release, quality, performance, governance, assurance) group skills for delegated arbitration and staffing. They are also the co-hosting unit, so the independence matrix (`data/crosscutting.json`: decider vs reviewer, builder vs adjudicator, implementer vs oracle author) is enforced by keeping each pair in different workstreams. A dispute inside one lead's subtree is settled by that lead. Only cross-workstream disputes reach `engine-architect` (`ARCH.ORG.escalation`).
+**Workstreams** (foundation, platform, content, world, rendering, simulation, audio, online, gameplay, UI, tools, release, quality, performance, governance, assurance) group skills for delegated arbitration and staffing. They are also the co-hosting unit, so the independence matrix (`data/crosscutting.json`: decider vs reviewer, builder vs adjudicator, implementer vs oracle author) is enforced by keeping each pair in different workstreams. A dispute inside one lead's subtree is settled by that lead unless the arbitrating lead is a party to it. Disputes between leads of one workstream, disputes across workstreams, and disputes in which the arbitrating lead is a party reach `engine-architect` (`ARCH.ORG.escalation`).
 
 ## 3. Skills depend on contracts, never on skills
 

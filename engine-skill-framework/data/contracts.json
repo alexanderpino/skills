@@ -672,7 +672,7 @@
    "layer": 3,
    "owner": "localization-i18n",
    "name": "Localized strings",
-   "summary": "String IDs, formatting, locale switching.",
+   "summary": "String IDs, formatting, locale switching; term references (per-locale grammatical attributes of substituted terms such as items, characters and places: gender, animacy, case forms, articles, particles) resolved for agreement in messages (UI.LOC.terms).",
    "requires": [
     "C-ASSET"
    ],
@@ -841,7 +841,7 @@
    "layer": "P",
    "owner": "program-orchestration",
    "name": "Agent coordination protocol",
-   "summary": "Ownership ledger with access classes; write sets by module convention (src/<skill-id>/, tools/<skill-id>/; tests owned by the test-owning skill); shared-file protocol; contributor semantics (review + change request, never direct writes); change requests; integration order and milestones; human-gate tasks; failure triage; per-change provenance; critic gates with calibration and independent adjudication; access classes per skill (public | nda:<holder>); NDA work routed only to cleared agents; test write sets: tests/unit/<skill-id>/ implementer-owned; tests/acceptance/<contract-id>/ owned by the contract's oracle_author, read-only (oracle-ro) for implementers; lock leases and hand-off records (ARCH.ORG.agent-continuity); work-package format for delegated planning; model lineage recorded per change.",
+   "summary": "Ownership ledger with access classes; write sets by module convention (src/<skill-id>/, tools/<skill-id>/; tests owned by the test-owning skill); shared-file protocol; contributor semantics (review + change request, never direct writes); change requests; integration order and milestones; human-gate tasks; failure triage; per-change provenance; critic gates with calibration and independent adjudication; access classes per skill and per path (public | nda:<holder> | sealed:oracle); NDA work routed only to cleared agents; test write sets: tests/unit/<skill-id>/ implementer-owned; tests/acceptance/<contract-id>/ owned by the contract's oracle_author, read-only (oracle-ro) for implementers; sealed holdouts, gate-time seeds and expected outputs live under access class sealed:oracle, readable only by oracle_author agents and CI runners and never by an implementer of that contract (BLD.CI.sealed-suites, QA.AGENT.holdout); lock leases and hand-off records (ARCH.ORG.agent-continuity); work-package format for delegated planning; model lineage recorded per change.",
    "requires": [],
    "universal": "all"
   },

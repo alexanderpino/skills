@@ -10,7 +10,7 @@ if os.path.exists(os.path.join(_HERE, "seed_hits.json")):
             SEED_HITS[f] = sid
 
 OVERRIDES = {
-    "K-ARCH-3": ("partial", "same-workstream lead disputes and disputes in which the arbitrating lead is a party go to engine-architect; delegated arbitration otherwise stays"),
+    "K-ARCH-3": ("partial", "adjudicator OVERTURNED the remainder, fixed in r3_h/docs; same-workstream lead disputes and disputes in which the arbitrating lead is a party go to engine-architect; delegated arbitration otherwise stays"),
     "K-ARCH-4": ("reject", "no new expert skills for the proposed roles; party leads recuse instead (ARCH.ORG.escalation)"),
     "K-TOOLS-8": ("partial", "shared DDC moves to a team-mid add-on and CNT.COOK.cache-fleet stays team-large; configuration standard-3d-team-tools added"),
     "K-PLATFORM-1": ("partial", "confidential slots extended and C-CERT split into public register and per-holder partitions; no module-level access field"),
@@ -19,10 +19,10 @@ OVERRIDES = {
     "K-GAMEPLAY-4": ("partial", "C-CAMERA added at layer 4; layer-3 vehicle and dialogue modules publish camera hints as data instead of consuming it (no upward link)"),
     "K-RENDER-6": ("partial", "C-PTREF added; path-tracing consumes C-LIGHT/C-TEMPORAL optionally rather than per-module attribution"),
     "K-TEST-4": ("partial", "oracle_reference required on layer 0–2 contracts; oracle authors are quality/assurance validators (co-authoring by consumers is by change request)"),
-    "K-TEST-6": ("partial", "BLD.CI.sealed-suites added; the sealed:oracle access class is a phase-2 SKILL.md obligation, not a data field"),
+    "K-TEST-6": ("partial", "adjudicator OVERTURNED the remainder, fixed in r3_h/docs; BLD.CI.sealed-suites added; the sealed:oracle access class is a phase-2 SKILL.md obligation, not a data field"),
     "K-COMPLETE-6": ("partial", "overlaps K-NET-6/9: content-set and server-browser cover join-time negotiation; NET.SRV.community-hosting added for redistribution and rulesets"),
     "K-COMPLETE-12": ("merge", "duplicate of K-TOOLS-14 (ED.UI.outliner)"),
-    "K-GAMEPLAY-7": ("partial", "UI.LOC.terms added; no radar entry (capability is established)"),
+    "K-GAMEPLAY-7": ("partial", "adjudicator OVERTURNED the remainder, fixed in r3_h/docs; UI.LOC.terms added; no radar entry (capability is established)"),
     "K-GAMEPLAY-3": ("accept", "GAM.DATA.tags in gameplay-data; tag queries removed from C-ABILITY"),
     "K-RENDER-5": ("reject", "verifier: layer-2 producers exposing work items that the graph imports (RND.GRAPH.external-work) is the sanctioned inversion, same as C-GPUMEM uploads and C-IO GPU decompression; the layer-3 C-RT module already wraps C-RTAS in graph passes"),
     "K-SIM-11": ("reject", "verifier: runtime collision geometry is derived from inputs already registered (mods, assets, input-commands); PHY.COL.runtime-build is budgeted and NET.SESS.budgets bounds client-triggered work; a derived-data entry would misuse parser_owners"),

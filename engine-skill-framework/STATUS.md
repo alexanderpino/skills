@@ -17,7 +17,7 @@ Not converged: round 3 still has real major/blocker findings to fix, and the Com
 
 ## Next steps (in order)
 
-1. **Adjudicate** the partial and reject dispositions of round 3 (`gauntlet/round-3/dispositions.md`) with one independent agent; fix overturns in `gauntlet/round-3/r3_h.py` (then `python3 gauntlet/round-3/apply.py`, `check.py`, `--selftest` once, `render.py`).
+1. Round-3 adjudication done (`gauntlet/round-3/adjudication.md`: 21 upheld, 3 overturned and fixed in `r3_h.py`/docs).
 2. **Round 4** (about 30 agents: 15 blind critics on a seeded copy in the scratchpad, one batch verifier each). New independent seed author; strengthen the K-NET brief (it missed its own seed twice in round 3). Save the workflow result to `gauntlet/round-4/workflow/` and run `scripts/checkpoint.py` while it runs.
 3. Repeat until a calibrated round has zero accepted blocker/major findings and the Completeness critic is clean in two consecutive rounds. Only then G2 (SKILL.md generation, `docs/08-phase-2-plan.md`).
 
