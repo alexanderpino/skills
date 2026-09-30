@@ -1110,6 +1110,17 @@
    "evidence": "Platform VPS/geospatial APIs (2022–2025)",
    "revisit": "Two platforms expose stable geospatial anchors",
    "fallback": "PLAT.XR.anchors (local/shared anchors) with PLAT.MOB.location"
+  },
+  {
+   "tech": "Predicted rigid-body physics with rollback",
+   "class": "M",
+   "owner": "prediction-rollback",
+   "capabilities": [
+    "NET.PRED.physics-rollback"
+   ],
+   "evidence": "PhysX/Jolt do not restore solver warm-start caches or partial islands; Chaos network-physics prediction is beta",
+   "revisit": "A shipped title predicts general rigid bodies over a restorable backend",
+   "fallback": "NET.PRED.physics (server-authoritative bodies with interpolation)"
   }
  ]
 }

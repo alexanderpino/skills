@@ -867,6 +867,48 @@
    "contradiction_terms": [
     "baked pvs (?:everywhere|default)"
    ]
+  },
+  {
+   "id": "L76",
+   "pattern": "Discrete-only collision with speed clamps",
+   "detection": "speed caps or thick walls to stop tunnelling",
+   "default_stance": "Continuous collision for fast bodies",
+   "justification_owner": "physics-architect",
+   "stance_capabilities": [
+    "PHY.COL.ccd"
+   ],
+   "contradiction_terms": [
+    "speed clamps? instead of"
+   ]
+  },
+  {
+   "id": "L77",
+   "pattern": "Unbounded always-awake physics world",
+   "detection": "no sleeping, active set or simulation LOD",
+   "default_stance": "Islands and sleeping, physics LOD, tier transitions",
+   "justification_owner": "physics-architect",
+   "stance_capabilities": [
+    "PHY.DYN.islands",
+    "PHY.ARCH.lod",
+    "PHY.ARCH.tier-transitions"
+   ],
+   "contradiction_terms": [
+    "always-awake"
+   ]
+  },
+  {
+   "id": "L78",
+   "pattern": "Rollback over non-restorable physics state",
+   "detection": "rollback or lockstep over a backend that cannot restore solver caches",
+   "default_stance": "Restore/resimulate conformance and sync tests",
+   "justification_owner": "physics-architect",
+   "stance_capabilities": [
+    "PHY.ARCH.rewind",
+    "NET.PRED.sync-test"
+   ],
+   "contradiction_terms": [
+    "rollback over non-restorable"
+   ]
   }
  ],
  "adr_exceptions": []

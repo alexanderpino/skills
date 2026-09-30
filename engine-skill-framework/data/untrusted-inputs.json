@@ -542,6 +542,67 @@
    "trust": "hostile-remote",
    "mode": "harness",
    "limits": "signature verification, replay window, schema bounds"
+  },
+  {
+   "id": "physics-assets",
+   "validating_owner": "collision-detection",
+   "parser_owners": [
+    "package-formats-vfs",
+    "modding-ugc"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "hull vertices, triangles, cook time, body/constraint counts; UGC cooking async, budgeted and sandboxed"
+  },
+  {
+   "id": "server-list-entries",
+   "validating_owner": "net-session",
+   "parser_owners": [
+    "network-transport"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "length/count/rate; endpoint allow-list; pre-auth"
+  },
+  {
+   "id": "tabular-imports",
+   "validating_owner": "gameplay-data",
+   "parser_owners": [],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "zip-bomb, XXE and formula-injection limits"
+  },
+  {
+   "id": "localization-exchange",
+   "validating_owner": "localization-i18n",
+   "parser_owners": [],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "XLIFF/PO size/depth limits"
+  },
+  {
+   "id": "narrative-imports",
+   "validating_owner": "narrative-dialogue",
+   "parser_owners": [],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "screenplay import size/depth limits"
+  },
+  {
+   "id": "vendor-deliveries",
+   "validating_owner": "content-pipeline-architect",
+   "parser_owners": [],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "package manifest and size limits"
+  },
+  {
+   "id": "tracker-webhooks",
+   "validating_owner": "collaboration-version-control",
+   "parser_owners": [],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "signature and schema verification"
   }
  ]
 }

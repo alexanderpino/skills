@@ -1060,14 +1060,17 @@
     "invites-deep-links",
     "ipc-messages",
     "launch-args",
+    "localization-exchange",
     "logged-untrusted-strings",
     "media-decoders",
     "ml-models",
     "mods",
+    "narrative-imports",
     "packets",
     "patch-manifests",
     "peer-inputs",
     "peer-state-hashes",
+    "physics-assets",
     "player-model-prompts",
     "procedural-asset-eval",
     "project-tool-code",
@@ -1077,15 +1080,19 @@
     "replicated-state",
     "saves",
     "scripts",
+    "server-list-entries",
     "server-pushed-content",
     "service-responses",
     "shader-caches",
     "shared-ddc",
     "store-notifications",
+    "tabular-imports",
     "telemetry-batches",
+    "tracker-webhooks",
     "transaction-requests",
     "ugc-graphs",
     "user-images",
+    "vendor-deliveries",
     "voice-streams",
     "web-content"
    ]
@@ -1206,7 +1213,8 @@
     "C-SVC?",
     "C-LIVE?",
     "C-SRVDATA?",
-    "C-ML?"
+    "C-ML?",
+    "C-HOSTAUTH?"
    ],
    "expertise": [
     "cheat taxonomies",
@@ -1628,6 +1636,7 @@
    "workstream": "gameplay",
    "untrusted_inputs": [
     "mods",
+    "physics-assets",
     "player-model-prompts",
     "server-pushed-content",
     "ugc-graphs"
@@ -2711,7 +2720,8 @@
    "implements": [],
    "workstream": "content",
    "untrusted_inputs": [
-    "shared-ddc"
+    "shared-ddc",
+    "vendor-deliveries"
    ]
   },
   {
@@ -2733,7 +2743,9 @@
      "material-system"
     ]
    ],
-   "provides": [],
+   "provides": [
+    "C-IMPORT"
+   ],
    "consumes": [
     "C-ASSET",
     "C-COOK"
@@ -2941,7 +2953,8 @@
    "workstream": "content",
    "untrusted_inputs": [
     "assets",
-    "decompressors"
+    "decompressors",
+    "physics-assets"
    ]
   },
   {
@@ -3150,7 +3163,8 @@
    "tool_consumes": [
     "C-EDCMD",
     "C-EDHOST",
-    "C-EDVIEW"
+    "C-EDVIEW",
+    "C-EDPREVIEW"
    ],
    "implements": [
     "C-ENV"
@@ -3688,7 +3702,9 @@
    "tool_consumes": [
     "C-EDCMD",
     "C-EDHOST",
-    "C-GRAPH"
+    "C-GRAPH",
+    "C-EDPREVIEW",
+    "C-IMPORT"
    ],
    "implements": [],
    "workstream": "rendering"
@@ -3796,7 +3812,8 @@
    "tool_consumes": [
     "C-COOK",
     "C-EDCMD",
-    "C-EDHOST"
+    "C-EDHOST",
+    "C-IMPORT"
    ],
    "implements": [],
    "workstream": "rendering"
@@ -3898,7 +3915,10 @@
     "client",
     "tools"
    ],
-   "tool_consumes": [],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
    "implements": [],
    "workstream": "rendering"
   },
@@ -4245,7 +4265,8 @@
    ],
    "tool_consumes": [
     "C-EDCMD",
-    "C-EDHOST"
+    "C-EDHOST",
+    "C-EDPREVIEW"
    ],
    "implements": [],
    "workstream": "rendering"
@@ -4357,7 +4378,8 @@
    "tool_consumes": [
     "C-GRAPH",
     "C-EDCMD",
-    "C-EDHOST"
+    "C-EDHOST",
+    "C-EDPREVIEW"
    ],
    "implements": [],
    "workstream": "rendering"
@@ -4388,7 +4410,8 @@
     ]
    ],
    "provides": [
-    "C-PHYS"
+    "C-PHYS",
+    "C-CHARCTRL"
    ],
    "consumes": [
     "C-SPATIAL",
@@ -4465,10 +4488,14 @@
     "tools"
    ],
    "tool_consumes": [
-    "C-COOK"
+    "C-COOK",
+    "C-IMPORT"
    ],
    "implements": [],
-   "workstream": "simulation"
+   "workstream": "simulation",
+   "untrusted_inputs": [
+    "physics-assets"
+   ]
   },
   {
    "id": "rigid-body-dynamics",
@@ -4512,7 +4539,9 @@
     "server",
     "tools"
    ],
-   "tool_consumes": [],
+   "tool_consumes": [
+    "C-IMPORT"
+   ],
    "implements": [
     "C-PHYS"
    ],
@@ -4559,7 +4588,9 @@
     "C-EDCMD",
     "C-EDHOST"
    ],
-   "implements": [],
+   "implements": [
+    "C-CHARCTRL"
+   ],
    "workstream": "simulation"
   },
   {
@@ -4660,7 +4691,8 @@
     "C-COOK",
     "C-EDCMD",
     "C-EDHOST",
-    "C-EDVIEW"
+    "C-EDVIEW",
+    "C-EDPREVIEW"
    ],
    "implements": [],
    "workstream": "simulation"
@@ -4728,6 +4760,10 @@
     [
      "3D physics",
      "rigid-body-dynamics"
+    ],
+    [
+     "Discrete cellular material simulation",
+     "systems-simulation"
     ]
    ],
    "provides": [],
@@ -4752,6 +4788,7 @@
     "C-EDVIEW"
    ],
    "implements": [
+    "C-CHARCTRL",
     "C-PHYS"
    ],
    "workstream": "simulation"
@@ -4854,7 +4891,9 @@
    "tool_consumes": [
     "C-COOK",
     "C-EDCMD",
-    "C-EDHOST"
+    "C-EDHOST",
+    "C-EDPREVIEW",
+    "C-IMPORT"
    ],
    "implements": [],
    "workstream": "simulation"
@@ -4949,7 +4988,8 @@
    "tool_consumes": [
     "C-EDCMD",
     "C-EDHOST",
-    "C-GRAPH"
+    "C-GRAPH",
+    "C-EDPREVIEW"
    ],
    "implements": [],
    "workstream": "simulation"
@@ -5145,7 +5185,8 @@
    ],
    "tool_consumes": [
     "C-EDCMD",
-    "C-EDHOST"
+    "C-EDHOST",
+    "C-EDPREVIEW"
    ],
    "implements": [],
    "workstream": "simulation"
@@ -5337,7 +5378,9 @@
     "C-GRAPH",
     "C-COOK",
     "C-EDCMD",
-    "C-EDHOST"
+    "C-EDHOST",
+    "C-EDPREVIEW",
+    "C-IMPORT"
    ],
    "implements": [],
    "workstream": "audio",
@@ -5443,7 +5486,8 @@
    "implements": [],
    "workstream": "online",
    "untrusted_inputs": [
-    "packets"
+    "packets",
+    "server-list-entries"
    ]
   },
   {
@@ -5484,7 +5528,9 @@
     "C-TASK",
     "C-HOSTAUTH?",
     "C-INTEGRITY?",
-    "C-STATECLASS"
+    "C-STATECLASS",
+    "C-PHYS?",
+    "C-NETSESSION"
    ],
    "expertise": [
     "state synchronization",
@@ -5575,7 +5621,7 @@
    "profiles": [
     "online"
    ],
-   "purpose": "Headless server builds and stripping, host lifecycle (C-SERVER) for rolling deploys, tick cost and multi-instance density, overload degradation, per-connection budgets, the authenticated admin surface, fleet orchestration boundary and server observability.",
+   "purpose": "Headless server builds and stripping, host lifecycle (C-SERVER) for rolling deploys, tick cost and multi-instance density, the authenticated admin surface, fleet orchestration boundary and server observability.",
    "non_responsibilities": [
     [
      "Fleet operation (outside engine scope)",
@@ -6047,7 +6093,10 @@
     "server",
     "tools"
    ],
-   "tool_consumes": [],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
    "implements": [],
    "workstream": "gameplay",
    "untrusted_inputs": [
@@ -6219,7 +6268,10 @@
     "C-EDHOST"
    ],
    "implements": [],
-   "workstream": "ui"
+   "workstream": "ui",
+   "untrusted_inputs": [
+    "localization-exchange"
+   ]
   },
   {
    "id": "editor-architect",
@@ -6356,7 +6408,8 @@
     ]
    ],
    "provides": [
-    "C-EDVIEW"
+    "C-EDVIEW",
+    "C-EDPREVIEW"
    ],
    "consumes": [
     "C-EDCMD",
@@ -6472,7 +6525,8 @@
    "implements": [],
    "workstream": "tools",
    "untrusted_inputs": [
-    "collab-session"
+    "collab-session",
+    "tracker-webhooks"
    ]
   },
   {
@@ -7299,7 +7353,8 @@
     "C-VEHICLE?",
     "C-INTEGRITY?",
     "C-CAMERA?",
-    "C-GAMEDATA"
+    "C-GAMEDATA",
+    "C-CHARCTRL"
    ],
    "expertise": [
     "character movement",
@@ -7370,7 +7425,10 @@
    "provides": [
     "C-GAMEDATA"
    ],
-   "implements": []
+   "implements": [],
+   "untrusted_inputs": [
+    "tabular-imports"
+   ]
   },
   {
    "id": "narrative-dialogue",
@@ -7428,7 +7486,10 @@
    "provides": [
     "C-DIALOGUE"
    ],
-   "implements": []
+   "implements": [],
+   "untrusted_inputs": [
+    "narrative-imports"
+   ]
   },
   {
    "id": "reference-games",
@@ -7519,7 +7580,7 @@
    "untrusted_inputs": [
     "browser-bridge"
    ],
-   "authoring": "Platform integration; web preview via the standard editor play mode."
+   "authoring": "Platform integration; web preview via C-TARGETPLAT deploy-to-browser and the web tier in RND.TOOL.scalability-preview."
   },
   {
    "id": "online-services-liveops",
@@ -7772,7 +7833,7 @@
      "crowd-simulation"
     ],
     [
-     "Cellular fluids",
+     "Continuum and particle fluids",
      "fluid-simulation"
     ],
     [
@@ -7941,11 +8002,12 @@
     "C-SVC?",
     "C-LIVE?",
     "C-WORLD?",
-    "C-REP?"
+    "C-INTEGRITY?"
    ],
    "untrusted_inputs": [
     "auth-tickets",
     "packets",
+    "server-list-entries",
     "server-pushed-content"
    ],
    "tool_consumes": [],

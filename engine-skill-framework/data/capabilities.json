@@ -2180,7 +2180,7 @@
       ],
       [
        "CORE.FRAME.fixed-step",
-       "Fixed-step simulation with interpolation",
+       "Fixed-step simulation with interpolation; bounded catch-up (max substeps, dilation vs drop) with cadence fixed for lockstep",
        "frame-orchestration",
        "E"
       ],
@@ -3135,7 +3135,11 @@
        "E",
        [
         "world-architect",
-        "ci-cd-automation"
+        "ci-cd-automation",
+        "fluid-simulation",
+        "spatial-audio-acoustics",
+        "navigation-pathfinding",
+        "global-illumination"
        ]
       ],
       [
@@ -3160,8 +3164,8 @@
         "ci-cd-automation"
        ],
        [
-        "lite3d",
-        "std3d"
+        "team-mid",
+        "team-large"
        ]
       ],
       [
@@ -3377,7 +3381,7 @@
       ],
       [
        "WLD.PART.hlod",
-       "HLOD strategy & generation orchestration",
+       "HLOD strategy & generation orchestration (builder implemented as a C-COOK world-scope processor; invalidation and distribution belong to CNT.COOK.world-build)",
        "world-architect",
        "E",
        [
@@ -4422,7 +4426,11 @@
         "async-io-storage",
         "gpu-memory-resources",
         "ray-tracing-infrastructure",
-        "resource-streaming-architect"
+        "resource-streaming-architect",
+        "physics-architect",
+        "fluid-simulation",
+        "cloth-deformables",
+        "crowd-simulation"
        ]
       ],
       [
@@ -5144,7 +5152,7 @@
       ],
       [
        "RND.GI.bake-pipeline",
-       "Incremental/distributed lighting bake orchestration",
+       "Incremental/distributed lighting bake orchestration (implemented as C-COOK world-scope processors; orchestration belongs to CNT.COOK.world-build)",
        "global-illumination",
        "E",
        [
@@ -5880,7 +5888,8 @@
        "render-architect",
        "E",
        [
-        "runtime-scalability"
+        "runtime-scalability",
+        "platform-web"
        ]
       ],
       [
@@ -5890,6 +5899,16 @@
        "E",
        [
         "visual-debugging-tools"
+       ]
+      ],
+      [
+       "RND.TOOL.direct-lights",
+       "Direct-light authoring: placement and units, IES/cookies, light functions, shadow budget and light-complexity views",
+       "direct-lighting-shadows",
+       "E",
+       [
+        "world-editor-viewport",
+        "global-illumination"
        ]
       ]
      ]
@@ -6059,7 +6078,7 @@
       ],
       [
        "PHY.ARCH.gpu",
-       "GPU physics offload",
+       "GPU physics offload; gameplay-visible GPU results are tick-stamped, latched and excluded from deterministic state; registered as external-work producers",
        "physics-architect",
        "M"
       ],
@@ -6204,6 +6223,17 @@
        ],
        [
         "experimental"
+       ]
+      ],
+      [
+       "PHY.ARCH.budget-degradation",
+       "Simulation actuators (substeps, solver iterations, active-body cap, CCD and query budgets, cloth/fluid particle counts) registered in CORE.SCALE.actuators",
+       "physics-architect",
+       "E",
+       [
+        "runtime-scalability",
+        "crowd-simulation",
+        "systems-simulation"
        ]
       ]
      ]
@@ -6550,7 +6580,7 @@
      "caps": [
       [
        "PHY.2D.dynamics",
-       "2D rigid bodies & collision",
+       "2D rigid bodies and dynamics solver (stacking, restitution, friction)",
        "physics-2d",
        "E"
       ],
@@ -6573,12 +6603,40 @@
        "E"
       ],
       [
-       "PHY.2D.cellular",
-       "Grid/cellular material & fluid simulation (falling sand, liquid/gas/heat grids), 2D-capable, deterministic",
+       "PHY.2D.queries-filtering",
+       "2D scene queries, collision layers and filtering",
+       "physics-2d",
+       "E"
+      ],
+      [
+       "PHY.2D.joints-ropes",
+       "2D joints, ropes and sleeping",
+       "physics-2d",
+       "E"
+      ],
+      [
+       "PHY.2D.ccd-sensors",
+       "2D continuous collision, sensors, kinematic bodies and platform riding",
+       "physics-2d",
+       "E"
+      ],
+      [
+       "PHY.2D.tilemap-collision",
+       "Tilemap and one-way collision",
        "physics-2d",
        "E",
        [
-        "fluid-simulation"
+        "render-2d-vector"
+       ]
+      ],
+      [
+       "PHY.2D.runtime-build",
+       "Runtime collision generation for destructible and edited 2D terrain",
+       "physics-2d",
+       "E",
+       [
+        "terrain",
+        "destruction-fracture"
        ]
       ]
      ]
@@ -7870,7 +7928,7 @@
       ],
       [
        "NET.ARCH.validation",
-       "Netcode oracle scenarios & acceptance thresholds (co-signed by simulation-validation per QA.AGENT.oracle-change-control)",
+       "Netcode oracle scenarios & acceptance thresholds incl. host-drop (co-signed by simulation validation)",
        "network-architect",
        "E",
        [
@@ -8146,6 +8204,16 @@
         "serialization-schema",
         "network-architect"
        ]
+      ],
+      [
+       "NET.REP.physics-bodies",
+       "Physics-body replication: active-set/change-set from C-PHYS, sleep flags, quantized pose/velocity, significance priority, prop extrapolation, prop and vehicle ownership hand-off",
+       "replication",
+       "E",
+       [
+        "physics-architect",
+        "prediction-rollback"
+       ]
       ]
      ]
     },
@@ -8182,7 +8250,7 @@
       ],
       [
        "NET.PRED.physics",
-       "Networked physics",
+       "Networked physics: server-authoritative replicated dynamic bodies with interpolation, extrapolation and smoothing",
        "prediction-rollback",
        "E",
        [
@@ -8253,6 +8321,25 @@
         "rigid-body-dynamics",
         "animation-runtime",
         "gameplay-systems-toolkit"
+       ]
+      ],
+      [
+       "NET.PRED.physics-rollback",
+       "Predicted physics with rollback and partial-island resimulation (restorable solver caches required)",
+       "prediction-rollback",
+       "M",
+       [
+        "rigid-body-dynamics",
+        "physics-architect"
+       ]
+      ],
+      [
+       "NET.PRED.physics-lockstep",
+       "Deterministic lockstep physics (backends declaring the deterministic level only)",
+       "prediction-rollback",
+       "E",
+       [
+        "determinism-replay"
        ]
       ]
      ]
@@ -8560,6 +8647,17 @@
         "input-system",
         "replication",
         "prediction-rollback"
+       ]
+      ],
+      [
+       "NET.SESS.host-migration",
+       "Host migration: replicated state or snapshot, prediction state and authority transfer; host-drop scenario",
+       "net-session",
+       "E",
+       [
+        "replication",
+        "prediction-rollback",
+        "determinism-replay"
        ]
       ]
      ]
@@ -9390,6 +9488,15 @@
         "visual-debugging-tools",
         "gameplay-data"
        ]
+      ],
+      [
+       "GAM.TOOL.save-inspector",
+       "Save inspector: inspect, edit, diff and upgrade dry-run over C-SAVE and CORE.SER.evolution",
+       "persistence-save",
+       "E",
+       [
+        "visual-debugging-tools"
+       ]
       ]
      ]
     },
@@ -9425,6 +9532,16 @@
        "E",
        [
         "persistence-save"
+       ]
+      ],
+      [
+       "GAM.SIM.cellular",
+       "Discrete grid/cellular simulation (falling sand, liquid/gas/heat grids, 2D and 3D voxel), deterministic",
+       "systems-simulation",
+       "E",
+       [
+        "physics-2d",
+        "voxel-worlds"
        ]
       ]
      ]
@@ -10203,6 +10320,18 @@
        [
         "accessibility"
        ]
+      ],
+      [
+       "ED.UI.settings-editor",
+       "Schema-driven project-settings editor over layered per-platform C-CFG (diff, validate)",
+       "editor-ui-framework",
+       "E"
+      ],
+      [
+       "ED.UI.workspace",
+       "Workspace: layouts, keybindings, command palette and preferences; domain tools register commands and settings through C-EDHOST",
+       "editor-ui-framework",
+       "E"
       ]
      ]
     },
@@ -11833,7 +11962,7 @@
       ],
       [
        "PRF.METH.budgets",
-       "Budgets per hardware tier × configuration × refresh class",
+       "Budgets per hardware tier × configuration × refresh class; per-tier simulation step budgets tied to PHY.ARCH.budget-degradation",
        "performance-architect",
        "E"
       ],
@@ -11985,6 +12114,17 @@
        "E",
        [
         "ci-cd-automation"
+       ]
+      ],
+      [
+       "PRF.BENCH.sim-worst-case",
+       "Simulation worst-case cost: contact storms, pile-ups, explosion-to-debris bursts, query storms, mass-agent surges",
+       "perf-benchmarking",
+       "E",
+       [
+        "physics-architect",
+        "crowd-simulation",
+        "destruction-fracture"
        ]
       ]
      ]
