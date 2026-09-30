@@ -4,7 +4,9 @@
 Why a separate branch: it never collides with the working branch, and each push replaces a single commit
 (force-with-lease), so a large, growing journal does not bloat history.
 
-Usage: python3 scripts/checkpoint.py [--interval 600] [--once] [--round 3]
+Usage: python3 scripts/checkpoint.py [--interval 600] [--once] [--round 3] [--clear]
+       Pushes only when the watched files changed since the last push. Run --clear after a workflow has finished and
+       its results are committed to the working branch: it deletes the checkpoint branch (remote + local) and worktree.
 Env:   WF_DIR   workflow transcript dir (default: newest under ~/.claude/projects/*/subagents/workflows/)
 """
 import argparse
@@ -74,12 +76,24 @@ def snapshot(paths, rnd):
     return False
 
 
+def clear():
+    if os.path.exists(WT):
+        run("git", "worktree", "remove", "--force", WT, check=False)
+    run("git", "worktree", "prune", check=False)
+    r = run("git", "push", "origin", "--delete", BRANCH, check=False)
+    run("git", "branch", "-D", BRANCH, check=False)
+    print("cleared" if r.returncode == 0 else f"remote delete failed: {r.stderr.strip()}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--interval", type=int, default=600)
     ap.add_argument("--once", action="store_true")
     ap.add_argument("--round", type=int, default=3)
+    ap.add_argument("--clear", action="store_true")
     a = ap.parse_args()
+    if a.clear:
+        return clear()
     last = None
     while True:
         paths = sources(newest_wf())
