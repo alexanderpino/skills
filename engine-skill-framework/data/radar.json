@@ -1267,6 +1267,30 @@
    "fallback": "flat video / stereoscopic rendering",
    "non_goal": true,
    "reviewed": "2026-09-30"
+  },
+  {
+   "tech": "Virtual-production cluster sync",
+   "class": "X",
+   "owner": "render-architect",
+   "capabilities": [
+    "RND.ARCH.cluster-sync"
+   ],
+   "evidence": "Broadcast and LED-volume pipelines use dedicated tooling",
+   "revisit": "A shipped title runs synchronised cluster output",
+   "fallback": "external virtual-production tooling",
+   "reviewed": "2026-09-30"
+  },
+  {
+   "tech": "Virtual-production timecode",
+   "class": "X",
+   "owner": "cinematics-sequencer",
+   "capabilities": [
+    "ANM.CINE.timecode"
+   ],
+   "evidence": "Broadcast and LED-volume pipelines use dedicated tooling",
+   "revisit": "A shipped title runs synchronised cluster output",
+   "fallback": "external virtual-production tooling",
+   "reviewed": "2026-09-30"
   }
  ],
  "as_of": "2026-09-30",

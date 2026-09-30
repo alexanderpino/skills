@@ -12,16 +12,15 @@ Branch: `claude/engine-skill-framework-phase1` (no PR). Phase 1 (G1) answers "do
 | 1 | 276 findings, schema v1 revision | 4a9a529 |
 | 2 | calibrated (12/15 seeds), 265 findings, v2 revision (153 skills, 124 contracts, 1360 capabilities); adjudication 20 upheld / 4 overturned | fd20381, 7385ce7 |
 | 3 | Calibrated (15/15 seeds, independent seed author). 224 findings, 53 seed hits, 171 real. **Revision applied** (r3_a–g, r3_z): 154 skills, 129 contracts, 39 configurations, 74 legacy patterns; check.py green, 37 selftest mutations red. Awaiting adjudication of the partial/reject dispositions. | f542e8c … (this commit) |
+| 4 | 144 findings, seed recall 7/15 (**not calibrated**: K-ARCH, K-SYSTEMS, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-TEST, K-SEC, K-COMPLETE missed their own seed; especially gate-validator and one-word-deletion seeds). 135 real findings: 107 confirmed by the verifier, 28 rejected. **Revision applied** (`gauntlet/round-4/r4_a–d`, `r4_z`): 156 skills, 134 contracts, 43 configurations, 88 legacy patterns; new rules (freeze-before-claim with extension tiers, radar staleness, process skills at M0, oracle_reference on all conformance contracts). Awaiting adjudication. | (this commit) |
 
 Not converged: round 3 still has real major/blocker findings to fix, and the Completeness critic must be clean in two consecutive rounds.
 
 ## Next steps (in order)
 
-1. Round-3 adjudication done (`gauntlet/round-3/adjudication.md`: 21 upheld, 3 overturned and fixed in `r3_h.py`/docs).
-2. **Round 4** (about 30 agents: 15 blind critics on a seeded copy in the scratchpad, one batch verifier each). New independent seed author; strengthen the K-NET brief (it missed its own seed twice in round 3). Save the workflow result to `gauntlet/round-4/workflow/` and run `scripts/checkpoint.py` while it runs.
-3. Repeat until a calibrated round has zero accepted blocker/major findings and the Completeness critic is clean in two consecutive rounds. Only then G2 (SKILL.md generation, `docs/08-phase-2-plan.md`).
-
-Recurring themes for round 4: rewordings that state a legacy stance are now scanned (`contradiction_terms`); oracle authors must be independent, staffed by the freeze and carry an `oracle_reference`; check that the new contracts (C-CMD, C-VFX, C-PTREF, C-HOSTAUTH, C-CAMERA) and the platform-variant closure hold up.
+1. **Adjudicate** round 4 partial/reject dispositions (`gauntlet/round-4/dispositions.md`) with one independent agent; fix overturns in `gauntlet/round-4/r4_h.py` (then `python3 gauntlet/round-4/apply.py`, `check.py`, `--selftest` once, `render.py`).
+2. **Round 5** (about 30 agents): fresh independent seed author with *harder-to-miss but still subtle* seeds spread over every critic; re-brief the critics that missed their own seed twice (K-ARCH, K-SYSTEMS, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-TEST, K-SEC) to sweep mechanically: each critic must open the data rows of its mandate (e.g. K-PROD/K-TEST: every milestone gate and its validator; K-SYSTEMS/K-PERF: every PAL and PRF row; K-FUTURE: radar and contracts' tiers). Recall must reach 80%.
+3. Repeat until a calibrated round has zero accepted blocker/major findings and the Completeness critic is clean in two consecutive rounds. Only then G2.
 
 ## Rules of engagement
 

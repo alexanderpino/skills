@@ -405,7 +405,7 @@
       ],
       [
        "ARCH.ORG.sensitive-paths",
-       "Sensitive write sets (registry parsers, crypto, auth, sandboxes, build & CI) require a K-SEC gate plus a second agent's approval",
+       "Sensitive write sets (registry parsers, crypto, auth, sandboxes, build & CI) require a K-SEC gate plus a second agent's approval; the agent control plane (ledger, access classes, critics.json, check.py, registry, human-gates register, seeds) needs human-gate approval and a fitness function diffs it against the protected branch",
        "program-orchestration",
        "E",
        [
@@ -711,7 +711,8 @@
        "E",
        [
         "memory-allocators",
-        "accessibility"
+        "accessibility",
+        "audio-architect"
        ]
       ],
       [
@@ -1046,6 +1047,15 @@
        [
         "packaging-release-patching",
         "ci-cd-automation"
+       ]
+      ],
+      [
+       "PLAT.CON.public-slot-reference",
+       "Public conformance-passing null implementation of every confidential slot so non-cleared agents run the same suites",
+       "platform-console",
+       "E",
+       [
+        "platform-architect"
        ]
       ]
      ]
@@ -2459,6 +2469,19 @@
         "editor-architect",
         "job-system-task-graph"
        ]
+      ],
+      [
+       "CORE.FRAME.local-time-scale",
+       "Per-entity and per-team time scale (hit-stop, bullet-time on a subset) obeyed by animation, physics, VFX, audio, abilities and movement; deterministic and recorded",
+       "frame-orchestration",
+       "E",
+       [
+        "animation-architect",
+        "physics-architect",
+        "audio-content-runtime",
+        "vfx-particles",
+        "gameplay-architect"
+       ]
       ]
      ]
     },
@@ -2791,6 +2814,16 @@
        [
         "persistence-save"
        ]
+      ],
+      [
+       "CORE.SCALE.safe-boot",
+       "Startup crash-loop detection and safe-mode boot: crash marker, N-strike rollback of settings to last-known-good, plugin/mod disable",
+       "runtime-scalability",
+       "E",
+       [
+        "persistence-save",
+        "crash-diagnostics"
+       ]
       ]
      ]
     }
@@ -3047,7 +3080,7 @@
       ],
       [
        "CNT.ID.registry",
-       "Asset registry & queries",
+       "Asset registry & queries; cooked, chunked, on-demand registry with streamed indexes and an incremental editor registry (never a full scan or residency at boot)",
        "content-pipeline-architect",
        "E"
       ],
@@ -3417,7 +3450,12 @@
        "content-pipeline-architect",
        "E",
        [
-        "ci-cd-automation"
+        "ci-cd-automation",
+        "narrative-dialogue",
+        "gameplay-data",
+        "cinematics-sequencer",
+        "gameplay-camera",
+        "input-system"
        ]
       ]
      ]
@@ -4164,6 +4202,16 @@
         "math-simd-numerics",
         "reconstruction-upscaling",
         "xr-runtime"
+       ]
+      ],
+      [
+       "RND.ARCH.cluster-sync",
+       "Genlock/frame-lock cluster rendering for virtual production",
+       "render-architect",
+       "X",
+       [],
+       [
+        "experimental"
        ]
       ]
      ]
@@ -7144,6 +7192,18 @@
        [
         "visual-debugging-tools"
        ]
+      ],
+      [
+       "ANM.GRAPH.actions",
+       "Action/montage playback: slots layered into graphs, sections and jumps, blend in/out, root-motion policy, notify-window ownership and replication participation",
+       "animation-graphs",
+       "E",
+       [
+        "animation-runtime",
+        "prediction-rollback",
+        "character-movement",
+        "gameplay-systems-toolkit"
+       ]
       ]
      ]
     },
@@ -7353,6 +7413,22 @@
        [
         "replication"
        ]
+      ],
+      [
+       "ANM.CINE.timecode",
+       "Timecode sync for virtual production and sequencer playback",
+       "cinematics-sequencer",
+       "X",
+       [],
+       [
+        "experimental"
+       ]
+      ],
+      [
+       "ANM.CINE.validation",
+       "Sequencer validation (missing bindings, timing conflicts) (registers with CNT.VAL.submit-gate; suite authorship by the contract's oracle_author)",
+       "cinematics-sequencer",
+       "E"
       ]
      ]
     },
@@ -7364,7 +7440,10 @@
        "ANM.TOOL.asset-editor",
        "Skeleton, skeletal-mesh & clip editor (sockets, notifies, curves, montages, compression preview)",
        "animation-runtime",
-       "E"
+       "E",
+       [
+        "animation-graphs"
+       ]
       ],
       [
        "ANM.TOOL.retarget-editor",
@@ -7511,6 +7590,18 @@
        "Offline faster-than-real-time render & null audio device",
        "audio-architect",
        "E"
+      ],
+      [
+       "AUD.ARCH.routing",
+       "Audio routing: endpoint hot-swap with format renegotiation, multi-endpoint output (main mix plus per-local-player devices), OS interruption handling",
+       "audio-architect",
+       "E",
+       [
+        "platform-architect",
+        "platform-console",
+        "input-devices-haptics",
+        "gameplay-architect"
+       ]
       ]
      ]
     },
@@ -7999,6 +8090,12 @@
        "Analog stick processing: radial/axial deadzones, anti-deadzone, response curves, calibration, drift compensation",
        "input-system",
        "E"
+      ],
+      [
+       "INP.ACT.validation",
+       "Action-map validation (conflicts, unreachable actions, glyph coverage) (registers with CNT.VAL.submit-gate; suite authorship by the contract's oracle_author)",
+       "input-system",
+       "E"
       ]
      ]
     },
@@ -8178,7 +8275,7 @@
       ],
       [
        "NET.TRANS.simulation",
-       "Network link conditioner seam (latency, loss, jitter)",
+       "Network link conditioner seam (latency, loss, jitter); replays a governed corpus of captured WAN, Wi-Fi and cellular traces",
        "network-transport",
        "E"
       ],
@@ -8934,6 +9031,18 @@
         "replication",
         "deformation-skinning"
        ]
+      ],
+      [
+       "GAM.FW.turns",
+       "Turn/phase/command-log substrate: ordered commands, undo/history, deterministic replay, clonable-state API for search",
+       "gameplay-architect",
+       "E",
+       [
+        "determinism-replay",
+        "ai-behavior-perception",
+        "persistence-save",
+        "online-services-liveops"
+       ]
       ]
      ]
     },
@@ -9045,6 +9154,41 @@
         "prediction-rollback",
         "anti-cheat-integrity"
        ]
+      ],
+      [
+       "GAM.SYS.timers",
+       "Game-time timers and latent actions (delays, cooldowns, wait-N-seconds): time-domain aware, pausable, saveable, replicated, deterministic",
+       "gameplay-systems-toolkit",
+       "E",
+       [
+        "persistence-save",
+        "frame-orchestration",
+        "prediction-rollback"
+       ]
+      ],
+      [
+       "GAM.SYS.cues",
+       "Feedback cues (hit-stop, shake, flash, sound, haptics) as predicted, deduplicated events",
+       "gameplay-systems-toolkit",
+       "E",
+       [
+        "prediction-rollback",
+        "replication",
+        "gameplay-camera",
+        "input-devices-haptics"
+       ]
+      ],
+      [
+       "GAM.SYS.interaction",
+       "Interaction and target selection: interactable discovery and focus, hold-to-interact, device-glyph prompts, soft-target/lock-on selection, arbitration among candidates and local players; server-validated online",
+       "gameplay-systems-toolkit",
+       "E",
+       [
+        "input-system",
+        "ui-architect",
+        "animation-runtime",
+        "gameplay-camera"
+       ]
       ]
      ]
     },
@@ -9122,7 +9266,8 @@
        "E",
        [
         "world-data-model",
-        "world-architect"
+        "world-architect",
+        "gameplay-systems-toolkit"
        ]
       ],
       [
@@ -9393,6 +9538,26 @@
        [
         "security-engineering"
        ]
+      ],
+      [
+       "GAM.SAVE.unknown-content",
+       "Unknown-record preservation and quarantine; mod/DLC dependency manifest per save",
+       "persistence-save",
+       "E",
+       [
+        "modding-ugc",
+        "serialization-schema"
+       ]
+      ],
+      [
+       "GAM.SAVE.slots",
+       "Save-slot catalogue: locale-independent metadata (playtime, thumbnail, version), per-user ownership and cross-platform portability",
+       "persistence-save",
+       "E",
+       [
+        "platform-services",
+        "ui-architect"
+       ]
       ]
      ]
     },
@@ -9432,6 +9597,12 @@
        "2D platformer movement (coyote time, input buffering)",
        "character-movement",
        "E"
+      ],
+      [
+       "GAM.MOVE.grid",
+       "Grid movement",
+       "character-movement",
+       "E"
       ]
      ]
     },
@@ -9455,7 +9626,10 @@
        "GAM.DATA.tuning",
        "Tuning assets with inheritance, platform & difficulty variants",
        "gameplay-data",
-       "E"
+       "E",
+       [
+        "accessibility"
+       ]
       ],
       [
        "GAM.DATA.spreadsheets",
@@ -9496,6 +9670,12 @@
         "vfx-particles",
         "material-system"
        ]
+      ],
+      [
+       "GAM.DATA.validation",
+       "Gameplay data referential and range integrity validation (registers with CNT.VAL.submit-gate; suite authorship by the contract's oracle_author)",
+       "gameplay-data",
+       "E"
       ]
      ]
     },
@@ -9563,6 +9743,17 @@
         "gameplay-camera",
         "motion-synthesis",
         "facial-animation"
+       ]
+      ],
+      [
+       "GAM.NARR.validation",
+       "Narrative/dialogue graph validation: unreachable/dead-end nodes, soft-locks, fact/flag define-use, per-locale VO/caption/loc coverage (registers with CNT.VAL.submit-gate; suite authorship by the contract's oracle_author)",
+       "narrative-dialogue",
+       "E",
+       [
+        "localization-i18n",
+        "audio-content-runtime",
+        "accessibility"
        ]
       ]
      ]
@@ -9744,6 +9935,12 @@
         "accessibility",
         "xr-runtime"
        ]
+      ],
+      [
+       "GAM.CAM.validation",
+       "Camera rig validation (collision, blend and comfort limits) (registers with CNT.VAL.submit-gate; suite authorship by the contract's oracle_author)",
+       "gameplay-camera",
+       "E"
       ]
      ]
     }
@@ -9903,7 +10100,9 @@
        "E",
        [
         "world-architect",
-        "gameplay-systems-toolkit"
+        "gameplay-systems-toolkit",
+        "asset-cook-processors",
+        "render-architect"
        ]
       ],
       [
@@ -9984,6 +10183,23 @@
        [
         "ui-architect"
        ]
+      ],
+      [
+       "UI.TXT.editing",
+       "Text editing model: caret, selection, grapheme-cluster movement, bidi caret, password and character-limit fields",
+       "text-fonts",
+       "E",
+       [
+        "ui-architect",
+        "platform-architect",
+        "accessibility"
+       ]
+      ],
+      [
+       "UI.TXT.segmentation",
+       "Text segmentation (UAX #29 grapheme, word and sentence boundaries)",
+       "text-fonts",
+       "E"
       ]
      ]
     },
@@ -10085,6 +10301,12 @@
         "gameplay-data",
         "narrative-dialogue"
        ]
+      ],
+      [
+       "UI.LOC.collation",
+       "Locale collation, case mapping and sorting",
+       "localization-i18n",
+       "E"
       ]
      ]
     },
@@ -10124,11 +10346,12 @@
       ],
       [
        "UI.A11Y.assists",
-       "Assist & difficulty hooks",
+       "Assist & difficulty hooks; assist class (cosmetic, input-only, simulation-affecting): simulation-affecting assists are replicated and recorded",
        "accessibility",
        "E",
        [
-        "gameplay-architect"
+        "gameplay-architect",
+        "gameplay-data"
        ]
       ],
       [
@@ -10940,6 +11163,17 @@
         "security-engineering",
         "packaging-release-patching"
        ]
+      ],
+      [
+       "BLD.SYS.ide-integration",
+       "IDE/debugger integration: compile_commands.json and project generation, debugger visualizers for handles, containers and entity ids (new handle/container types ship visualizers)",
+       "build-system-toolchains",
+       "E",
+       [
+        "containers-core-types",
+        "scripting-runtime",
+        "developer-experience-docs"
+       ]
       ]
      ]
     },
@@ -11444,6 +11678,16 @@
         "text-fonts",
         "post-color-hdr"
        ]
+      ],
+      [
+       "QA.RENDER.shader-conformance",
+       "Shader toolchain validation: differential execution of reference compute kernels across backends, all-permutation compile gate, compiler-fuzz lane, compiler/driver version qualification",
+       "render-validation",
+       "E",
+       [
+        "shader-system",
+        "rhi-core"
+       ]
       ]
      ]
     },
@@ -11592,6 +11836,16 @@
         "server-scaleout-persistence",
         "online-services-liveops",
         "dedicated-server"
+       ]
+      ],
+      [
+       "QA.ROBUST.minimization",
+       "Test-case reduction: fuzz-input, replay-trace and scene minimization, required for failures handed to implementers",
+       "robustness-fuzzing",
+       "E",
+       [
+        "determinism-replay",
+        "render-validation"
        ]
       ]
      ]
@@ -11888,6 +12142,16 @@
        [
         "program-orchestration"
        ]
+      ],
+      [
+       "QA.AGENT.holdout-hygiene",
+       "Holdout anti-probing protocol: per-package query budget, retirement of failed cases replaced from a seeded generator, fixed failure taxonomy without input detail, redacted-repro channel, overfitting canary, queries logged in provenance",
+       "test-architect",
+       "E",
+       [
+        "program-orchestration",
+        "ci-cd-automation"
+       ]
       ]
      ]
     },
@@ -11921,7 +12185,8 @@
        "E",
        [
         "prediction-rollback",
-        "replication"
+        "replication",
+        "network-transport"
        ]
       ],
       [
@@ -13094,7 +13359,8 @@
        "anti-cheat-integrity",
        "E",
        [
-        "determinism-replay"
+        "determinism-replay",
+        "accessibility"
        ]
       ],
       [
@@ -13108,7 +13374,7 @@
       ],
       [
        "XC.SEC.hardening",
-       "Exploit-mitigation & hardened-build matrix per platform (CFI, shadow stacks, allocator hardening)",
+       "Exploit-mitigation & hardened-build matrix per platform (CFI, shadow stacks, allocator hardening); side-channel row (retpoline/SSBD policy, tenant isolation on shared hosts)",
        "security-engineering",
        "E",
        [
@@ -13237,7 +13503,8 @@
        [
         "program-orchestration",
         "ci-cd-automation",
-        "crash-diagnostics"
+        "crash-diagnostics",
+        "engine-product-management"
        ]
       ],
       [

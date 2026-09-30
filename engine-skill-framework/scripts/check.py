@@ -342,6 +342,14 @@ def run(m):
                 n = len(placed.get(sid, []))
                 if n != 1:
                     E(f"build skill {sid} appears in {n} milestones (expected exactly 1)")
+        for name, v in claims.items():
+            if len(v) != 1 or name not in m.configurations:
+                continue
+            for sk in m.members(name):
+                for cid, opt in m.deps(sk, include_universal=True):
+                    if not opt and cid in frozen_at and m.layer(cid) != "P" and idx_of[frozen_at[cid]] > idx_of[v[0]]:
+                        E(f"configuration {name} claimed at {v[0]} requires contract {cid} (via {sk}) frozen later at "
+                          f"{frozen_at[cid]}; freeze the core earlier and use an extension tier")
         for name in m.configurations:
             if len(claims.get(name, [])) != 1:
                 E(f"configuration {name} is claimed in full by {len(claims.get(name, []))} milestones (expected 1)")
@@ -361,11 +369,13 @@ def run(m):
             if cons and min(cons) > f:
                 E(f"contract {cid} frozen at {frozen_at[cid]} before any consumer is built")
             impl_ms = [ms_of[x] for x in m.skill_order if x in ms_of and cid in m.skill(x).get("implements", [])]
-            if m.contract(cid).get("needs_implementer") and impl_ms and max(impl_ms) > f:
+            tier_ms = [idx_of[v] for v in (m.contract(cid).get("extension_tiers") or {}).values() if v in idx_of]
+            if m.contract(cid).get("needs_implementer") and impl_ms and max(impl_ms) > f \
+                    and not (tier_ms and max(tier_ms) >= max(impl_ms)):
                 E(f"contract {cid} frozen at {frozen_at[cid]} before its last implementer is built")
             oa = m.contract(cid).get("oracle_author")
-            if m.layer(cid) in (0, 1, 2) and not m.contract(cid).get("oracle_reference"):
-                E(f"contract {cid} (layer {m.layer(cid)}) names no oracle_reference (external corpora or reference)")
+            if m.contract(cid).get("conformance") and not m.contract(cid).get("oracle_reference"):
+                E(f"conformance contract {cid} (layer {m.layer(cid)}) names no oracle_reference (external corpora or reference)")
             if oa in ms_of and ms_of[oa] > f:
                 E(f"contract {cid} frozen at {frozen_at[cid]} before its oracle author {oa} is built")
             for tier, tms in (m.contract(cid).get("extension_tiers") or {}).items():
@@ -511,6 +521,12 @@ def run(m):
                 ok_owner = True
         if caps_ and not ok_owner:
             E(f"legacy pattern {p['id']}: justification owner owns, contributes to or leads none of its stance caps")
+
+    # -- process skills (oracle authors, validators, critics) are staffed from M0
+    if m.milestone_doc["milestones"]:
+        want = sorted(x for x in m.skill_order if m.skill(x).get("kind") == "process")
+        if sorted(m.milestone_doc["milestones"][0].get("process_skills", [])) != want:
+            E("milestone M0 must list every process skill in process_skills")
 
     # -- radar entries are dated and not stale for their class
     import datetime
@@ -722,6 +738,7 @@ def selftest():
         ("dangling capability reference", lambda m: first_cap(m).__setitem__(1, first_cap(m)[1] + " (see RES.MGMT.nothing)"), "refers to unknown capability"),
         ("experimental capability in a shipping profile", lambda m: [c.__setitem__(5, ["aaa"]) for d in m.cap_doc["domains"] for a in d["areas"] for c in a["caps"] if c[0] == "RND.GRAPH.work-graphs"], "must carry exactly the 'experimental' profile"),
         ("legacy contradiction term", lambda m: m.contract("C-FRAME").__setitem__("summary", m.contract("C-FRAME")["summary"] + " Variable-timestep simulation on the render frame delta."), "states legacy pattern"),
+        ("claim before freeze", lambda m: [ms["contracts_frozen"].remove("C-RG") for ms in m.milestone_doc["milestones"] if "C-RG" in ms["contracts_frozen"]] and m.milestone_doc["milestones"][7]["contracts_frozen"].append("C-RG"), "frozen later"),
         ("radar entry stale", lambda m: m.radar_doc["entries"][0].__setitem__("reviewed", "2020-01-01"), "reviewed"),
         ("oracle reference missing", lambda m: m.contract("C-MEM").pop("oracle_reference"), "oracle_reference"),
         ("legacy pattern without stance", lambda m: m.legacy_doc["patterns"][0].__setitem__("stance_capabilities", []), "has no stance capabilities"),

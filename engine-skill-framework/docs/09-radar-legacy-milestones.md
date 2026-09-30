@@ -16,9 +16,11 @@ Every non-established capability is on the radar with an owner, evidence, a revi
 | CXL memory tiers | speculative | memory-allocators | non-goal | Server-only hardware | Client/console hardware exposes tiered memory | — |
 | Linked/AFR multi-GPU rendering | speculative | gpu-platform-architect | non-goal | Vendor support withdrawn | Vendor re-investment | — |
 | Generative world models as renderer/simulator | speculative | render-architect | non-goal | Genie 3, Muse/WHAM (2025) research | Controllable, deterministic model at interactive rates on consumer hardware | — |
+| Volumetric and spatial video | speculative | media-playback | non-goal | Research and early products | A shipping title targets it | flat video / stereoscopic rendering |
+| Light-field and holographic displays | speculative | render-architect | non-goal | Research and early products | A shipping title targets it | flat video / stereoscopic rendering |
 | ECS relationships | emerging | ecs-runtime | `CORE.ECS.relationships` | Flecs relationships; Bevy relations work | Benchmarks on engine entity mixes show query cost acceptable | Component references + explicit indices |
 | C++26 static reflection | emerging | reflection-metadata | `CORE.REFL.generation` | P2996 adopted for C++26 | C++26 reflection available on every platform compiler | Code generation |
-| Memory-safe language components | emerging | core-runtime-architect | `CORE.LIFE.interop` | Android Rust adoption data; CISA/NSA roadmap guidance | Console toolchain support for chosen language | Hardened C++ subset + fuzzing |
+| Memory-safe language components | emerging | core-runtime-architect | `CORE.LIFE.interop` | Android Rust adoption data; CISA/NSA roadmap guidance | Console toolchain support for chosen language; agent-authored memory-safety escapes above threshold in C++ modules | Hardened C++ subset + fuzzing |
 | OpenUSD as interchange backbone | emerging | asset-import-interchange | `CNT.IMP.usd` | AOUSD Core Spec; DCC adoption | Core spec 1.0 stable & DCC coverage of needed schemas | glTF/FBX import |
 | MaterialX / OpenPBR interchange & model | emerging | material-system | `RND.MAT.openpbr` | OpenPBR 1.0 (ASWF 2024); UE Substrate production in 5.7 | Real-time OpenPBR evaluation cost within tier budgets | Layered PBR model |
 | Remote/CDN content streaming at runtime | emerging | async-io-storage | `RES.IO.remote` | Microsoft Flight Simulator, Roblox | Offline & cache policy validated on target platforms | Install-time content only |
@@ -44,7 +46,6 @@ Every non-established capability is on the radar with an owner, evidence, a revi
 | Audio-driven & ML lip sync | emerging | facial-animation | `ANM.FACE.lipsync-ml` | Production phoneme lip sync; ML variants | Localization coverage & quality | ANM.FACE.lipsync (phoneme/viseme lip sync) |
 | Wave-based acoustic propagation | emerging | spatial-audio-acoustics | `AUD.SPAT.propagation` | Project Acoustics; Steam Audio | Bake/runtime cost fit | Reverb zones + occlusion |
 | Runtime neural speech (TTS/ASR) | emerging | audio-content-runtime | `AUD.CONTENT.speech` | Shipped AI-NPC titles 2025 | Latency, cost & localization quality | Recorded VO |
-| Seamless server meshing | emerging | server-scaleout-persistence | `NET.ARCH.meshing` | Star Citizen server meshing live since late 2024; few technical postmortems | Two shipped-title technical postmortems | Zoned/instanced servers (NET.SRV.zoning) |
 | QUIC/WebTransport game transport | emerging | network-transport | `NET.TRANS.quic` | RFC 9000; WebTransport | Latency parity with custom UDP on target platforms | Custom UDP protocol |
 | Learned & LLM-driven agents | emerging | ai-behavior-perception | `GAM.AI.learned` | GT Sophy shipped in Gran Turismo 7 (2023) | Moderation, cost & rating requirements met per title | Authored behavior via C-AIAGENT fallback |
 | Generative authoring tools | emerging | ai-assisted-authoring | `ED.AI.generative`, `ED.AI.provenance`, `ED.AI.evaluation` | Unity AI; Roblox Assistant | Licensing/provenance clear for training data | Manual authoring |
@@ -67,14 +68,13 @@ Every non-established capability is on the radar with an owner, evidence, a revi
 | OS model APIs, weight residency & local/remote routing | emerging | ml-inference-runtime | `ML.RT.os-models`, `ML.RT.residency`, `ML.RT.local-remote` | Windows ML GA, Apple Foundation Models, Android AICore (2025) | Shipped title using an OS model API | Engine-packaged models |
 | OS-composited spatial scenes (shared space) | emerging | xr-runtime | `PLAT.XR.scene-export` | visionOS Shared Space/RealityKit; Unity PolySpatial | Second platform with OS-composited app scenes | Full/immersive space only |
 | Player-prompted runtime asset generation | emerging | modding-ugc | `XC.EXT.generated-assets` | Roblox Cube 3D (2025) | Second platform shipping it | Offline UGC only |
-| Memory-safe language components (XC.SEC.memory-safety) | emerging | security-engineering | `XC.SEC.memory-safety` | Android Rust adoption data; CISA/NSA roadmap guidance | Console toolchain support for chosen language | Hardened C++ subset + fuzzing |
+| Memory-safe language components (XC.SEC.memory-safety) | emerging | security-engineering | `XC.SEC.memory-safety` | Android Rust adoption data; CISA/NSA roadmap guidance | Console toolchain support for chosen language; agent-authored memory-safety escapes above threshold in C++ modules | Hardened C++ subset + fuzzing |
 | MaterialX / OpenPBR interchange & model (CNT.IMP.materialx) | emerging | asset-import-interchange | `CNT.IMP.materialx` | OpenPBR 1.0 (ASWF 2024); UE Substrate production in 5.7 | Real-time OpenPBR evaluation cost within tier budgets | Layered PBR model |
 | Planetary & geospatial worlds (CNT.IMP.geospatial) | emerging | asset-import-interchange | `CNT.IMP.geospatial` | MSFS; Cesium/3D Tiles integrations | A reference game requires planet scale | Planar partitioned worlds |
 | ReSTIR GI & path-traced GI (RND.PT.realtime) | emerging | path-tracing | `RND.PT.realtime` | Ouyang et al. HPG 2021; shipped PT modes | RT tier performance on console-class hardware | hybrid raster + RT effects |
 | Strand hair simulation & rendering (PHY.SOFT.hair-sim) | emerging | cloth-deformables | `PHY.SOFT.hair-sim` | UE Groom; Frostbite strands | Budget fit at target character counts | bone-chain dynamics |
 | In-shader neural evaluation & differentiable shaders (RND.SHADER.autodiff) | emerging | shader-system | `RND.SHADER.autodiff` | SM 6.9 cooperative vectors (preview); Slang autodiff | Non-preview cross-vendor support | hand-derived gradients or finite differences in tool code |
 | WebGPU backend & web 3D (PLAT.WEB.webgpu-target) | emerging | platform-web | `PLAT.WEB.webgpu-target` | WebGPU in Chrome/Edge/Safari/Firefox (2023–2025) | Shipped WebGPU with bindless/timestamp features in all engines' target browsers | Web target limited to WebGPU-capable browsers (no WebGL backend; see non-goal) |
-| Gaussian splatting & radiance fields (RND.GEO.splats) | emerging | geometry-pipeline | `RND.GEO.splats` | Kerbl et al. 2023; 3DGRT 2024; glTF splat extension work | Standard format + relighting + shipped game use | Photogrammetry meshes |
 | Generative authoring tools (CNT.COOK.ml-assisted) | emerging | asset-cook-processors | `CNT.COOK.ml-assisted` | Unity AI; Roblox Assistant | Licensing/provenance clear for training data (QA.CERT.ml-provenance) | classical processors |
 | Agent/automation control API (MCP class) (QA.FUNC.agent-exploration) | emerging | functional-automation-soak | `QA.FUNC.agent-exploration` | EA SEED RL testing; academic game-testing agents | Agent-found defects exceed the scripted-bot rate over two milestones | scripted bots and random-walk monkeys |
 | Generative-AI service boundary & guardrails (XC.SEC.genai) | emerging | security-engineering | `XC.SEC.genai` | OWASP LLM Top 10; Steam AI disclosure | Per-title policy approval | no live-generated content; offline authored variants |
@@ -84,6 +84,9 @@ Every non-established capability is on the radar with an owner, evidence, a revi
 | Runtime procedural fracture at scale | emerging | destruction-fracture | `PHY.DEST.procedural` | Pre-fractured destruction is established; impact-time fracture at scale is research-grade | A shipped title fractures at impact within the debris budget on consoles | PHY.DEST.runtime (pre-fractured assets) |
 | On-device autoregressive execution | emerging | ml-inference-runtime | `ML.RT.sequence-exec` | OS-provided and open on-device speech/language runtimes (2024–2026) | Two shipping consumers stay within KV-cache and latency budgets on min-spec | remote model via C-LIVE (ML.RT.local-remote) |
 | Geospatial localization (VPS) & Earth-anchored content | emerging | xr-runtime | `PLAT.XR.geospatial` | Platform VPS/geospatial APIs (2022–2025) | Two platforms expose stable geospatial anchors | PLAT.XR.anchors (local/shared anchors) with PLAT.MOB.location |
+| Predicted rigid-body physics with rollback | emerging | prediction-rollback | `NET.PRED.physics-rollback` | PhysX/Jolt do not restore solver warm-start caches or partial islands; Chaos network-physics prediction is beta | A shipped title predicts general rigid bodies over a restorable backend | NET.PRED.physics (server-authoritative bodies with interpolation) |
+| Engine as cloud render host | emerging | platform-architect | `PLAT.PAL.cloud-render-host` | Cloud gaming services host titles on datacentre GPUs (2020–2026) | Two shipped titles run a first-party render host with published latency budgets | client build streamed by a third-party host (PLAT.PAL.cloud-streaming) |
+| Browser ML backends | emerging | ml-inference-runtime | `ML.RT.web-backends` | WebNN and WebGPU inference (2024–2026) | Two browser engines ship WebNN by default | remote inference via C-LIVE (ML.RT.local-remote) |
 | Cloud-hybrid compute (split client/cloud simulation) | experimental | network-architect | `PLAT.PAL.cloud-hybrid` | Crackdown 3 cloud destruction (2019) — limited | Two shipped titles publish latency/cost postmortems | Local simulation only |
 | ML-generated content in PCG | experimental | procedural-generation | `WLD.PCG.ml` | Research & tool demos | Deterministic, licensable models with provenance | Rule-based PCG |
 | Work graphs & mesh nodes | experimental | render-graph-scheduling | `RND.GRAPH.work-graphs` | D3D12 Work Graphs 1.0 (2024); vendor samples; no shipped titles | Support on ≥2 console/desktop APIs and one shipped-title postmortem | Indirect / device-generated commands |
@@ -93,6 +96,7 @@ Every non-established capability is on the radar with an owner, evidence, a revi
 | In-shader neural evaluation & differentiable shaders | experimental | shader-system | `RND.SHADER.neural` | API-neutral matrix/tensor intrinsics: DXIL linear algebra, Vulkan cooperative matrix/vector, Metal tensor operations (2025–2026 previews) | Two shipping backends expose the same matrix intrinsic set in retail drivers | Standalone inference dispatch |
 | Gaussian splatting & radiance fields | experimental | geometry-pipeline | `RND.GEO.splat-relight` | Kerbl et al. 2023; 3DGRT 2024; glTF splat extension work | Standard format + relighting + shipped game use | Photogrammetry meshes |
 | ML cloth & learned deformables | experimental | cloth-deformables | `PHY.SOFT.ml` | Research; UE ML cloth experiments | Production quality & budget | XPBD cloth |
+| Seamless server meshing | experimental | server-scaleout-persistence | `NET.ARCH.meshing` | Star Citizen server meshing live since late 2024; few technical postmortems | Two shipped-title technical postmortems | NET.SRV.zoning (zoned/instanced multi-server worlds) |
 | HW ray-traced curve primitives (LSS) | experimental | ray-tracing-infrastructure | `RND.RT.curves` | Blackwell LSS; DXR/Vulkan extensions 2025 | Cross-vendor API support | Hair cards or tube proxies in the BLAS |
 | Hardware-decodable dense geometry (DGF) | experimental | virtualized-geometry-lod | `RND.LOD.dgf` | AMD DGF (2025) specification | Hardware decode on two vendors | Engine cluster compression |
 | L4S low-latency congestion signalling | experimental | network-transport | `NET.TRANS.l4s` | RFC 9330–9332 | Deployed on two major access networks | Standard congestion control |
@@ -104,9 +108,12 @@ Every non-established capability is on the radar with an owner, evidence, a revi
 | std3d on the web | experimental | platform-web | `PLAT.WEB.std3d` | WebGPU subgroups (2025); bindless & memory64 in progress | WebGPU bindless + memory64 in two browsers | lite3d web tier |
 | Work graphs & mesh nodes (RND.GEO.mesh-nodes) | experimental | geometry-pipeline | `RND.GEO.mesh-nodes` | D3D12 Work Graphs 1.0 (2024); vendor samples; no shipped titles | Support on ≥2 console/desktop APIs and one shipped-title postmortem | Indirect / device-generated commands |
 | Work graphs & mesh nodes (RND.RHI.work-graph-programs) | experimental | rhi-core | `RND.RHI.work-graph-programs` | D3D12 Work Graphs 1.0 (2024); vendor samples; no shipped titles | Support on ≥2 console/desktop APIs and one shipped-title postmortem | ExecuteIndirect / device-generated commands |
+| Gaussian splatting & radiance fields (RND.GEO.splats) | experimental | geometry-pipeline | `RND.GEO.splats` | Kerbl et al. 2023; 3DGRT 2024; glTF splat extension work | Standard format + relighting + shipped game use | Photogrammetry meshes |
 | Gaussian splatting & radiance fields (CNT.IMP.splats) | experimental | asset-import-interchange | `CNT.IMP.splats` | Kerbl et al. 2023; 3DGRT 2024; glTF splat extension work | Standard format + relighting + shipped game use | convert to meshes at import |
 | Learned physics-based character control | experimental | ik-procedural-animation | `ANM.IK.learned-physics` | Research and early middleware; no shipped engine feature | A shipped title uses a learned physics policy | ANM.IK.physical (active ragdoll with PD motors) |
 | Learned surrogates inside the physics step | experimental | physics-architect | `PHY.ARCH.learned-surrogates` | Research on learned destruction/fluid surrogates; no shipped engine feature | A shipped title uses a learned surrogate with recorded outputs | classical solvers |
+| Virtual-production cluster sync | experimental | render-architect | `RND.ARCH.cluster-sync` | Broadcast and LED-volume pipelines use dedicated tooling | A shipped title runs synchronised cluster output | external virtual-production tooling |
+| Virtual-production timecode | experimental | cinematics-sequencer | `ANM.CINE.timecode` | Broadcast and LED-volume pipelines use dedicated tooling | A shipped title runs synchronised cluster output | external virtual-production tooling |
 
 ## Anti-legacy pattern catalogue
 
@@ -132,7 +139,7 @@ A pattern is not forbidden. If it appears, the justification owner must record a
 | L16 | Synchronous IO / blocking loads | file read on a frame-critical thread | Async staged pipeline with deadlines | async-io-storage | `RES.MGMT.pipeline`, `RES.IO.backends` |
 | L17 | Page-fault-driven streaming | mmap reads on latency-critical workers | Explicit IO requests; mmap only prefetched/tool-side | async-io-storage | `RES.IO.mmap` |
 | L18 | Blocking whole-level load before play | whole level loaded before play | Async non-blocking loading; cell streaming with budgeted activation for 3D/openworld | world-architect | `WLD.PART.activation`, `WLD.MODEL.unit-load` |
-| L19 | Immediate synchronous observer callbacks across subsystems | callbacks invoked on the producer's thread mid-update | Deferred batched events at declared consumption points | entity-object-model | `CORE.OBJ.events` |
+| L19 | Immediate synchronous observer callbacks across subsystems | callbacks invoked on the producer's thread mid-update | Deferred batched events at declared consumption points | entity-object-model | `CORE.OBJ.events`, `PHY.ARCH.events` |
 | L20 | Stringly-typed reflection on runtime paths | name lookups per frame | Static reflection & resolved IDs; strings at tool/script boundaries | reflection-metadata | `CORE.REFL.static-default` |
 | L21 | Tracing-GC-managed engine objects | engine objects reachable via GC | Explicit ownership + generational handles; weak script refs | entity-object-model | `CORE.OBJ.references` |
 | L22 | Global script VM on one thread | single interpreter mutating the world | Per-worker VMs/isolates, deferred mutation | scripting-runtime | `GAM.SCR.concurrency` |
@@ -140,9 +147,9 @@ A pattern is not forbidden. If it appears, the justification owner must record a
 | L24 | Blocking cook-before-play | full cook required before running | On-demand cooking & cook-server streaming | content-pipeline-architect | `CNT.COOK.on-demand` |
 | L25 | Single-thread-first design | systems that must run serially by construction | Parallel by construction, correct on one worker (inline mode) | architecture-governance | `CORE.JOBS.scheduler`, `CORE.JOBS.degenerate`, `ARCH.GOV.fitness` |
 | L26 | Monolithic subsystems | one module owning a whole domain | Contracts + focused experts | engine-architect | `ARCH.STRUCT.contracts`, `ARCH.STRUCT.replaceability` |
-| L27 | ECS for everything / GPU-driven everywhere (new dogma) | technique applied where access patterns do not fit | Per-domain ADR with workload evidence | architecture-governance | `ARCH.GOV.adr` |
+| L27 | ECS for everything (new dogma) | technique applied where access patterns do not fit | Per-domain ADR with workload evidence | architecture-governance | `CORE.OBJ.hybrid`, `CORE.ECS.bridges`, `ARCH.GOV.adr` |
 | L28 | Global renderer sync & CPU/GPU flushes | WaitForIdle / flush calls on frame paths | Render-graph-derived barriers; external work imported with queue transfers | render-graph-scheduling | `RND.GRAPH.barriers`, `RND.GRAPH.external-work` |
-| L29 | Runtime shader/PSO compilation on first use | PSO created on first draw; hitch on new material | PSO coverage from play traces, precompiled/pipeline libraries, async creation with fallbacks | shader-system | `RND.RHI.pso`, `RND.SHADER.cache`, `RND.SHADER.precache`, `RND.SHADER.pso-lists` |
+| L29 | Runtime shader/PSO compilation on first use | PSO created on first draw; hitch on new material | PSO coverage from play traces, precompiled/pipeline libraries, async creation with fallbacks | shader-system | `RND.MAT.pso-miss-policy`, `RND.RHI.pso`, `RND.SHADER.cache`, `RND.SHADER.precache`, `RND.SHADER.pso-lists` |
 | L30 | Frame-coupled variable-timestep simulation | simulation stepped by render delta | Fixed/declared step with interpolation per C-FRAME | frame-orchestration | `CORE.FRAME.fixed-step` |
 | L31 | Hard-reference transitive load graphs | loading one asset pulls large dependency closures | Soft references, dependency-aware loading with budgets | resource-streaming-architect | `RES.MGMT.dependencies` |
 | L32 | Process-global current world | static world accessor | World handles; multiple isolated worlds | entity-object-model | `CORE.OBJ.world-instances` |
@@ -185,9 +192,23 @@ A pattern is not forbidden. If it appears, the justification owner must record a
 | L69 | Flaky-test tolerance (retry until green) | retries or quarantines that hide nondeterminism | Flake classification and root-cause policy | test-architect | `QA.STRAT.flaky` |
 | L70 | Average-fps performance targets | budgets stated as mean fps | Per-tier frame-time budgets with percentiles | performance-architect | `PRF.METH.budgets` |
 | L71 | Big-bang releases without staged rollout | all-at-once patch to every client | Canary/staged rollout with kill switches | packaging-release-patching | `BLD.REL.staged-rollout` |
-| L72 | Baked-string localization | translated text embedded in code or textures | Keyed string tables with plural/gender rules | localization-i18n | `UI.LOC.strings` |
-| L73 | Reconstruction/frame generation as budget substitute | budgets or latency judged on generated frames | Upscaling/frame generation is an optional presentation layer; budgets and latency judged on rendered frames with a minimum base rate per tier | performance-architect | `RND.RECON.framegen`, `PRF.LOAD.pacing-latency` |
+| L72 | Baked-string localization | translated text embedded in code or textures | Keyed string tables with plural/gender rules | localization-i18n | `UI.LOC.messageformat`, `UI.LOC.strings`, `UI.LOC.terms` |
+| L73 | Reconstruction/frame generation as budget substitute | budgets or latency judged on generated frames | Frame generation is an optional presentation layer, never counted toward latency or simulation budgets; upscaling is a declared budget input per tier (internal-resolution budget at base rate with the reconstruction mode) | performance-architect | `RND.RECON.framegen`, `PRF.LOAD.pacing-latency` |
 | L74 | Long-lived static CI/cloud credentials | keys in CI variables or images | OIDC workload identity, short-lived tokens, ephemeral runners | ci-cd-automation | `BLD.CI.hardening` |
+| L75 | Baked visibility (PVS/portals) on GPU-driven tiers | precomputed visibility sets used where HZB culling is available | GPU HZB culling; baked visibility only on the CPU-culled tier by ADR | geometry-pipeline | `RND.GEO.culling`, `RND.GEO.cpu-occlusion`, `RND.GEO.precomputed-visibility` |
+| L76 | Discrete-only collision with speed clamps | speed caps or thick walls to stop tunnelling | Continuous collision for fast bodies | physics-architect | `PHY.COL.ccd` |
+| L77 | Unbounded always-awake physics world | no sleeping, active set or simulation LOD | Islands and sleeping, physics LOD, tier transitions | physics-architect | `PHY.DYN.islands`, `PHY.ARCH.lod`, `PHY.ARCH.tier-transitions` |
+| L78 | Rollback over non-restorable physics state | rollback or lockstep over a backend that cannot restore solver caches | Restore/resimulate conformance and sync tests | physics-architect | `PHY.ARCH.rewind`, `NET.PRED.sync-test` |
+| L79 | Thread-per-subsystem and fixed worker counts | per-subsystem loops for physics, audio, streaming or network; constant-size worker pools | One scheduler, worker count from topology and actuators | job-system-task-graph | `CORE.JOBS.thread-model`, `CORE.JOBS.scheduler`, `CORE.SCALE.actuators`, `PRF.CPU.hybrid` |
+| L80 | Unbounded stage queues and benchmarks on non-profile builds | queues without back-pressure; timings from debug builds | Bounded queues with back-pressure; benchmarks on the profile build configuration | performance-architect | `PRF.METH.gates`, `BLD.SYS.configs` |
+| L81 | GPU-driven everywhere (new dogma) | GPU-driven path forced on tiers where it loses | Per-tier submission strategy by ADR | render-architect | `RND.ARCH.submission-strategy` |
+| L82 | Neural/ML by default (new dogma) | ML features without measured advantage or fallback | ML behind optional contracts with fallbacks and evidence ADRs | ml-inference-runtime | `ML.RT.scheduling`, `ARCH.GOV.adr` |
+| L83 | Async physics by default (new dogma) | decoupled physics stepping without rollback or determinism review | Stepping mode chosen per netcode family by ADR | physics-architect | `PHY.ARCH.async`, `PHY.ARCH.stepping` |
+| L84 | Full asset-registry scan or residency at boot | registry loaded in full at startup | Cooked, chunked, on-demand registry with streamed indexes | content-pipeline-architect | `CNT.ID.registry` |
+| L85 | Text without shaping or grapheme awareness | ASCII, bitmap-font or code-unit text handling | Shaping, bidi and grapheme segmentation | text-fonts | `UI.TXT.shaping`, `UI.TXT.bidi` |
+| L86 | Sentence assembly by string concatenation | concatenated fragments for localized sentences | MessageFormat-class messages with terms and agreement | localization-i18n | `UI.LOC.messageformat`, `UI.LOC.terms` |
+| L87 | Synchronous per-request pathfinding and navmesh rebuild | path or rebuild on the calling thread | Batched async path queries and incremental rebuild | navigation-pathfinding | `GAM.AI.pathfinding`, `GAM.AI.navmesh` |
+| L88 | Hard-coded gameplay tunables | constants in code | Data-driven tuning assets | gameplay-data | `GAM.DATA.tuning` |
 
 ## Untrusted-input registry
 
@@ -256,6 +277,21 @@ Every input class has exactly one validating owner; parser owners register it to
 | player-feedback | crash-diagnostics | engine-product-management | agent-input | redteam | quarantined as data; no instruction authority |
 | inter-agent-messages | program-orchestration | — | agent-input | redteam | provenance-tagged; no instruction authority; findings and commit messages are data |
 | store-notifications | platform-services | server-scaleout-persistence | hostile-remote | harness | signature verification, replay window, schema bounds |
+| physics-assets | collision-detection | package-formats-vfs, modding-ugc | hostile-remote | harness | hull vertices, triangles, cook time, body/constraint counts; UGC cooking async, budgeted and sandboxed |
+| server-list-entries | net-session | network-transport | hostile-remote | harness | length/count/rate; endpoint allow-list; pre-auth |
+| tabular-imports | gameplay-data | — | hostile-local | harness | zip-bomb, XXE and formula-injection limits |
+| localization-exchange | localization-i18n | — | hostile-local | harness | XLIFF/PO size/depth limits |
+| narrative-imports | narrative-dialogue | — | hostile-local | harness | screenplay import size/depth limits |
+| vendor-deliveries | content-pipeline-architect | — | hostile-local | harness | package manifest and size limits |
+| tracker-webhooks | collaboration-version-control | — | hostile-remote | harness | signature and schema verification |
+| lan-discovery | net-session | network-transport | hostile-remote | harness | pre-auth broadcast/mDNS replies: length/rate limits |
+| community-server-config | dedicated-server | modding-ugc | hostile-remote | harness | ruleset/config file size/depth limits |
+| hid-reports | input-devices-haptics | — | hostile-local | harness | report/descriptor size and structure limits |
+| remote-build-results | ci-cd-automation | build-system-toolchains | hostile-remote | harness | cache/result signature and size limits |
+| patch-payloads | packaging-release-patching | package-formats-vfs | hostile-remote | harness | signature, size and chunk limits |
+| tool-outputs | security-engineering | — | agent-input | redteam | quarantined as data; no instruction authority |
+| agent-memory | program-orchestration | — | agent-input | redteam | quarantined as data; no instruction authority |
+| contributed-patches | engine-product-management | — | agent-input | redteam | quarantined as data; no instruction authority |
 
 ## Milestones (walking skeleton → engine 1.0)
 
@@ -281,9 +317,9 @@ Skills: asset-cook-processors, asset-import-interchange, async-io-storage, build
 
 **Exit criteria:** The indie-2d and minimal reference games are playable on PC with save, localization, accessibility baseline and hot reload. Network design authorities (network-architect, transport, replication, prediction, sessions) draft C-NET/C-REP/C-PREDICT/C-NETSESSION and review every freeze; a two-instance loopback session (lockstep or rollback) runs under QA.SIM.netsim. Security: threat model for the configuration, fuzz harnesses for every registered input reaching it, hardened shipping build, dev-surface audit. Perf: within budget on min-spec PC; hitch gate active.
 
-**Gates (capability → independent validator):** `QA.REF.ladder` → `QA.STRAT.release-criteria`, `QA.SIM.netsim` → `QA.AGENT.oracle-change-control`, `XC.SEC.threats` → `QA.ROBUST.fuzzing`, `XC.SEC.hardening` → `QA.CERT.prechecks`, `BLD.SYS.dev-surface-exclusion` → `XC.SEC.testing`, `PRF.LOAD.hitch-gate` → `PRF.BENCH.regression`, `QA.RENDER.golden` → `QA.FUNC.compat`, `QA.SIM.stability-suite` → `QA.FUNC.soak`
+**Gates (capability → independent validator):** `QA.REF.ladder` → `QA.STRAT.release-criteria`, `QA.SIM.netsim` → `QA.AGENT.oracle-change-control`, `XC.SEC.threats` → `QA.ROBUST.fuzzing`, `XC.SEC.hardening` → `QA.CERT.prechecks`, `BLD.SYS.dev-surface-exclusion` → `XC.SEC.testing`, `PRF.LOAD.hitch-gate` → `PRF.BENCH.regression`, `QA.RENDER.golden` → `QA.FUNC.compat`, `QA.SIM.stability-suite` → `QA.FUNC.soak`, `PRF.METH.asymptotics` → `PRF.BENCH.scale-content`
 
-**Contracts frozen:** C-API, C-ASSET, C-BUILD, C-COOK, C-DET, C-EVID, C-FLOW, C-FRAME, C-ID, C-INPUT, C-PERF, C-PRESENT, C-REFL, C-SER, C-SPATIAL, C-TEXT, C-TRUST, C-VIEW
+**Contracts frozen:** C-A11YRT, C-ANIM, C-API, C-ASSET, C-AUDIO, C-BUILD, C-CHARCTRL, C-COLOR, C-COOK, C-DET, C-DRAW2D, C-EVID, C-FLOW, C-FRAME, C-GAME, C-GAMEDATA, C-GPUMEM, C-GPUTIER, C-ID, C-IMPORT, C-INPUT, C-IO, C-IPC, C-LOC, C-MATIF, C-PAL, C-PERF, C-PHYS, C-PRESENT, C-REFL, C-RES, C-RG, C-RHI, C-RSCENE, C-SCENETEX, C-SER, C-SHADER, C-SNAPSHOT, C-SPATIAL, C-STATECLASS, C-TEXT, C-TRUST, C-VFS, C-VIEW, C-WORLD
 
 **Contracts drafted:** C-A11YRT, C-ABILITY, C-AI, C-AIAGENT, C-ANIM, C-AUDIO, C-CAMERA, C-DIALOGUE, C-ECS, C-ENV, C-GAME, C-GAMEDATA, C-HOSTAUTH, C-INTEGRITY, C-LIVE, C-LOC, C-MOVE, C-NAV, C-NET, C-NETLINK, C-NETSESSION, C-PCG, C-PHYS, C-PKG, C-PLUGIN, C-PREDICT, C-RELOAD, C-REP, C-SAVE, C-SCRIPT, C-SEQ, C-SIGNIF, C-SVC, C-UI, C-VFX, C-VIDEO, C-WORLD
 
@@ -295,9 +331,9 @@ Skills: accessibility, ai-behavior-perception, animation-architect, animation-gr
 
 **Exit criteria:** indie-2d ships on PC, console, mobile and web with a TRC/store-review dry run; the editor and tools configuration closes with source control; rollback (8 frames under 150 ms / 5% loss) and async play proven. Local multiplayer: 2-player split-screen with independent UI focus, listeners and input. Perf: mobile tier within budget.
 
-**Gates (capability → independent validator):** `QA.CERT.prechecks` → `QA.STRAT.release-criteria`, `ED.COLLAB.vcs` → `QA.FUNC.editor`, `NET.PRED.rollback` → `QA.SIM.netsim`, `GAM.FW.local-players` → `QA.FUNC.automation`, `PRF.MEM.footprint` → `QA.FUNC.soak`, `PRF.LOAD.pacing-latency` → `PRF.BENCH.stats`, `QA.FUNC.soak` → `PRF.MEM.footprint`, `XC.SEC.data-rights` → `QA.CERT.privacy`, `XC.SEC.childrens-data` → `QA.CERT.privacy`, `XC.SEC.vuln-response` → `QA.ROBUST.fuzzing`
+**Gates (capability → independent validator):** `QA.CERT.prechecks` → `QA.STRAT.release-criteria`, `ED.COLLAB.vcs` → `QA.FUNC.editor`, `NET.PRED.rollback` → `QA.SIM.netsim`, `GAM.FW.local-players` → `QA.FUNC.automation`, `PRF.MEM.footprint` → `QA.FUNC.soak`, `PRF.LOAD.pacing-latency` → `PRF.BENCH.stats`, `QA.FUNC.soak` → `PRF.MEM.footprint`, `XC.SEC.data-rights` → `QA.CERT.privacy`, `XC.SEC.childrens-data` → `QA.CERT.privacy`, `XC.SEC.vuln-response` → `QA.ROBUST.fuzzing`, `PRF.NET.resim-cost` → `QA.SIM.netsim`, `PRF.MEM.size` → `PRF.BENCH.stats`
 
-**Contracts frozen:** C-A11YRT, C-ABILITY, C-ANIM, C-AUDIO, C-AUTOMATION, C-BENCH, C-CAMERA, C-CERT, C-CMD, C-DEVICE, C-DIALOGUE, C-ECS, C-GAME, C-GAMEDATA, C-GOVERN, C-GPUMEM, C-GPUTIER, C-HOSTAUTH, C-INTEGRITY, C-IO, C-IPC, C-LIVE, C-LOC, C-NET, C-NETLINK, C-NETSESSION, C-PAL, C-PKG, C-PLUGIN, C-PREDICT, C-PROD, C-RELEASE, C-RELOAD, C-REP, C-REPLAY, C-RES, C-RHI, C-SAVE, C-SCRIPT, C-SEQ, C-SIGNIF, C-SNAPSHOT, C-SVC, C-TARGETPLAT, C-VFS, C-WORLD
+**Contracts frozen:** C-ABILITY, C-AUTOMATION, C-BENCH, C-CAMERA, C-CERT, C-CMD, C-DEVICE, C-DIALOGUE, C-ECS, C-EDCMD, C-EDHOST, C-ENV, C-GOVERN, C-HOSTAUTH, C-INTEGRITY, C-LIVE, C-NET, C-NETLINK, C-NETSESSION, C-PCG, C-PKG, C-PLUGIN, C-PREDICT, C-PROD, C-RELEASE, C-RELOAD, C-REP, C-REPLAY, C-REWIND, C-SAVE, C-SCRIPT, C-SEQ, C-SIGNIF, C-SVC, C-TARGETPLAT
 
 **Contracts drafted:** C-EDCMD, C-EDHOST, C-EDVIEW, C-GRAPH, C-VCS
 
@@ -309,9 +345,9 @@ Skills: collaboration-version-control, editor-architect, editor-ui-framework, fl
 
 **Exit criteria:** The standard-3d reference game runs on PC and console with GPU-driven and CPU-submission paths, reference path-tracer validation (itself validated), the lite-3d mobile and portable-console configurations; C-RHI reviewed against the tensor tier by ml-inference-runtime before freeze. Tools: iteration-latency targets met on standard-3d-tools and on-device iteration to console and mobile. Perf: std3d and lite3d budgets per tier; PSO first-encounter hitch gate; governor closed-loop test.
 
-**Gates (capability → independent validator):** `QA.RENDER.reference-validation` → `QA.AGENT.oracle-change-control`, `RND.SHADER.pso-lists` → `PRF.LOAD.hitch-gate`, `CORE.SCALE.governor` → `PRF.METH.gates`, `XC.ITER.metrics` → `QA.FUNC.editor`, `PRF.GPU.baselines` → `PRF.METH.gates`, `PRF.METH.pipeline-budgets` → `PRF.BENCH.tools`
+**Gates (capability → independent validator):** `QA.RENDER.reference-validation` → `QA.AGENT.oracle-change-control`, `RND.SHADER.pso-lists` → `PRF.LOAD.hitch-gate`, `CORE.SCALE.governor` → `PRF.METH.gates`, `XC.ITER.metrics` → `QA.FUNC.editor`, `PRF.GPU.baselines` → `PRF.METH.gates`, `PRF.METH.pipeline-budgets` → `PRF.BENCH.tools`, `PRF.METH.energy` → `PRF.GPU.power`
 
-**Contracts frozen:** C-AI, C-COLOR, C-DEVUI, C-DRAW2D, C-EDCMD, C-EDHOST, C-EDVIEW, C-ENV, C-GRAPH, C-LIGHTENV, C-MATIF, C-MOVE, C-NAV, C-PCG, C-PHYS, C-RG, C-RSCENE, C-SCENETEX, C-SHADER, C-TEMPORAL, C-UI, C-VCS, C-VFX, C-VIDEO, C-VT
+**Contracts frozen:** C-AI, C-DEVUI, C-EDPREVIEW, C-EDVIEW, C-GRAPH, C-INSTANCES, C-LIGHT, C-LIGHTENV, C-MOVE, C-NAV, C-TEMPORAL, C-UI, C-VCS, C-VFX, C-VIDEO, C-VT
 
 **Contracts drafted:** C-ATMOS, C-GEOLOD, C-GI, C-INSTANCES, C-LIGHT, C-PTREF, C-RT, C-RTAS, C-TRANSLUCENT, C-VEHICLE
 
@@ -323,9 +359,9 @@ Skills: atmosphere-weather, character-physics, character-rendering, cloth-deform
 
 **Exit criteria:** Online reference games per netcode family: dedicated-server shooter with prediction and lag compensation, listen-server co-op, desync-free 2 h lockstep soak, web transports; bot load test; packet/handshake fuzzing, DoS test, server-authority review and external pen test (human gate); patch + DLC + staged rollout + rollback executed on the online reference game. Perf: bandwidth per player and server density within budget.
 
-**Gates (capability → independent validator):** `QA.FUNC.load` → `PRF.NET.load-analysis`, `NET.TRANS.dos` → `XC.SEC.testing`, `BLD.REL.staged-rollout` → `QA.FUNC.compat-corpus`, `BLD.REL.rollback` → `QA.STRAT.release-criteria`, `PRF.NET.bandwidth` → `QA.FUNC.load`, `PLAT.LIVE.operations` → `QA.FUNC.soak`
+**Gates (capability → independent validator):** `QA.FUNC.load` → `PRF.NET.load-analysis`, `NET.TRANS.dos` → `XC.SEC.testing`, `BLD.REL.staged-rollout` → `QA.FUNC.compat-corpus`, `BLD.REL.rollback` → `QA.STRAT.release-criteria`, `PRF.NET.bandwidth` → `QA.FUNC.load`, `PLAT.LIVE.operations` → `QA.FUNC.soak`, `PRF.NET.latency` → `QA.FUNC.load`
 
-**Contracts frozen:** C-ATMOS, C-GEOLOD, C-GI, C-INSTANCES, C-LIGHT, C-PTREF, C-TRANSLUCENT, C-VEHICLE
+**Contracts frozen:** C-ATMOS, C-GEOLOD, C-GI, C-PTREF, C-TRANSLUCENT, C-VEHICLE
 
 **Contracts drafted:** C-CROWD, C-EDIT, C-SERVER
 
@@ -333,11 +369,11 @@ Skills: crowd-simulation, dedicated-server, modding-ugc
 
 ### M5 · Open world, simulation & XR (3 new build skills)
 
-**Configurations proven:** `open-world-client`, `rts-3d-massim-client`, `sandbox-online-server`, `xr-pc-client`, `xr-standalone-client`, `xr-console-client`
+**Configurations proven:** `open-world-client`, `rts-3d-massim-client`, `sandbox-online-server`, `xr-pc-client`, `xr-standalone-client`, `xr-console-client`, `xr-standalone-tools`, `lite-3d-mobile-openworld-online-client`, `lite-3d-portable-openworld-client`, `lite-3d-web-client`
 
 **Exit criteria:** Open-world reference slice streams at target speed within the arbitration budget (arbiter without oscillation or starvation, A14); massim and sandbox configurations closed and benchmarked; XR on PC, standalone and console. Perf: scale-content stress worlds within declared asymptotics.
 
-**Gates (capability → independent validator):** `RES.MGMT.arbitration` → `PRF.MEM.peaks`, `RES.MGMT.validation` → `PRF.LOAD.load-time`, `PRF.BENCH.scale-content` → `PRF.METH.asymptotics`
+**Gates (capability → independent validator):** `RES.MGMT.arbitration` → `PRF.MEM.peaks`, `RES.MGMT.validation` → `PRF.LOAD.load-time`, `PRF.BENCH.scale-content` → `QA.SIM.mass-agents`
 
 **Contracts frozen:** C-CROWD, C-EDIT, C-SERVER
 
@@ -351,7 +387,7 @@ Skills: ml-inference-runtime, server-scaleout-persistence, xr-runtime
 
 **Exit criteria:** AAA reference slice; zoned hand-off and persistence crash-consistency with ≥1k bot clients; mods with sandbox-escape and GPU-DoS tests; experimental features only behind the experimental profile. Tools: team-large pipeline (multi-user sessions, distributed cook, world builds) on aaa-open-world-online-tools.
 
-**Gates (capability → independent validator):** `NET.SRV.cross-server` → `QA.FUNC.load`, `XC.SEC.sandbox` → `QA.ROBUST.fuzzing`, `ED.COLLAB.multiuser` → `QA.FUNC.editor`, `PRF.METH.asymptotics` → `PRF.BENCH.scale-content`, `PRF.NET.server-density` → `QA.FUNC.load`
+**Gates (capability → independent validator):** `NET.SRV.cross-server` → `QA.FUNC.load`, `XC.SEC.sandbox` → `QA.ROBUST.fuzzing`, `ED.COLLAB.multiuser` → `QA.FUNC.editor`, `PRF.NET.server-density` → `QA.FUNC.load`
 
 **Contracts frozen:** C-AIAGENT, C-ML, C-MLGPU, C-RT, C-RTAS, C-SHARD, C-SRVDATA, C-XRVIEW
 

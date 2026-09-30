@@ -674,6 +674,7 @@
    "implements": [],
    "workstream": "governance",
    "untrusted_inputs": [
+    "agent-memory",
     "external-reports",
     "inter-agent-messages",
     "triage-artifacts"
@@ -1089,6 +1090,7 @@
     "clipboard-dragdrop",
     "cloud-saves",
     "collab-session",
+    "community-server-config",
     "config-layers",
     "crash-uploads",
     "dcc-live-link",
@@ -1098,10 +1100,12 @@
     "editor-plugins",
     "fonts",
     "generated-content",
+    "hid-reports",
     "imported-dcc-files",
     "input-commands",
     "invites-deep-links",
     "ipc-messages",
+    "lan-discovery",
     "launch-args",
     "localization-exchange",
     "logged-untrusted-strings",
@@ -1111,6 +1115,7 @@
     "narrative-imports",
     "packets",
     "patch-manifests",
+    "patch-payloads",
     "peer-inputs",
     "peer-state-hashes",
     "physics-assets",
@@ -1118,6 +1123,7 @@
     "procedural-asset-eval",
     "project-tool-code",
     "push-payloads",
+    "remote-build-results",
     "remote-config",
     "replays",
     "replicated-state",
@@ -1224,6 +1230,7 @@
    "implements": [],
    "workstream": "quality",
    "untrusted_inputs": [
+    "tool-outputs",
     "vuln-reports"
    ]
   },
@@ -1678,6 +1685,7 @@
    "implements": [],
    "workstream": "gameplay",
    "untrusted_inputs": [
+    "community-server-config",
     "mods",
     "physics-assets",
     "player-model-prompts",
@@ -2667,7 +2675,10 @@
     "C-EDHOST"
    ],
    "implements": [],
-   "workstream": "platform"
+   "workstream": "platform",
+   "untrusted_inputs": [
+    "hid-reports"
+   ]
   },
   {
    "id": "xr-runtime",
@@ -3005,6 +3016,7 @@
    "untrusted_inputs": [
     "assets",
     "decompressors",
+    "patch-payloads",
     "physics-assets"
    ]
   },
@@ -5537,6 +5549,7 @@
    "implements": [],
    "workstream": "online",
    "untrusted_inputs": [
+    "lan-discovery",
     "packets",
     "server-list-entries"
    ]
@@ -5720,7 +5733,8 @@
    "implements": [],
    "workstream": "online",
    "untrusted_inputs": [
-    "admin-commands"
+    "admin-commands",
+    "community-server-config"
    ]
   },
   {
@@ -5799,7 +5813,7 @@
    "profiles": [
     "all"
    ],
-   "purpose": "Reusable gameplay systems: abilities, effects and attributes, gameplay tags, batched deferred spawning (pooling only where measured), gameplay message routing.",
+   "purpose": "Reusable gameplay systems: abilities, effects and attributes, hit detection and projectiles, building, aim assist, volumes, impacts, timers, cues and interaction, batched deferred spawning (pooling only where measured), gameplay message routing.",
    "non_responsibilities": [
     [
      "Generic events",
@@ -6759,6 +6773,7 @@
    "implements": [],
    "workstream": "release",
    "untrusted_inputs": [
+    "remote-build-results",
     "third-party-source"
    ]
   },
@@ -6802,6 +6817,7 @@
    "implements": [],
    "workstream": "release",
    "untrusted_inputs": [
+    "remote-build-results",
     "triage-artifacts"
    ]
   },
@@ -6849,7 +6865,8 @@
    "implements": [],
    "workstream": "release",
    "untrusted_inputs": [
-    "patch-manifests"
+    "patch-manifests",
+    "patch-payloads"
    ]
   },
   {
@@ -7440,7 +7457,7 @@
     "tools"
    ],
    "workstream": "gameplay",
-   "purpose": "Designer-owned data: typed data tables and row references, curve assets, tuning assets with inheritance and per-platform/difficulty variants, spreadsheet round-trip, balance simulation, and live data hotfixes through remote overrides.",
+   "purpose": "Designer-owned data: typed data tables and row references, curve assets, tuning assets with inheritance and per-platform/difficulty variants, spreadsheet round-trip, balance simulation, and live data hotfixes through remote overrides, gameplay tag dictionary and surface types.",
    "non_responsibilities": [
     [
      "Serialization mechanics",
@@ -7463,7 +7480,8 @@
     "C-CFG",
     "C-LOC?",
     "C-DET?",
-    "C-RELOAD?"
+    "C-RELOAD?",
+    "C-A11YRT?"
    ],
    "tool_consumes": [
     "C-EDCMD",
@@ -7816,6 +7834,7 @@
    ],
    "implements": [],
    "untrusted_inputs": [
+    "contributed-patches",
     "external-reports",
     "player-feedback"
    ]
@@ -8063,6 +8082,7 @@
    ],
    "untrusted_inputs": [
     "auth-tickets",
+    "lan-discovery",
     "packets",
     "server-list-entries",
     "server-pushed-content"

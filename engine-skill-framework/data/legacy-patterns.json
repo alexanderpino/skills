@@ -202,7 +202,8 @@
    "default_stance": "Deferred batched events at declared consumption points",
    "justification_owner": "entity-object-model",
    "stance_capabilities": [
-    "CORE.OBJ.events"
+    "CORE.OBJ.events",
+    "PHY.ARCH.events"
    ],
    "contradiction_terms": [
     "immediate synchronous|global event bus"
@@ -285,11 +286,13 @@
   },
   {
    "id": "L27",
-   "pattern": "ECS for everything / GPU-driven everywhere (new dogma)",
+   "pattern": "ECS for everything (new dogma)",
    "detection": "technique applied where access patterns do not fit",
    "default_stance": "Per-domain ADR with workload evidence",
    "justification_owner": "architecture-governance",
    "stance_capabilities": [
+    "CORE.OBJ.hybrid",
+    "CORE.ECS.bridges",
     "ARCH.GOV.adr"
    ]
   },
@@ -820,7 +823,9 @@
    "default_stance": "Keyed string tables with plural/gender rules",
    "justification_owner": "localization-i18n",
    "stance_capabilities": [
-    "UI.LOC.strings"
+    "UI.LOC.messageformat",
+    "UI.LOC.strings",
+    "UI.LOC.terms"
    ],
    "contradiction_terms": [
     "hard-?coded (?:ui )?strings"
@@ -938,6 +943,115 @@
    ],
    "contradiction_terms": [
     "unbounded stage queues"
+   ]
+  },
+  {
+   "id": "L81",
+   "pattern": "GPU-driven everywhere (new dogma)",
+   "detection": "GPU-driven path forced on tiers where it loses",
+   "default_stance": "Per-tier submission strategy by ADR",
+   "justification_owner": "render-architect",
+   "stance_capabilities": [
+    "RND.ARCH.submission-strategy"
+   ],
+   "contradiction_terms": [
+    "gpu-driven everywhere"
+   ]
+  },
+  {
+   "id": "L82",
+   "pattern": "Neural/ML by default (new dogma)",
+   "detection": "ML features without measured advantage or fallback",
+   "default_stance": "ML behind optional contracts with fallbacks and evidence ADRs",
+   "justification_owner": "ml-inference-runtime",
+   "stance_capabilities": [
+    "ML.RT.scheduling",
+    "ARCH.GOV.adr"
+   ],
+   "contradiction_terms": [
+    "ml by default"
+   ]
+  },
+  {
+   "id": "L83",
+   "pattern": "Async physics by default (new dogma)",
+   "detection": "decoupled physics stepping without rollback or determinism review",
+   "default_stance": "Stepping mode chosen per netcode family by ADR",
+   "justification_owner": "physics-architect",
+   "stance_capabilities": [
+    "PHY.ARCH.async",
+    "PHY.ARCH.stepping"
+   ],
+   "contradiction_terms": [
+    "async physics by default"
+   ]
+  },
+  {
+   "id": "L84",
+   "pattern": "Full asset-registry scan or residency at boot",
+   "detection": "registry loaded in full at startup",
+   "default_stance": "Cooked, chunked, on-demand registry with streamed indexes",
+   "justification_owner": "content-pipeline-architect",
+   "stance_capabilities": [
+    "CNT.ID.registry"
+   ],
+   "contradiction_terms": [
+    "full (?:asset-)?registry scan"
+   ]
+  },
+  {
+   "id": "L85",
+   "pattern": "Text without shaping or grapheme awareness",
+   "detection": "ASCII, bitmap-font or code-unit text handling",
+   "default_stance": "Shaping, bidi and grapheme segmentation",
+   "justification_owner": "text-fonts",
+   "stance_capabilities": [
+    "UI.TXT.shaping",
+    "UI.TXT.bidi"
+   ],
+   "contradiction_terms": [
+    "code-unit text"
+   ]
+  },
+  {
+   "id": "L86",
+   "pattern": "Sentence assembly by string concatenation",
+   "detection": "concatenated fragments for localized sentences",
+   "default_stance": "MessageFormat-class messages with terms and agreement",
+   "justification_owner": "localization-i18n",
+   "stance_capabilities": [
+    "UI.LOC.messageformat",
+    "UI.LOC.terms"
+   ],
+   "contradiction_terms": [
+    "string concatenation for (?:sentences|messages)"
+   ]
+  },
+  {
+   "id": "L87",
+   "pattern": "Synchronous per-request pathfinding and navmesh rebuild",
+   "detection": "path or rebuild on the calling thread",
+   "default_stance": "Batched async path queries and incremental rebuild",
+   "justification_owner": "navigation-pathfinding",
+   "stance_capabilities": [
+    "GAM.AI.pathfinding",
+    "GAM.AI.navmesh"
+   ],
+   "contradiction_terms": [
+    "synchronous (?:per-request )?pathfinding"
+   ]
+  },
+  {
+   "id": "L88",
+   "pattern": "Hard-coded gameplay tunables",
+   "detection": "constants in code",
+   "default_stance": "Data-driven tuning assets",
+   "justification_owner": "gameplay-data",
+   "stance_capabilities": [
+    "GAM.DATA.tuning"
+   ],
+   "contradiction_terms": [
+    "hard-?coded tunables"
    ]
   }
  ],

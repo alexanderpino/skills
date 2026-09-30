@@ -603,6 +603,78 @@
    "trust": "hostile-remote",
    "mode": "harness",
    "limits": "signature and schema verification"
+  },
+  {
+   "id": "lan-discovery",
+   "validating_owner": "net-session",
+   "parser_owners": [
+    "network-transport"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "pre-auth broadcast/mDNS replies: length/rate limits"
+  },
+  {
+   "id": "community-server-config",
+   "validating_owner": "dedicated-server",
+   "parser_owners": [
+    "modding-ugc"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "ruleset/config file size/depth limits"
+  },
+  {
+   "id": "hid-reports",
+   "validating_owner": "input-devices-haptics",
+   "parser_owners": [],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "report/descriptor size and structure limits"
+  },
+  {
+   "id": "remote-build-results",
+   "validating_owner": "ci-cd-automation",
+   "parser_owners": [
+    "build-system-toolchains"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "cache/result signature and size limits"
+  },
+  {
+   "id": "patch-payloads",
+   "validating_owner": "packaging-release-patching",
+   "parser_owners": [
+    "package-formats-vfs"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "signature, size and chunk limits"
+  },
+  {
+   "id": "tool-outputs",
+   "validating_owner": "security-engineering",
+   "parser_owners": [],
+   "trust": "agent-input",
+   "mode": "redteam",
+   "limits": "quarantined as data; no instruction authority"
+  },
+  {
+   "id": "agent-memory",
+   "validating_owner": "program-orchestration",
+   "parser_owners": [],
+   "trust": "agent-input",
+   "mode": "redteam",
+   "limits": "quarantined as data; no instruction authority"
+  },
+  {
+   "id": "contributed-patches",
+   "validating_owner": "engine-product-management",
+   "parser_owners": [],
+   "trust": "agent-input",
+   "mode": "redteam",
+   "limits": "quarantined as data; no instruction authority"
   }
  ]
 }

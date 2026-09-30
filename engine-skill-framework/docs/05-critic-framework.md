@@ -207,7 +207,7 @@ Threat model, trust boundaries, memory safety, supply chain, privacy, incident r
 | geometry-pipeline | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · | · |
 | virtualized-geometry-lod | · | ◆ |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
 | texture-streaming-vt | · | ◆ |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
-| direct-lighting-shadows | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · | · |
+| direct-lighting-shadows | · | ◆ |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
 | global-illumination | · | ◆ |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
 | ray-tracing-infrastructure | · | ◆ | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
 | path-tracing | · | ◆ |  |  |  |  |  | · | · | · | · | · |  | · | · |
@@ -248,7 +248,7 @@ Threat model, trust boundaries, memory safety, supply chain, privacy, incident r
 | navigation-pathfinding | · |  |  | ◆ |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
 | crowd-simulation | · |  |  | ◆ | ◆ | ◆ |  | · | · | · | · | · | ◆ | · | · |
 | ai-behavior-perception | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | ◆ |
-| persistence-save | · |  |  |  | ◆ |  |  | · | · | · | · | · | ◆ | · | ◆ |
+| persistence-save | · |  |  |  | ◆ | ◆ |  | · | · | · | · | · | ◆ | · | ◆ |
 | ui-architect | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
 | text-fonts | · | ◆ |  |  |  |  |  | · | · | · | · | · | ◆ | · | · |
 | localization-i18n | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
@@ -257,7 +257,7 @@ Threat model, trust boundaries, memory safety, supply chain, privacy, incident r
 | world-editor-viewport | · | ◆ |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
 | graph-editor-framework | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
 | collaboration-version-control | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
-| visual-debugging-tools | · | ◆ |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
+| visual-debugging-tools | · | ◆ | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
 | ai-assisted-authoring | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · | ◆ |
 | build-release-architect | · |  |  |  |  | ◆ | ◆ | · | ◆ | · | · | · |  | · | · |
 | build-system-toolchains | · |  |  |  |  | ◆ | ◆ | · | ◆ | · | · | · |  | · | ◆ |
@@ -293,5 +293,7 @@ Threat model, trust boundaries, memory safety, supply chain, privacy, incident r
 | privacy-data-protection | · |  |  |  |  |  |  | · | · | · | · | · |  | · | ◆ |
 | gameplay-camera | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
 | pipeline-performance | · |  |  |  |  |  |  | ◆ | · | · | · | · |  | ◆ | · |
+| foundation-conformance | · |  |  |  |  |  |  | · | · | · | · | · |  | ◆ | · |
+| ui-text-conformance | · |  |  |  |  |  |  | · | · | · | · | · |  | ◆ | · |
 
 ◆ domain critic (specifically scoped) · · universal critic
