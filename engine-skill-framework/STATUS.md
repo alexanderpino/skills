@@ -11,26 +11,17 @@ Branch: `claude/engine-skill-framework-phase1` (no PR). Phase 1 (G1) answers "do
 | 0 | capability map, skill graph, contracts, critics, validator | 72ac034 |
 | 1 | 276 findings, schema v1 revision | 4a9a529 |
 | 2 | calibrated (12/15 seeds), 265 findings, v2 revision (153 skills, 124 contracts, 1360 capabilities); adjudication 20 upheld / 4 overturned | fd20381, 7385ce7 |
-| 3 | **in progress.** Calibrated (15/15 seeds, independent seed author). 224 findings, 53 hit seeds, 171 real. Round-2 overturns already fixed in `gauntlet/round-3/r3_a.py`. K-NET missed its own seed twice, so it is re-briefed for round 4. | f542e8c |
+| 3 | Calibrated (15/15 seeds, independent seed author). 224 findings, 53 seed hits, 171 real. **Revision applied** (r3_a–g, r3_z): 154 skills, 129 contracts, 39 configurations, 74 legacy patterns; check.py green, 37 selftest mutations red. Awaiting adjudication of the partial/reject dispositions. | f542e8c … (this commit) |
 
 Not converged: round 3 still has real major/blocker findings to fix, and the Completeness critic must be clean in two consecutive rounds.
 
-## PAUSED (usage limit) — exact state
-
-- Working branch is fully committed and pushed; `check.py` green. Background saver stopped; last workflow snapshot is on branch `claude/engine-skill-framework-checkpoints` and the journal is committed in `gauntlet/round-3/workflow/journal.jsonl` (554 finished agent results; run `wf_f2b5b705-724` was stopped mid-way through the verifier re-run).
-- Done for round 3: all 15 critics reported (`gauntlet/round-3/K-*.md`, 224 findings), seeds scored (15/15), overturn fixes applied (`r3_a.py`).
-- Not done: dispositioning the 171 real findings, `r3_b.py…` revision, adjudication, round 4. The verifier pass (K-TEST-9..17, all K-SEC) is optional; skip it or redo it as one batch verifier per critic.
-- Resume: read `CLAUDE.md`, then follow "Next steps" below. In a new session run `scripts/checkpoint.py --restore` only if the working branch lacks something; afterwards `--clear` the checkpoint branch.
-
 ## Next steps (in order)
 
-1. **Verifier results for round 3.** 51 verifier calls (K-TEST-9..17, all K-SEC) failed at a usage limit. Either resume the workflow (`gauntlet/round-3/RESUME.md`, run `wf_f2b5b705-724`), or skip it: verifiers are a first screen only, not required by the protocol. Save the result to `gauntlet/round-3/workflow/`.
-2. **Disposition** the 171 real findings (`gauntlet/round-3/K-*.md`, structured data in `workflow/round3-result.json`; seed hits in `seed_hits.json`). Findings that only mention a seeded item while raising a different defect are dispositioned on their merits.
-3. **Revise**: add `gauntlet/round-3/r3_b.py …` parts (editor API: `scripts/edit.py`; examples: `gauntlet/round-2/r2_*.py`), fill `disp.py` overrides, run `python3 gauntlet/round-3/apply.py` (base `fd20381`), then `check.py`, `check.py --selftest`, `render.py`, commit.
-4. **Adjudicate** partial/reject dispositions with one independent agent, fix overturns.
-5. **Round 4**, with the K-NET brief strengthened.
+1. **Adjudicate** the partial and reject dispositions of round 3 (`gauntlet/round-3/dispositions.md`) with one independent agent; fix overturns in `gauntlet/round-3/r3_h.py` (then `python3 gauntlet/round-3/apply.py`, `check.py`, `--selftest` once, `render.py`).
+2. **Round 4** (about 30 agents: 15 blind critics on a seeded copy in the scratchpad, one batch verifier each). New independent seed author; strengthen the K-NET brief (it missed its own seed twice in round 3). Save the workflow result to `gauntlet/round-4/workflow/` and run `scripts/checkpoint.py` while it runs.
+3. Repeat until a calibrated round has zero accepted blocker/major findings and the Completeness critic is clean in two consecutive rounds. Only then G2 (SKILL.md generation, `docs/08-phase-2-plan.md`).
 
-Recurring themes worth fixing first in round 3: check.py should detect legacy wording in capability names (K-LEGACY-12); oracle authors are same-workstream for 40 contracts and chosen for passing the check rather than competence (K-ARCH-1/2); milestone gates name capabilities owned by the gated feature's own implementer (K-PROD-3).
+Recurring themes for round 4: rewordings that state a legacy stance are now scanned (`contradiction_terms`); oracle authors must be independent, staffed by the freeze and carry an `oracle_reference`; check that the new contracts (C-CMD, C-VFX, C-PTREF, C-HOSTAUTH, C-CAMERA) and the platform-variant closure hold up.
 
 ## Rules of engagement
 

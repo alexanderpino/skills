@@ -13,7 +13,7 @@ A skill is the smallest unit that satisfies all four of these conditions:
 
 **Split** a unit when its parts need different literatures, change at different rates, or are validated separately. **Merge** units that share hot data without a stable interface, or that cannot be validated alone. Both rules are applied to the capability map, never to historical engine module lists.
 
-The rules produced **153 skills** (round 2 added sessions, server scale-out, server host PAL, console RHI backends, gameplay camera, systems simulation, test runtime harness, security runtime, online performance and privacy). `check.py` warns on experts that own fewer than three capabilities (too fine) and on skills that own more than thirty (too coarse).
+The rules produced **154 skills** (round 2 added sessions, server scale-out, server host PAL, console RHI backends, gameplay camera, systems simulation, test runtime harness, security runtime, online performance and privacy). `check.py` warns on experts that own fewer than three capabilities (too fine) and on skills that own more than thirty (too coarse).
 
 ## 2. Tiers and kinds
 
@@ -36,7 +36,7 @@ The configuration-closure proof therefore measures *engine* scale-down separatel
 
 ## 3. Skills depend on contracts, never on skills
 
-Every dependency edge goes through a **contract** (`data/contracts.json`, 124 contracts). Contracts carry a layer: 0 platform, 1 foundation, 2 engine services, 3 subsystems, 4 game framework, 5 tools, and P for process contracts. `check.py` enforces the following properties.
+Every dependency edge goes through a **contract** (`data/contracts.json`, 129 contracts). Contracts carry a layer: 0 platform, 1 foundation, 2 engine services, 3 subsystems, 4 game framework, 5 tools, and P for process contracts. `check.py` enforces the following properties.
 
 - **Contract layering.** Build-level `requires` edges are acyclic and never point upward.
 - **No upward module links.** A runtime skill's code may only consume contracts at or below the layer of the module doing the consuming. A skill that ships several modules attributes each dependency to one of them. For example, `C-SER@C-SNAPSHOT` means the snapshot module (L2) needs serialization, while the L1 determinism-rules module does not.
@@ -73,7 +73,7 @@ A **configuration** is a point on three independent axes:
 
 Round 0 mixed these three axes. That made it impossible to express, for example, the server half of an open-world game or a 2D indie game shipping on console.
 
-`check.py` proves all 34 named configurations are closed. These run from `indie-2d-online-moddable-server` (61 build skills), `online-3d-bot-client` (68), `mobile-async-client` (70) and `minimal-client` (75) up to `aaa-open-world-online-tools` (123). Every configuration is claimed by exactly one milestone, which proves it buildable by then. Capability-level profile tags provide finer gating inside a skill:
+`check.py` proves all 39 named configurations are closed. These run from `indie-2d-online-moddable-server` (61 build skills), `online-3d-bot-client` (68), `mobile-async-client` (70) and `minimal-client` (75) up to `aaa-open-world-online-tools` (123). Every configuration is claimed by exactly one milestone, which proves it buildable by then. Capability-level profile tags provide finer gating inside a skill:
 - Virtual shadow maps, cluster LOD and visibility buffers are `std3d`.
 - Strand hair and real-time path tracing are `aaa`.
 - Multi-user editing, distributed cooking and build farms are `team-large`; locking and artifact retention are not.
@@ -83,7 +83,7 @@ Organizational scale-down is handled separately. A small effort co-hosts the ski
 
 ## 6. Default architectural stances
 
-These are the **defaults** that phase-2 skills inherit. Each one can be overridden only by an ADR with evidence. This table is a summary: the full catalogue (57 patterns, including editor, networking, simulation, security and validation legacy) is `data/legacy-patterns.json`, where every pattern names the capabilities that carry its stance and `check.py` verifies them.
+These are the **defaults** that phase-2 skills inherit. Each one can be overridden only by an ADR with evidence. This table is a summary: the full catalogue (74 patterns, including editor, networking, simulation, security and validation legacy) is `data/legacy-patterns.json`, where every pattern names the capabilities that carry its stance and `check.py` verifies that they exist, are owned in the justification owner's subtree, and that no capability name, contract text or skill purpose matches a pattern's `contradiction_terms` (unless `adr_exceptions` records an ADR).
 
 | Default | Legacy pattern it replaces | Justification |
 |---|---|---|
@@ -103,9 +103,9 @@ These are the **defaults** that phase-2 skills inherit. Each one can be overridd
 
 ## 7. Technique maturity and the radar
 
-Every capability carries a maturity class: established, emerging, experimental or speculative. `data/radar.json` lists every non-established capability with its owner, evidence, a revisit/promotion trigger and a fallback. Explicit non-goals are also recorded there: backend services, RISC-V, BCI, CXL, linked/AFR multi-GPU, GLES/WebGL backends and generative world models. `check.py` fails any non-established capability that is missing from the radar, any radar entry whose class differs from its capabilities' maturity or whose owner neither owns nor leads them, and any M/X/S entry without a fallback.
+Every capability carries a maturity class: established, emerging, experimental or speculative. `data/radar.json` lists every non-established capability with its owner, evidence, a revisit/promotion trigger and a fallback. Explicit non-goals are also recorded there: backend services, RISC-V, BCI, CXL, linked/AFR multi-GPU, GLES/WebGL backends (web targets require WebGPU; the revisit trigger is the measured browser-capability share, `PLAT.WEB.audience-share`) and generative world models. `check.py` fails any non-established capability that is missing from the radar, any radar entry whose class differs from its capabilities' maturity or whose owner neither owns nor leads them, and any M/X/S entry without a fallback.
 
-Emerging and experimental techniques are reached through optional contracts or extension points. The gated contracts `C-ML`, `C-MLGPU`, `C-RT`, `C-RTAS` and `C-AIAGENT` may only be consumed optionally, and no non-gated contract may require one (`check.py`). Experimental capabilities are additionally confined to the `experimental` profile. Work graphs are an optional part of `C-RG` (`RND.GRAPH.work-graphs`, X).
+Emerging and experimental techniques are reached through optional contracts or extension points. The gated contracts `C-ML`, `C-MLGPU`, `C-RT`, `C-RTAS` and `C-AIAGENT` may only be consumed optionally, and no non-gated contract may require one (`check.py`), so non-RT and non-ML builds stay buildable. Products that require hardware RT or tensor support are expressed as the `hwrt` add-on plus the `rt` and `rt+tensor` GPU tiers of `C-GPUTIER` (configuration `rt-required-3d-client`), not by making the contract mandatory. Experimental capabilities are additionally confined to the `experimental` profile. Work graphs are an optional part of `C-RG` (`RND.GRAPH.work-graphs`, X).
 
 ## 8. Specific boundary decisions
 

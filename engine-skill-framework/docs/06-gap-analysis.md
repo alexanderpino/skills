@@ -63,6 +63,7 @@ Each row is a decision that an owning skill must record as an ADR. The phase-2 S
 | B28 | Mod execution model | Sandboxed scripts/graphs only vs native plugins behind opt-in | modding-ugc, security-engineering | Distribution-channel risk (signed updates, revocation), platform policy; sandboxed by default. |
 | B25 | Gameplay control model | Possession-style controller/pawn vs data-oriented control binding vs genre-specific | gameplay-architect | Genre, multiplayer model, input-to-entity cardinality. |
 | B26 | Game UI technology | Retained engine UI vs embedded web UI; editor toolkit shared with game UI or not | ui-architect, editor-ui-framework | Console performance, accessibility tree export, designer tooling. |
+| B29 | Implementation language | C++ vs Rust vs mixed (Rust for parsers, network and security-critical components, C++ elsewhere) | core-runtime-architect, security-engineering | Console toolchain support, memory-safety benefit on hostile-input parsers (XC.SEC.memory-safety), hiring, interop cost across C-ABI boundaries. Decided by ADR under CORE.LIFE.language. |
 
 ## C. Known coverage weaknesses of this framework itself
 

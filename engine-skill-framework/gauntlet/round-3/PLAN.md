@@ -10,8 +10,11 @@ Base: fd20381 (+ r3_a). Scripts run in name order; `r3_z.py` rebuilds milestones
 - **Milestones** (K-TOOLS-1/4, K-PLATFORM-3, K-SIM-2, K-FUTURE-2, K-PROD-3, K-PERF-10): build/CI/import skills into M0; freeze rules: needs_implementer contracts freeze after their last implementer, L≥2 contracts at the median consumer milestone, gated contracts at M6 with `extension_tiers`; gates become {capability, validator} with a validator owned outside the gated feature; add memory/pacing/baseline gates. C-PHYS becomes needs_implementer (K-SIM-4).
 - **Tools/platform** (K-TOOLS-3,6-14; K-PLATFORM-1,2,6-8,10,12-14): see r3_c (editor/tools) and r3_d (platform).
 
-## Done so far
-- r3_a (round-2 overturns), r3_b (oracle authors, organizations.json, agent-coordination caps, C-PHYS needs_implementer), r3_z (milestones: M0 build/CI/import, freeze rules, gate validators). check.py green, selftest 34/34.
+## Done
+All 224 findings are dispositioned (`dispositions.md`, generated): 53 seed hits removed (5 with residual fixes), 147 accepted, 11 partial, 12 reject (verifier or design reasons in `disp.py`), 1 merge. Parts: r3_a (round-2 overturns), r3_b (oracle authors, organizations, agent coordination), r3_c (tools/editor, platform variants, architecture minors), r3_d (rendering, simulation, networking), r3_e (foundation, performance, production, future-proofing), r3_f (completeness, anti-legacy catalogue L58–L74 with contradiction terms, gameplay/content), r3_g (test/oracle/security), r3_z (milestones M0–M7 rebuilt with gate validators, oracle-author-aware freezes).
 
-## Still to read and dispose
-NET, SIM (rest), RENDER, SYSTEMS, PERF, PROD (rest), FUTURE (rest), COMPLETE, LEGACY, GAMEPLAY, TEST, SEC (verifier outputs: verify_out_K-TEST.json, K-SEC pending).
+New check.py rules: per-platform-variant implementer closure, contradiction terms over capability/contract/skill text, oracle author staffed before a contract freezes, oracle_reference on layer 0–2 contracts, sealed/organization/oracle independence rules from earlier parts. 37 selftest mutations all go red.
+
+## Next
+1. One independent adjudicator over the partial/reject dispositions; fix overturns in `r3_h.py`.
+2. Round 4: fresh seed author, K-NET brief strengthened, 15 critics + one batch verifier each.
