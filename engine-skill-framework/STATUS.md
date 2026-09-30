@@ -15,6 +15,13 @@ Branch: `claude/engine-skill-framework-phase1` (no PR). Phase 1 (G1) answers "do
 
 Not converged: round 3 still has real major/blocker findings to fix, and the Completeness critic must be clean in two consecutive rounds.
 
+## PAUSED (usage limit) — exact state
+
+- Working branch is fully committed and pushed; `check.py` green. Background saver stopped; last workflow snapshot is on branch `claude/engine-skill-framework-checkpoints` and the journal is committed in `gauntlet/round-3/workflow/journal.jsonl` (554 finished agent results; run `wf_f2b5b705-724` was stopped mid-way through the verifier re-run).
+- Done for round 3: all 15 critics reported (`gauntlet/round-3/K-*.md`, 224 findings), seeds scored (15/15), overturn fixes applied (`r3_a.py`).
+- Not done: dispositioning the 171 real findings, `r3_b.py…` revision, adjudication, round 4. The verifier pass (K-TEST-9..17, all K-SEC) is optional; skip it or redo it as one batch verifier per critic.
+- Resume: read `CLAUDE.md`, then follow "Next steps" below. In a new session run `scripts/checkpoint.py --restore` only if the working branch lacks something; afterwards `--clear` the checkpoint branch.
+
 ## Next steps (in order)
 
 1. **Verifier results for round 3.** 51 verifier calls (K-TEST-9..17, all K-SEC) failed at a usage limit. Either resume the workflow (`gauntlet/round-3/RESUME.md`, run `wf_f2b5b705-724`), or skip it: verifiers are a first screen only, not required by the protocol. Save the result to `gauntlet/round-3/workflow/`.
