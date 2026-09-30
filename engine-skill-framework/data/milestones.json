@@ -252,6 +252,10 @@
     {
      "capability": "QA.SIM.stability-suite",
      "validator": "QA.FUNC.soak"
+    },
+    {
+     "capability": "PRF.METH.asymptotics",
+     "validator": "PRF.BENCH.scale-content"
     }
    ],
    "contracts_draft": [
@@ -388,6 +392,14 @@
     {
      "capability": "XC.SEC.vuln-response",
      "validator": "QA.ROBUST.fuzzing"
+    },
+    {
+     "capability": "PRF.NET.resim-cost",
+     "validator": "QA.SIM.netsim"
+    },
+    {
+     "capability": "PRF.MEM.size",
+     "validator": "PRF.BENCH.stats"
     }
    ],
    "contracts_draft": [
@@ -507,6 +519,10 @@
     {
      "capability": "PRF.METH.pipeline-budgets",
      "validator": "PRF.BENCH.tools"
+    },
+    {
+     "capability": "PRF.METH.energy",
+     "validator": "PRF.GPU.power"
     }
    ],
    "contracts_draft": [
@@ -599,6 +615,10 @@
     {
      "capability": "PLAT.LIVE.operations",
      "validator": "QA.FUNC.soak"
+    },
+    {
+     "capability": "PRF.NET.latency",
+     "validator": "QA.FUNC.load"
     }
    ],
    "contracts_draft": [
@@ -626,7 +646,11 @@
     "sandbox-online-server",
     "xr-pc-client",
     "xr-standalone-client",
-    "xr-console-client"
+    "xr-console-client",
+    "xr-standalone-tools",
+    "lite-3d-mobile-openworld-online-client",
+    "lite-3d-portable-openworld-client",
+    "lite-3d-web-client"
    ],
    "skills": [
     "ml-inference-runtime",
@@ -645,7 +669,7 @@
     },
     {
      "capability": "PRF.BENCH.scale-content",
-     "validator": "PRF.METH.asymptotics"
+     "validator": "QA.SIM.mass-agents"
     }
    ],
    "contracts_draft": [
@@ -687,10 +711,6 @@
     {
      "capability": "ED.COLLAB.multiuser",
      "validator": "QA.FUNC.editor"
-    },
-    {
-     "capability": "PRF.METH.asymptotics",
-     "validator": "PRF.BENCH.scale-content"
     },
     {
      "capability": "PRF.NET.server-density",

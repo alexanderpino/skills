@@ -512,6 +512,21 @@ def run(m):
         if caps_ and not ok_owner:
             E(f"legacy pattern {p['id']}: justification owner owns, contributes to or leads none of its stance caps")
 
+    # -- radar entries are dated and not stale for their class
+    import datetime
+    rdoc = m.radar_doc
+    if rdoc.get("as_of"):
+        asof = datetime.date.fromisoformat(rdoc["as_of"])
+        for e in rdoc["entries"]:
+            try:
+                age = (asof - datetime.date.fromisoformat(e.get("reviewed", ""))).days
+            except ValueError:
+                E(f"radar entry '{e['tech']}' has no valid 'reviewed' date")
+                continue
+            lim = rdoc.get("max_age_days", {}).get(e["class"])
+            if lim is not None and age > lim:
+                E(f"radar entry '{e['tech']}' (class {e['class']}) was reviewed {age} days before as_of (max {lim})")
+
     # -- legacy contradiction terms: capability names, contract text and skill purposes must not state a legacy pattern
     excepted = {(x.get("pattern"), x.get("id")) for x in m.legacy_doc.get("adr_exceptions", []) if x.get("adr")}
     scanned = [("capability", cid, m.cap(cid)["name"]) for cid in m.caps]
@@ -707,6 +722,7 @@ def selftest():
         ("dangling capability reference", lambda m: first_cap(m).__setitem__(1, first_cap(m)[1] + " (see RES.MGMT.nothing)"), "refers to unknown capability"),
         ("experimental capability in a shipping profile", lambda m: [c.__setitem__(5, ["aaa"]) for d in m.cap_doc["domains"] for a in d["areas"] for c in a["caps"] if c[0] == "RND.GRAPH.work-graphs"], "must carry exactly the 'experimental' profile"),
         ("legacy contradiction term", lambda m: m.contract("C-FRAME").__setitem__("summary", m.contract("C-FRAME")["summary"] + " Variable-timestep simulation on the render frame delta."), "states legacy pattern"),
+        ("radar entry stale", lambda m: m.radar_doc["entries"][0].__setitem__("reviewed", "2020-01-01"), "reviewed"),
         ("oracle reference missing", lambda m: m.contract("C-MEM").pop("oracle_reference"), "oracle_reference"),
         ("legacy pattern without stance", lambda m: m.legacy_doc["patterns"][0].__setitem__("stance_capabilities", []), "has no stance capabilities"),
         ("untrusted input not fuzzed", lambda m: [s["fuzz_targets"].remove("packets") for s in m.skill_doc["skills"] if s.get("fuzz_targets")], "has no fuzz target"),

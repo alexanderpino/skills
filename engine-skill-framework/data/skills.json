@@ -23,7 +23,7 @@
    "experimental": "Opt-in experimental (X/S) capabilities",
    "team-mid": "Studios of about 10–150 people (shared DDC, tool telemetry, small-session multi-user)",
    "persistent-world": "Persistent multi-server worlds (zoning, meshing, hand-off, leases, transactions)",
-   "hwrt": "Hardware ray tracing required (RT-only lighting paths, RT+tensor console baseline); no raster fallback is validated in these configurations",
+   "hwrt": "Hardware ray tracing required (RT-only lighting paths); tensor support only where a feature declares it; no raster fallback is validated in these configurations",
    "ml": "Runtime ML features (on-device inference, OS models, ML upscaling)"
   }
  },
@@ -502,6 +502,49 @@
    "platforms": [
     "pc",
     "console"
+   ]
+  },
+  "xr-standalone-tools": {
+   "profiles": [
+    "lite3d",
+    "xr"
+   ],
+   "target": "tools",
+   "platforms": [
+    "pc"
+   ],
+   "target_platforms": [
+    "xr-standalone"
+   ]
+  },
+  "lite-3d-mobile-openworld-online-client": {
+   "profiles": [
+    "lite3d",
+    "openworld",
+    "online"
+   ],
+   "target": "client",
+   "platforms": [
+    "mobile"
+   ]
+  },
+  "lite-3d-portable-openworld-client": {
+   "profiles": [
+    "lite3d",
+    "openworld"
+   ],
+   "target": "client",
+   "platforms": [
+    "console"
+   ]
+  },
+  "lite-3d-web-client": {
+   "profiles": [
+    "lite3d"
+   ],
+   "target": "client",
+   "platforms": [
+    "web"
    ]
   }
  },
@@ -2304,7 +2347,9 @@
     "server",
     "tools"
    ],
-   "tool_consumes": [],
+   "tool_consumes": [
+    "C-COOK"
+   ],
    "implements": [],
    "workstream": "platform",
    "dev_surfaces": [
@@ -2350,7 +2395,9 @@
     "server",
     "tools"
    ],
-   "tool_consumes": [],
+   "tool_consumes": [
+    "C-COOK"
+   ],
    "implements": [
     "C-PAL",
     "C-TARGETPLAT"
@@ -2397,7 +2444,9 @@
     "client",
     "tools"
    ],
-   "tool_consumes": [],
+   "tool_consumes": [
+    "C-COOK"
+   ],
    "implements": [
     "C-PAL",
     "C-SVC",
@@ -2447,7 +2496,9 @@
     "client",
     "tools"
    ],
-   "tool_consumes": [],
+   "tool_consumes": [
+    "C-COOK"
+   ],
    "implements": [
     "C-PAL",
     "C-TARGETPLAT"
@@ -7063,7 +7114,9 @@
     "pc:win-arm64",
     "pc:linux-steamos",
     "mobile:android",
-    "xr-standalone:android-xr"
+    "xr-standalone:android-xr",
+    "xr-standalone:horizon-os",
+    "xr-standalone:pico-os"
    ]
   },
   {
@@ -7571,7 +7624,9 @@
     "browser platform APIs",
     "web delivery"
    ],
-   "tool_consumes": [],
+   "tool_consumes": [
+    "C-COOK"
+   ],
    "provides": [],
    "implements": [
     "C-PAL",
@@ -7903,7 +7958,9 @@
    "consumes": [
     "C-BASE"
    ],
-   "tool_consumes": [],
+   "tool_consumes": [
+    "C-COOK"
+   ],
    "provides": [],
    "authoring": "Server-host OS integration; no authored content."
   },
@@ -8369,11 +8426,24 @@
   ],
   "xr-standalone": [
    "android-xr",
-   "visionos"
+   "visionos",
+   "horizon-os",
+   "pico-os"
   ],
   "server-host": [
    "linux-x64",
    "linux-arm64"
+  ],
+  "console": [
+   "fixed-class-a",
+   "portable-class-a",
+   "fixed-class-b",
+   "portable-class-b"
+  ],
+  "web": [
+   "chromium",
+   "webkit",
+   "gecko"
   ]
  }
 }

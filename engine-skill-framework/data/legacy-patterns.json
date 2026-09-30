@@ -830,7 +830,7 @@
    "id": "L73",
    "pattern": "Reconstruction/frame generation as budget substitute",
    "detection": "budgets or latency judged on generated frames",
-   "default_stance": "Upscaling/frame generation is an optional presentation layer; budgets and latency judged on rendered frames with a minimum base rate per tier",
+   "default_stance": "Frame generation is an optional presentation layer, never counted toward latency or simulation budgets; upscaling is a declared budget input per tier (internal-resolution budget at base rate with the reconstruction mode)",
    "justification_owner": "performance-architect",
    "stance_capabilities": [
     "RND.RECON.framegen",
@@ -908,6 +908,36 @@
    ],
    "contradiction_terms": [
     "rollback over non-restorable"
+   ]
+  },
+  {
+   "id": "L79",
+   "pattern": "Thread-per-subsystem and fixed worker counts",
+   "detection": "per-subsystem loops for physics, audio, streaming or network; constant-size worker pools",
+   "default_stance": "One scheduler, worker count from topology and actuators",
+   "justification_owner": "job-system-task-graph",
+   "stance_capabilities": [
+    "CORE.JOBS.thread-model",
+    "CORE.JOBS.scheduler",
+    "CORE.SCALE.actuators",
+    "PRF.CPU.hybrid"
+   ],
+   "contradiction_terms": [
+    "thread-per-subsystem"
+   ]
+  },
+  {
+   "id": "L80",
+   "pattern": "Unbounded stage queues and benchmarks on non-profile builds",
+   "detection": "queues without back-pressure; timings from debug builds",
+   "default_stance": "Bounded queues with back-pressure; benchmarks on the profile build configuration",
+   "justification_owner": "performance-architect",
+   "stance_capabilities": [
+    "PRF.METH.gates",
+    "BLD.SYS.configs"
+   ],
+   "contradiction_terms": [
+    "unbounded stage queues"
    ]
   }
  ],

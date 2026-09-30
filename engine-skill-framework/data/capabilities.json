@@ -450,6 +450,36 @@
         "program-orchestration",
         "test-architect"
        ]
+      ],
+      [
+       "ARCH.ORG.scope-control",
+       "Scope control: budget envelope per milestone, burn/slip trigger, ordered descope list (configurations and non-goals), stop/cancel criterion, human gate for envelope raise",
+       "program-orchestration",
+       "E",
+       [
+        "engine-architect",
+        "engine-product-management"
+       ]
+      ],
+      [
+       "ARCH.ORG.human-capacity",
+       "Human capacity model: role roster, SLA per gate class, non-blocking continuation (gated task parks, agents proceed on independent work packages), batching cadence per milestone, delegate/expiry rule, gate-wait-time metric; creator-panel sampling per discipline (task completion, time-to-first-asset)",
+       "program-orchestration",
+       "E",
+       [
+        "developer-experience-docs"
+       ]
+      ],
+      [
+       "ARCH.ORG.external-dependencies",
+       "External lead-time register (platform-holder admission and NDAs, devkit procurement, certification queue slots, pen-test booking, middleware negotiation) with start-by dates derived from milestone exits, feeding ARCH.ORG.risk",
+       "program-orchestration",
+       "E",
+       [
+        "platform-console",
+        "certification-compliance",
+        "ci-cd-automation"
+       ]
       ]
      ]
     },
@@ -495,7 +525,10 @@
        "ARCH.PROD.licensing-model",
        "Engine licensing & terms model for game teams",
        "engine-product-management",
-       "E"
+       "E",
+       [
+        "certification-compliance"
+       ]
       ],
       [
        "ARCH.PROD.field-feedback",
@@ -792,6 +825,24 @@
         "input-devices-haptics",
         "platform-desktop"
        ]
+      ],
+      [
+       "PLAT.PAL.target-tools",
+       "Target-platform tooling contract content: cook format variants, shader-target hook, packager hook, deploy/run/debug",
+       "platform-architect",
+       "E"
+      ],
+      [
+       "PLAT.PAL.cloud-render-host",
+       "Engine as cloud render host: headless GPU rendering, frame capture, low-latency hardware encode, video/input back-channel, multi-tenant GPU packing",
+       "platform-architect",
+       "M",
+       [
+        "frame-orchestration",
+        "gpu-platform-architect",
+        "network-transport",
+        "input-system"
+       ]
       ]
      ]
     },
@@ -846,6 +897,12 @@
        [
         "input-system"
        ]
+      ],
+      [
+       "PLAT.DESK.target-tools",
+       "Target-platform cook variants, shader-target and packager hooks, deploy/run/debug",
+       "platform-desktop",
+       "E"
       ]
      ]
     },
@@ -923,6 +980,73 @@
        "Console-build cloud streaming (streamed console titles)",
        "platform-console",
        "E"
+      ],
+      [
+       "PLAT.CON.target-tools",
+       "Target-platform cook variants, shader-target and packager hooks, deploy/run/debug",
+       "platform-console",
+       "E",
+       [
+        "rhi-console"
+       ]
+      ],
+      [
+       "PLAT.CON.svc-trophies-privileges",
+       "Console first-party trophies/achievements, privileges and parental controls behind the public C-SVC interface",
+       "platform-console",
+       "E",
+       [
+        "platform-services"
+       ]
+      ],
+      [
+       "PLAT.CON.svc-entitlements-presence",
+       "Console first-party entitlements, presence and activities behind the public C-SVC interface",
+       "platform-console",
+       "E",
+       [
+        "platform-services"
+       ]
+      ],
+      [
+       "PLAT.CON.packaging",
+       "Console packaging and signing tools (confidential, per platform holder; public stubs on BLD.REL.packaging/submission)",
+       "platform-console",
+       "E",
+       [
+        "packaging-release-patching",
+        "ci-cd-automation"
+       ]
+      ],
+      [
+       "PLAT.CON.submission",
+       "Console submission validators and pre-submission checkers (confidential, per platform holder; public stubs on BLD.REL.packaging/submission)",
+       "platform-console",
+       "E",
+       [
+        "packaging-release-patching",
+        "ci-cd-automation"
+       ]
+      ],
+      [
+       "PLAT.CON.patch-format",
+       "Console mandated patch/DLC formats and size rules (confidential, per platform holder; public stubs on BLD.REL.packaging/submission)",
+       "platform-console",
+       "E",
+       [
+        "packaging-release-patching",
+        "ci-cd-automation"
+       ]
+      ],
+      [
+       "PLAT.CON.ci-lane",
+       "Console devkit CI lanes (confidential, per platform holder; public stubs on BLD.REL.packaging/submission)",
+       "platform-console",
+       "E",
+       [
+        "packaging-release-patching",
+        "ci-cd-automation"
+       ]
       ]
      ]
     },
@@ -1002,6 +1126,12 @@
        [
         "privacy-data-protection"
        ]
+      ],
+      [
+       "PLAT.MOB.target-tools",
+       "Target-platform cook variants, shader-target and packager hooks, deploy/run/debug",
+       "platform-mobile",
+       "E"
       ]
      ]
     },
@@ -1211,6 +1341,16 @@
        "E",
        [
         "security-runtime"
+       ]
+      ],
+      [
+       "PLAT.SVC.pc-storefronts",
+       "PC storefront SDK adapters (Steamworks, Epic Online Services, GOG Galaxy, Microsoft Store/GDK-PC), Steam Input and overlay rules",
+       "platform-services",
+       "E",
+       [
+        "platform-desktop",
+        "packaging-release-patching"
        ]
       ]
      ]
@@ -1448,6 +1588,12 @@
        [
         "observability-telemetry"
        ]
+      ],
+      [
+       "PLAT.WEB.target-tools",
+       "Target-platform cook variants, shader-target and packager hooks, deploy/run/debug",
+       "platform-web",
+       "E"
       ]
      ]
     },
@@ -1581,6 +1727,12 @@
        [
         "job-system-task-graph"
        ]
+      ],
+      [
+       "PLAT.SRV.target-tools",
+       "Target-platform cook variants, shader-target and packager hooks, deploy/run/debug",
+       "platform-server-host",
+       "E"
       ]
      ]
     }
@@ -1644,7 +1796,7 @@
       ],
       [
        "CORE.LIFE.language",
-       "Implementation language(s) ADR (C++, Rust or mixed), standard baseline & compiler feature policy, coding standard",
+       "Implementation language(s) ADR (C++, Rust or mixed), standard baseline & compiler feature policy, coding standard; ADR criteria include agent-verifiability and undefined-behaviour class exposure",
        "core-runtime-architect",
        "E",
        [
@@ -4762,10 +4914,13 @@
        "RND.GEO.splats",
        "Static Gaussian-splat / radiance-field rendering, sorting, LOD & compositing",
        "geometry-pipeline",
-       "M",
+       "X",
        [
         "ray-tracing-infrastructure",
         "asset-import-interchange"
+       ],
+       [
+        "experimental"
        ]
       ],
       [
@@ -6020,6 +6175,15 @@
        [
         "audio-content-runtime",
         "ai-behavior-perception"
+       ]
+      ],
+      [
+       "ML.RT.web-backends",
+       "Browser ML backends (WebNN, WebGPU-compute inference)",
+       "ml-inference-runtime",
+       "M",
+       [
+        "platform-web"
        ]
       ]
      ]
@@ -7940,9 +8104,12 @@
        "NET.ARCH.meshing",
        "Seamless dynamic server meshing / cross-server entity authority",
        "server-scaleout-persistence",
-       "M",
+       "X",
        [
         "network-architect"
+       ],
+       [
+        "experimental"
        ]
       ],
       [
@@ -10735,7 +10902,7 @@
       ],
       [
        "BLD.SYS.configs",
-       "Build configurations (debug, development, test, profile = shipping optimization with C-INSTR on, shipping)",
+       "Build configurations (debug, development, test, profile = shipping optimization with C-INSTR on, shipping); sole owner of the compiler-flag mechanism with per-module flag classes ('det-strict' owned by determinism-replay, 'perf')",
        "build-system-toolchains",
        "E",
        [
@@ -11108,6 +11275,15 @@
         "package-formats-vfs",
         "online-services-liveops",
         "security-engineering"
+       ]
+      ],
+      [
+       "BLD.REL.store-variants",
+       "Per-store build variants and depots",
+       "packaging-release-patching",
+       "E",
+       [
+        "platform-services"
        ]
       ]
      ]
@@ -11485,7 +11661,8 @@
        "E",
        [
         "platform-desktop",
-        "platform-mobile"
+        "platform-mobile",
+        "xr-runtime"
        ]
       ],
       [
@@ -11575,6 +11752,15 @@
         "ui-architect",
         "platform-services",
         "privacy-data-protection"
+       ]
+      ],
+      [
+       "QA.CERT.authorship-ip",
+       "Outbound authorship and IP: authorship records, model-vendor terms register, licensor of record, trademark clearance",
+       "certification-compliance",
+       "E",
+       [
+        "program-orchestration"
        ]
       ]
      ]
@@ -11962,7 +12148,7 @@
       ],
       [
        "PRF.METH.budgets",
-       "Budgets per hardware tier × configuration × refresh class; per-tier simulation step budgets tied to PHY.ARCH.budget-degradation",
+       "Budgets per hardware tier × configuration × refresh class; per-tier simulation step budgets tied to PHY.ARCH.budget-degradation; percentile frame-time, hitch, startup/transition, traversal and latency lines",
        "performance-architect",
        "E"
       ],
@@ -12126,6 +12312,24 @@
         "crowd-simulation",
         "destruction-fracture"
        ]
+      ],
+      [
+       "PRF.BENCH.proxy-metrics",
+       "Deterministic pre-merge proxy metrics (instruction and cache-miss counts, allocations per frame, draw/dispatch/barrier counts, bytes per entity, replay memory traffic) calibrated against lab wall-clock",
+       "perf-benchmarking",
+       "E",
+       [
+        "ci-cd-automation"
+       ]
+      ],
+      [
+       "PRF.BENCH.lab-scheduling",
+       "Perf-lab scheduling, queueing and overload policy",
+       "perf-benchmarking",
+       "E",
+       [
+        "ci-cd-automation"
+       ]
       ]
      ]
     },
@@ -12168,9 +12372,20 @@
       ],
       [
        "PRF.CPU.compiler",
-       "PGO/LTO build profiles & optimization flag policy (sole owner)",
+       "PGO profile data and optimization recommendations (flag mechanism belongs to BLD.SYS.configs)",
        "cpu-performance",
        "E"
+      ],
+      [
+       "PRF.CPU.parallel-scaling",
+       "Parallel scalability: work/span extraction, scaling curves (2 to 64 workers, SMT, P/E) with core masks, per-task overhead limits, parallel-efficiency-at-N line in C-BUDGET",
+       "cpu-performance",
+       "E",
+       [
+        "job-system-task-graph",
+        "frame-orchestration",
+        "observability-telemetry"
+       ]
       ]
      ]
     },
@@ -12325,6 +12540,16 @@
         "build-system-toolchains",
         "packaging-release-patching",
         "platform-web"
+       ]
+      ],
+      [
+       "PRF.MEM.bandwidth",
+       "DRAM/fabric bandwidth per frame by consumer class on UMA and mobile tiers (OBS.LOG.hw-counters), memory-bound classification and bandwidth actuators",
+       "memory-performance",
+       "E",
+       [
+        "gpu-performance",
+        "loading-streaming-performance"
        ]
       ]
      ]
@@ -12714,7 +12939,7 @@
       ],
       [
        "XC.DET.conformance",
-       "Determinism conformance matrix (toolchain × ISA × platform × cores × schedule) as CI gate",
+       "Determinism conformance matrix (toolchain × ISA × platform × cores × schedule) as CI gate; optimization level, PGO and LTO are part of the conformance matrix",
        "determinism-replay",
        "E",
        [

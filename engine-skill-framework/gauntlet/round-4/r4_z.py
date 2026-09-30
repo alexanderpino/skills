@@ -25,3 +25,6 @@ def apply(ed):
                 m["contracts_draft"].remove(cid)
         ms[frozen[cid]]["contracts_frozen"] = sorted(ms[frozen[cid]]["contracts_frozen"] + [cid])
         ed.note("", f"contract {cid} frozen at {ms[frozen[cid]]['id']}")
+    rd = ed.doc["radar"]
+    for e in rd["entries"]:
+        e.setdefault("reviewed", rd.get("as_of", "2026-09-30"))

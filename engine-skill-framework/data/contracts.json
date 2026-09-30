@@ -205,7 +205,7 @@
    "layer": "P",
    "owner": "performance-architect",
    "name": "Budgets & performance gates",
-   "summary": "Budget numbers per hardware tier × configuration × refresh class, derived from the performance model; perf gate thresholds; transfer bytes per frame and async-queue occupancy per tier; resimulation-window line per rollback/prediction configuration ((window × tick cost) + snapshot save/restore per tick fits one frame); size lines per configuration × platform (binary/WASM, install, download, shader/PSO cache); energy per frame / battery-hours and sustained-state frame-time budgets per battery-powered tier; network lines (per-connection bytes/s, server egress per CCU, tick cost per player, packet rate) and named link-class profiles (home Wi-Fi, cellular, console NAT) with values supplied by NET.ARCH.budgets.",
+   "summary": "Budget numbers per hardware tier × configuration × refresh class, derived from the performance model; perf gate thresholds; transfer bytes per frame and async-queue occupancy per tier; resimulation-window line per rollback/prediction configuration ((window × tick cost) + snapshot save/restore per tick fits one frame); size lines per configuration × platform (binary/WASM, install, download, shader/PSO cache); energy per frame / battery-hours and sustained-state frame-time budgets per battery-powered tier; network lines (per-connection bytes/s, server egress per CCU, tick cost per player, packet rate) and named link-class profiles (home Wi-Fi, cellular, console NAT) with values supplied by NET.ARCH.budgets; DRAM/fabric bandwidth-per-frame line by consumer class for UMA and mobile tiers; p50/p99/p99.9 frame time, max hitch length and hitches per hour per tier, startup and level-transition time, stream-in quality at traversal speed, input-to-photon latency per refresh class and netcode family; tier records declare the internal-resolution budget and reconstruction mode where the tier mandates upscaling.",
    "requires": [],
    "universal": "all"
   },
@@ -947,7 +947,7 @@
    "layer": 1,
    "owner": "runtime-scalability",
    "name": "Scalability & governor",
-   "summary": "Device-profile knobs, scalability cvars, budget query/report API, actuator registration and governor control signals.",
+   "summary": "Device-profile knobs, scalability cvars, budget query/report API, actuator registration and governor control signals; each actuator carries a class ('presentation' | 'sim-local-nonobservable' | 'sim-authoritative'); under lockstep, rollback and replay recording only presentation actuators are client-driven, sim-authoritative ones go through tick-stamped recorded events.",
    "requires": [
     "C-CFG"
    ],
@@ -1065,7 +1065,7 @@
    "layer": 2,
    "owner": "gpu-platform-architect",
    "name": "GPU feature tiers",
-   "summary": "Named GPU feature tiers (binding model, pipeline-state model, queue topology, mesh/RT/tensor support, memory model) and the API baseline each tier maps to; render features declare the minimum tier they need; tiers 'rt' and 'rt+tensor' declare hardware ray tracing and tensor support as required baselines for configurations carrying the hwrt profile.",
+   "summary": "Named GPU feature tiers (binding model, pipeline-state model, queue topology, mesh/RT/tensor support, memory model) and the API baseline each tier maps to; render features declare the minimum tier they need; tiers 'rt' and 'rt+tensor' declare hardware ray tracing and tensor support as required baselines for configurations carrying the hwrt profile; features declare a required capability set (API-neutral feature bits with versioned limits); tiers are named bundles for configurations and QA matrices.",
    "requires": [
     "C-RHI"
    ],
