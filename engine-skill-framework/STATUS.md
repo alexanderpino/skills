@@ -28,6 +28,7 @@ Recurring themes worth fixing first in round 3: check.py should detect legacy wo
 - Keep workflows small (about 30 agents per round: 15 critics plus one batch verifier each, not two per finding).
 - Blind critics review a seeded copy in the scratchpad, never the repository; seeds are planted by an independent agent and sealed until all critics report.
 - Checkpoint (commit + push, saving any workflow result/journal into `gauntlet/round-N/workflow/`) after every step **and after roughly every 15–20 agents finish** inside a workflow.
+- `scripts/checkpoint.py` runs in the background (every 10 min) and force-pushes workflow journal/results to branch `claude/engine-skill-framework-checkpoints` (one replaced commit; recover files from there if a session dies). Start it with `python3 engine-skill-framework/scripts/checkpoint.py &`.
 - Commit and push after every step. Scripts reproduce every data change (`apply.py` resets `data/` to the previous commit and replays the parts).
 - The framework is self-contained; do not link it to any other skill or repository.
 
