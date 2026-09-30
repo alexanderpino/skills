@@ -70,23 +70,24 @@ Every non-established capability is on the radar with an owner, evidence, a revi
 | Memory-safe language components (XC.SEC.memory-safety) | emerging | security-engineering | `XC.SEC.memory-safety` | Android Rust adoption data; CISA/NSA roadmap guidance | Console toolchain support for chosen language | Hardened C++ subset + fuzzing |
 | MaterialX / OpenPBR interchange & model (CNT.IMP.materialx) | emerging | asset-import-interchange | `CNT.IMP.materialx` | OpenPBR 1.0 (ASWF 2024); UE Substrate production in 5.7 | Real-time OpenPBR evaluation cost within tier budgets | Layered PBR model |
 | Planetary & geospatial worlds (CNT.IMP.geospatial) | emerging | asset-import-interchange | `CNT.IMP.geospatial` | MSFS; Cesium/3D Tiles integrations | A reference game requires planet scale | Planar partitioned worlds |
-| ReSTIR GI & path-traced GI (RND.PT.realtime) | emerging | path-tracing | `RND.PT.realtime` | Ouyang et al. HPG 2021; shipped PT modes | RT tier performance on console-class hardware | Probe/radiance-cache GI |
-| Strand hair simulation & rendering (PHY.SOFT.hair-sim) | emerging | cloth-deformables | `PHY.SOFT.hair-sim` | UE Groom; Frostbite strands | Budget fit at target character counts | Hair cards |
+| ReSTIR GI & path-traced GI (RND.PT.realtime) | emerging | path-tracing | `RND.PT.realtime` | Ouyang et al. HPG 2021; shipped PT modes | RT tier performance on console-class hardware | hybrid raster + RT effects |
+| Strand hair simulation & rendering (PHY.SOFT.hair-sim) | emerging | cloth-deformables | `PHY.SOFT.hair-sim` | UE Groom; Frostbite strands | Budget fit at target character counts | bone-chain dynamics |
 | In-shader neural evaluation & differentiable shaders (RND.SHADER.autodiff) | emerging | shader-system | `RND.SHADER.autodiff` | SM 6.9 cooperative vectors (preview); Slang autodiff | Non-preview cross-vendor support | hand-derived gradients or finite differences in tool code |
-| WebGPU backend & web 3D (PLAT.WEB.webgpu-target) | emerging | platform-web | `PLAT.WEB.webgpu-target` | WebGPU in Chrome/Edge/Safari/Firefox (2023–2025) | Bindless/timestamp features in WebGPU | Web target limited to WebGPU-capable browsers (no WebGL backend; see non-goal) |
+| WebGPU backend & web 3D (PLAT.WEB.webgpu-target) | emerging | platform-web | `PLAT.WEB.webgpu-target` | WebGPU in Chrome/Edge/Safari/Firefox (2023–2025) | Shipped WebGPU with bindless/timestamp features in all engines' target browsers | Web target limited to WebGPU-capable browsers (no WebGL backend; see non-goal) |
 | Gaussian splatting & radiance fields (RND.GEO.splats) | emerging | geometry-pipeline | `RND.GEO.splats` | Kerbl et al. 2023; 3DGRT 2024; glTF splat extension work | Standard format + relighting + shipped game use | Photogrammetry meshes |
-| Generative authoring tools (CNT.COOK.ml-assisted) | emerging | asset-cook-processors | `CNT.COOK.ml-assisted` | Unity AI; Roblox Assistant | Licensing/provenance clear for training data | Manual authoring |
-| Agent/automation control API (MCP class) (QA.FUNC.agent-exploration) | emerging | functional-automation-soak | `QA.FUNC.agent-exploration` | MCP integrations for major engines (2025); EA SEED RL testing | Stable protocol adoption | CLI/commandlets |
-| Generative-AI service boundary & guardrails (XC.SEC.genai) | emerging | security-engineering | `XC.SEC.genai` | OWASP LLM Top 10; Steam AI disclosure | Per-title policy approval | No live-generated content |
+| Generative authoring tools (CNT.COOK.ml-assisted) | emerging | asset-cook-processors | `CNT.COOK.ml-assisted` | Unity AI; Roblox Assistant | Licensing/provenance clear for training data (QA.CERT.ml-provenance) | classical processors |
+| Agent/automation control API (MCP class) (QA.FUNC.agent-exploration) | emerging | functional-automation-soak | `QA.FUNC.agent-exploration` | EA SEED RL testing; academic game-testing agents | Agent-found defects exceed the scripted-bot rate over two milestones | scripted bots and random-walk monkeys |
+| Generative-AI service boundary & guardrails (XC.SEC.genai) | emerging | security-engineering | `XC.SEC.genai` | OWASP LLM Top 10; Steam AI disclosure | Per-title policy approval | no live-generated content; offline authored variants |
 | Coordination of ~150 autonomous agents (program) | emerging | program-orchestration | `ARCH.ORG.ownership-ledger`, `ARCH.ORG.staffing`, `ARCH.ORG.change-requests`, `ARCH.ORG.write-sets`, `ARCH.ORG.skill-lifecycle`, `ARCH.ORG.agent-continuity`, `ARCH.ORG.delegated-planning` | No published precedent at this agent count; multi-agent coding systems (2025) | Two milestones completed without lock deadlock or lost work | Human coordinator role per workstream and mandatory human review sampling per tier (ARCH.ORG.human-gates) |
 | Independence & model lineage of agent verification | emerging | architecture-governance | `ARCH.ORG.independence`, `ARCH.ORG.model-requalification` | LLM-as-judge self-preference and correlated errors (2023–2024) | Measured escape rate of seeded defects stable across model changes | Human coordinator role per workstream and mandatory human review sampling per tier (ARCH.ORG.human-gates) |
 | Cross-platform bit-reproducible float math | emerging | math-simd-numerics | `CORE.MATH.deterministic` | Same-binary determinism is established; cross-ISA/compiler reproducibility of floats is not (A4) | Two shipped titles run mixed-platform lockstep on float math without desync | CORE.MATH.fixed-point (fixed-point numerics) or same-binary determinism |
 | Runtime procedural fracture at scale | emerging | destruction-fracture | `PHY.DEST.procedural` | Pre-fractured destruction is established; impact-time fracture at scale is research-grade | A shipped title fractures at impact within the debris budget on consoles | PHY.DEST.runtime (pre-fractured assets) |
-| Cloud-hybrid compute (split client/cloud simulation) | experimental | platform-architect | `PLAT.PAL.cloud-hybrid` | Crackdown 3 cloud destruction (2019) — limited | Two shipped titles publish latency/cost postmortems | Local simulation only |
+| On-device autoregressive execution | emerging | ml-inference-runtime | `ML.RT.sequence-exec` | OS-provided and open on-device speech/language runtimes (2024–2026) | Two shipping consumers stay within KV-cache and latency budgets on min-spec | remote model via C-LIVE (ML.RT.local-remote) |
+| Cloud-hybrid compute (split client/cloud simulation) | experimental | network-architect | `PLAT.PAL.cloud-hybrid` | Crackdown 3 cloud destruction (2019) — limited | Two shipped titles publish latency/cost postmortems | Local simulation only |
 | ML-generated content in PCG | experimental | procedural-generation | `WLD.PCG.ml` | Research & tool demos | Deterministic, licensable models with provenance | Rule-based PCG |
 | Work graphs & mesh nodes | experimental | render-graph-scheduling | `RND.GRAPH.work-graphs` | D3D12 Work Graphs 1.0 (2024); vendor samples; no shipped titles | Support on ≥2 console/desktop APIs and one shipped-title postmortem | Indirect / device-generated commands |
-| Neural materials | experimental | material-system | `RND.MAT.neural` | Zeltner et al., SIGGRAPH 2024 | Cross-vendor cooperative-vector support + shipped evidence | Layered analytic BRDF |
-| Neural texture compression | experimental | texture-streaming-vt | `RND.TEX.ntc` | Vaidyanathan et al. 2023; RTX NTC SDK beta | Shipped titles + non-preview cooperative-vector support | BCn/ASTC; transcode-on-load variant |
+| Neural materials | experimental | material-system | `RND.MAT.neural` | Zeltner et al., SIGGRAPH 2024 | Cross-vendor matrix/tensor-intrinsic support + shipped evidence | Layered analytic BRDF |
+| Neural texture compression | experimental | texture-streaming-vt | `RND.TEX.ntc` | Vaidyanathan et al. 2023; RTX NTC SDK beta | Shipped titles + non-preview matrix/tensor-intrinsic support | BCn/ASTC; transcode-on-load variant |
 | Neural radiance caching | experimental | global-illumination | `RND.GI.neural-cache` | Müller et al. 2021; RTX Remix titles | Cross-vendor tensor support & budget fit | Radiance cache |
 | In-shader neural evaluation & differentiable shaders | experimental | shader-system | `RND.SHADER.neural` | API-neutral matrix/tensor intrinsics: DXIL linear algebra, Vulkan cooperative matrix/vector, Metal tensor operations (2025–2026 previews) | Two shipping backends expose the same matrix intrinsic set in retail drivers | Standalone inference dispatch |
 | Gaussian splatting & radiance fields | experimental | geometry-pipeline | `RND.GEO.splat-relight` | Kerbl et al. 2023; 3DGRT 2024; glTF splat extension work | Standard format + relighting + shipped game use | Photogrammetry meshes |
@@ -96,14 +97,15 @@ Every non-established capability is on the radar with an owner, evidence, a revi
 | L4S low-latency congestion signalling | experimental | network-transport | `NET.TRANS.l4s` | RFC 9330–9332 | Deployed on two major access networks | Standard congestion control |
 | Media-over-QUIC spectator streams | experimental | replication | `NET.REP.moq-spectator` | IETF MoQ drafts | RFC + CDN support | Delayed spectator replication |
 | LLM decisions on authoritative state | experimental | ai-behavior-perception | `GAM.AI.llm-decision` | Demos only | Shipped title with replay/rollback-safe model decisions | Authored AI |
-| On-device sequence/generative models | experimental | ml-inference-runtime | `ML.RT.sequence-models` | 2025 on-device SLM demos in games | Shipped title with on-device generation within budget | Remote generation via C-LIVE |
+| On-device sequence/generative models | experimental | ml-inference-runtime | `ML.RT.constrained-decoding` | 2025 on-device SLM demos in games | Shipped title with on-device generation within budget | Remote generation via C-LIVE |
 | NPU inference backends in games | experimental | ml-inference-runtime | `ML.RT.npu` | NNAPI deprecated (Android 15); Windows ML GA 2025 | Shipped title offloads a frame-relevant network to an NPU on two platforms | GPU/CPU backend |
 | Heterogeneous adapter offload | experimental | gpu-platform-architect | `RND.GPU.hetero-offload` | Vendor samples; no shipped titles | Two shipped titles | Single adapter |
 | std3d on the web | experimental | platform-web | `PLAT.WEB.std3d` | WebGPU subgroups (2025); bindless & memory64 in progress | WebGPU bindless + memory64 in two browsers | lite3d web tier |
 | Work graphs & mesh nodes (RND.GEO.mesh-nodes) | experimental | geometry-pipeline | `RND.GEO.mesh-nodes` | D3D12 Work Graphs 1.0 (2024); vendor samples; no shipped titles | Support on ≥2 console/desktop APIs and one shipped-title postmortem | Indirect / device-generated commands |
-| Work graphs & mesh nodes (RND.RHI.work-graph-programs) | experimental | rhi-core | `RND.RHI.work-graph-programs` | D3D12 Work Graphs 1.0 (2024); vendor samples; no shipped titles | Support on ≥2 console/desktop APIs and one shipped-title postmortem | Indirect / device-generated commands |
-| Gaussian splatting & radiance fields (CNT.IMP.splats) | experimental | asset-import-interchange | `CNT.IMP.splats` | Kerbl et al. 2023; 3DGRT 2024; glTF splat extension work | Standard format + relighting + shipped game use | Photogrammetry meshes |
+| Work graphs & mesh nodes (RND.RHI.work-graph-programs) | experimental | rhi-core | `RND.RHI.work-graph-programs` | D3D12 Work Graphs 1.0 (2024); vendor samples; no shipped titles | Support on ≥2 console/desktop APIs and one shipped-title postmortem | ExecuteIndirect / device-generated commands |
+| Gaussian splatting & radiance fields (CNT.IMP.splats) | experimental | asset-import-interchange | `CNT.IMP.splats` | Kerbl et al. 2023; 3DGRT 2024; glTF splat extension work | Standard format + relighting + shipped game use | convert to meshes at import |
 | Learned physics-based character control | experimental | ik-procedural-animation | `ANM.IK.learned-physics` | Research and early middleware; no shipped engine feature | A shipped title uses a learned physics policy | ANM.IK.physical (active ragdoll with PD motors) |
+| Learned surrogates inside the physics step | experimental | physics-architect | `PHY.ARCH.learned-surrogates` | Research on learned destruction/fluid surrogates; no shipped engine feature | A shipped title uses a learned surrogate with recorded outputs | classical solvers |
 
 ## Anti-legacy pattern catalogue
 
@@ -229,9 +231,10 @@ Every input class has exactly one validating owner; parser owners register it to
 | device-db-updates | platform-architect | — | semi-trusted-signed | harness | schema/rollback/staged rollout |
 | push-payloads | platform-mobile | — | hostile-remote | harness | length/schema |
 | clipboard-dragdrop | platform-architect | editor-ui-framework | hostile-local | harness | size/type allow-list |
-| runtime-collision-geometry | collision-detection | voxel-worlds, modding-ugc | hostile-remote | harness | triangle count/extents/degeneracy/rebuild time per tick |
 | server-pushed-content | modding-ugc | net-session | hostile-remote | harness | size/type allow-list; signature required; sandboxed load |
 | client-rpcs | replication | — | hostile-remote | harness | per-RPC rate, argument bounds, authority check |
+| ipc-messages | core-runtime-architect | crash-diagnostics, editor-architect | hostile-local | harness | frame size/rate/schema version; TOCTOU-safe copy-out from shared memory |
+| player-model-prompts | ai-behavior-perception | audio-content-runtime, online-services-liveops, modding-ugc | hostile-remote | harness | length/rate/token budget/moderation pre-filter |
 
 ## Milestones (walking skeleton → engine 1.0)
 
@@ -251,7 +254,7 @@ Every input class has exactly one validating owner; parser owners register it to
 
 Skills: asset-cook-processors, asset-import-interchange, async-io-storage, build-system-toolchains, ci-cd-automation, concurrency-primitives, containers-core-types, content-pipeline-architect, core-runtime-architect, crash-diagnostics, determinism-replay, entity-object-model, frame-orchestration, gpu-memory-resources, gpu-platform-architect, input-devices-haptics, input-system, job-system-task-graph, material-system, math-simd-numerics, memory-allocators, observability-telemetry, package-formats-vfs, platform-architect, platform-desktop, post-color-hdr, reconstruction-upscaling, reflection-metadata, render-2d-vector, render-architect, render-graph-scheduling, resource-streaming-architect, rhi-core, rhi-vulkan, runtime-scalability, security-runtime, serialization-schema, shader-system, spatial-transforms, test-runtime-harness, text-fonts, texture-streaming-vt, visual-debugging-tools
 
-### M1 · Indie 2D slice on PC (44 new build skills)
+### M1 · Indie 2D slice on PC (43 new build skills)
 
 **Configurations proven:** `indie-2d-client@pc`, `minimal-client@pc`
 
@@ -261,9 +264,9 @@ Skills: asset-cook-processors, asset-import-interchange, async-io-storage, build
 
 **Contracts frozen:** C-API, C-ASSET, C-BUILD, C-COOK, C-DET, C-EVID, C-FLOW, C-FRAME, C-ID, C-INPUT, C-PERF, C-PRESENT, C-REFL, C-SER, C-SPATIAL, C-TEXT, C-TRUST, C-VIEW
 
-**Contracts drafted:** C-A11YRT, C-ABILITY, C-AI, C-AIAGENT, C-ANIM, C-AUDIO, C-DIALOGUE, C-ECS, C-ENV, C-GAME, C-GAMEDATA, C-HOSTAUTH, C-INTEGRITY, C-LIVE, C-LOC, C-ML, C-MLGPU, C-MOVE, C-NAV, C-NET, C-NETLINK, C-NETSESSION, C-PCG, C-PHYS, C-PKG, C-PLUGIN, C-PREDICT, C-RELOAD, C-REP, C-SAVE, C-SCRIPT, C-SEQ, C-SIGNIF, C-SVC, C-UI, C-VFX, C-VIDEO, C-WORLD
+**Contracts drafted:** C-A11YRT, C-ABILITY, C-AI, C-AIAGENT, C-ANIM, C-AUDIO, C-DIALOGUE, C-ECS, C-ENV, C-GAME, C-GAMEDATA, C-HOSTAUTH, C-INTEGRITY, C-LIVE, C-LOC, C-MOVE, C-NAV, C-NET, C-NETLINK, C-NETSESSION, C-PCG, C-PHYS, C-PKG, C-PLUGIN, C-PREDICT, C-RELOAD, C-REP, C-SAVE, C-SCRIPT, C-SEQ, C-SIGNIF, C-SVC, C-UI, C-VFX, C-VIDEO, C-WORLD
 
-Skills: accessibility, ai-behavior-perception, animation-architect, animation-graphs, animation-runtime, anti-cheat-integrity, audio-architect, audio-content-runtime, audio-dsp-mixing, character-movement, cinematics-sequencer, ecs-runtime, gameplay-architect, gameplay-camera, gameplay-data, gameplay-systems-toolkit, hot-reload-iteration, ik-procedural-animation, localization-i18n, media-playback, ml-inference-runtime, narrative-dialogue, navigation-pathfinding, net-session, network-architect, network-transport, online-services-liveops, packaging-release-patching, persistence-save, physics-2d, physics-architect, platform-services, plugin-system, prediction-rollback, procedural-generation, reference-games, replication, rhi-d3d12, rhi-metal, scripting-runtime, ui-architect, vfx-particles, world-architect, world-data-model
+Skills: accessibility, ai-behavior-perception, animation-architect, animation-graphs, animation-runtime, anti-cheat-integrity, audio-architect, audio-content-runtime, audio-dsp-mixing, character-movement, cinematics-sequencer, ecs-runtime, gameplay-architect, gameplay-camera, gameplay-data, gameplay-systems-toolkit, hot-reload-iteration, ik-procedural-animation, localization-i18n, media-playback, narrative-dialogue, navigation-pathfinding, net-session, network-architect, network-transport, online-services-liveops, packaging-release-patching, persistence-save, physics-2d, physics-architect, platform-services, plugin-system, prediction-rollback, procedural-generation, reference-games, replication, rhi-d3d12, rhi-metal, scripting-runtime, ui-architect, vfx-particles, world-architect, world-data-model
 
 ### M2 · Indie 2D ships everywhere, with tools (15 new build skills)
 
@@ -299,7 +302,7 @@ Skills: atmosphere-weather, character-physics, character-rendering, cloth-deform
 
 **Exit criteria:** Online reference games per netcode family: dedicated-server shooter with prediction and lag compensation, listen-server co-op, desync-free 2 h lockstep soak, web transports; bot load test; packet/handshake fuzzing, DoS test, server-authority review and external pen test (human gate); patch + DLC + staged rollout + rollback executed on the online reference game. Perf: bandwidth per player and server density within budget.
 
-**Gates (capability → independent validator):** `QA.FUNC.load` → `PRF.NET.load-analysis`, `NET.TRANS.dos` → `XC.SEC.testing`, `BLD.REL.staged-rollout` → `QA.FUNC.compat-corpus`, `BLD.REL.rollback` → `QA.STRAT.release-criteria`, `PRF.NET.bandwidth` → `QA.FUNC.load`
+**Gates (capability → independent validator):** `QA.FUNC.load` → `PRF.NET.load-analysis`, `NET.TRANS.dos` → `XC.SEC.testing`, `BLD.REL.staged-rollout` → `QA.FUNC.compat-corpus`, `BLD.REL.rollback` → `QA.STRAT.release-criteria`, `PRF.NET.bandwidth` → `QA.FUNC.load`, `PLAT.LIVE.operations` → `QA.FUNC.soak`
 
 **Contracts frozen:** C-ATMOS, C-GEOLOD, C-GI, C-INSTANCES, C-LIGHT, C-PTREF, C-TRANSLUCENT, C-VEHICLE
 
@@ -307,7 +310,7 @@ Skills: atmosphere-weather, character-physics, character-rendering, cloth-deform
 
 Skills: crowd-simulation, dedicated-server, modding-ugc
 
-### M5 · Open world, simulation & XR (2 new build skills)
+### M5 · Open world, simulation & XR (3 new build skills)
 
 **Configurations proven:** `open-world-client`, `rts-3d-massim-client`, `sandbox-online-server`, `xr-pc-client`, `xr-standalone-client`, `xr-console-client`
 
@@ -317,13 +320,13 @@ Skills: crowd-simulation, dedicated-server, modding-ugc
 
 **Contracts frozen:** C-CROWD, C-EDIT, C-SERVER
 
-**Contracts drafted:** C-SHARD, C-SRVDATA, C-XRVIEW
+**Contracts drafted:** C-ML, C-MLGPU, C-SHARD, C-SRVDATA, C-XRVIEW
 
-Skills: server-scaleout-persistence, xr-runtime
+Skills: ml-inference-runtime, server-scaleout-persistence, xr-runtime
 
 ### M6 · AAA & ecosystem (1 new build skills)
 
-**Configurations proven:** `aaa-open-world-online-client`, `aaa-open-world-online-server`, `aaa-open-world-online-tools`, `aaa-experimental-client`
+**Configurations proven:** `aaa-open-world-online-client`, `aaa-open-world-online-server`, `aaa-open-world-online-tools`, `aaa-experimental-client`, `rt-required-3d-client`
 
 **Exit criteria:** AAA reference slice; zoned hand-off and persistence crash-consistency with ≥1k bot clients; mods with sandbox-escape and GPU-DoS tests; experimental features only behind the experimental profile. Tools: team-large pipeline (multi-user sessions, distributed cook, world builds) on aaa-open-world-online-tools.
 
@@ -339,7 +342,7 @@ Skills: ai-assisted-authoring
 
 **Exit criteria:** Customer-corpus upgrade from the previous release, release notes, backport stream open, console certification pass of at least one reference game, live-ops and end-of-service rehearsal. Every milestone exit also runs the skill-library review (ARCH.ORG.skill-lifecycle).
 
-**Gates (capability → independent validator):** `ARCH.PROD.customer-corpus` → `QA.REF.upkeep`, `XC.EXT.lts` → `QA.FUNC.compat-corpus`, `BLD.REL.end-of-service` → `QA.FUNC.compat`, `PLAT.LIVE.operations` → `QA.FUNC.soak`
+**Gates (capability → independent validator):** `ARCH.PROD.customer-corpus` → `QA.REF.upkeep`, `XC.EXT.lts` → `QA.FUNC.compat-corpus`, `BLD.REL.end-of-service` → `QA.FUNC.compat`
 
 Skills: 
 

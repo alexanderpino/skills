@@ -292,5 +292,6 @@ Threat model, trust boundaries, memory safety, supply chain, privacy, incident r
 | security-runtime | · |  |  |  |  |  |  | · | · | · | · | · |  | · | ◆ |
 | privacy-data-protection | · |  |  |  |  |  |  | · | · | · | · | · |  | · | ◆ |
 | gameplay-camera | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
+| pipeline-performance | · |  |  |  |  |  |  | ◆ | · | · | · | · |  | ◆ | · |
 
 ◆ domain critic (specifically scoped) · · universal critic

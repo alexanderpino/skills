@@ -22,7 +22,9 @@
    "online-async": "Asynchronous / turn-based backend-mediated play (no real-time transport)",
    "experimental": "Opt-in experimental (X/S) capabilities",
    "team-mid": "Studios of about 10–150 people (shared DDC, tool telemetry, small-session multi-user)",
-   "persistent-world": "Persistent multi-server worlds (zoning, meshing, hand-off, leases, transactions)"
+   "persistent-world": "Persistent multi-server worlds (zoning, meshing, hand-off, leases, transactions)",
+   "hwrt": "Hardware ray tracing required (RT-only lighting paths, RT+tensor console baseline); no raster fallback is validated in these configurations",
+   "ml": "Runtime ML features (on-device inference, OS models, ML upscaling)"
   }
  },
  "configurations": {
@@ -222,7 +224,8 @@
   "xr-standalone-client": {
    "profiles": [
     "lite3d",
-    "xr"
+    "xr",
+    "ml"
    ],
    "target": "client",
    "platforms": [
@@ -232,7 +235,8 @@
   "xr-pc-client": {
    "profiles": [
     "std3d",
-    "xr"
+    "xr",
+    "ml"
    ],
    "target": "client",
    "platforms": [
@@ -248,7 +252,8 @@
     "ugc",
     "vehicles",
     "team-large",
-    "persistent-world"
+    "persistent-world",
+    "ml"
    ],
    "target": "client",
    "platforms": [
@@ -265,7 +270,8 @@
     "ugc",
     "vehicles",
     "team-large",
-    "persistent-world"
+    "persistent-world",
+    "ml"
    ],
    "target": "server",
    "platforms": [
@@ -281,7 +287,8 @@
     "ugc",
     "vehicles",
     "team-large",
-    "persistent-world"
+    "persistent-world",
+    "ml"
    ],
    "target": "tools",
    "platforms": [
@@ -306,7 +313,8 @@
   "xr-console-client": {
    "profiles": [
     "std3d",
-    "xr"
+    "xr",
+    "ml"
    ],
    "target": "client",
    "platforms": [
@@ -421,7 +429,8 @@
     "openworld",
     "online",
     "aaa",
-    "experimental"
+    "experimental",
+    "ml"
    ],
    "target": "client",
    "platforms": [
@@ -480,6 +489,19 @@
    "target": "headless-client",
    "platforms": [
     "server-host"
+   ]
+  },
+  "rt-required-3d-client": {
+   "profiles": [
+    "std3d",
+    "aaa",
+    "hwrt",
+    "ml"
+   ],
+   "target": "client",
+   "platforms": [
+    "pc",
+    "console"
    ]
   }
  },
@@ -1031,6 +1053,7 @@
     "imported-dcc-files",
     "input-commands",
     "invites-deep-links",
+    "ipc-messages",
     "launch-args",
     "logged-untrusted-strings",
     "media-decoders",
@@ -1040,13 +1063,13 @@
     "patch-manifests",
     "peer-inputs",
     "peer-state-hashes",
+    "player-model-prompts",
     "procedural-asset-eval",
     "project-tool-code",
     "push-payloads",
     "remote-config",
     "replays",
     "replicated-state",
-    "runtime-collision-geometry",
     "saves",
     "scripts",
     "server-pushed-content",
@@ -1287,7 +1310,8 @@
    "implements": [],
    "workstream": "foundation",
    "untrusted_inputs": [
-    "crash-uploads"
+    "crash-uploads",
+    "ipc-messages"
    ]
   },
   {
@@ -1588,7 +1612,7 @@
    "workstream": "gameplay",
    "untrusted_inputs": [
     "mods",
-    "runtime-collision-geometry",
+    "player-model-prompts",
     "server-pushed-content",
     "ugc-graphs"
    ],
@@ -1633,9 +1657,9 @@
    "tier": "expert",
    "parent": "core-runtime-architect",
    "profiles": [
-    "all"
+    "ml"
    ],
-   "purpose": "Runtime neural-network inference shared by neural rendering, animation, audio and AI: GPU (cooperative-vector / tensor) and CPU backends, model packaging and quantization, scheduling within frame budgets, determinism characteristics.",
+   "purpose": "Runtime neural-network inference shared by neural rendering, animation, audio and AI: GPU (matrix/tensor intrinsics tier) and CPU backends, model packaging and quantization, scheduling within frame budgets, determinism characteristics.",
    "non_responsibilities": [
     [
      "Vendor upscalers",
@@ -1673,7 +1697,7 @@
    "expertise": [
     "inference engines",
     "quantization",
-    "cooperative vectors",
+    "matrix/tensor intrinsics",
     "ONNX"
    ],
    "kind": "runtime",
@@ -1729,10 +1753,9 @@
     "C-INSTR"
    ],
    "expertise": [
-    "C++20/23",
+    "C++/Rust systems programming",
     "module systems",
-    "error models",
-    "configuration systems"
+    "error models"
    ],
    "kind": "runtime",
    "targets": [
@@ -1746,6 +1769,7 @@
    "workstream": "foundation",
    "untrusted_inputs": [
     "config-layers",
+    "ipc-messages",
     "launch-args"
    ]
   },
@@ -1814,7 +1838,8 @@
    ],
    "consumes": [
     "C-PAL",
-    "C-BASE"
+    "C-BASE",
+    "C-SYNC"
    ],
    "expertise": [
     "allocator design",
@@ -3928,10 +3953,10 @@
     "C-GPUTIER",
     "C-RES",
     "C-RSCENE@C-RT",
+    "C-RG@C-RT",
     "C-INSTANCES@C-RT",
     "C-MATIF@C-RT",
-    "C-GEOLOD?@C-RT",
-    "C-RG"
+    "C-GEOLOD?@C-RT"
    ],
    "expertise": [
     "DXR/Vulkan RT",
@@ -4345,7 +4370,8 @@
     "C-RG?",
     "C-FLOW",
     "C-SAVE?",
-    "C-WORLD?"
+    "C-WORLD?",
+    "C-ML?"
    ],
    "expertise": [
     "physics engines (Jolt, PhysX, Havok, Box2D)",
@@ -4409,10 +4435,7 @@
     "C-COOK"
    ],
    "implements": [],
-   "workstream": "simulation",
-   "untrusted_inputs": [
-    "runtime-collision-geometry"
-   ]
+   "workstream": "simulation"
   },
   {
    "id": "rigid-body-dynamics",
@@ -4440,7 +4463,8 @@
     "C-TASK",
     "C-DET",
     "C-ANIM?",
-    "C-ENV?"
+    "C-ENV?",
+    "C-ML?"
    ],
    "expertise": [
     "TGS/XPBD",
@@ -5279,7 +5303,10 @@
     "C-EDHOST"
    ],
    "implements": [],
-   "workstream": "audio"
+   "workstream": "audio",
+   "untrusted_inputs": [
+    "player-model-prompts"
+   ]
   },
   {
    "id": "network-architect",
@@ -5929,7 +5956,8 @@
    "implements": [],
    "workstream": "gameplay",
    "untrusted_inputs": [
-    "generated-content"
+    "generated-content",
+    "player-model-prompts"
    ]
   },
   {
@@ -6207,6 +6235,7 @@
    "workstream": "tools",
    "untrusted_inputs": [
     "automation-commands",
+    "ipc-messages",
     "project-tool-code"
    ]
   },
@@ -6778,10 +6807,7 @@
     "C-EDHOST",
     "C-EDVIEW"
    ],
-   "provides": [],
-   "untrusted_inputs": [
-    "runtime-collision-geometry"
-   ]
+   "provides": []
   },
   {
    "id": "gpu-platform-architect",
@@ -7492,6 +7518,7 @@
    "untrusted_inputs": [
     "chat-text",
     "generated-content",
+    "player-model-prompts",
     "remote-config",
     "service-responses"
    ],
@@ -8095,6 +8122,46 @@
     "C-EDHOST",
     "C-EDVIEW"
    ],
+   "provides": [],
+   "implements": []
+  },
+  {
+   "id": "pipeline-performance",
+   "name": "Pipeline Performance",
+   "tier": "expert",
+   "parent": "performance-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "process",
+   "targets": [],
+   "workstream": "performance",
+   "purpose": "Independent analysis of production-pipeline performance: distributed-cook utilization and critical path, DDC miss root causes, shader permutation compile cost, C++/native build critical path and header cost, CI wall-clock; routes findings via C-PERF.",
+   "non_responsibilities": [
+    [
+     "Pipeline implementation",
+     "build-release-architect"
+    ],
+    [
+     "Benchmark harness",
+     "perf-benchmarking"
+    ],
+    [
+     "Editor implementation",
+     "editor-architect"
+    ]
+   ],
+   "expertise": [
+    "build and cook profiling",
+    "critical-path analysis",
+    "cache hit-rate analysis"
+   ],
+   "consumes": [
+    "C-INSTR",
+    "C-BUDGET",
+    "C-BENCH"
+   ],
+   "tool_consumes": [],
    "provides": [],
    "implements": []
   }

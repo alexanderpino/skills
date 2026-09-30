@@ -165,6 +165,16 @@
        "Governance weight per organization tier (consumes tier names from ARCH.ORG.staffing)",
        "architecture-governance",
        "E"
+      ],
+      [
+       "ARCH.GOV.radar-transitions",
+       "Maturity-class transitions: radar review at every milestone exit, promotion checklist (evidence, profile retag, optional-to-required change, extension-tier freeze, conformance, budget) and demotion into legacy-patterns on vendor withdrawal",
+       "architecture-governance",
+       "E",
+       [
+        "research-evidence",
+        "api-lifecycle-migration"
+       ]
       ]
      ]
     },
@@ -294,13 +304,16 @@
       ],
       [
        "ARCH.ORG.human-gates",
-       "Register of decisions requiring human authorization (contracts, spend, NDA access, submissions, legal/source-policy sign-off, production signing, security exceptions & risk acceptance, CI permission/secret-scope changes, new third-party dependencies, vulnerability disclosure, telemetry scope, sampled audit of adjudications and S3/S4 verdicts)",
+       "Register of decisions requiring human authorization (contracts, spend, NDA material, and irreversible live-production actions: player-data restore/edit, GM/admin commands on shipping servers, ban waves, rollout promotion past canary, global kill switch and remote-config changes, economy grants)",
        "program-orchestration",
        "E",
        [
         "engine-architect",
         "certification-compliance",
-        "security-engineering"
+        "security-engineering",
+        "online-services-liveops",
+        "anti-cheat-integrity",
+        "dedicated-server"
        ]
       ],
       [
@@ -501,6 +514,18 @@
        "engine-product-management",
        "E",
        [
+        "certification-compliance"
+       ]
+      ],
+      [
+       "ARCH.PROD.vendor-telemetry",
+       "Legal and privacy basis of vendor-bound telemetry: licensee-controlled opt-in, controller/processor roles, DPA template, allowed data classes, no silent billing telemetry",
+       "privacy-data-protection",
+       "E",
+       [
+        "engine-product-management",
+        "observability-telemetry",
+        "crash-diagnostics",
         "certification-compliance"
        ]
       ]
@@ -725,9 +750,13 @@
       [
        "PLAT.PAL.cloud-hybrid",
        "Split client/cloud compute boundary",
-       "platform-architect",
+       "network-architect",
        "X",
-       [],
+       [
+        "platform-architect",
+        "frame-orchestration",
+        "online-services-liveops"
+       ],
        [
         "experimental"
        ]
@@ -1578,7 +1607,7 @@
       ],
       [
        "CORE.LIFE.language",
-       "Implementation language(s), standard baseline & compiler feature policy (incl. C++26 adoption plan, coding standard)",
+       "Implementation language(s) ADR (C++, Rust or mixed), standard baseline & compiler feature policy, coding standard",
        "core-runtime-architect",
        "E",
        [
@@ -1745,7 +1774,7 @@
      "caps": [
       [
        "CORE.MEM.virtual",
-       "Virtual memory reservation & mapping",
+       "Virtual memory reservation, mapping & page-size policy (4K/64K/2M, large/huge pages, commit/decommit granularity per platform, client and server)",
        "memory-allocators",
        "E"
       ],
@@ -2199,6 +2228,17 @@
         "platform-mobile",
         "xr-runtime"
        ]
+      ],
+      [
+       "CORE.FRAME.multi-world",
+       "Concurrent per-world frame graphs on one worker pool: independent time domains and cadences, cross-world priority and fair share, per-world overload isolation, process-global vs world-scoped sync points",
+       "frame-orchestration",
+       "E",
+       [
+        "dedicated-server",
+        "editor-architect",
+        "job-system-task-graph"
+       ]
       ]
      ]
     },
@@ -2638,7 +2678,7 @@
       ],
       [
        "RES.IO.gpu-decompress",
-       "GPU decompression (GDeflate class)",
+       "GPU decompression (GPU-decodable codecs, GDeflate/Zstd class)",
        "async-io-storage",
        "E",
        [
@@ -4271,7 +4311,7 @@
       ],
       [
        "RND.SHADER.interop",
-       "Shared C++/shader interop headers",
+       "Shared host/shader interop headers",
        "shader-system",
        "E"
       ],
@@ -4932,6 +4972,19 @@
        "Planar reflections (clip-plane re-render, tier-scaled)",
        "global-illumination",
        "E"
+      ],
+      [
+       "RND.GI.rt-required",
+       "Hardware-RT-only lighting path (no raster fallback) for the hwrt profile",
+       "global-illumination",
+       "E",
+       [
+        "ray-tracing-infrastructure",
+        "path-tracing"
+       ],
+       [
+        "hwrt"
+       ]
       ]
      ]
     },
@@ -5462,7 +5515,7 @@
       ],
       [
        "RND.GPU.hetero-offload",
-       "Heterogeneous adapter offload (inference, encode, async work on the integrated GPU/NPU)",
+       "Heterogeneous adapter offload (non-inference async work and encode on a secondary adapter)",
        "gpu-platform-architect",
        "X",
        [],
@@ -5664,7 +5717,8 @@
        "ml-inference-runtime",
        "X",
        [
-        "platform-architect"
+        "platform-architect",
+        "gpu-platform-architect"
        ],
        [
         "experimental"
@@ -5675,16 +5729,6 @@
        "Backend & quantization conformance with tolerance tables; model-version regression",
        "ml-inference-runtime",
        "M"
-      ],
-      [
-       "ML.RT.sequence-models",
-       "Autoregressive/diffusion execution: KV-cache budgets, token streaming, cancellation, constrained decoding",
-       "ml-inference-runtime",
-       "X",
-       [],
-       [
-        "experimental"
-       ]
       ],
       [
        "ML.RT.os-models",
@@ -5708,6 +5752,26 @@
        "M",
        [
         "online-services-liveops"
+       ]
+      ],
+      [
+       "ML.RT.constrained-decoding",
+       "Constrained decoding and diffusion execution inside the frame budget",
+       "ml-inference-runtime",
+       "X",
+       [],
+       [
+        "experimental"
+       ]
+      ],
+      [
+       "ML.RT.sequence-exec",
+       "Autoregressive execution: KV-cache budgets, token streaming, cancellation",
+       "ml-inference-runtime",
+       "M",
+       [
+        "audio-content-runtime",
+        "ai-behavior-perception"
        ]
       ]
      ]
@@ -5899,6 +5963,18 @@
        [
         "physics-2d",
         "rigid-body-dynamics"
+       ]
+      ],
+      [
+       "PHY.ARCH.learned-surrogates",
+       "Learned policies/surrogates inside the physics step (substep hook with recorded or deterministic outputs)",
+       "physics-architect",
+       "X",
+       [
+        "ml-inference-runtime"
+       ],
+       [
+        "experimental"
        ]
       ]
      ]
@@ -8121,13 +8197,14 @@
       ],
       [
        "NET.SESS.overload",
-       "Overload degradation (time dilation, adaptive tick, relevancy throttling)",
+       "Server overload actuators (time dilation, adaptive tick, relevancy throttling) registered with CORE.SCALE.actuators",
        "net-session",
        "E",
        [
         "replication",
         "frame-orchestration",
-        "dedicated-server"
+        "dedicated-server",
+        "runtime-scalability"
        ]
       ],
       [
@@ -8616,7 +8693,8 @@
        "ai-behavior-perception",
        "M",
        [
-        "security-engineering"
+        "security-engineering",
+        "ml-inference-runtime"
        ]
       ],
       [
@@ -10073,7 +10151,7 @@
       ],
       [
        "BLD.SYS.compile-speed",
-       "C++ modules, unity builds, PCH",
+       "Compile-time scalability (modules/unity/PCH or crate-graph partitioning)",
        "build-system-toolchains",
        "E"
       ],
@@ -10355,9 +10433,13 @@
       ],
       [
        "BLD.REL.rollback",
-       "Release rollback",
+       "Per-channel recovery: server/content rollback, client roll-forward hotfix path (store clients cannot be downgraded), rollout halt, compatibility-window constraints",
        "packaging-release-patching",
-       "E"
+       "E",
+       [
+        "network-architect",
+        "online-services-liveops"
+       ]
       ],
       [
        "BLD.REL.api-redist",
@@ -10836,6 +10918,19 @@
         "audio-dsp-mixing",
         "architecture-governance"
        ]
+      ],
+      [
+       "QA.CERT.ml-provenance",
+       "Provenance of shipped ML models and training data: model/dataset licence register, performer-consent register for digital replicas (voice, face, motion) linked to CNT.ID.rights, AI-output transparency mapping (EU AI Act class)",
+       "certification-compliance",
+       "E",
+       [
+        "ml-inference-runtime",
+        "content-pipeline-architect",
+        "motion-synthesis",
+        "facial-animation",
+        "narrative-dialogue"
+       ]
       ]
      ]
     },
@@ -11193,6 +11288,17 @@
         "perf-benchmarking",
         "runtime-scalability"
        ]
+      ],
+      [
+       "PRF.METH.energy",
+       "Whole-device energy & sustained-performance methodology",
+       "performance-architect",
+       "E",
+       [
+        "gpu-performance",
+        "cpu-performance",
+        "platform-mobile"
+       ]
       ]
      ]
     },
@@ -11267,6 +11373,15 @@
        [
         "editor-architect",
         "content-pipeline-architect"
+       ]
+      ],
+      [
+       "PRF.BENCH.lab",
+       "Reference perf hardware per tier: inventory, clock/thermal control, exclusivity, noise qualification (tiers from ARCH.REQ.hardware-tiers)",
+       "perf-benchmarking",
+       "E",
+       [
+        "ci-cd-automation"
        ]
       ]
      ]
@@ -11406,15 +11521,6 @@
        ]
       ],
       [
-       "PRF.LOAD.editor",
-       "Editor startup, asset-open, PIE-start & large-world viewport analysis and hitch attribution (budgets in PRF.METH.pipeline-budgets)",
-       "loading-streaming-performance",
-       "E",
-       [
-        "editor-architect"
-       ]
-      ],
-      [
        "PRF.LOAD.pacing-latency",
        "Frame pacing & end-to-end latency analysis (percentile frame times, present jitter, input-to-photon by hardware/marker measurement) with a pacing gate",
        "loading-streaming-performance",
@@ -11466,6 +11572,17 @@
        [
         "resource-streaming-architect"
        ]
+      ],
+      [
+       "PRF.MEM.size",
+       "Binary/WASM, install, download and on-disk cache size analysis and attribution per module, asset class and configuration",
+       "memory-performance",
+       "E",
+       [
+        "build-system-toolchains",
+        "packaging-release-patching",
+        "platform-web"
+       ]
       ]
      ]
     },
@@ -11509,6 +11626,69 @@
        [
         "network-architect",
         "frame-orchestration"
+       ]
+      ],
+      [
+       "PRF.NET.resim-cost",
+       "Worst-case resimulation cost vs frame budget per rollback/prediction configuration",
+       "online-performance",
+       "E",
+       [
+        "prediction-rollback",
+        "determinism-replay"
+       ]
+      ]
+     ]
+    },
+    {
+     "id": "PRF.PIPE",
+     "name": "Pipeline performance",
+     "caps": [
+      [
+       "PRF.PIPE.cook",
+       "Distributed-cook utilization, critical path and DDC miss root causes",
+       "pipeline-performance",
+       "E",
+       [
+        "content-pipeline-architect",
+        "asset-cook-processors"
+       ]
+      ],
+      [
+       "PRF.PIPE.shader-compile",
+       "Shader permutation compile cost and cache analysis",
+       "pipeline-performance",
+       "E",
+       [
+        "shader-system"
+       ]
+      ],
+      [
+       "PRF.PIPE.build",
+       "Native build critical path, header cost and cache effectiveness",
+       "pipeline-performance",
+       "E",
+       [
+        "build-system-toolchains"
+       ]
+      ],
+      [
+       "PRF.PIPE.ci",
+       "CI wall-clock and queue analysis",
+       "pipeline-performance",
+       "E",
+       [
+        "ci-cd-automation"
+       ]
+      ],
+      [
+       "PRF.PIPE.editor",
+       "Editor startup, asset-open, PIE-start & large-world viewport analysis and hitch attribution (budgets in PRF.METH.pipeline-budgets)",
+       "pipeline-performance",
+       "E",
+       [
+        "editor-architect",
+        "loading-streaming-performance"
        ]
       ]
      ]
@@ -11810,7 +11990,7 @@
       ],
       [
        "XC.ITER.live-coding",
-       "C++ live coding",
+       "Native-code live coding",
        "hot-reload-iteration",
        "E"
       ],

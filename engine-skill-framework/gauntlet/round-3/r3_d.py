@@ -66,12 +66,6 @@ def apply(ed):
     ed.use("texture-streaming-vt", "C-RSCENE", "C-INSTANCES?", "C-VIEW?", tags=t)
     _append(ed, "C-VT", "shader-side VT sampling and feedback interface for material-generated code.", t)
 
-    t = "K-RENDER-5"
-    ed.contract_set("C-RTAS", layer=3, requires=["C-RG", "C-GPUMEM"], tags=t)
-    ed.use("ray-tracing-infrastructure", "C-RG", tags=t)
-    ed.note(t, "C-RTAS moves to layer 3: acceleration-structure builds are graph-scheduled producers "
-               "(RND.GRAPH.external-work), so the contract requires C-RG")
-
     t = "K-RENDER-6"
     ed.contract_add("C-PTREF", 3, "path-tracing", "Reference render service",
                     "Reference render request (scene snapshot, view, convergence criterion, seed, AOVs) and converged, "
@@ -173,10 +167,6 @@ def apply(ed):
             ("QA.SIM.fluids-fields", "Fluid and field simulation runs (conservation, stability, desync lanes)",
              "simulation-validation", ["fluid-simulation", "systems-simulation"])):
         ed.cap(cid, name, owner, contrib=contrib, tags=t)
-
-    t = "K-SIM-11"
-    _input(ed, "runtime-collision-geometry", "collision-detection", ["voxel-worlds", "modding-ugc"], "hostile-remote",
-           "triangle count/extents/degeneracy/rebuild time per tick", )
 
     t = "K-SIM-12"
     ed.cap_set("PHY.DEST.runtime", name="Pre-fractured destruction & debris management", tags=t)

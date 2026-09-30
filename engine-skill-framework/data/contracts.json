@@ -76,7 +76,8 @@
    "name": "Allocation & memory accounting",
    "summary": "Allocator interface, tagging, budgets hooks, OOM behavior.",
    "requires": [
-    "C-BASE"
+    "C-BASE",
+    "C-SYNC"
    ],
    "universal": "runtime",
    "conformance": true,
@@ -104,7 +105,7 @@
    "layer": 1,
    "owner": "concurrency-primitives",
    "name": "Concurrency primitives & thread-safety annotations",
-   "summary": "Atomics, locks, lock-free queues, safe reclamation, thread-safety annotation conventions, OS-waitable completion tokens that IO/GPU fences plug into.",
+   "summary": "Atomics, locks, lock-free queues, safe reclamation, thread-safety annotation conventions, OS-waitable completion tokens that IO/GPU fences plug into; lock-free node storage uses the C-BASE raw allocator (not C-MEM).",
    "requires": [
     "C-BASE"
    ],
@@ -168,7 +169,7 @@
    "layer": "P",
    "owner": "performance-architect",
    "name": "Budgets & performance gates",
-   "summary": "Budget numbers per hardware tier × configuration × refresh class, derived from the performance model; perf gate thresholds; transfer bytes per frame and async-queue occupancy per tier.",
+   "summary": "Budget numbers per hardware tier × configuration × refresh class, derived from the performance model; perf gate thresholds; transfer bytes per frame and async-queue occupancy per tier; resimulation-window line per rollback/prediction configuration ((window × tick cost) + snapshot save/restore per tick fits one frame); size lines per configuration × platform (binary/WASM, install, download, shader/PSO cache); energy per frame / battery-hours and sustained-state frame-time budgets per battery-powered tier.",
    "requires": [],
    "universal": "all"
   },
@@ -504,7 +505,7 @@
    "layer": 3,
    "owner": "physics-architect",
    "name": "Physics world & scene queries",
-   "summary": "Bodies, shapes, queries (handle-addressed, batched), contact events with budgets, stepping phases, batch add/remove O(batch), snapshot/restore/resimulate participation, collider history for rewind; world instances and local simulation spaces; conformance: restore + resimulate N ticks reproduces the state hash at the declared determinism level; backends (in-house 2D, in-house 3D, or middleware behind the integration layer PHY.ARCH.middleware-layer) implement it; every configuration that requires it contains one.",
+   "summary": "Bodies, shapes, queries (handle-addressed, batched), contact events with budgets, stepping phases, batch add/remove O(batch), snapshot/restore/resimulate participation, collider history for rewind; world instances and local simulation spaces; conformance: restore + resimulate N ticks reproduces the state hash at the declared determinism level; backends (in-house 2D, in-house 3D, or middleware behind the integration layer PHY.ARCH.middleware-layer) implement it; every configuration that requires it contains one; substep policy hook whose outputs are recorded or deterministic.",
    "requires": [
     "C-SPATIAL",
     "C-FRAME",
@@ -835,7 +836,7 @@
    "layer": 2,
    "owner": "core-runtime-architect",
    "name": "Engine IPC",
-   "summary": "Process model and IPC/RPC transport for editor↔runtime, tool workers, crash handler, profiler and script debugger; dev-only port security.",
+   "summary": "Process model and IPC/RPC transport for editor↔runtime, tool workers, crash handler, profiler and script debugger; dev-only port security; untrusted-frame validation (ipc-messages input) on every endpoint that survives into shipping.",
    "requires": [
     "C-PAL",
     "C-TASK"
@@ -947,7 +948,7 @@
    "layer": 2,
    "owner": "gpu-platform-architect",
    "name": "GPU feature tiers",
-   "summary": "Named GPU feature tiers (binding model, pipeline-state model, queue topology, mesh/RT/tensor support, memory model) and the API baseline each tier maps to; render features declare the minimum tier they need.",
+   "summary": "Named GPU feature tiers (binding model, pipeline-state model, queue topology, mesh/RT/tensor support, memory model) and the API baseline each tier maps to; render features declare the minimum tier they need; tiers 'rt' and 'rt+tensor' declare hardware ray tracing and tensor support as required baselines for configurations carrying the hwrt profile.",
    "requires": [
     "C-RHI"
    ],
@@ -1197,7 +1198,7 @@
    "layer": 3,
    "owner": "online-services-liveops",
    "name": "Online & live-ops services",
-   "summary": "Sessions/matchmaking tickets, remote config, events/experiments, chat sessions, moderation, generative/inference service calls with quotas, trusted time, service emulation; cross-platform parties and presence; content-key delivery for pre-loaded and embargoed content.",
+   "summary": "Sessions/matchmaking tickets, remote config, events/experiments, chat sessions, moderation, generative/inference service calls with quotas, trusted time, service emulation; cross-platform parties and presence; content-key delivery for pre-loaded and embargoed content; live-production actions carry a human-approval token.",
    "requires": [
     "C-PAL",
     "C-TASK"
@@ -1259,7 +1260,7 @@
    "layer": "P",
    "owner": "perf-benchmarking",
    "name": "Benchmark registration",
-   "summary": "Benchmark registration, metric schema, C-BUDGET line reference, warm-up and variance rules, required hardware tier, replay-driven runs; runs through the in-process runner in OBS.LOG.bench-runtime, present in every configuration; gates run on the profile build configuration.",
+   "summary": "Benchmark registration, metric schema, C-BUDGET line reference, warm-up and variance rules, required hardware tier, replay-driven runs; runs through the in-process runner in OBS.LOG.bench-runtime, present in every configuration; gates run on the profile build configuration; thermal-soak preconditioning and sustained-window measurement.",
    "requires": [],
    "universal": "all"
   },
@@ -1284,7 +1285,7 @@
    "layer": 2,
    "owner": "runtime-scalability",
    "name": "Runtime governor",
-   "summary": "Governor control inputs from shipping-grade signals (GPU frame time, present feedback, pool pressure, thermal/power) independent of C-INSTR; actuator commands through C-SCALE; decision log.",
+   "summary": "Governor control inputs from shipping-grade signals (GPU frame time, present feedback, pool pressure, thermal/power) independent of C-INSTR; actuator commands through C-SCALE; decision log; CPU critical-path and per-phase tick-overrun signals from C-FRAME (shipping-grade); CPU-vs-GPU-bound classification selects actuators; server tick overrun is the primary input on server targets.",
    "requires": [
     "C-SCALE",
     "C-PRESENT",
@@ -1347,12 +1348,12 @@
   },
   {
    "id": "C-RTAS",
-   "layer": 3,
+   "layer": 2,
    "owner": "ray-tracing-infrastructure",
    "name": "Acceleration structures & ray queries",
    "summary": "Acceleration-structure build/refit/compaction, instance and geometry inputs, ray-query API with hardware and software backends; independent of the render scene.",
    "requires": [
-    "C-RG",
+    "C-RHI",
     "C-GPUMEM"
    ],
    "conformance": true,

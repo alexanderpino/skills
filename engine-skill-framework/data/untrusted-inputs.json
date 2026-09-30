@@ -454,17 +454,6 @@
    "limits": "size/type allow-list"
   },
   {
-   "id": "runtime-collision-geometry",
-   "validating_owner": "collision-detection",
-   "parser_owners": [
-    "voxel-worlds",
-    "modding-ugc"
-   ],
-   "trust": "hostile-remote",
-   "mode": "harness",
-   "limits": "triangle count/extents/degeneracy/rebuild time per tick"
-  },
-  {
    "id": "server-pushed-content",
    "validating_owner": "modding-ugc",
    "parser_owners": [
@@ -481,6 +470,29 @@
    "trust": "hostile-remote",
    "mode": "harness",
    "limits": "per-RPC rate, argument bounds, authority check"
+  },
+  {
+   "id": "ipc-messages",
+   "validating_owner": "core-runtime-architect",
+   "parser_owners": [
+    "crash-diagnostics",
+    "editor-architect"
+   ],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "frame size/rate/schema version; TOCTOU-safe copy-out from shared memory"
+  },
+  {
+   "id": "player-model-prompts",
+   "validating_owner": "ai-behavior-perception",
+   "parser_owners": [
+    "audio-content-runtime",
+    "online-services-liveops",
+    "modding-ugc"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "length/rate/token budget/moderation pre-filter"
   }
  ]
 }

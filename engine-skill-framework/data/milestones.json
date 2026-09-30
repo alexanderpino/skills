@@ -163,7 +163,6 @@
     "ik-procedural-animation",
     "localization-i18n",
     "media-playback",
-    "ml-inference-runtime",
     "narrative-dialogue",
     "navigation-pathfinding",
     "net-session",
@@ -231,8 +230,6 @@
     "C-INTEGRITY",
     "C-LIVE",
     "C-LOC",
-    "C-ML",
-    "C-MLGPU",
     "C-MOVE",
     "C-NAV",
     "C-NET",
@@ -535,6 +532,10 @@
     {
      "capability": "PRF.NET.bandwidth",
      "validator": "QA.FUNC.load"
+    },
+    {
+     "capability": "PLAT.LIVE.operations",
+     "validator": "QA.FUNC.soak"
     }
    ],
    "contracts_draft": [
@@ -565,6 +566,7 @@
     "xr-console-client"
    ],
    "skills": [
+    "ml-inference-runtime",
     "server-scaleout-persistence",
     "xr-runtime"
    ],
@@ -584,6 +586,8 @@
     }
    ],
    "contracts_draft": [
+    "C-ML",
+    "C-MLGPU",
     "C-SHARD",
     "C-SRVDATA",
     "C-XRVIEW"
@@ -601,7 +605,8 @@
     "aaa-open-world-online-client",
     "aaa-open-world-online-server",
     "aaa-open-world-online-tools",
-    "aaa-experimental-client"
+    "aaa-experimental-client",
+    "rt-required-3d-client"
    ],
    "skills": [
     "ai-assisted-authoring"
@@ -659,10 +664,6 @@
     {
      "capability": "BLD.REL.end-of-service",
      "validator": "QA.FUNC.compat"
-    },
-    {
-     "capability": "PLAT.LIVE.operations",
-     "validator": "QA.FUNC.soak"
     }
    ],
    "contracts_draft": [],

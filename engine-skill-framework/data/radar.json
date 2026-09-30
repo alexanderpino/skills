@@ -7,7 +7,7 @@
    "capabilities": [
     "PLAT.PAL.cloud-hybrid"
    ],
-   "owner": "platform-architect",
+   "owner": "network-architect",
    "evidence": "Crackdown 3 cloud destruction (2019) — limited",
    "revisit": "Two shipped titles publish latency/cost postmortems",
    "fallback": "Local simulation only"
@@ -120,7 +120,7 @@
    ],
    "owner": "material-system",
    "evidence": "Zeltner et al., SIGGRAPH 2024",
-   "revisit": "Cross-vendor cooperative-vector support + shipped evidence",
+   "revisit": "Cross-vendor matrix/tensor-intrinsic support + shipped evidence",
    "fallback": "Layered analytic BRDF"
   },
   {
@@ -154,7 +154,7 @@
    ],
    "owner": "texture-streaming-vt",
    "evidence": "Vaidyanathan et al. 2023; RTX NTC SDK beta",
-   "revisit": "Shipped titles + non-preview cooperative-vector support",
+   "revisit": "Shipped titles + non-preview matrix/tensor-intrinsic support",
    "fallback": "BCn/ASTC; transcode-on-load variant"
   },
   {
@@ -776,7 +776,7 @@
    "class": "X",
    "owner": "ml-inference-runtime",
    "capabilities": [
-    "ML.RT.sequence-models"
+    "ML.RT.constrained-decoding"
    ],
    "evidence": "2025 on-device SLM demos in games",
    "revisit": "Shipped title with on-device generation within budget",
@@ -912,7 +912,7 @@
    "owner": "rhi-core",
    "evidence": "D3D12 Work Graphs 1.0 (2024); vendor samples; no shipped titles",
    "revisit": "Support on ≥2 console/desktop APIs and one shipped-title postmortem",
-   "fallback": "Indirect / device-generated commands"
+   "fallback": "ExecuteIndirect / device-generated commands"
   },
   {
    "tech": "ReSTIR GI & path-traced GI (RND.PT.realtime)",
@@ -923,7 +923,7 @@
    "owner": "path-tracing",
    "evidence": "Ouyang et al. HPG 2021; shipped PT modes",
    "revisit": "RT tier performance on console-class hardware",
-   "fallback": "Probe/radiance-cache GI"
+   "fallback": "hybrid raster + RT effects"
   },
   {
    "tech": "Strand hair simulation & rendering (PHY.SOFT.hair-sim)",
@@ -934,7 +934,7 @@
    "owner": "cloth-deformables",
    "evidence": "UE Groom; Frostbite strands",
    "revisit": "Budget fit at target character counts",
-   "fallback": "Hair cards"
+   "fallback": "bone-chain dynamics"
   },
   {
    "tech": "In-shader neural evaluation & differentiable shaders (RND.SHADER.autodiff)",
@@ -955,7 +955,7 @@
    ],
    "owner": "platform-web",
    "evidence": "WebGPU in Chrome/Edge/Safari/Firefox (2023–2025)",
-   "revisit": "Bindless/timestamp features in WebGPU",
+   "revisit": "Shipped WebGPU with bindless/timestamp features in all engines' target browsers",
    "fallback": "Web target limited to WebGPU-capable browsers (no WebGL backend; see non-goal)"
   },
   {
@@ -978,7 +978,7 @@
    "owner": "asset-import-interchange",
    "evidence": "Kerbl et al. 2023; 3DGRT 2024; glTF splat extension work",
    "revisit": "Standard format + relighting + shipped game use",
-   "fallback": "Photogrammetry meshes"
+   "fallback": "convert to meshes at import"
   },
   {
    "tech": "Generative authoring tools (CNT.COOK.ml-assisted)",
@@ -988,8 +988,8 @@
    ],
    "owner": "asset-cook-processors",
    "evidence": "Unity AI; Roblox Assistant",
-   "revisit": "Licensing/provenance clear for training data",
-   "fallback": "Manual authoring"
+   "revisit": "Licensing/provenance clear for training data (QA.CERT.ml-provenance)",
+   "fallback": "classical processors"
   },
   {
    "tech": "Agent/automation control API (MCP class) (QA.FUNC.agent-exploration)",
@@ -998,9 +998,9 @@
     "QA.FUNC.agent-exploration"
    ],
    "owner": "functional-automation-soak",
-   "evidence": "MCP integrations for major engines (2025); EA SEED RL testing",
-   "revisit": "Stable protocol adoption",
-   "fallback": "CLI/commandlets"
+   "evidence": "EA SEED RL testing; academic game-testing agents",
+   "revisit": "Agent-found defects exceed the scripted-bot rate over two milestones",
+   "fallback": "scripted bots and random-walk monkeys"
   },
   {
    "tech": "Generative-AI service boundary & guardrails (XC.SEC.genai)",
@@ -1011,7 +1011,7 @@
    "owner": "security-engineering",
    "evidence": "OWASP LLM Top 10; Steam AI disclosure",
    "revisit": "Per-title policy approval",
-   "fallback": "No live-generated content"
+   "fallback": "no live-generated content; offline authored variants"
   },
   {
    "tech": "Coordination of ~150 autonomous agents (program)",
@@ -1074,6 +1074,28 @@
    "evidence": "Research and early middleware; no shipped engine feature",
    "revisit": "A shipped title uses a learned physics policy",
    "fallback": "ANM.IK.physical (active ragdoll with PD motors)"
+  },
+  {
+   "tech": "On-device autoregressive execution",
+   "class": "M",
+   "owner": "ml-inference-runtime",
+   "capabilities": [
+    "ML.RT.sequence-exec"
+   ],
+   "evidence": "OS-provided and open on-device speech/language runtimes (2024–2026)",
+   "revisit": "Two shipping consumers stay within KV-cache and latency budgets on min-spec",
+   "fallback": "remote model via C-LIVE (ML.RT.local-remote)"
+  },
+  {
+   "tech": "Learned surrogates inside the physics step",
+   "class": "X",
+   "owner": "physics-architect",
+   "capabilities": [
+    "PHY.ARCH.learned-surrogates"
+   ],
+   "evidence": "Research on learned destruction/fluid surrogates; no shipped engine feature",
+   "revisit": "A shipped title uses a learned surrogate with recorded outputs",
+   "fallback": "classical solvers"
   }
  ]
 }
