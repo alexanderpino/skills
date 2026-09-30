@@ -1,5 +1,5 @@
 {
- "_doc": "Technology radar. Every non-established capability must appear here with owner, evidence, revisit trigger and fallback; non-goals are recorded explicitly. Owned by architecture-governance (ARCH.GOV.radar). Each entry carries 'reviewed' (ISO date); check.py fails entries older than max_age_days for their class relative to as_of. Promotion triggers should be testable predicates (shipped-title count, API status). Evidence-to-class rule: M requires at least two shipped titles with published postmortems; one shipped title or research evidence is X.",
+ "_doc": "Technology radar. Every non-established capability must appear here with owner, evidence, revisit trigger and fallback; non-goals are recorded explicitly. Owned by architecture-governance (ARCH.GOV.radar). Each entry carries 'reviewed' (ISO date); check.py fails entries older than max_age_days for their class relative to as_of. Promotion triggers should be testable predicates (shipped-title count, API status). Evidence-to-class rule: M requires at least two shipped titles with published postmortems; one shipped title or research evidence is X. Program-level entries (ARCH.ORG.*) are judged by their human fallback.",
  "entries": [
   {
    "tech": "Cloud-hybrid compute (split client/cloud simulation)",
@@ -401,7 +401,7 @@
   },
   {
    "tech": "ML deformers",
-   "class": "M",
+   "class": "X",
    "capabilities": [
     "ANM.DEF.ml"
    ],
@@ -413,7 +413,7 @@
   },
   {
    "tech": "Learned motion & neural controllers",
-   "class": "M",
+   "class": "X",
    "capabilities": [
     "ANM.SYN.learned"
    ],
@@ -485,7 +485,7 @@
   },
   {
    "tech": "Learned & LLM-driven agents",
-   "class": "M",
+   "class": "X",
    "capabilities": [
     "GAM.AI.learned"
    ],
@@ -719,7 +719,7 @@
   },
   {
    "tech": "Conflict-free concurrent world editing",
-   "class": "M",
+   "class": "X",
    "capabilities": [
     "ED.COLLAB.concurrent-world"
    ],
@@ -864,7 +864,6 @@
    "class": "M",
    "owner": "ml-inference-runtime",
    "capabilities": [
-    "ML.RT.os-models",
     "ML.RT.residency",
     "ML.RT.local-remote"
    ],
@@ -923,7 +922,7 @@
   },
   {
    "tech": "Player-prompted runtime asset generation",
-   "class": "M",
+   "class": "X",
    "owner": "modding-ugc",
    "capabilities": [
     "XC.EXT.generated-assets"
@@ -1353,6 +1352,18 @@
    "evidence": "DLSS 4, FSR 4 and PSSR ship in titles (2025)",
    "revisit": "Two vendors expose a common integration API",
    "fallback": "RND.RECON.upscalers (engine temporal upscaler)",
+   "reviewed": "2026-09-30"
+  },
+  {
+   "tech": "OS-provided foundation-model APIs as a backend",
+   "class": "X",
+   "owner": "ml-inference-runtime",
+   "capabilities": [
+    "ML.RT.os-models"
+   ],
+   "evidence": "Windows ML GA, Apple Foundation Models, Android AICore announced (2025); no shipped title with a postmortem",
+   "revisit": "Two shipped titles using an OS model API, with postmortems",
+   "fallback": "Engine-packaged models",
    "reviewed": "2026-09-30"
   }
  ],

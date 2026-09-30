@@ -365,7 +365,7 @@
       ],
       [
        "ARCH.ORG.independence",
-       "Independence matrix: never-same-agent pairs (decider vs governance reviewer, implementer vs oracle author, builder vs adjudicator, security reviewer vs reviewed code, milestone owner vs gate owner) enforced by staffing at every organization tier; co-hosting capped by capability count",
+       "Independence matrix: never-same-agent pairs (decider vs governance reviewer, implementer vs oracle author, builder vs adjudicator, security reviewer vs reviewed code, milestone owner vs gate owner) enforced by staffing at every organization tier; the co-hosting unit is the workstream (data/organizations.json tiers), and per-agent load is bounded by tier choice and ARCH.ORG.human-capacity, not by a capability-count cap",
        "architecture-governance",
        "M",
        [
@@ -771,7 +771,7 @@
       ],
       [
        "PLAT.PAL.confidential-extensions",
-       "NDA platform extensions: segregated modules/repos, public stubs, sanitized CI results, access classes; data-class rules: per-holder sealed partitions for tier/budget numbers, DDC, symbols and captures with a public envelope and sanitized summaries",
+       "NDA platform extensions: segregated modules/repos, public stubs, sanitized CI results, access classes; data-class rules: per-holder sealed partitions for tier/budget numbers, DDC, symbols and captures with a public envelope and sanitized summaries; SDK version pins, cert-mandated minimums and compiler matrices of holder platforms join the per-holder partitions, with only a public envelope in BLD.SYS.platform-sdks and BLD.SYS.toolchains",
        "platform-architect",
        "E",
        [
@@ -3437,7 +3437,7 @@
       ],
       [
        "CNT.COOK.determinism-check",
-       "Cook determinism verification",
+       "Cook determinism hooks (reference inputs and threshold proposals only; suite authorship belongs to the contract's oracle_author, tools-pipeline-conformance)",
        "content-pipeline-architect",
        "E",
        [
@@ -6362,7 +6362,11 @@
        "ML.RT.os-models",
        "OS-provided foundation-model APIs as a backend",
        "ml-inference-runtime",
-       "M"
+       "X",
+       [],
+       [
+        "experimental"
+       ]
       ],
       [
        "ML.RT.residency",
@@ -7326,9 +7330,12 @@
        "ANM.DEF.ml",
        "ML deformers",
        "deformation-skinning",
-       "M",
+       "X",
        [
         "ml-inference-runtime"
+       ],
+       [
+        "experimental"
        ]
       ],
       [
@@ -7449,9 +7456,12 @@
        "ANM.SYN.learned",
        "Learned motion matching & neural controllers",
        "motion-synthesis",
-       "M",
+       "X",
        [
         "ml-inference-runtime"
+       ],
+       [
+        "experimental"
        ]
       ],
       [
@@ -8446,7 +8456,7 @@
       ],
       [
        "NET.ARCH.validation",
-       "Netcode oracle scenarios & acceptance thresholds incl. host-drop (co-signed by simulation validation)",
+       "Netcode validation hooks: reference scenes incl. host-drop and threshold proposals only; scenario suites and acceptance thresholds belong to the contracts' oracle_author (simulation-validation)",
        "network-architect",
        "E",
        [
@@ -9672,7 +9682,11 @@
        "GAM.AI.learned",
        "Learned policies / ML agents (via C-AIAGENT)",
        "ai-behavior-perception",
-       "M"
+       "X",
+       [],
+       [
+        "experimental"
+       ]
       ],
       [
        "GAM.AI.local-avoidance",
@@ -10752,7 +10766,7 @@
       ],
       [
        "UI.A11Y.validation",
-       "Accessibility validation",
+       "Accessibility validation hooks (reference scenes and threshold proposals only; suite authorship belongs to the contract's oracle_author, ui-text-conformance)",
        "accessibility",
        "E",
        [
@@ -11190,6 +11204,10 @@
        "E",
        [
         "asset-cook-processors"
+       ],
+       [
+        "lite3d",
+        "std3d"
        ]
       ],
       [
@@ -11214,13 +11232,21 @@
        "E",
        [
         "post-color-hdr"
+       ],
+       [
+        "std3d"
        ]
       ],
       [
        "ED.WORLD.mesh-paint",
        "Mesh vertex-color & texture painting",
        "world-editor-viewport",
-       "E"
+       "E",
+       [],
+       [
+        "lite3d",
+        "std3d"
+       ]
       ]
      ]
     },
@@ -11321,10 +11347,10 @@
        "ED.COLLAB.concurrent-world",
        "Conflict-free concurrent world editing at studio scale (CRDT/OT class)",
        "collaboration-version-control",
-       "M",
+       "X",
        [],
        [
-        "team-large"
+        "experimental"
        ]
       ],
       [
@@ -11538,7 +11564,7 @@
       ],
       [
        "BLD.SYS.platform-sdks",
-       "Platform SDK version management & store/cert-mandated minimums",
+       "Platform SDK version management & store-mandated minimums for public platforms (non-public platform pins and matrices are per-holder data under the NDA-extension mechanism of platform-architect)",
        "build-system-toolchains",
        "E",
        [
@@ -12206,6 +12232,18 @@
        [
         "network-architect"
        ]
+      ],
+      [
+       "QA.FUNC.release-rehearsal",
+       "Release rehearsal drills on the online reference game: patch, DLC, staged rollout with halt, rollback and roll-forward, live-ops runbook and incident drills, key-rotation and revocation drill, vulnerability-disclosure SLA drill; records executed evidence per gate",
+       "functional-automation-soak",
+       "E",
+       [
+        "packaging-release-patching",
+        "online-services-liveops",
+        "security-engineering",
+        "reference-games"
+       ]
       ]
      ]
     },
@@ -12275,7 +12313,7 @@
       ],
       [
        "QA.CERT.prechecks",
-       "Automated certification pre-checks",
+       "Automated certification pre-checks (public and non-holder checks; holder pre-submission checkers belong to PLAT.CON.submission)",
        "certification-compliance",
        "E"
       ],
@@ -14228,11 +14266,14 @@
        "XC.EXT.generated-assets",
        "Runtime validation & cooking of player-prompted generated assets under XC.SEC.genai",
        "modding-ugc",
-       "M",
+       "X",
        [
         "asset-cook-processors",
         "security-engineering",
         "online-services-liveops"
+       ],
+       [
+        "experimental"
        ]
       ],
       [

@@ -714,7 +714,7 @@
     "dedicated-server",
     "modding-ugc"
    ],
-   "exit": "Online reference games per netcode family: dedicated-server shooter with prediction and lag compensation, listen-server co-op, desync-free 2 h lockstep soak, web transports; bot load test; packet/handshake fuzzing, DoS test, server-authority review and external pen test (human gate; gates XC.SEC.server-validation, XC.SEC.info-hiding, XC.SEC.incident, NET.SRV.admin, NET.SRV.transactions, PLAT.COMM.receipts; XC.SEC.testing validates); patch + DLC + staged rollout + rollback executed on the online reference game. Perf: bandwidth per player within budget and latency gated; server density is gated at M6 (PRF.NET.server-density). A console configuration passes a holder pre-submission or partner review (scheduled from ARCH.ORG.external-dependencies start-by dates); M7 stays the final pass.",
+   "exit": "Online reference games per netcode family: dedicated-server shooter with prediction and lag compensation, listen-server co-op, desync-free 2 h lockstep soak, web transports; bot load test; packet/handshake fuzzing, DoS test, server-authority review and external pen test (human gate; gates XC.SEC.server-validation, XC.SEC.info-hiding, XC.SEC.incident, NET.SRV.admin, NET.SRV.transactions, PLAT.COMM.receipts; XC.SEC.testing validates); patch + DLC + staged rollout + rollback executed on the online reference game (QA.FUNC.release-rehearsal validates rollout, rollback and live-ops). Perf: bandwidth per player within budget and latency gated; server density is gated at M6 (PRF.NET.server-density). A console configuration passes a holder pre-submission or partner review (scheduled from ARCH.ORG.external-dependencies start-by dates); M7 stays the final pass.",
    "gates": [
     {
      "capability": "QA.FUNC.load",
@@ -726,11 +726,11 @@
     },
     {
      "capability": "BLD.REL.staged-rollout",
-     "validator": "QA.FUNC.compat-corpus"
+     "validator": "QA.FUNC.release-rehearsal"
     },
     {
      "capability": "BLD.REL.rollback",
-     "validator": "QA.STRAT.release-criteria"
+     "validator": "QA.FUNC.release-rehearsal"
     },
     {
      "capability": "PRF.NET.bandwidth",
@@ -738,7 +738,7 @@
     },
     {
      "capability": "PLAT.LIVE.operations",
-     "validator": "QA.FUNC.soak"
+     "validator": "QA.FUNC.release-rehearsal"
     },
     {
      "capability": "PRF.NET.latency",
@@ -762,7 +762,7 @@
     },
     {
      "capability": "NET.SRV.transactions",
-     "validator": "QA.FUNC.load"
+     "validator": "QA.ROBUST.distributed-faults"
     },
     {
      "capability": "PLAT.COMM.receipts",
@@ -825,7 +825,7 @@
     },
     {
      "capability": "RES.MGMT.validation",
-     "validator": "PRF.LOAD.load-time"
+     "validator": "QA.SIM.streaming"
     },
     {
      "capability": "PRF.BENCH.scale-content",
@@ -872,7 +872,7 @@
    "gates": [
     {
      "capability": "NET.SRV.cross-server",
-     "validator": "QA.FUNC.load"
+     "validator": "QA.ROBUST.distributed-faults"
     },
     {
      "capability": "XC.SEC.sandbox",
@@ -933,7 +933,7 @@
     },
     {
      "capability": "QA.STRAT.release-criteria",
-     "validator": "QA.FUNC.compat-corpus"
+     "validator": "QA.FUNC.release-rehearsal"
     },
     {
      "capability": "QA.FUNC.compat-corpus",

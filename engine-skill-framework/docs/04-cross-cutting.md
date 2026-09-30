@@ -48,7 +48,7 @@ These pairs are never hosted by the same agent at any organization tier (`check.
 | program-orchestration | architecture-governance | builder/scheduler vs adjudicator |
 | program-orchestration | reference-games | milestone owner vs gate content |
 | security-engineering | owning-skill | security reviewer vs reviewed code |
-| test-architect | owning-skill | oracle author vs implementer |
+| test-architect | owning-skill | test policy, definition-of-done and canary owner vs implementer (per-contract oracle_author independence is checked per contract and per tier by check.py) |
 | security-engineering | security-runtime | reviewer vs implementer of crypto and trust-root code |
 | robustness-fuzzing | owning-skill | fuzz-harness co-signer vs parser owner |
 

@@ -21,7 +21,7 @@
             pipeline-performance  (5) ·process
     [X] test-architect  (20) ·process
             render-validation  (8) ·process
-            functional-automation-soak  (12) ·process
+            functional-automation-soak  (13) ·process
             robustness-fuzzing  (6) ·process
             certification-compliance  (18) ·process
             reference-games  (6)
@@ -196,53 +196,53 @@ A configuration is a point on three independent axes: scale/feature **profiles**
 
 | Configuration | Profiles | Target | Platforms | Build skills | Capabilities |
 |---|---|---|---|---|---|
-| minimal-client | minimal | client | pc, console, mobile, web | 74 | 754 |
-| indie-2d-client | min2d | client | pc, console, mobile, web | 81 | 830 |
-| indie-2d-tools | min2d | tools | pc | 92 | 944 |
-| indie-2d-online-moddable-client | min2d, online, ugc | client | pc, console, mobile | 85 | 903 |
-| indie-2d-online-moddable-server | min2d, online, ugc | server | server-host | 59 | 632 |
-| rts-2d-massim-client | min2d, massim, online-lockstep | client | pc | 83 | 854 |
-| lite-3d-mobile-client | lite3d | client | mobile | 94 | 919 |
-| lite-3d-mobile-online-client | lite3d, online | client | mobile | 99 | 995 |
-| standard-3d-client | std3d | client | pc, console | 98 | 953 |
-| standard-3d-tools | std3d | tools | pc | 110 | 1087 |
-| open-world-client | std3d, openworld | client | pc, console | 99 | 960 |
-| online-3d-client | std3d, online | client | pc, console | 103 | 1029 |
-| online-3d-server | std3d, online | server | server-host | 67 | 683 |
-| online-3d-bot-client | std3d, online | headless-client | server-host | 67 | 681 |
-| racing-3d-client | std3d, vehicles | client | pc, console | 99 | 960 |
-| rts-3d-massim-client | std3d, massim, online-lockstep | client | pc | 103 | 1003 |
-| sandbox-online-server | std3d, sandbox, online, persistent-world | server | server-host | 71 | 704 |
-| xr-standalone-client | lite3d, xr, ml | client | xr-standalone | 96 | 948 |
-| xr-pc-client | std3d, xr, ml | client | pc | 98 | 962 |
-| aaa-open-world-online-client | std3d, openworld, online, aaa, ugc, vehicles, team-large, persistent-world, ml | client | pc, console | 108 | 1076 |
-| aaa-open-world-online-server | std3d, openworld, online, aaa, ugc, vehicles, team-large, persistent-world, ml | server | server-host | 73 | 729 |
-| aaa-open-world-online-tools | std3d, openworld, online, aaa, ugc, vehicles, team-large, persistent-world, ml | tools | pc | 123 | 1227 |
-| sandbox-2d-client | min2d, sandbox | client | pc | 79 | 801 |
-| xr-console-client | std3d, xr, ml | client | console | 96 | 964 |
-| lite-3d-portable-console-client | lite3d | client | console | 93 | 920 |
-| fighting-2d-rollback-client | min2d, online-rollback | client | pc, console | 82 | 859 |
-| mobile-async-client | minimal, online-async | client | mobile | 69 | 717 |
-| coop-3d-listen-client | std3d, online | client | pc, console | 103 | 1029 |
-| indie-2d-online-web-client | min2d, online | client | web | 79 | 855 |
-| online-3d-console-client | std3d, online | client | console | 99 | 1011 |
-| minimal-tools | minimal | tools | pc | 82 | 845 |
-| lite-3d-mobile-tools | lite3d | tools | pc | 107 | 1052 |
-| online-3d-tools | std3d, online | tools | pc | 116 | 1164 |
+| minimal-client | minimal | client | pc, console, mobile, web | 74 | 753 |
+| indie-2d-client | min2d | client | pc, console, mobile, web | 81 | 829 |
+| indie-2d-tools | min2d | tools | pc | 92 | 940 |
+| indie-2d-online-moddable-client | min2d, online, ugc | client | pc, console, mobile | 85 | 901 |
+| indie-2d-online-moddable-server | min2d, online, ugc | server | server-host | 59 | 630 |
+| rts-2d-massim-client | min2d, massim, online-lockstep | client | pc | 83 | 853 |
+| lite-3d-mobile-client | lite3d | client | mobile | 94 | 916 |
+| lite-3d-mobile-online-client | lite3d, online | client | mobile | 99 | 992 |
+| standard-3d-client | std3d | client | pc, console | 98 | 950 |
+| standard-3d-tools | std3d | tools | pc | 110 | 1084 |
+| open-world-client | std3d, openworld | client | pc, console | 99 | 957 |
+| online-3d-client | std3d, online | client | pc, console | 103 | 1026 |
+| online-3d-server | std3d, online | server | server-host | 67 | 681 |
+| online-3d-bot-client | std3d, online | headless-client | server-host | 67 | 679 |
+| racing-3d-client | std3d, vehicles | client | pc, console | 99 | 957 |
+| rts-3d-massim-client | std3d, massim, online-lockstep | client | pc | 103 | 1000 |
+| sandbox-online-server | std3d, sandbox, online, persistent-world | server | server-host | 71 | 702 |
+| xr-standalone-client | lite3d, xr, ml | client | xr-standalone | 96 | 944 |
+| xr-pc-client | std3d, xr, ml | client | pc | 98 | 958 |
+| aaa-open-world-online-client | std3d, openworld, online, aaa, ugc, vehicles, team-large, persistent-world, ml | client | pc, console | 108 | 1071 |
+| aaa-open-world-online-server | std3d, openworld, online, aaa, ugc, vehicles, team-large, persistent-world, ml | server | server-host | 73 | 725 |
+| aaa-open-world-online-tools | std3d, openworld, online, aaa, ugc, vehicles, team-large, persistent-world, ml | tools | pc | 123 | 1221 |
+| sandbox-2d-client | min2d, sandbox | client | pc | 79 | 800 |
+| xr-console-client | std3d, xr, ml | client | console | 96 | 960 |
+| lite-3d-portable-console-client | lite3d | client | console | 93 | 917 |
+| fighting-2d-rollback-client | min2d, online-rollback | client | pc, console | 82 | 858 |
+| mobile-async-client | minimal, online-async | client | mobile | 69 | 716 |
+| coop-3d-listen-client | std3d, online | client | pc, console | 103 | 1026 |
+| indie-2d-online-web-client | min2d, online | client | web | 79 | 854 |
+| online-3d-console-client | std3d, online | client | console | 99 | 1008 |
+| minimal-tools | minimal | tools | pc | 82 | 841 |
+| lite-3d-mobile-tools | lite3d | tools | pc | 107 | 1048 |
+| online-3d-tools | std3d, online | tools | pc | 116 | 1161 |
 | aaa-experimental-client | std3d, openworld, online, aaa, experimental, ml | client | pc | 104 | 1069 |
-| standard-3d-team-tools | std3d, online, team-mid | tools | pc | 116 | 1168 |
-| fighting-2d-rollback-tools | min2d, online-rollback | tools | pc | 93 | 974 |
-| rts-massim-lockstep-tools | min2d, massim, online-lockstep | tools | pc | 94 | 969 |
-| mobile-async-validator | minimal, online-async | headless-client | server-host | 47 | 476 |
-| rt-required-3d-client | std3d, aaa, hwrt, ml | client | pc, console | 100 | 974 |
-| xr-standalone-tools | lite3d, xr | tools | pc | 108 | 1070 |
-| lite-3d-mobile-openworld-online-client | lite3d, openworld, online | client | mobile | 100 | 1002 |
-| lite-3d-portable-openworld-client | lite3d, openworld | client | console | 94 | 927 |
-| lite-3d-web-client | lite3d | client | web | 93 | 913 |
-| community-server-pc | min2d, online, ugc | server | pc, server-host | 60 | 641 |
-| sandbox-2d-tools | min2d, sandbox | tools | pc | 90 | 915 |
-| rt-required-3d-tools | std3d, hwrt | tools | pc | 109 | 1075 |
-| aaa-experimental-tools | std3d, openworld, online, aaa, experimental | tools | pc | 116 | 1190 |
+| standard-3d-team-tools | std3d, online, team-mid | tools | pc | 116 | 1165 |
+| fighting-2d-rollback-tools | min2d, online-rollback | tools | pc | 93 | 970 |
+| rts-massim-lockstep-tools | min2d, massim, online-lockstep | tools | pc | 94 | 965 |
+| mobile-async-validator | minimal, online-async | headless-client | server-host | 47 | 475 |
+| rt-required-3d-client | std3d, aaa, hwrt, ml | client | pc, console | 100 | 970 |
+| xr-standalone-tools | lite3d, xr | tools | pc | 108 | 1066 |
+| lite-3d-mobile-openworld-online-client | lite3d, openworld, online | client | mobile | 100 | 999 |
+| lite-3d-portable-openworld-client | lite3d, openworld | client | console | 94 | 924 |
+| lite-3d-web-client | lite3d | client | web | 93 | 910 |
+| community-server-pc | min2d, online, ugc | server | pc, server-host | 60 | 639 |
+| sandbox-2d-tools | min2d, sandbox | tools | pc | 90 | 911 |
+| rt-required-3d-tools | std3d, hwrt | tools | pc | 109 | 1072 |
+| aaa-experimental-tools | std3d, openworld, online, aaa, experimental | tools | pc | 116 | 1191 |
 
 ### Membership matrix
 
@@ -533,7 +533,7 @@ Rendering correctness validation: golden-image tests with perceptual metrics, to
 
 Game-level automation: scripted and bot playthroughs, smoke/boot tests, soak and stability runs (memory growth, leaks), hardware/OS compatibility matrix, network harnesses and server load tests.
 
-- **Owns:** `QA.FUNC.automation`; `QA.FUNC.smoke`; `QA.FUNC.soak`; `QA.FUNC.compat`; `QA.FUNC.network`; `QA.FUNC.load`; `QA.FUNC.editor`; `QA.FUNC.agent-exploration`; `QA.FUNC.bug-capture`; `QA.FUNC.playtest`; `QA.FUNC.compat-corpus`; `QA.FUNC.version-skew`
+- **Owns:** `QA.FUNC.automation`; `QA.FUNC.smoke`; `QA.FUNC.soak`; `QA.FUNC.compat`; `QA.FUNC.network`; `QA.FUNC.load`; `QA.FUNC.editor`; `QA.FUNC.agent-exploration`; `QA.FUNC.bug-capture`; `QA.FUNC.playtest`; `QA.FUNC.compat-corpus`; `QA.FUNC.version-skew`; `QA.FUNC.release-rehearsal`
 - **Contributes to:** `ARCH.PROD.customer-corpus`; `INP.ACT.injection`; `NET.ARCH.validation`; `UI.FW.validation`; `ED.ARCH.transaction-invariants`; `BLD.CI.devices`; `BLD.CI.device-lanes`; `PRF.BENCH.scale-content`; `PRF.NET.load-analysis`; `OBS.CRASH.feedback`
 - **Not responsible for:** Unit test frameworks → test-architect; Device-farm infrastructure → ci-cd-automation
 - **Provides:** — · **Consumes:** C-GAME?, C-INPUT?, C-NET?, C-AUTOMATION
@@ -573,7 +573,7 @@ Tracks and pre-validates external requirements: platform certification (TRC/XR/L
 Threat modeling and trust boundaries for every untrusted input, secure-coding and memory-safety policy, supply-chain security, secrets, anti-tamper boundary, mod/UGC sandbox policy.
 
 - **Owns:** `XC.SEC.threats`; `XC.SEC.coding`; `XC.SEC.trust`; `XC.SEC.supply-chain`; `XC.SEC.secrets`; `XC.SEC.tamper`; `XC.SEC.sandbox`; `XC.SEC.memory-safety`; `XC.SEC.hardening`; `XC.SEC.crypto-policy`; `XC.SEC.vuln-response`; `XC.SEC.incident`; `XC.SEC.dev-trust`; `XC.SEC.agent-boundary`; `XC.SEC.key-custody`; `XC.SEC.genai`; `XC.SEC.testing`; `XC.SEC.agent-redteam`
-- **Contributes to:** `ARCH.EVID.source-policy`; `ARCH.ORG.human-gates`; `ARCH.ORG.provenance`; `ARCH.ORG.sensitive-paths`; `PLAT.PAL.process`; `PLAT.PAL.confidential-extensions`; `PLAT.SVC.voice-moderation`; `PLAT.LIVE.support-tools`; `PLAT.COMM.receipts`; `CORE.LIFE.language`; `CORE.LIFE.ipc`; `CORE.LIFE.interop`; `CORE.LIFE.config-trust`; `CORE.MEM.field-detection`; `CORE.MEM.exec-pages`; `CORE.TYPES.crypto`; `CORE.TYPES.hash-dos`; `CORE.SER.untrusted`; `RES.PKG.crypto`; `RND.MEM.zero-init-robust-access`; `RND.TEX.runtime-decode`; `NET.TRANS.crypto`; `NET.TRANS.dos`; `NET.TRANS.pq-kex`; `NET.SRV.admin`; `NET.SRV.secrets-delivery`; `GAM.SCR.sandbox`; `GAM.AI.local-guardrails`; `GAM.SAVE.integrity`; `UI.FW.web-view`; `ED.ARCH.automation-security`; `ED.COLLAB.codev`; `ED.COLLAB.session-server`; `BLD.SYS.third-party`; `BLD.SYS.dev-surface-exclusion`; `BLD.SYS.provenance`; `BLD.CI.build-distribution`; `BLD.CI.backports`; `BLD.CI.leak-protection`; `BLD.CI.hardening`; `BLD.REL.preload-embargo`; `QA.CERT.privacy`; `QA.CERT.licenses`; `QA.CERT.export-crypto`; `PRF.BENCH.shipping-delta`; `OBS.LOG.consent`; `OBS.LOG.analytics`; `OBS.CRASH.privacy`; `XC.SEC.privacy`; `XC.SEC.data-rights`; `XC.SEC.signed-artifacts`; `XC.EXT.mod-editor`; `XC.EXT.ugc-integrity`; `XC.EXT.generated-assets`
+- **Contributes to:** `ARCH.EVID.source-policy`; `ARCH.ORG.human-gates`; `ARCH.ORG.provenance`; `ARCH.ORG.sensitive-paths`; `PLAT.PAL.process`; `PLAT.PAL.confidential-extensions`; `PLAT.SVC.voice-moderation`; `PLAT.LIVE.support-tools`; `PLAT.COMM.receipts`; `CORE.LIFE.language`; `CORE.LIFE.ipc`; `CORE.LIFE.interop`; `CORE.LIFE.config-trust`; `CORE.MEM.field-detection`; `CORE.MEM.exec-pages`; `CORE.TYPES.crypto`; `CORE.TYPES.hash-dos`; `CORE.SER.untrusted`; `RES.PKG.crypto`; `RND.MEM.zero-init-robust-access`; `RND.TEX.runtime-decode`; `NET.TRANS.crypto`; `NET.TRANS.dos`; `NET.TRANS.pq-kex`; `NET.SRV.admin`; `NET.SRV.secrets-delivery`; `GAM.SCR.sandbox`; `GAM.AI.local-guardrails`; `GAM.SAVE.integrity`; `UI.FW.web-view`; `ED.ARCH.automation-security`; `ED.COLLAB.codev`; `ED.COLLAB.session-server`; `BLD.SYS.third-party`; `BLD.SYS.dev-surface-exclusion`; `BLD.SYS.provenance`; `BLD.CI.build-distribution`; `BLD.CI.backports`; `BLD.CI.leak-protection`; `BLD.CI.hardening`; `BLD.REL.preload-embargo`; `QA.FUNC.release-rehearsal`; `QA.CERT.privacy`; `QA.CERT.licenses`; `QA.CERT.export-crypto`; `PRF.BENCH.shipping-delta`; `OBS.LOG.consent`; `OBS.LOG.analytics`; `OBS.CRASH.privacy`; `XC.SEC.privacy`; `XC.SEC.data-rights`; `XC.SEC.signed-artifacts`; `XC.EXT.mod-editor`; `XC.EXT.ugc-integrity`; `XC.EXT.generated-assets`
 - **Not responsible for:** Cheat detection → anti-cheat-integrity; Fuzzing campaigns → robustness-fuzzing; Transport encryption implementation → network-transport; Privacy engineering → privacy-data-protection; Crypto and signed-artifact code → security-runtime
 - **Provides:** C-TRUST · **Consumes:** —
 - **Untrusted inputs:** tool-outputs, vuln-reports
@@ -2036,7 +2036,7 @@ CI pipelines, build farm and artifact storage, pre-submit and merge gating, symb
 Platform packaging and signing, store-submission artifacts, delta/chunk patching, DLC, install-on-demand, client/server/content version compatibility, CDN boundary, release rollback.
 
 - **Owns:** `BLD.REL.packaging`; `BLD.REL.submission`; `BLD.REL.patching`; `BLD.REL.dlc`; `BLD.REL.on-demand`; `BLD.REL.compat`; `BLD.REL.cdn`; `BLD.REL.rollback`; `BLD.REL.api-redist`; `BLD.REL.engine-distribution`; `BLD.REL.staged-rollout`; `BLD.REL.end-of-service`; `BLD.REL.server-artifacts`; `BLD.REL.preload-embargo`; `BLD.REL.store-variants`
-- **Contributes to:** `PLAT.CON.packaging`; `PLAT.CON.submission`; `PLAT.CON.patch-format`; `PLAT.CON.ci-lane`; `PLAT.SVC.trials`; `PLAT.SVC.pc-storefronts`; `PLAT.WEB.delivery`; `RES.PKG.install-layout`; `CNT.VAL.audit`; `NET.ARCH.versioning`; `NET.SRV.community-hosting`; `NET.SESS.content-set`; `GAM.SCR.hotfix`; `UI.LOC.language-packs`; `BLD.SYS.provenance`; `BLD.CI.build-distribution`; `BLD.CI.leak-protection`; `QA.FUNC.compat-corpus`; `PRF.MEM.size`; `XC.SEC.vuln-response`; `XC.SEC.key-custody`; `XC.EXT.mod-editor`
+- **Contributes to:** `PLAT.CON.packaging`; `PLAT.CON.submission`; `PLAT.CON.patch-format`; `PLAT.CON.ci-lane`; `PLAT.SVC.trials`; `PLAT.SVC.pc-storefronts`; `PLAT.WEB.delivery`; `RES.PKG.install-layout`; `CNT.VAL.audit`; `NET.ARCH.versioning`; `NET.SRV.community-hosting`; `NET.SESS.content-set`; `GAM.SCR.hotfix`; `UI.LOC.language-packs`; `BLD.SYS.provenance`; `BLD.CI.build-distribution`; `BLD.CI.leak-protection`; `QA.FUNC.compat-corpus`; `QA.FUNC.release-rehearsal`; `PRF.MEM.size`; `XC.SEC.vuln-response`; `XC.SEC.key-custody`; `XC.EXT.mod-editor`
 - **Not responsible for:** Package runtime format → package-formats-vfs; Certification tracking → certification-compliance
 - **Provides:** C-PKG · **Consumes:** C-VFS, C-BUILD, C-SVC, C-COOK, C-RELEASE · **Tool-side:** C-TARGETPLAT
 - **Untrusted inputs:** patch-manifests, patch-payloads
@@ -2220,7 +2220,7 @@ The dialogue line model and narrative runtime shared by VO, subtitles, lip sync,
 The reference-game ladder (one representative game per configuration) used as milestone and release gate: reference-game code written only against the public API, production-scale content acquired or generated with a rights manifest, upkeep across engine releases, and the internal playtest and dogfood loop.
 
 - **Owns:** `QA.REF.ladder`; `QA.REF.content`; `QA.REF.dogfood`; `QA.REF.game-code`; `QA.REF.content-acquisition`; `QA.REF.upkeep`
-- **Contributes to:** `ARCH.ORG.milestones`; `QA.STRAT.release-criteria`; `PRF.BENCH.scale-content`
+- **Contributes to:** `ARCH.ORG.milestones`; `QA.STRAT.release-criteria`; `QA.FUNC.release-rehearsal`; `PRF.BENCH.scale-content`
 - **Not responsible for:** Teaching samples → developer-experience-docs; Benchmark harness → perf-benchmarking
 - **Provides:** — · **Consumes:** C-GAME, C-INPUT?, C-UI?, C-SCRIPT?, C-GAMEDATA?, C-API
 - **Expertise:** game production, content production, playtesting
@@ -2247,7 +2247,7 @@ Web target (WASM + WebGPU): threads and cross-origin isolation, memory limits, O
 Integration boundary to third-party and own online backends and live operations: matchmaking/lobby/session boundary, remote config and feature flags, live events and experiments, service-hosted voice/text chat sessions, moderation (UGC, chat, generated content), wallet and ads boundaries, trusted time, remote generative-AI/inference boundary, service emulators and outage injection for tests.
 
 - **Owns:** `PLAT.SVC.matchmaking`; `PLAT.SVC.remote-config`; `PLAT.SVC.moderation`; `PLAT.SVC.voice-text`; `PLAT.SVC.trusted-time`; `PLAT.SVC.genai-boundary`; `PLAT.SVC.emulation`; `PLAT.SVC.admission`; `PLAT.SVC.xplat-social`; `PLAT.SVC.voice-moderation`; `PLAT.LIVE.events`; `PLAT.LIVE.experiments`; `PLAT.LIVE.operations`; `PLAT.LIVE.support-tools`; `PLAT.COMM.currency`; `PLAT.COMM.ads`; `NET.ARCH.async`
-- **Contributes to:** `ARCH.ORG.human-gates`; `PLAT.PAL.device-db`; `PLAT.PAL.cloud-hybrid`; `CORE.LIFE.config`; `ML.RT.local-remote`; `AUD.SPAT.proximity-voice`; `NET.ARCH.async-validation`; `NET.TRANS.qos-probe`; `NET.SRV.orchestration`; `NET.SRV.lifecycle`; `NET.SESS.server-browser`; `GAM.FW.turns`; `UI.A11Y.comms`; `ED.ARCH.pie`; `BLD.REL.rollback`; `BLD.REL.staged-rollout`; `BLD.REL.end-of-service`; `BLD.REL.preload-embargo`; `QA.ROBUST.distributed-faults`; `OBS.LOG.analytics`; `XC.SEC.incident`; `XC.SEC.genai`; `XC.EXT.ugc-discovery`; `XC.EXT.ugc-integrity`; `XC.EXT.generated-assets`
+- **Contributes to:** `ARCH.ORG.human-gates`; `PLAT.PAL.device-db`; `PLAT.PAL.cloud-hybrid`; `CORE.LIFE.config`; `ML.RT.local-remote`; `AUD.SPAT.proximity-voice`; `NET.ARCH.async-validation`; `NET.TRANS.qos-probe`; `NET.SRV.orchestration`; `NET.SRV.lifecycle`; `NET.SESS.server-browser`; `GAM.FW.turns`; `UI.A11Y.comms`; `ED.ARCH.pie`; `BLD.REL.rollback`; `BLD.REL.staged-rollout`; `BLD.REL.end-of-service`; `BLD.REL.preload-embargo`; `QA.FUNC.release-rehearsal`; `QA.ROBUST.distributed-faults`; `OBS.LOG.analytics`; `XC.SEC.incident`; `XC.SEC.genai`; `XC.EXT.ugc-discovery`; `XC.EXT.ugc-integrity`; `XC.EXT.generated-assets`
 - **Not responsible for:** First-party platform services → platform-services; Backend implementation → external:backend; Game-server hosting → dedicated-server
 - **Provides:** C-LIVE · **Consumes:** C-PAL, C-TASK, C-CFG, C-SVC?, C-SIGN, C-A11YRT? · **Implements:** C-NETLINK
 - **Untrusted inputs:** chat-text, generated-content, player-model-prompts, player-profile-strings, qos-probe-replies, remote-config, service-responses
@@ -2323,7 +2323,7 @@ Simulation substrates of colony, city, factory and sandbox games: grid/field sim
 
 **Server Host Platform** · expert · runtime · workstream: platform · parent: platform-architect · profiles: all · targets: server, headless-client, tools · platforms: server-host
 
-Server-host PAL implementation: containerized Linux and ARM64 hosts, cgroup-aware CPU and memory discovery, NUMA on large instances, signal/termination handling, no display or GPU, orchestrator health integration at the OS level.
+Server-host PAL implementation: containerized Linux and ARM64 hosts, cgroup-aware CPU and memory discovery, NUMA on large instances, signal/termination handling, no display (headless GPU only through PLAT.SRV.gpu-host: offscreen surfaces, container GPU passthrough, hardware encode), orchestrator health integration at the OS level.
 
 - **Owns:** `PLAT.SRV.pal`; `PLAT.SRV.host-os`; `PLAT.SRV.container-topology`; `PLAT.SRV.target-tools`; `PLAT.SRV.gpu-host`
 - **Not responsible for:** Server gameplay & lifecycle → dedicated-server; Fleet operation → external:backend

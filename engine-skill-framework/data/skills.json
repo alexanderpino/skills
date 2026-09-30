@@ -8063,7 +8063,7 @@
     "C-PAL",
     "C-TARGETPLAT"
    ],
-   "purpose": "Server-host PAL implementation: containerized Linux and ARM64 hosts, cgroup-aware CPU and memory discovery, NUMA on large instances, signal/termination handling, no display or GPU, orchestrator health integration at the OS level.",
+   "purpose": "Server-host PAL implementation: containerized Linux and ARM64 hosts, cgroup-aware CPU and memory discovery, NUMA on large instances, signal/termination handling, no display (headless GPU only through PLAT.SRV.gpu-host: offscreen surfaces, container GPU passthrough, hardware encode), orchestrator health integration at the OS level.",
    "non_responsibilities": [
     [
      "Server gameplay & lifecycle",

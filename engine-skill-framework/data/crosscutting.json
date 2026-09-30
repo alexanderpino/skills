@@ -181,7 +181,7 @@
   [
    "test-architect",
    "owning-skill",
-   "oracle author vs implementer"
+   "test policy, definition-of-done and canary owner vs implementer (per-contract oracle_author independence is checked per contract and per tier by check.py)"
   ],
   [
    "security-engineering",

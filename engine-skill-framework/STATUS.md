@@ -19,7 +19,7 @@ Not converged: round 3 still has real major/blocker findings to fix, and the Com
 
 ## Next steps (in order)
 
-1. **Adjudicate** round 5 partial/reject dispositions (`gauntlet/round-5/dispositions.md`) with one independent agent; fix overturns in `gauntlet/round-5/r5_h.py` (then `python3 gauntlet/round-5/apply.py`, `check.py`, `--selftest` once, `render.py`).
+1. Round-5 adjudication done (`gauntlet/round-5/adjudication.md`: 33 upheld, 9 overturned and fixed in `r5_h.py`).
 2. **Round 6**: fresh seed author (medium-visibility seeds, include an omission seed), same mechanical-sweep briefs (`gauntlet/round-5/workflow/g1-round-5-gauntlet.js` is the template). Convergence needs a calibrated round with zero accepted blocker/major findings and the Completeness critic clean in two consecutive rounds; rounds 4 and 5 still produced 50–60 confirmed major findings each, mostly new capability/contract gaps per domain rather than errors in earlier fixes.
 3. Only then G2 (SKILL.md generation, `docs/08-phase-2-plan.md`).
 
