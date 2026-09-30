@@ -42,7 +42,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `ARCH.REQ.profiles` Engine configuration profiles & feature sets (indie 2D → AAA open-world online) — **engine-architect**
 - `ARCH.REQ.hardware-tiers` Hardware tier definitions (the only definition of tier names) incl. server instance classes and refresh-rate classes — **engine-architect** · with performance-architect, dedicated-server
 - `ARCH.REQ.non-goals` Capability & non-goal register (radar non-goals) — **engine-architect**
-- `ARCH.REQ.platform-matrix` Platform matrix (OS × ISA × API × store) generated from skills.json platform_variants and implementer variants — **engine-architect** · with platform-architect, build-system-toolchains, ci-cd-automation, certification-compliance
+- `ARCH.REQ.platform-matrix` Platform matrix (OS × ISA × API; store axis from PLAT.SVC.pc-storefronts, platform-console entries and BLD.REL.store-variants) generated from skills.json platform_variants and implementer variants — **engine-architect** · with platform-architect, build-system-toolchains, ci-cd-automation, certification-compliance
 
 **ARCH.STRUCT — Structure & boundaries**
 
@@ -345,7 +345,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `CORE.CONC.sync` Synchronization primitives (futex-backed locks, events, spin with backoff); no subsystem-wide locks on frame paths; priority inheritance/donation where the OS offers it, no spinning across QoS classes, lock-class registry (frame-critical, RT-forbidden) — **concurrency-primitives**
 - `CORE.CONC.lockfree` Lock-free / wait-free structures (MPMC queues, work-stealing deques) — **concurrency-primitives**
 - `CORE.CONC.reclamation` Safe memory reclamation (epochs, hazard pointers) — **concurrency-primitives**
-- `CORE.CONC.correctness` Thread-safety annotations & model checking — **concurrency-primitives** · with robustness-fuzzing
+- `CORE.CONC.correctness` Thread-safety annotations and model-checking hooks (litmus/linearizability reference scenes and threshold proposals only; suite authorship belongs to the contract's oracle_author) — **concurrency-primitives** · with robustness-fuzzing
 - `CORE.CONC.retirement` Retirement service (C-LIFETIME): completion-token, fence and epoch retire queues shared with safe memory reclamation — **concurrency-primitives** · with core-runtime-architect, rhi-core, gpu-memory-resources
 - `CORE.CONC.layout` Cross-thread data layout: per-target destructive-interference size, padding and sharding rules, per-worker sharded counters and queues, padding lint — **concurrency-primitives** · with containers-core-types, platform-architect
 
@@ -642,7 +642,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `RND.ARCH.feature-contract` Render feature / plugin contract — **render-architect**
 - `RND.ARCH.scene-sync` Simulation→render extraction: change-tracked, parallel, versioned delta streams (CPU cost O(changes)) — **render-architect** · with geometry-pipeline, frame-orchestration
 - `RND.ARCH.scalability` Render scalability tiers — **render-architect** · with performance-architect
-- `RND.ARCH.multiview` Multi-view rendering: split-screen, PiP, captures, stereo/multiview — **render-architect** · with xr-runtime
+- `RND.ARCH.multiview` Multi-view rendering: split-screen, PiP, captures, stereo/multiview; isolated preview scenes with their own lighting and budget for 3D UI and render-to-texture cameras; UI-less, HDR and tiled capture honoring platform capture restrictions (PLAT.SVC.capture) — **render-architect** · with xr-runtime, ui-architect, gameplay-camera
 - `RND.ARCH.debug-modes` Buffer visualization & render debug modes — **render-architect** · with visual-debugging-tools
 - `RND.ARCH.submission-strategy` Submission strategy per hardware tier (GPU-driven vs CPU-culled batched), by ADR; TBDR suitability — **render-architect** · with geometry-pipeline, platform-mobile
 - `RND.ARCH.editor-rendering` Editor render features: GPU picking, selection outline, editor primitives — **render-architect** · with world-editor-viewport, editor-ui-framework

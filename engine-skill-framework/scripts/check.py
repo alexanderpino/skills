@@ -342,6 +342,16 @@ def run(m):
                 n = len(placed.get(sid, []))
                 if n != 1:
                     E(f"build skill {sid} appears in {n} milestones (expected exactly 1)")
+        gv = {}
+        for ms_ in m.milestone_doc["milestones"]:
+            for g_ in ms_.get("gates", []):
+                gv[g_["capability"]] = g_["validator"]
+        for a_, b_ in gv.items():
+            if gv.get(b_) == a_:
+                E(f"gate cycle: {a_} is validated by {b_} which is validated by {a_}")
+            c_ = gv.get(b_)
+            if c_ and gv.get(c_) == a_ and a_ not in (b_, c_):
+                E(f"gate cycle: {a_} -> {b_} -> {c_} -> {a_}")
         for name, v in claims.items():
             if len(v) != 1 or name not in m.configurations:
                 continue
@@ -738,6 +748,7 @@ def selftest():
         ("dangling capability reference", lambda m: first_cap(m).__setitem__(1, first_cap(m)[1] + " (see RES.MGMT.nothing)"), "refers to unknown capability"),
         ("experimental capability in a shipping profile", lambda m: [c.__setitem__(5, ["aaa"]) for d in m.cap_doc["domains"] for a in d["areas"] for c in a["caps"] if c[0] == "RND.GRAPH.work-graphs"], "must carry exactly the 'experimental' profile"),
         ("legacy contradiction term", lambda m: m.contract("C-FRAME").__setitem__("summary", m.contract("C-FRAME")["summary"] + " Variable-timestep simulation on the render frame delta."), "states legacy pattern"),
+        ("gate cycle", lambda m: [g.__setitem__("validator", "QA.FUNC.soak" if g["capability"] == "PRF.MEM.footprint" else "PRF.MEM.footprint") for ms in m.milestone_doc["milestones"] for g in ms["gates"] if g["capability"] in ("PRF.MEM.footprint", "QA.FUNC.soak")], "gate cycle"),
         ("claim before freeze", lambda m: [ms["contracts_frozen"].remove("C-RG") for ms in m.milestone_doc["milestones"] if "C-RG" in ms["contracts_frozen"]] and m.milestone_doc["milestones"][7]["contracts_frozen"].append("C-RG"), "frozen later"),
         ("radar entry stale", lambda m: m.radar_doc["entries"][0].__setitem__("reviewed", "2020-01-01"), "reviewed"),
         ("oracle reference missing", lambda m: m.contract("C-MEM").pop("oracle_reference"), "oracle_reference"),

@@ -18,7 +18,7 @@ Not converged: round 3 still has real major/blocker findings to fix, and the Com
 
 ## Next steps (in order)
 
-1. **Adjudicate** round 4 partial/reject dispositions (`gauntlet/round-4/dispositions.md`) with one independent agent; fix overturns in `gauntlet/round-4/r4_h.py` (then `python3 gauntlet/round-4/apply.py`, `check.py`, `--selftest` once, `render.py`).
+1. Round-4 adjudication done (`gauntlet/round-4/adjudication.md`: 33 upheld, 8 overturned and fixed in `r4_h.py`; gate-cycle check added).
 2. **Round 5** (about 30 agents): fresh independent seed author with *harder-to-miss but still subtle* seeds spread over every critic; re-brief the critics that missed their own seed twice (K-ARCH, K-SYSTEMS, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-TEST, K-SEC) to sweep mechanically: each critic must open the data rows of its mandate (e.g. K-PROD/K-TEST: every milestone gate and its validator; K-SYSTEMS/K-PERF: every PAL and PRF row; K-FUTURE: radar and contracts' tiers). Recall must reach 80%.
 3. Repeat until a calibrated round has zero accepted blocker/major findings and the Completeness critic is clean in two consecutive rounds. Only then G2.
 

@@ -39,7 +39,7 @@
       ],
       [
        "ARCH.REQ.platform-matrix",
-       "Platform matrix (OS × ISA × API × store) generated from skills.json platform_variants and implementer variants",
+       "Platform matrix (OS × ISA × API; store axis from PLAT.SVC.pc-storefronts, platform-console entries and BLD.REL.store-variants) generated from skills.json platform_variants and implementer variants",
        "engine-architect",
        "E",
        [
@@ -2152,7 +2152,7 @@
       ],
       [
        "CORE.CONC.correctness",
-       "Thread-safety annotations & model checking",
+       "Thread-safety annotations and model-checking hooks (litmus/linearizability reference scenes and threshold proposals only; suite authorship belongs to the contract's oracle_author)",
        "concurrency-primitives",
        "E",
        [
@@ -4097,11 +4097,13 @@
       ],
       [
        "RND.ARCH.multiview",
-       "Multi-view rendering: split-screen, PiP, captures, stereo/multiview",
+       "Multi-view rendering: split-screen, PiP, captures, stereo/multiview; isolated preview scenes with their own lighting and budget for 3D UI and render-to-texture cameras; UI-less, HDR and tiled capture honoring platform capture restrictions (PLAT.SVC.capture)",
        "render-architect",
        "E",
        [
-        "xr-runtime"
+        "xr-runtime",
+        "ui-architect",
+        "gameplay-camera"
        ]
       ],
       [

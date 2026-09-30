@@ -74,7 +74,7 @@
     },
     {
      "capability": "QA.AGENT.holdout",
-     "validator": "QA.SIM.golden-traces"
+     "validator": "XC.SEC.agent-redteam"
     },
     {
      "capability": "QA.AGENT.mutation-gate",
@@ -326,6 +326,7 @@
     "C-WORLD"
    ],
    "contracts_frozen": [
+    "C-A11Y",
     "C-A11YRT",
     "C-ANIM",
     "C-API",
@@ -432,7 +433,7 @@
     },
     {
      "capability": "QA.FUNC.soak",
-     "validator": "PRF.MEM.footprint"
+     "validator": "PRF.BENCH.stats"
     },
     {
      "capability": "XC.SEC.data-rights",
@@ -453,6 +454,10 @@
     {
      "capability": "PRF.MEM.size",
      "validator": "PRF.BENCH.stats"
+    },
+    {
+     "capability": "XC.SEC.dev-trust",
+     "validator": "QA.FUNC.editor"
     }
    ],
    "contracts_draft": [
@@ -489,7 +494,6 @@
     "C-PROD",
     "C-RELEASE",
     "C-RELOAD",
-    "C-REP",
     "C-REPLAY",
     "C-REWIND",
     "C-SAVE",
@@ -620,7 +624,7 @@
     "dedicated-server",
     "modding-ugc"
    ],
-   "exit": "Online reference games per netcode family: dedicated-server shooter with prediction and lag compensation, listen-server co-op, desync-free 2 h lockstep soak, web transports; bot load test; packet/handshake fuzzing, DoS test, server-authority review and external pen test (human gate); patch + DLC + staged rollout + rollback executed on the online reference game. Perf: bandwidth per player and server density within budget.",
+   "exit": "Online reference games per netcode family: dedicated-server shooter with prediction and lag compensation, listen-server co-op, desync-free 2 h lockstep soak, web transports; bot load test; packet/handshake fuzzing, DoS test, server-authority review and external pen test (human gate; gates XC.SEC.server-validation, XC.SEC.info-hiding, XC.SEC.incident, NET.SRV.admin, NET.SRV.transactions, PLAT.COMM.receipts; XC.SEC.testing validates); patch + DLC + staged rollout + rollback executed on the online reference game. Perf: bandwidth per player within budget and latency gated; server density is gated at M6 (PRF.NET.server-density).",
    "gates": [
     {
      "capability": "QA.FUNC.load",
@@ -649,6 +653,30 @@
     {
      "capability": "PRF.NET.latency",
      "validator": "QA.FUNC.load"
+    },
+    {
+     "capability": "XC.SEC.server-validation",
+     "validator": "QA.FUNC.network"
+    },
+    {
+     "capability": "XC.SEC.info-hiding",
+     "validator": "XC.SEC.testing"
+    },
+    {
+     "capability": "XC.SEC.incident",
+     "validator": "QA.CERT.prechecks"
+    },
+    {
+     "capability": "NET.SRV.admin",
+     "validator": "XC.SEC.testing"
+    },
+    {
+     "capability": "NET.SRV.transactions",
+     "validator": "QA.FUNC.load"
+    },
+    {
+     "capability": "PLAT.COMM.receipts",
+     "validator": "XC.SEC.testing"
     }
    ],
    "contracts_draft": [
@@ -661,6 +689,7 @@
     "C-GEOLOD",
     "C-GI",
     "C-PTREF",
+    "C-REP",
     "C-TRANSLUCENT",
     "C-VEHICLE"
    ]
@@ -782,7 +811,7 @@
     },
     {
      "capability": "QA.FUNC.compat-corpus",
-     "validator": "QA.CERT.prechecks"
+     "validator": "QA.REF.upkeep"
     }
    ],
    "contracts_draft": [],

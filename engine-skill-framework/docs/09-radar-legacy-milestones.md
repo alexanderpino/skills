@@ -303,7 +303,7 @@ Every input class has exactly one validating owner; parser owners register it to
 
 **Exit criteria:** Boots on one PC platform, runs the task graph, opens a window, presents through the RHI, reads input, draws a sprite and text, loads one cooked and signed asset from a package, passes CI with sanitizer, fuzz (package/serialization parsers) and determinism smoke lanes. Perf: trace capture and the C-BENCH runner on the skeleton; C-BUDGET v0 for indie-2d tiers; CI perf lane (frame time, startup, memory).
 
-**Gates (capability → independent validator):** `QA.HOST.runner` → `QA.STRAT.integration`, `XC.DET.conformance` → `QA.ROBUST.concurrency`, `QA.ROBUST.fuzzing` → `QA.AGENT.gate-canaries`, `OBS.LOG.bench-runtime` → `PRF.BENCH.regression`, `QA.AGENT.test-integrity` → `XC.SEC.agent-redteam`, `QA.AGENT.holdout` → `QA.SIM.golden-traces`, `QA.AGENT.mutation-gate` → `QA.ROBUST.fuzzing`, `QA.AGENT.gate-canaries` → `XC.SEC.agent-redteam`, `XC.SEC.agent-boundary` → `QA.AGENT.gate-canaries`, `XC.SEC.supply-chain` → `BLD.SYS.dev-surface-exclusion`, `XC.SEC.secrets` → `BLD.CI.hardening`, `XC.SEC.key-custody` → `QA.CERT.prechecks`
+**Gates (capability → independent validator):** `QA.HOST.runner` → `QA.STRAT.integration`, `XC.DET.conformance` → `QA.ROBUST.concurrency`, `QA.ROBUST.fuzzing` → `QA.AGENT.gate-canaries`, `OBS.LOG.bench-runtime` → `PRF.BENCH.regression`, `QA.AGENT.test-integrity` → `XC.SEC.agent-redteam`, `QA.AGENT.holdout` → `XC.SEC.agent-redteam`, `QA.AGENT.mutation-gate` → `QA.ROBUST.fuzzing`, `QA.AGENT.gate-canaries` → `XC.SEC.agent-redteam`, `XC.SEC.agent-boundary` → `QA.AGENT.gate-canaries`, `XC.SEC.supply-chain` → `BLD.SYS.dev-surface-exclusion`, `XC.SEC.secrets` → `BLD.CI.hardening`, `XC.SEC.key-custody` → `QA.CERT.prechecks`
 
 **Contracts frozen:** C-ADR, C-ARCH, C-BASE, C-BUDGET, C-CFG, C-CRASH, C-ERR, C-INSTR, C-LIFETIME, C-MATH, C-MEM, C-MOD, C-ORCH, C-SCALE, C-SIGN, C-SYNC, C-TASK, C-TEST, C-TESTHOST, C-TYPES
 
@@ -319,7 +319,7 @@ Skills: asset-cook-processors, asset-import-interchange, async-io-storage, build
 
 **Gates (capability → independent validator):** `QA.REF.ladder` → `QA.STRAT.release-criteria`, `QA.SIM.netsim` → `QA.AGENT.oracle-change-control`, `XC.SEC.threats` → `QA.ROBUST.fuzzing`, `XC.SEC.hardening` → `QA.CERT.prechecks`, `BLD.SYS.dev-surface-exclusion` → `XC.SEC.testing`, `PRF.LOAD.hitch-gate` → `PRF.BENCH.regression`, `QA.RENDER.golden` → `QA.FUNC.compat`, `QA.SIM.stability-suite` → `QA.FUNC.soak`, `PRF.METH.asymptotics` → `PRF.BENCH.scale-content`
 
-**Contracts frozen:** C-A11YRT, C-ANIM, C-API, C-ASSET, C-AUDIO, C-BUILD, C-CHARCTRL, C-COLOR, C-COOK, C-DET, C-DRAW2D, C-EVID, C-FLOW, C-FRAME, C-GAME, C-GAMEDATA, C-GPUMEM, C-GPUTIER, C-ID, C-IMPORT, C-INPUT, C-IO, C-IPC, C-LOC, C-MATIF, C-PAL, C-PERF, C-PHYS, C-PRESENT, C-REFL, C-RES, C-RG, C-RHI, C-RSCENE, C-SCENETEX, C-SER, C-SHADER, C-SNAPSHOT, C-SPATIAL, C-STATECLASS, C-TEXT, C-TRUST, C-VFS, C-VIEW, C-WORLD
+**Contracts frozen:** C-A11Y, C-A11YRT, C-ANIM, C-API, C-ASSET, C-AUDIO, C-BUILD, C-CHARCTRL, C-COLOR, C-COOK, C-DET, C-DRAW2D, C-EVID, C-FLOW, C-FRAME, C-GAME, C-GAMEDATA, C-GPUMEM, C-GPUTIER, C-ID, C-IMPORT, C-INPUT, C-IO, C-IPC, C-LOC, C-MATIF, C-PAL, C-PERF, C-PHYS, C-PRESENT, C-REFL, C-RES, C-RG, C-RHI, C-RSCENE, C-SCENETEX, C-SER, C-SHADER, C-SNAPSHOT, C-SPATIAL, C-STATECLASS, C-TEXT, C-TRUST, C-VFS, C-VIEW, C-WORLD
 
 **Contracts drafted:** C-A11YRT, C-ABILITY, C-AI, C-AIAGENT, C-ANIM, C-AUDIO, C-CAMERA, C-DIALOGUE, C-ECS, C-ENV, C-GAME, C-GAMEDATA, C-HOSTAUTH, C-INTEGRITY, C-LIVE, C-LOC, C-MOVE, C-NAV, C-NET, C-NETLINK, C-NETSESSION, C-PCG, C-PHYS, C-PKG, C-PLUGIN, C-PREDICT, C-RELOAD, C-REP, C-SAVE, C-SCRIPT, C-SEQ, C-SIGNIF, C-SVC, C-UI, C-VFX, C-VIDEO, C-WORLD
 
@@ -331,9 +331,9 @@ Skills: accessibility, ai-behavior-perception, animation-architect, animation-gr
 
 **Exit criteria:** indie-2d ships on PC, console, mobile and web with a TRC/store-review dry run; the editor and tools configuration closes with source control; rollback (8 frames under 150 ms / 5% loss) and async play proven. Local multiplayer: 2-player split-screen with independent UI focus, listeners and input. Perf: mobile tier within budget.
 
-**Gates (capability → independent validator):** `QA.CERT.prechecks` → `QA.STRAT.release-criteria`, `ED.COLLAB.vcs` → `QA.FUNC.editor`, `NET.PRED.rollback` → `QA.SIM.netsim`, `GAM.FW.local-players` → `QA.FUNC.automation`, `PRF.MEM.footprint` → `QA.FUNC.soak`, `PRF.LOAD.pacing-latency` → `PRF.BENCH.stats`, `QA.FUNC.soak` → `PRF.MEM.footprint`, `XC.SEC.data-rights` → `QA.CERT.privacy`, `XC.SEC.childrens-data` → `QA.CERT.privacy`, `XC.SEC.vuln-response` → `QA.ROBUST.fuzzing`, `PRF.NET.resim-cost` → `QA.SIM.netsim`, `PRF.MEM.size` → `PRF.BENCH.stats`
+**Gates (capability → independent validator):** `QA.CERT.prechecks` → `QA.STRAT.release-criteria`, `ED.COLLAB.vcs` → `QA.FUNC.editor`, `NET.PRED.rollback` → `QA.SIM.netsim`, `GAM.FW.local-players` → `QA.FUNC.automation`, `PRF.MEM.footprint` → `QA.FUNC.soak`, `PRF.LOAD.pacing-latency` → `PRF.BENCH.stats`, `QA.FUNC.soak` → `PRF.BENCH.stats`, `XC.SEC.data-rights` → `QA.CERT.privacy`, `XC.SEC.childrens-data` → `QA.CERT.privacy`, `XC.SEC.vuln-response` → `QA.ROBUST.fuzzing`, `PRF.NET.resim-cost` → `QA.SIM.netsim`, `PRF.MEM.size` → `PRF.BENCH.stats`, `XC.SEC.dev-trust` → `QA.FUNC.editor`
 
-**Contracts frozen:** C-ABILITY, C-AUTOMATION, C-BENCH, C-CAMERA, C-CERT, C-CMD, C-DEVICE, C-DIALOGUE, C-ECS, C-EDCMD, C-EDHOST, C-ENV, C-GOVERN, C-HOSTAUTH, C-INTEGRITY, C-LIVE, C-NET, C-NETLINK, C-NETSESSION, C-PCG, C-PKG, C-PLUGIN, C-PREDICT, C-PROD, C-RELEASE, C-RELOAD, C-REP, C-REPLAY, C-REWIND, C-SAVE, C-SCRIPT, C-SEQ, C-SIGNIF, C-SVC, C-TARGETPLAT
+**Contracts frozen:** C-ABILITY, C-AUTOMATION, C-BENCH, C-CAMERA, C-CERT, C-CMD, C-DEVICE, C-DIALOGUE, C-ECS, C-EDCMD, C-EDHOST, C-ENV, C-GOVERN, C-HOSTAUTH, C-INTEGRITY, C-LIVE, C-NET, C-NETLINK, C-NETSESSION, C-PCG, C-PKG, C-PLUGIN, C-PREDICT, C-PROD, C-RELEASE, C-RELOAD, C-REPLAY, C-REWIND, C-SAVE, C-SCRIPT, C-SEQ, C-SIGNIF, C-SVC, C-TARGETPLAT
 
 **Contracts drafted:** C-EDCMD, C-EDHOST, C-EDVIEW, C-GRAPH, C-VCS
 
@@ -357,11 +357,11 @@ Skills: atmosphere-weather, character-physics, character-rendering, cloth-deform
 
 **Configurations proven:** `online-3d-server`, `online-3d-client`, `online-3d-bot-client`, `online-3d-tools`, `online-3d-console-client`, `coop-3d-listen-client`, `lite-3d-mobile-online-client`, `standard-3d-team-tools`, `indie-2d-online-web-client`, `indie-2d-online-moddable-client`, `indie-2d-online-moddable-server`, `rts-2d-massim-client`, `rts-massim-lockstep-tools`
 
-**Exit criteria:** Online reference games per netcode family: dedicated-server shooter with prediction and lag compensation, listen-server co-op, desync-free 2 h lockstep soak, web transports; bot load test; packet/handshake fuzzing, DoS test, server-authority review and external pen test (human gate); patch + DLC + staged rollout + rollback executed on the online reference game. Perf: bandwidth per player and server density within budget.
+**Exit criteria:** Online reference games per netcode family: dedicated-server shooter with prediction and lag compensation, listen-server co-op, desync-free 2 h lockstep soak, web transports; bot load test; packet/handshake fuzzing, DoS test, server-authority review and external pen test (human gate; gates XC.SEC.server-validation, XC.SEC.info-hiding, XC.SEC.incident, NET.SRV.admin, NET.SRV.transactions, PLAT.COMM.receipts; XC.SEC.testing validates); patch + DLC + staged rollout + rollback executed on the online reference game. Perf: bandwidth per player within budget and latency gated; server density is gated at M6 (PRF.NET.server-density).
 
-**Gates (capability → independent validator):** `QA.FUNC.load` → `PRF.NET.load-analysis`, `NET.TRANS.dos` → `XC.SEC.testing`, `BLD.REL.staged-rollout` → `QA.FUNC.compat-corpus`, `BLD.REL.rollback` → `QA.STRAT.release-criteria`, `PRF.NET.bandwidth` → `QA.FUNC.load`, `PLAT.LIVE.operations` → `QA.FUNC.soak`, `PRF.NET.latency` → `QA.FUNC.load`
+**Gates (capability → independent validator):** `QA.FUNC.load` → `PRF.NET.load-analysis`, `NET.TRANS.dos` → `XC.SEC.testing`, `BLD.REL.staged-rollout` → `QA.FUNC.compat-corpus`, `BLD.REL.rollback` → `QA.STRAT.release-criteria`, `PRF.NET.bandwidth` → `QA.FUNC.load`, `PLAT.LIVE.operations` → `QA.FUNC.soak`, `PRF.NET.latency` → `QA.FUNC.load`, `XC.SEC.server-validation` → `QA.FUNC.network`, `XC.SEC.info-hiding` → `XC.SEC.testing`, `XC.SEC.incident` → `QA.CERT.prechecks`, `NET.SRV.admin` → `XC.SEC.testing`, `NET.SRV.transactions` → `QA.FUNC.load`, `PLAT.COMM.receipts` → `XC.SEC.testing`
 
-**Contracts frozen:** C-ATMOS, C-GEOLOD, C-GI, C-PTREF, C-TRANSLUCENT, C-VEHICLE
+**Contracts frozen:** C-ATMOS, C-GEOLOD, C-GI, C-PTREF, C-REP, C-TRANSLUCENT, C-VEHICLE
 
 **Contracts drafted:** C-CROWD, C-EDIT, C-SERVER
 
@@ -399,7 +399,7 @@ Skills: ai-assisted-authoring
 
 **Exit criteria:** Customer-corpus upgrade from the previous release, release notes, backport stream open, console certification pass of at least one reference game, live-ops and end-of-service rehearsal. Every milestone exit also runs the skill-library review (ARCH.ORG.skill-lifecycle).
 
-**Gates (capability → independent validator):** `ARCH.PROD.customer-corpus` → `QA.REF.upkeep`, `XC.EXT.lts` → `QA.FUNC.compat-corpus`, `BLD.REL.end-of-service` → `QA.FUNC.compat`, `QA.STRAT.release-criteria` → `QA.FUNC.compat-corpus`, `QA.FUNC.compat-corpus` → `QA.CERT.prechecks`
+**Gates (capability → independent validator):** `ARCH.PROD.customer-corpus` → `QA.REF.upkeep`, `XC.EXT.lts` → `QA.FUNC.compat-corpus`, `BLD.REL.end-of-service` → `QA.FUNC.compat`, `QA.STRAT.release-criteria` → `QA.FUNC.compat-corpus`, `QA.FUNC.compat-corpus` → `QA.REF.upkeep`
 
 Skills: 
 

@@ -1850,7 +1850,7 @@ Save-game model and serialization, save versioning and migration, atomic writes,
 Game UI architecture (retained, change-notified view models with resolved bindings), layout, styling, focus and navigation, animation, in-world UI, designer tool logic, UI performance.
 
 - **Owns:** `UI.FW.architecture`; `UI.FW.layout`; `UI.FW.styling`; `UI.FW.focus`; `UI.FW.animation`; `UI.FW.world-ui`; `UI.FW.performance`; `UI.FW.text-scale`; `UI.FW.safe-area`; `UI.FW.rtl-mirroring`; `UI.FW.xr-interaction`; `UI.FW.platform-dialogs`; `UI.FW.a11y-tree`; `UI.FW.logic`; `UI.FW.loading-screens`; `UI.FW.subtitles`; `UI.FW.validation`; `UI.FW.maps`; `UI.FW.web-view`; `UI.TOOL.designer`; `UI.TOOL.preview`; `UI.TOOL.binding-debug`
-- **Contributes to:** `ARCH.ORG.delegated-planning`; `PLAT.PAL.cloud-streaming`; `PLAT.PAL.safe-area`; `CORE.REFL.static-default`; `RND.2D.ui-backend`; `INP.ACT.ui-routing`; `INP.ACT.touch-controls`; `GAM.FW.ui-binding`; `GAM.SYS.markers`; `GAM.SYS.interaction`; `GAM.SAVE.slots`; `UI.TXT.cjk-layout`; `UI.TXT.editing`; `UI.A11Y.palettes`; `ED.UI.toolkit-basis`; `QA.CERT.legal-surfaces`
+- **Contributes to:** `ARCH.ORG.delegated-planning`; `PLAT.PAL.cloud-streaming`; `PLAT.PAL.safe-area`; `CORE.REFL.static-default`; `RND.ARCH.multiview`; `RND.2D.ui-backend`; `INP.ACT.ui-routing`; `INP.ACT.touch-controls`; `GAM.FW.ui-binding`; `GAM.SYS.markers`; `GAM.SYS.interaction`; `GAM.SAVE.slots`; `UI.TXT.cjk-layout`; `UI.TXT.editing`; `UI.A11Y.palettes`; `ED.UI.toolkit-basis`; `QA.CERT.legal-surfaces`
 - **Not responsible for:** UI draw backend → render-2d-vector; Text shaping → text-fonts; Editor panels → editor-ui-framework; Developer/debug immediate-mode UI → visual-debugging-tools
 - **Provides:** C-UI · **Consumes:** C-REFL, C-INPUT, C-DRAW2D, C-TEXT, C-LOC, C-A11YRT, C-AUDIO?, C-VIDEO?, C-PAL, C-A11Y, C-FRAME, C-COLOR, C-TRANSLUCENT?, C-SCRIPT?, C-VIEW, C-RELOAD?, C-VFX? · **Tool-side:** C-EDCMD, C-EDHOST
 - **Untrusted inputs:** web-content
@@ -2411,7 +2411,7 @@ Privacy as its own discipline: privacy engineering, data inventory and sensitivi
 Gameplay camera as its own discipline: camera rigs and modes as C-VIEW sources, blending, collision and occlusion handling, framing, 2D cameras (dead zones, parallax, pixel snapping), comfort and accessibility motion options, photo mode.
 
 - **Owns:** `GAM.TOOL.camera`; `GAM.CAM.rigs`; `GAM.CAM.photo`; `GAM.CAM.2d`; `GAM.CAM.comfort`; `GAM.CAM.validation`
-- **Contributes to:** `CNT.VAL.submit-gate`; `WLD.SPACE.views`; `GAM.SYS.cues`; `GAM.SYS.interaction`; `GAM.NARR.scenes`
+- **Contributes to:** `CNT.VAL.submit-gate`; `WLD.SPACE.views`; `RND.ARCH.multiview`; `GAM.SYS.cues`; `GAM.SYS.interaction`; `GAM.NARR.scenes`
 - **Not responsible for:** View arbitration → spatial-transforms; Cinematic cameras → cinematics-sequencer; XR head pose → xr-runtime
 - **Provides:** C-CAMERA · **Consumes:** C-VIEW, C-GAME, C-PHYS?, C-INPUT?, C-A11YRT?, C-RELOAD? · **Tool-side:** C-EDCMD, C-EDHOST, C-EDVIEW
 - **Expertise:** real-time cameras (Haigh-Hutchinson), camera feel & comfort, 2D camera design
