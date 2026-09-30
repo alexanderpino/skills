@@ -304,7 +304,7 @@
       ],
       [
        "ARCH.ORG.human-gates",
-       "Register of decisions requiring human authorization (contracts, spend, NDA material, and irreversible live-production actions: player-data restore/edit, GM/admin commands on shipping servers, ban waves, rollout promotion past canary, global kill switch and remote-config changes, economy grants)",
+       "Register of decisions requiring human authorization (contracts, spend, NDA material, and irreversible live-production actions: player-data restore/edit, GM/admin commands on shipping servers, ban waves, rollout promotion past canary, global kill switch and remote-config changes, economy grants; legal instrument and clearance class with named roles (counsel, data-protection officer, security lead, platform account holder))",
        "program-orchestration",
        "E",
        [
@@ -837,12 +837,15 @@
        "PLAT.PAL.cloud-render-host",
        "Cloud render host policy (implementation in PLAT.SRV.gpu-host)",
        "platform-architect",
-       "M",
+       "X",
        [
         "frame-orchestration",
         "gpu-platform-architect",
         "network-transport",
         "input-system"
+       ],
+       [
+        "experimental"
        ]
       ],
       [
@@ -2003,9 +2006,12 @@
        "CORE.MATH.deterministic",
        "Cross-platform reproducible math library",
        "math-simd-numerics",
-       "M",
+       "X",
        [
         "determinism-replay"
+       ],
+       [
+        "experimental"
        ]
       ],
       [
@@ -4676,6 +4682,17 @@
        [
         "memory-allocators"
        ]
+      ],
+      [
+       "RND.MEM.zero-init-robust-access",
+       "Zero-initialization of fresh and aliased VRAM, robust bounds-checked buffer/image access for untrusted shaders, device-lost/TDR recovery",
+       "gpu-memory-resources",
+       "E",
+       [
+        "shader-system",
+        "render-graph-scheduling",
+        "security-engineering"
+       ]
       ]
      ]
     },
@@ -5295,10 +5312,10 @@
        "RND.TEX.feedback",
        "Sampler-feedback streaming; backend abstraction: hardware sampler feedback where present, shader-written feedback elsewhere",
        "texture-streaming-vt",
-       "M",
+       "X",
        [],
        [
-        "std3d"
+        "experimental"
        ]
       ],
       [
@@ -5628,10 +5645,10 @@
        "RND.RT.cluster-blas",
        "Cluster / partitioned acceleration structures",
        "ray-tracing-infrastructure",
-       "M",
+       "X",
        [],
        [
-        "aaa"
+        "experimental"
        ]
       ],
       [
@@ -5700,7 +5717,7 @@
       ],
       [
        "RND.RECON.upscalers",
-       "Temporal & ML upscalers (DLSS, FSR, XeSS, PSSR class)",
+       "Engine temporal upscaler (TAAU class)",
        "reconstruction-upscaling",
        "E"
       ],
@@ -5787,6 +5804,12 @@
         "global-illumination",
         "ml-inference-runtime"
        ]
+      ],
+      [
+       "RND.RECON.upscalers-ml",
+       "Vendor ML upscaler integrations (DLSS, FSR, XeSS, PSSR class)",
+       "reconstruction-upscaling",
+       "M"
       ]
      ]
     },
@@ -6373,10 +6396,13 @@
        "ML.RT.sequence-exec",
        "Autoregressive execution: KV-cache budgets, token streaming, cancellation",
        "ml-inference-runtime",
-       "M",
+       "X",
        [
         "audio-content-runtime",
         "ai-behavior-perception"
+       ],
+       [
+        "experimental"
        ]
       ],
       [
@@ -6938,7 +6964,11 @@
        "PHY.DEST.procedural",
        "Runtime procedural fracture at impact time at scale",
        "destruction-fracture",
-       "M"
+       "X",
+       [],
+       [
+        "experimental"
+       ]
       ]
      ]
     },
@@ -7257,6 +7287,21 @@
        "E",
        [
         "asset-import-interchange"
+       ]
+      ],
+      [
+       "ANM.RT.2d-speech",
+       "Dialogue-driven 2D portrait and sprite mouth animation per locale (C-DIALOGUE timing)",
+       "animation-runtime",
+       "E",
+       [
+        "facial-animation",
+        "narrative-dialogue",
+        "audio-content-runtime"
+       ],
+       [
+        "minimal",
+        "min2d"
        ]
       ]
      ]
@@ -7612,6 +7657,18 @@
        "Sequencer validation (missing bindings, timing conflicts) (registers with CNT.VAL.submit-gate; suite authorship by the contract's oracle_author)",
        "cinematics-sequencer",
        "E"
+      ],
+      [
+       "ANM.CINE.localized-tracks",
+       "Locale variant audio/subtitle/viseme tracks for authored cutscenes, duration reconciliation and per-locale validation",
+       "cinematics-sequencer",
+       "E",
+       [
+        "localization-i18n",
+        "audio-content-runtime",
+        "facial-animation",
+        "narrative-dialogue"
+       ]
       ]
      ]
     },
@@ -7853,6 +7910,17 @@
        "E",
        [
         "network-transport"
+       ]
+      ],
+      [
+       "AUD.DSP.user-mix",
+       "Player-facing mix options: category volumes, mono downmix, dialogue boost, per-output dynamic-range profiles, speaker-layout selection, as C-CFG settings with an accessibility validation case",
+       "audio-dsp-mixing",
+       "E",
+       [
+        "accessibility",
+        "persistence-save",
+        "platform-architect"
        ]
       ]
      ]
@@ -8214,9 +8282,14 @@
       ],
       [
        "INP.ACT.glyphs",
-       "Per-device prompts & glyphs",
+       "Per-device prompts & glyphs; typed input-action arguments in UI.LOC.messageformat and UI.TXT.rich re-resolve on device change",
        "input-system",
-       "E"
+       "E",
+       [
+        "ui-architect",
+        "text-fonts",
+        "localization-i18n"
+       ]
       ],
       [
        "INP.ACT.confirm-swap",
@@ -8544,6 +8617,15 @@
        [
         "online-services-liveops"
        ]
+      ],
+      [
+       "NET.TRANS.pq-kex",
+       "Post-quantum hybrid key exchange (X25519MLKEM768 class) with algorithm ids in handshake formats and a handshake size that fits the MTU budget",
+       "network-transport",
+       "M",
+       [
+        "security-engineering"
+       ]
       ]
      ]
     },
@@ -8780,10 +8862,13 @@
        "NET.PRED.physics-rollback",
        "Predicted physics with rollback and partial-island resimulation (restorable solver caches required)",
        "prediction-rollback",
-       "M",
+       "X",
        [
         "rigid-body-dynamics",
         "physics-architect"
+       ],
+       [
+        "experimental"
        ]
       ],
       [
@@ -9175,7 +9260,11 @@
        "gameplay-architect",
        "E",
        [
-        "input-system"
+        "input-system",
+        "ui-architect",
+        "gameplay-camera",
+        "persistence-save",
+        "accessibility"
        ]
       ],
       [
@@ -9673,6 +9762,33 @@
        "Game-tree search AI (minimax, MCTS, information-set search) over clonable rule state",
        "ai-behavior-perception",
        "E"
+      ],
+      [
+       "GAM.AI.agent-profiles",
+       "Nav-agent profiles matching capsule and movement capabilities",
+       "navigation-pathfinding",
+       "E",
+       [
+        "character-movement",
+        "character-physics"
+       ]
+      ],
+      [
+       "GAM.AI.nav-streaming",
+       "Streamed, world-partitioned navigation data: per-cell navmesh cook and streaming, cross-cell stitching, server residency, regional generation, dynamic invalidation",
+       "navigation-pathfinding",
+       "E",
+       [
+        "world-architect",
+        "world-data-model",
+        "destruction-fracture",
+        "voxel-worlds",
+        "resource-streaming-architect"
+       ],
+       [
+        "openworld",
+        "sandbox"
+       ]
       ]
      ]
     },
@@ -9747,7 +9863,7 @@
       ],
       [
        "GAM.SAVE.integrity",
-       "Save signing & tamper policy",
+       "Save signing & tamper policy; client-signed saves are tamper-evident only; online-relevant fields are server-authoritative (NET.SRV.persistence); server-held keys under XC.SEC.key-custody",
        "persistence-save",
        "E",
        [
@@ -9827,6 +9943,16 @@
        [
         "ik-procedural-animation",
         "character-physics"
+       ]
+      ],
+      [
+       "GAM.MOVE.ai-drive",
+       "Navigation-driven character movement: nav intents and off-mesh links driving C-MOVE modes",
+       "character-movement",
+       "E",
+       [
+        "navigation-pathfinding",
+        "ai-behavior-perception"
        ]
       ]
      ]
@@ -10153,7 +10279,7 @@
       ],
       [
        "GAM.CAM.comfort",
-       "Camera comfort & accessibility motion options (shake, FOV, head-bob)",
+       "Camera comfort & accessibility motion options (shake, FOV, head-bob) (consumes UI.A11Y.motion settings)",
        "gameplay-camera",
        "E",
        [
@@ -10338,6 +10464,31 @@
        [
         "platform-services",
         "security-engineering"
+       ]
+      ],
+      [
+       "UI.FW.settings-model",
+       "Settings screen model: schema-driven categories from C-CFG, apply/restart/dependency rules, timed display-mode revert, hardware-detected defaults",
+       "ui-architect",
+       "E",
+       [
+        "persistence-save",
+        "runtime-scalability",
+        "accessibility",
+        "input-system",
+        "audio-architect"
+       ]
+      ],
+      [
+       "UI.FW.local-player-ui",
+       "Local multiplayer UI: per-viewport HUD and safe area, per-player focus and menus, shared vs per-player screens",
+       "ui-architect",
+       "E",
+       [
+        "gameplay-architect",
+        "gameplay-camera",
+        "render-architect",
+        "accessibility"
        ]
       ]
      ]
@@ -10532,6 +10683,19 @@
        "Locale collation, case mapping and sorting",
        "localization-i18n",
        "E"
+      ],
+      [
+       "UI.LOC.runtime-locale",
+       "Runtime active-locale management: OS locale detection, separate text/VO/subtitle language, fallback chains, live switch re-resolving localized assets, fonts, VO packs and cached text",
+       "localization-i18n",
+       "E",
+       [
+        "persistence-save",
+        "audio-content-runtime",
+        "text-fonts",
+        "resource-streaming-architect",
+        "platform-architect"
+       ]
       ]
      ]
     },
@@ -10565,9 +10729,16 @@
       ],
       [
        "UI.A11Y.motion",
-       "Motion reduction & photosensitivity options",
+       "Motion reduction & photosensitivity options; sole setting owner, with a runtime flash-limiter hook",
        "accessibility",
-       "E"
+       "E",
+       [
+        "gameplay-camera",
+        "ui-architect",
+        "post-color-hdr",
+        "vfx-particles",
+        "gameplay-systems-toolkit"
+       ]
       ],
       [
        "UI.A11Y.assists",
@@ -11338,11 +11509,13 @@
       ],
       [
        "BLD.SYS.third-party",
-       "Third-party dependency management",
+       "Third-party dependency management with an agent admission policy: mirror-only egress, hash-pinned lockfile, human gate for new dependencies and maintainer changes (ARCH.ORG.human-gates), vendored-diff review",
        "build-system-toolchains",
        "E",
        [
-        "security-engineering"
+        "security-engineering",
+        "ci-cd-automation",
+        "program-orchestration"
        ]
       ],
       [
@@ -11835,7 +12008,7 @@
       ],
       [
        "QA.STRAT.contract-fakes",
-       "Policy & verification of contract test doubles (doubles pass the contract's conformance suite)",
+       "Policy & verification of contract test doubles (doubles pass the contract's conformance suite); periodic real-vs-double differential per boundary contract",
        "test-architect",
        "E",
        [
@@ -11919,6 +12092,15 @@
         "shader-system",
         "rhi-core"
        ]
+      ],
+      [
+       "QA.RENDER.temporal",
+       "Temporal image validation: scripted camera paths, supersampled reference sequences, temporal metrics (ghosting, flicker, shimmer), motion-vector reprojection error",
+       "render-validation",
+       "E",
+       [
+        "reconstruction-upscaling"
+       ]
       ]
      ]
     },
@@ -11946,7 +12128,7 @@
       ],
       [
        "QA.FUNC.compat",
-       "Hardware / OS compatibility matrix",
+       "Hardware / OS compatibility matrix (single matrix definition generated from PLAT.PAL.device-db tiers, share and driver deny-list; render, functional and perf lanes consume it)",
        "functional-automation-soak",
        "E"
       ],
@@ -12378,7 +12560,7 @@
        "QA.AGENT.holdout-hygiene",
        "Holdout anti-probing protocol: per-package query budget, retirement of failed cases replaced from a seeded generator, fixed failure taxonomy without input detail, redacted-repro channel, overfitting canary, queries logged in provenance",
        "test-architect",
-       "E",
+       "M",
        [
         "program-orchestration",
         "ci-cd-automation"
@@ -12530,6 +12712,15 @@
        [
         "resource-streaming-architect"
        ]
+      ],
+      [
+       "QA.SIM.determinism-matrix",
+       "Determinism conformance matrix (toolchain × ISA × platform × cores × schedule) and golden hash corpus; determinism-replay keeps policy and hooks",
+       "simulation-validation",
+       "E",
+       [
+        "determinism-replay"
+       ]
       ]
      ]
     },
@@ -12646,6 +12837,33 @@
        "QA.CONF.command-properties",
        "Command apply/invert/merge property tests",
        "tools-pipeline-conformance",
+       "E",
+       [
+        "test-architect"
+       ]
+      ],
+      [
+       "QA.CONF.services",
+       "Server, persistence and service-boundary conformance suites",
+       "services-conformance",
+       "E",
+       [
+        "test-architect"
+       ]
+      ],
+      [
+       "QA.CONF.saves",
+       "Save migration and integrity conformance corpora",
+       "services-conformance",
+       "E",
+       [
+        "test-architect"
+       ]
+      ],
+      [
+       "QA.CONF.service-doubles",
+       "Real-provider sandbox lanes for service and platform doubles",
+       "services-conformance",
        "E",
        [
         "test-architect"
@@ -13845,6 +14063,18 @@
        [
         "platform-services",
         "certification-compliance"
+       ]
+      ],
+      [
+       "XC.SEC.gameplay-rng",
+       "Security-relevant gameplay randomness: economy and ranking outcomes use a server CSPRNG with an audit record; deterministic RNG is forbidden for them",
+       "anti-cheat-integrity",
+       "E",
+       [
+        "security-runtime",
+        "math-simd-numerics",
+        "server-scaleout-persistence",
+        "determinism-replay"
        ]
       ]
      ]

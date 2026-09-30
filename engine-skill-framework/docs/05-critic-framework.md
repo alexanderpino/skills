@@ -296,5 +296,6 @@ Threat model, trust boundaries, memory safety, supply chain, privacy, incident r
 | foundation-conformance | · |  |  |  |  |  |  | · | · | · | · | · |  | ◆ | · |
 | ui-text-conformance | · |  |  |  |  |  |  | · | · | · | · | · |  | ◆ | · |
 | tools-pipeline-conformance | · |  |  |  |  |  |  | · | · | · | · | · |  | ◆ | · |
+| services-conformance | · |  |  |  |  |  |  | · | · | · | · | · |  | ◆ | · |
 
 ◆ domain critic (specifically scoped) · · universal critic

@@ -150,6 +150,9 @@
    "stance_capabilities": [
     "RND.ARCH.scene-sync",
     "RND.GEO.gpu-scene"
+   ],
+   "contradiction_terms": [
+    "mirrored copy|O\\(scene objects\\)"
    ]
   },
   {
@@ -172,6 +175,9 @@
    "stance_capabilities": [
     "RES.MGMT.pipeline",
     "RES.IO.backends"
+   ],
+   "contradiction_terms": [
+    "blocking waits on the host thread"
    ]
   },
   {
@@ -384,6 +390,9 @@
    "stance_capabilities": [
     "UI.FW.architecture",
     "UI.FW.logic"
+   ],
+   "contradiction_terms": [
+    "(?<!no )per-frame (?:property )?polling|string-keyed bindings"
    ]
   },
   {
@@ -395,6 +404,9 @@
    "stance_capabilities": [
     "PHY.ARCH.events",
     "PHY.ARCH.async"
+   ],
+   "contradiction_terms": [
+    "step-time callbacks|modify bodies during the step"
    ]
   },
   {
@@ -417,6 +429,7 @@
     "ED.ARCH.transactions"
    ],
    "contradiction_terms": [
+    "full copy of the affected",
     "snapshot-based undo"
    ]
   },
@@ -1053,6 +1066,20 @@
    ],
    "contradiction_terms": [
     "hard-?coded tunables"
+   ]
+  },
+  {
+   "id": "L89",
+   "pattern": "Independent per-domain streaming pools",
+   "detection": "each domain sizes and evicts its own pool",
+   "default_stance": "One arbitrated budget across pools",
+   "justification_owner": "resource-streaming-architect",
+   "stance_capabilities": [
+    "RES.MGMT.arbitration",
+    "CORE.MEM.uma"
+   ],
+   "contradiction_terms": [
+    "independent (?:per-domain )?streaming pools"
    ]
   }
  ],

@@ -13,14 +13,15 @@ Branch: `claude/engine-skill-framework-phase1` (no PR). Phase 1 (G1) answers "do
 | 2 | calibrated (12/15 seeds), 265 findings, v2 revision (153 skills, 124 contracts, 1360 capabilities); adjudication 20 upheld / 4 overturned | fd20381, 7385ce7 |
 | 3 | Calibrated (15/15 seeds, independent seed author). 224 findings, 53 seed hits, 171 real. **Revision applied** (r3_a–g, r3_z): 154 skills, 129 contracts, 39 configurations, 74 legacy patterns; check.py green, 37 selftest mutations red. Awaiting adjudication of the partial/reject dispositions. | f542e8c … (this commit) |
 | 4 | 144 findings, seed recall 7/15 (**not calibrated**: K-ARCH, K-SYSTEMS, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-TEST, K-SEC, K-COMPLETE missed their own seed; especially gate-validator and one-word-deletion seeds). 135 real findings: 107 confirmed by the verifier, 28 rejected. **Revision applied** (`gauntlet/round-4/r4_a–d`, `r4_z`): 156 skills, 134 contracts, 43 configurations, 88 legacy patterns; new rules (freeze-before-claim with extension tiers, radar staleness, process skills at M0, oracle_reference on all conformance contracts). Awaiting adjudication. | (this commit) |
+| 5 | Calibrated: seed recall 14/15 (S11, an omitted validation capability, missed by all). 154 findings, 31 seed hits, 123 real (98 confirmed: 1 blocker, 60 major, 37 minor). **Revision applied** (`gauntlet/round-5/r5_a–c`, `r5_z`): 158 skills, 135 contracts, 47 configurations, 89 legacy patterns; new rules: placeholder oracle_reference banned, real_backend_lane on boundary contracts, gate cycles, freeze after first consumer. Awaiting adjudication. | (this commit) |
 
 Not converged: round 3 still has real major/blocker findings to fix, and the Completeness critic must be clean in two consecutive rounds.
 
 ## Next steps (in order)
 
-1. Round-4 adjudication done (`gauntlet/round-4/adjudication.md`: 33 upheld, 8 overturned and fixed in `r4_h.py`; gate-cycle check added).
-2. **Round 5** (about 30 agents): fresh independent seed author with *harder-to-miss but still subtle* seeds spread over every critic; re-brief the critics that missed their own seed twice (K-ARCH, K-SYSTEMS, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-TEST, K-SEC) to sweep mechanically: each critic must open the data rows of its mandate (e.g. K-PROD/K-TEST: every milestone gate and its validator; K-SYSTEMS/K-PERF: every PAL and PRF row; K-FUTURE: radar and contracts' tiers). Recall must reach 80%.
-3. Repeat until a calibrated round has zero accepted blocker/major findings and the Completeness critic is clean in two consecutive rounds. Only then G2.
+1. **Adjudicate** round 5 partial/reject dispositions (`gauntlet/round-5/dispositions.md`) with one independent agent; fix overturns in `gauntlet/round-5/r5_h.py` (then `python3 gauntlet/round-5/apply.py`, `check.py`, `--selftest` once, `render.py`).
+2. **Round 6**: fresh seed author (medium-visibility seeds, include an omission seed), same mechanical-sweep briefs (`gauntlet/round-5/workflow/g1-round-5-gauntlet.js` is the template). Convergence needs a calibrated round with zero accepted blocker/major findings and the Completeness critic clean in two consecutive rounds; rounds 4 and 5 still produced 50–60 confirmed major findings each, mostly new capability/contract gaps per domain rather than errors in earlier fixes.
+3. Only then G2 (SKILL.md generation, `docs/08-phase-2-plan.md`).
 
 ## Rules of engagement
 

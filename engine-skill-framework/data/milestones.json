@@ -58,7 +58,7 @@
     },
     {
      "capability": "XC.DET.conformance",
-     "validator": "QA.ROBUST.concurrency"
+     "validator": "QA.SIM.golden-traces"
     },
     {
      "capability": "QA.ROBUST.fuzzing",
@@ -103,6 +103,14 @@
     {
      "capability": "PRF.BENCH.proxy-metrics",
      "validator": "BLD.CI.bisection"
+    },
+    {
+     "capability": "ARCH.ORG.ownership-ledger",
+     "validator": "QA.AGENT.gate-canaries"
+    },
+    {
+     "capability": "ARCH.ORG.agent-continuity",
+     "validator": "QA.AGENT.test-integrity"
     }
    ],
    "contracts_draft": [
@@ -194,6 +202,7 @@
     "research-evidence",
     "robustness-fuzzing",
     "security-engineering",
+    "services-conformance",
     "simulation-validation",
     "test-architect",
     "tools-pipeline-conformance",
@@ -280,11 +289,11 @@
     },
     {
      "capability": "QA.RENDER.golden",
-     "validator": "QA.FUNC.compat"
+     "validator": "QA.AGENT.gate-canaries"
     },
     {
      "capability": "QA.SIM.stability-suite",
-     "validator": "QA.FUNC.soak"
+     "validator": "QA.AGENT.gate-canaries"
     },
     {
      "capability": "PRF.METH.asymptotics",
@@ -297,6 +306,26 @@
     {
      "capability": "PRF.BENCH.lab",
      "validator": "BLD.CI.device-lanes"
+    },
+    {
+     "capability": "QA.CERT.licenses",
+     "validator": "XC.SEC.supply-chain"
+    },
+    {
+     "capability": "ARCH.ORG.change-requests",
+     "validator": "QA.AGENT.oracle-independence"
+    },
+    {
+     "capability": "ARCH.ORG.critic-calibration",
+     "validator": "XC.SEC.agent-redteam"
+    },
+    {
+     "capability": "ARCH.ORG.human-capacity",
+     "validator": "QA.AGENT.baseline-governance"
+    },
+    {
+     "capability": "UI.A11Y.validation",
+     "validator": "QA.FUNC.compat"
     }
    ],
    "contracts_draft": [
@@ -476,6 +505,30 @@
     {
      "capability": "PRF.GPU.power",
      "validator": "PRF.BENCH.stats"
+    },
+    {
+     "capability": "CNT.ID.rights",
+     "validator": "QA.CERT.licenses"
+    },
+    {
+     "capability": "QA.CERT.legal-surfaces",
+     "validator": "UI.FW.validation"
+    },
+    {
+     "capability": "QA.CERT.ratings",
+     "validator": "QA.FUNC.compat"
+    },
+    {
+     "capability": "QA.CERT.export-crypto",
+     "validator": "XC.SEC.testing"
+    },
+    {
+     "capability": "XC.EXT.upgrade",
+     "validator": "QA.FUNC.compat-corpus"
+    },
+    {
+     "capability": "BLD.REL.packaging",
+     "validator": "QA.CERT.prechecks"
     }
    ],
    "contracts_draft": [
@@ -521,7 +574,8 @@
     "C-SIGNIF",
     "C-SVC",
     "C-TARGETPLAT"
-   ]
+   ],
+   "engine_release": "preview"
   },
   {
    "id": "M3",
@@ -595,6 +649,14 @@
     {
      "capability": "PRF.MEM.bandwidth",
      "validator": "PRF.GPU.analysis"
+    },
+    {
+     "capability": "RND.GEO.cpu-submission",
+     "validator": "QA.RENDER.matrix"
+    },
+    {
+     "capability": "QA.RENDER.temporal",
+     "validator": "QA.AGENT.gate-canaries"
     }
    ],
    "contracts_draft": [
@@ -705,6 +767,18 @@
     {
      "capability": "PLAT.COMM.receipts",
      "validator": "XC.SEC.testing"
+    },
+    {
+     "capability": "ARCH.ORG.escalation",
+     "validator": "QA.AGENT.oracle-change-control"
+    },
+    {
+     "capability": "BLD.REL.patching",
+     "validator": "QA.FUNC.compat-corpus"
+    },
+    {
+     "capability": "BLD.REL.dlc",
+     "validator": "QA.FUNC.compat-corpus"
     }
    ],
    "contracts_draft": [
@@ -720,7 +794,8 @@
     "C-REP",
     "C-TRANSLUCENT",
     "C-VEHICLE"
-   ]
+   ],
+   "engine_release": "beta"
   },
   {
    "id": "M5",
@@ -818,6 +893,10 @@
     {
      "capability": "PRF.METH.model",
      "validator": "PRF.NET.load-analysis"
+    },
+    {
+     "capability": "QA.ROBUST.distributed-faults",
+     "validator": "QA.FUNC.load"
     }
    ],
    "contracts_draft": [],
@@ -830,14 +909,15 @@
     "C-SHARD",
     "C-SRVDATA",
     "C-XRVIEW"
-   ]
+   ],
+   "engine_release": "release candidate"
   },
   {
    "id": "M7",
    "name": "Engine 1.0 / first LTS",
    "configurations": [],
    "skills": [],
-   "exit": "Customer-corpus upgrade from the previous release, release notes, backport stream open, console certification pass of at least one reference game, live-ops and end-of-service rehearsal. Every milestone exit also runs the skill-library review (ARCH.ORG.skill-lifecycle).",
+   "exit": "Customer-corpus upgrade from the M6 release candidate and earlier previews, release notes, backport stream open, console certification pass of at least one reference game, live-ops and end-of-service rehearsal. Every milestone exit also runs the skill-library review (ARCH.ORG.skill-lifecycle).",
    "gates": [
     {
      "capability": "ARCH.PROD.customer-corpus",
@@ -858,6 +938,14 @@
     {
      "capability": "QA.FUNC.compat-corpus",
      "validator": "QA.REF.upkeep"
+    },
+    {
+     "capability": "ARCH.PROD.licensing-model",
+     "validator": "QA.CERT.licenses"
+    },
+    {
+     "capability": "ARCH.PROD.upstreaming",
+     "validator": "QA.CERT.code-provenance"
     }
    ],
    "contracts_draft": [],

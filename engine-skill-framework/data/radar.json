@@ -151,7 +151,7 @@
   },
   {
    "tech": "Sampler-feedback streaming",
-   "class": "M",
+   "class": "X",
    "capabilities": [
     "RND.TEX.feedback"
    ],
@@ -214,8 +214,7 @@
    "class": "M",
    "capabilities": [
     "RND.RT.omm",
-    "RND.RT.ser",
-    "RND.RT.cluster-blas"
+    "RND.RT.ser"
    ],
    "owner": "ray-tracing-infrastructure",
    "evidence": "DXR 1.2 / Vulkan extensions; vendor SDKs",
@@ -762,6 +761,7 @@
     "QA.AGENT.baseline-governance",
     "QA.AGENT.gate-canaries",
     "QA.AGENT.holdout",
+    "QA.AGENT.holdout-hygiene",
     "QA.AGENT.mutation-gate",
     "QA.AGENT.oracle-change-control",
     "QA.AGENT.oracle-independence",
@@ -1144,7 +1144,7 @@
   },
   {
    "tech": "Cross-platform bit-reproducible float math",
-   "class": "M",
+   "class": "X",
    "owner": "math-simd-numerics",
    "capabilities": [
     "CORE.MATH.deterministic"
@@ -1156,7 +1156,7 @@
   },
   {
    "tech": "Runtime procedural fracture at scale",
-   "class": "M",
+   "class": "X",
    "owner": "destruction-fracture",
    "capabilities": [
     "PHY.DEST.procedural"
@@ -1180,7 +1180,7 @@
   },
   {
    "tech": "On-device autoregressive execution",
-   "class": "M",
+   "class": "X",
    "owner": "ml-inference-runtime",
    "capabilities": [
     "ML.RT.sequence-exec"
@@ -1216,7 +1216,7 @@
   },
   {
    "tech": "Predicted rigid-body physics with rollback",
-   "class": "M",
+   "class": "X",
    "owner": "prediction-rollback",
    "capabilities": [
     "NET.PRED.physics-rollback"
@@ -1228,7 +1228,7 @@
   },
   {
    "tech": "Engine as cloud render host",
-   "class": "M",
+   "class": "X",
    "owner": "platform-architect",
    "capabilities": [
     "PLAT.PAL.cloud-render-host"
@@ -1317,6 +1317,42 @@
    "revisit": "A shipped title needs Windows as a fleet host",
    "fallback": "pc target for community-hosted servers (community-server-pc)",
    "non_goal": true,
+   "reviewed": "2026-09-30"
+  },
+  {
+   "tech": "Cluster acceleration structures",
+   "class": "X",
+   "owner": "ray-tracing-infrastructure",
+   "capabilities": [
+    "RND.RT.cluster-blas"
+   ],
+   "evidence": "NVIDIA-only cluster BLAS API",
+   "revisit": "A vendor-neutral D3D12 or Vulkan KHR cluster-AS API ships",
+   "fallback": "proxy-mesh BLAS per cluster LOD level (RND.RT.lod)",
+   "reviewed": "2026-09-30"
+  },
+  {
+   "tech": "Post-quantum hybrid key exchange",
+   "class": "M",
+   "owner": "network-transport",
+   "capabilities": [
+    "NET.TRANS.pq-kex"
+   ],
+   "evidence": "Hybrid X25519MLKEM768 default in browsers and OpenSSL 3.5 (2025)",
+   "revisit": "Two game transports ship hybrid KEX",
+   "fallback": "classical key exchange with algorithm agility (NET.TRANS.crypto)",
+   "reviewed": "2026-09-30"
+  },
+  {
+   "tech": "Vendor ML upscalers",
+   "class": "M",
+   "owner": "reconstruction-upscaling",
+   "capabilities": [
+    "RND.RECON.upscalers-ml"
+   ],
+   "evidence": "DLSS 4, FSR 4 and PSSR ship in titles (2025)",
+   "revisit": "Two vendors expose a common integration API",
+   "fallback": "RND.RECON.upscalers (engine temporal upscaler)",
    "reviewed": "2026-09-30"
   }
  ],

@@ -68,7 +68,7 @@
    "id": "cloud-saves",
    "validating_owner": "persistence-save",
    "parser_owners": [],
-   "trust": "semi-trusted-signed",
+   "trust": "hostile-local",
    "mode": "harness",
    "limits": "size/depth"
   },
@@ -685,6 +685,28 @@
    "trust": "hostile-remote",
    "mode": "harness",
    "limits": "size/rate/signature limits; spoofable UDP"
+  },
+  {
+   "id": "remote-play-input",
+   "validating_owner": "platform-architect",
+   "parser_owners": [
+    "input-system",
+    "network-transport"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "rate/schema/session-token; per-session process/GPU-context isolation"
+  },
+  {
+   "id": "player-profile-strings",
+   "validating_owner": "online-services-liveops",
+   "parser_owners": [
+    "text-fonts",
+    "ui-architect"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "length, NFC normalization, control/bidi-override allow-list, output-context escaping"
   }
  ]
 }

@@ -384,6 +384,11 @@ def run(m):
                     and not (tier_ms and max(tier_ms) >= max(impl_ms)):
                 E(f"contract {cid} frozen at {frozen_at[cid]} before its last implementer is built")
             oa = m.contract(cid).get("oracle_author")
+            if m.contract(cid).get("conformance") and m.contract(cid).get("oracle_reference") == [
+                    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"]:
+                E(f"conformance contract {cid} carries the placeholder oracle_reference; name a non-derived source")
+            if m.contract(cid).get("boundary") and not (m.contract(cid).get("test_double") or {}).get("real_backend_lane"):
+                E(f"boundary contract {cid} declares no real_backend_lane for its test double")
             if m.contract(cid).get("conformance") and not m.contract(cid).get("oracle_reference"):
                 E(f"conformance contract {cid} (layer {m.layer(cid)}) names no oracle_reference (external corpora or reference)")
             if oa in ms_of and ms_of[oa] > f:
@@ -751,6 +756,7 @@ def selftest():
         ("gate cycle", lambda m: [g.__setitem__("validator", "QA.FUNC.soak" if g["capability"] == "PRF.MEM.footprint" else "PRF.MEM.footprint") for ms in m.milestone_doc["milestones"] for g in ms["gates"] if g["capability"] in ("PRF.MEM.footprint", "QA.FUNC.soak")], "gate cycle"),
         ("claim before freeze", lambda m: [ms["contracts_frozen"].remove("C-RG") for ms in m.milestone_doc["milestones"] if "C-RG" in ms["contracts_frozen"]] and m.milestone_doc["milestones"][7]["contracts_frozen"].append("C-RG"), "frozen later"),
         ("radar entry stale", lambda m: m.radar_doc["entries"][0].__setitem__("reviewed", "2020-01-01"), "reviewed"),
+        ("placeholder oracle reference", lambda m: m.contract("C-WORLD").__setitem__("oracle_reference", ["reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"]), "placeholder"),
         ("oracle reference missing", lambda m: m.contract("C-MEM").pop("oracle_reference"), "oracle_reference"),
         ("legacy pattern without stance", lambda m: m.legacy_doc["patterns"][0].__setitem__("stance_capabilities", []), "has no stance capabilities"),
         ("untrusted input not fuzzed", lambda m: [s["fuzz_targets"].remove("packets") for s in m.skill_doc["skills"] if s.get("fuzz_targets")], "has no fuzz target"),

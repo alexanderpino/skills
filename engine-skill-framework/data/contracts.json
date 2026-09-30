@@ -16,7 +16,8 @@
    "boundary": true,
    "test_double": {
     "kind": "null/fake platform + event injection",
-    "owner": "platform-architect"
+    "owner": "platform-architect",
+    "real_backend_lane": "sandbox or devkit lane on a fixed cadence; drift ticket on divergence"
    },
    "oracle_reference": [
     "platform conformance suites per OS; syscall-behaviour differential runs"
@@ -103,7 +104,8 @@
    "boundary": true,
    "test_double": {
     "kind": "tracking/failing allocator",
-    "owner": "memory-allocators"
+    "owner": "memory-allocators",
+    "real_backend_lane": "sandbox or devkit lane on a fixed cadence; drift ticket on divergence"
    },
    "oracle_reference": [
     "allocator stress and fragmentation corpora; ASan/Valgrind-class runs"
@@ -319,7 +321,8 @@
    "boundary": true,
    "test_double": {
     "kind": "in-memory IO with fault points",
-    "owner": "async-io-storage"
+    "owner": "async-io-storage",
+    "real_backend_lane": "sandbox or devkit lane on a fixed cadence; drift ticket on divergence"
    },
    "oracle_reference": [
     "fio-class workloads and per-platform IO conformance suites"
@@ -440,7 +443,8 @@
    "boundary": true,
    "test_double": {
     "kind": "null/software device",
-    "owner": "rhi-core"
+    "owner": "rhi-core",
+    "real_backend_lane": "sandbox or devkit lane on a fixed cadence; drift ticket on divergence"
    },
    "oracle_reference": [
     "Vulkan CTS, D3D12 conformance/WARP and Metal validation suites"
@@ -486,7 +490,8 @@
    "boundary": true,
    "test_double": {
     "kind": "reference inference runtime with tolerance tables",
-    "owner": "ml-inference-runtime"
+    "owner": "ml-inference-runtime",
+    "real_backend_lane": "sandbox or devkit lane on a fixed cadence; drift ticket on divergence"
    }
   },
   {
@@ -502,7 +507,7 @@
    "conformance": true,
    "oracle_author": "simulation-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "streaming-cell traversal scenarios from open-world benchmarks; analytic coverage tests"
    ],
    "extension_tiers": {
     "late-consumers": "M2"
@@ -557,7 +562,7 @@
    "conformance": true,
    "oracle_author": "render-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "MaterialX/OpenPBR reference renders and furnace tests"
    ],
    "extension_tiers": {
     "late-consumers": "M3"
@@ -577,7 +582,7 @@
    "conformance": true,
    "oracle_author": "render-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "delta-extraction equivalence against a full-scene rebuild"
    ],
    "extension_tiers": {
     "late-consumers": "M3"
@@ -595,7 +600,7 @@
    "conformance": true,
    "oracle_author": "render-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "supersampled reference sequences and motion-vector reprojection error (QA.RENDER.temporal)"
    ]
   },
   {
@@ -644,7 +649,7 @@
    "conformance": true,
    "oracle_author": "render-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "pixel-exact sprite/tilemap reference frames from an independent rasterizer"
    ],
    "extension_tiers": {
     "late-consumers": "M3"
@@ -753,14 +758,15 @@
     "C-TASK"
    ],
    "conformance": true,
-   "oracle_author": "functional-automation-soak",
+   "oracle_author": "services-conformance",
    "boundary": true,
    "test_double": {
     "kind": "first-party service emulator",
-    "owner": "platform-services"
+    "owner": "platform-services",
+    "real_backend_lane": "sandbox or devkit lane on a fixed cadence; drift ticket on divergence"
    },
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "platform SDK sample suites and store sandbox accounts"
    ],
    "needs_implementer": true
   },
@@ -769,7 +775,7 @@
    "layer": 3,
    "owner": "localization-i18n",
    "name": "Localized strings",
-   "summary": "String IDs, formatting, locale switching; term references (per-locale grammatical attributes of substituted terms such as items, characters and places: gender, animacy, case forms, articles, particles) resolved for agreement in messages (UI.LOC.terms).",
+   "summary": "String IDs, formatting, locale switching; term references (per-locale grammatical attributes of substituted terms such as items, characters and places: gender, animacy, case forms, articles, particles) resolved for agreement in messages (UI.LOC.terms); locale-change event and reload obligations.",
    "requires": [
     "C-ASSET"
    ],
@@ -798,7 +804,7 @@
    "conformance": true,
    "oracle_author": "ui-text-conformance",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "W3C/Yoga flexbox layout test suites and focus-navigation reference graphs"
    ]
   },
   {
@@ -829,7 +835,7 @@
    "conformance": true,
    "oracle_author": "functional-automation-soak",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "reference games' scripted playthroughs with recorded state hashes"
    ],
    "extension_tiers": {
     "late-consumers": "M2"
@@ -847,7 +853,7 @@
    "conformance": true,
    "oracle_author": "functional-automation-soak",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "language conformance suites (Lua test suite, ECMAScript test262 class) and sandbox-escape corpora"
    ]
   },
   {
@@ -862,7 +868,7 @@
     "C-STATECLASS"
    ],
    "conformance": true,
-   "oracle_author": "functional-automation-soak",
+   "oracle_author": "services-conformance",
    "oracle_reference": [
     "save round-trip and migration corpora from historical builds"
    ]
@@ -881,7 +887,7 @@
    "conformance": true,
    "oracle_author": "tools-pipeline-conformance",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "cook determinism corpora: identical inputs across machines produce identical outputs"
    ]
   },
   {
@@ -899,7 +905,7 @@
    "conformance": true,
    "oracle_author": "tools-pipeline-conformance",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "undo/redo property tests against a model editor"
    ],
    "extension_tiers": {
     "late-consumers": "M3"
@@ -918,7 +924,7 @@
    "conformance": true,
    "oracle_author": "tools-pipeline-conformance",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "graph compile round-trip corpora and adversarial graph cases"
    ]
   },
   {
@@ -931,7 +937,7 @@
    "conformance": true,
    "oracle_author": "tools-pipeline-conformance",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "reproducible-build comparison against a clean-room build"
    ]
   },
   {
@@ -947,7 +953,7 @@
    "conformance": true,
    "oracle_author": "tools-pipeline-conformance",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "patch-chain corpora from historical builds and delta-size references"
    ]
   },
   {
@@ -1165,7 +1171,7 @@
    "conformance": true,
    "oracle_author": "simulation-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "cross-build replay corpora with recorded hashes"
    ]
   },
   {
@@ -1210,7 +1216,7 @@
    "conformance": true,
    "oracle_author": "simulation-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "analytic terrain/water/wind query cases"
    ],
    "extension_tiers": {
     "late-consumers": "M3"
@@ -1247,7 +1253,7 @@
    "conformance": true,
    "oracle_author": "render-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "instance-scene delta streams against a full rebuild"
    ],
    "extension_tiers": {
     "late-consumers": "M4"
@@ -1265,7 +1271,7 @@
    "conformance": true,
    "oracle_author": "render-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "cluster-LOD error-bound analytic cases and reference meshes"
    ]
   },
   {
@@ -1281,7 +1287,7 @@
    "conformance": true,
    "oracle_author": "render-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "page-table/feedback reference traces against a full-residency render"
    ]
   },
   {
@@ -1296,7 +1302,7 @@
    "conformance": true,
    "oracle_author": "render-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "analytic light-transport scenes (Cornell box, furnace) via the reference path tracer"
    ],
    "extension_tiers": {
     "late-consumers": "M4"
@@ -1314,7 +1320,7 @@
    "conformance": true,
    "oracle_author": "render-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "reference path-traced GI captures"
    ]
   },
   {
@@ -1329,7 +1335,7 @@
    "conformance": true,
    "oracle_author": "render-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "published atmospheric scattering reference tables"
    ]
   },
   {
@@ -1349,7 +1355,8 @@
    "boundary": true,
    "test_double": {
     "kind": "reference media decoder with conformance streams",
-    "owner": "media-playback"
+    "owner": "media-playback",
+    "real_backend_lane": "sandbox or devkit lane on a fixed cadence; drift ticket on divergence"
    }
   },
   {
@@ -1366,7 +1373,8 @@
    "boundary": true,
    "test_double": {
     "kind": "virtual devices / injection",
-    "owner": "input-devices-haptics"
+    "owner": "input-devices-haptics",
+    "real_backend_lane": "sandbox or devkit lane on a fixed cadence; drift ticket on divergence"
    },
    "oracle_reference": [
     "device-report corpora from real controllers"
@@ -1387,7 +1395,8 @@
    "boundary": true,
    "test_double": {
     "kind": "loopback + link conditioner",
-    "owner": "network-transport"
+    "owner": "network-transport",
+    "real_backend_lane": "sandbox or devkit lane on a fixed cadence; drift ticket on divergence"
    },
    "oracle_reference": [
     "netem-class link-condition scenarios; wire-format corpora"
@@ -1460,7 +1469,7 @@
    "conformance": true,
    "oracle_author": "functional-automation-soak",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "schema/referential-integrity corpora and spreadsheet round-trip cases"
    ],
    "extension_tiers": {
     "late-consumers": "M2"
@@ -1495,7 +1504,7 @@
    "gated": true,
    "oracle_author": "simulation-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "deterministic decision-trace corpora for provider swap tests"
    ]
   },
   {
@@ -1510,7 +1519,7 @@
    "conformance": true,
    "oracle_author": "ui-text-conformance",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "WCAG/XAG test suites and screen-reader (NVDA/VoiceOver) walkthroughs"
    ],
    "extension_tiers": {
     "late-consumers": "M2"
@@ -1528,7 +1537,7 @@
    "conformance": true,
    "oracle_author": "functional-automation-soak",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "overlay golden cases and stripped-shipping binary scans"
    ]
   },
   {
@@ -1543,7 +1552,7 @@
    "conformance": true,
    "oracle_author": "tools-pipeline-conformance",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "panel-embedding integration cases across editors"
    ],
    "extension_tiers": {
     "late-consumers": "M3"
@@ -1560,14 +1569,15 @@
     "C-TASK"
    ],
    "conformance": true,
-   "oracle_author": "functional-automation-soak",
+   "oracle_author": "services-conformance",
    "boundary": true,
    "test_double": {
     "kind": "service emulator",
-    "owner": "online-services-liveops"
+    "owner": "online-services-liveops",
+    "real_backend_lane": "sandbox or devkit lane on a fixed cadence; drift ticket on divergence"
    },
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "service sandbox environments of the real backends"
    ]
   },
   {
@@ -1582,12 +1592,13 @@
    "conformance": true,
    "oracle_author": "render-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "OpenXR conformance test suite"
    ],
    "boundary": true,
    "test_double": {
     "kind": "scripted OpenXR runtime",
-    "owner": "xr-runtime"
+    "owner": "xr-runtime",
+    "real_backend_lane": "sandbox or devkit lane on a fixed cadence; drift ticket on divergence"
    }
   },
   {
@@ -1604,12 +1615,13 @@
    "gated": true,
    "oracle_author": "robustness-fuzzing",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "GPU-vs-CPU inference parity with tolerance tables"
    ],
    "boundary": true,
    "test_double": {
     "kind": "reference GPU inference pass",
-    "owner": "ml-inference-runtime"
+    "owner": "ml-inference-runtime",
+    "real_backend_lane": "sandbox or devkit lane on a fixed cadence; drift ticket on divergence"
    }
   },
   {
@@ -1685,7 +1697,7 @@
    "conformance": true,
    "oracle_author": "render-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "per-view texture layout cases against per-path reference frames"
    ],
    "extension_tiers": {
     "late-consumers": "M3"
@@ -1722,7 +1734,7 @@
    "conformance": true,
    "oracle_author": "render-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "light-environment publication cases against an independent evaluator"
    ]
   },
   {
@@ -1739,7 +1751,7 @@
    "conformance": true,
    "oracle_author": "render-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "OIT reference renders (depth-peeling ground truth)"
    ]
   },
   {
@@ -1772,7 +1784,7 @@
    "conformance": true,
    "oracle_author": "simulation-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "seeded generation determinism corpora"
    ],
    "extension_tiers": {
     "late-consumers": "M3"
@@ -1806,7 +1818,7 @@
    "conformance": true,
    "oracle_author": "functional-automation-soak",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "deploy/run/debug smoke suites on real devkits and emulators"
    ]
   },
   {
@@ -1822,7 +1834,7 @@
    "conformance": true,
    "oracle_author": "simulation-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "netem-class join/leave/reconnect scenarios"
    ]
   },
   {
@@ -1837,9 +1849,9 @@
     "C-HOSTAUTH"
    ],
    "conformance": true,
-   "oracle_author": "functional-automation-soak",
+   "oracle_author": "services-conformance",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "orchestrator sandbox drain/readiness scenarios"
    ]
   },
   {
@@ -1854,14 +1866,15 @@
     "C-NET"
    ],
    "conformance": true,
-   "oracle_author": "simulation-validation",
+   "oracle_author": "services-conformance",
    "boundary": true,
    "test_double": {
     "kind": "in-process multi-node simulator with fault injection",
-    "owner": "server-scaleout-persistence"
+    "owner": "server-scaleout-persistence",
+    "real_backend_lane": "sandbox or devkit lane on a fixed cadence; drift ticket on divergence"
    },
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "multi-node migration scenarios under partition and process-kill faults"
    ]
   },
   {
@@ -1876,14 +1889,15 @@
     "C-STATECLASS"
    ],
    "conformance": true,
-   "oracle_author": "functional-automation-soak",
+   "oracle_author": "services-conformance",
    "boundary": true,
    "test_double": {
     "kind": "in-process multi-node simulator with fault injection",
-    "owner": "server-scaleout-persistence"
+    "owner": "server-scaleout-persistence",
+    "real_backend_lane": "sandbox or devkit lane on a fixed cadence; drift ticket on divergence"
    },
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "Jepsen-class consistency and idempotency checks"
    ]
   },
   {
@@ -1898,7 +1912,7 @@
    "conformance": true,
    "oracle_author": "tools-pipeline-conformance",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "picking/gizmo interaction property tests"
    ]
   },
   {
@@ -1914,12 +1928,13 @@
    "conformance": true,
    "oracle_author": "tools-pipeline-conformance",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "real VCS server sandboxes (Perforce/Git) with merge conflict corpora"
    ],
    "boundary": true,
    "test_double": {
     "kind": "in-process VCS server emulator",
-    "owner": "collaboration-version-control"
+    "owner": "collaboration-version-control",
+    "real_backend_lane": "sandbox or devkit lane on a fixed cadence; drift ticket on divergence"
    }
   },
   {
@@ -1938,7 +1953,7 @@
    "conformance": true,
    "oracle_author": "functional-automation-soak",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "permission and budget abuse corpora for edit sessions"
    ]
   },
   {
@@ -1954,7 +1969,7 @@
    "conformance": true,
    "oracle_author": "functional-automation-soak",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "automation-API protocol corpora"
    ]
   },
   {
@@ -1970,12 +1985,13 @@
    "conformance": true,
    "oracle_author": "security-engineering",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "cheat-tool traces and validator false-positive corpora"
    ],
    "boundary": true,
    "test_double": {
     "kind": "third-party anti-cheat SDK stub",
-    "owner": "anti-cheat-integrity"
+    "owner": "anti-cheat-integrity",
+    "real_backend_lane": "sandbox or devkit lane on a fixed cadence; drift ticket on divergence"
    }
   },
   {
@@ -2011,7 +2027,8 @@
    "boundary": true,
    "test_double": {
     "kind": "software HSM/KMS emulator",
-    "owner": "security-runtime"
+    "owner": "security-runtime",
+    "real_backend_lane": "sandbox or devkit lane on a fixed cadence; drift ticket on divergence"
    }
   },
   {
@@ -2059,7 +2076,7 @@
    "conformance": true,
    "oracle_author": "simulation-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "sequencer timing references against frame-accurate exports"
    ]
   },
   {
@@ -2107,7 +2124,7 @@
    "conformance": true,
    "oracle_author": "functional-automation-soak",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "particle-system determinism and budget scenarios"
    ]
   },
   {
@@ -2123,7 +2140,7 @@
    "conformance": true,
    "oracle_author": "render-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "analytic furnace scenes and an external renderer (PBRT/Mitsuba) differential"
    ]
   },
   {
@@ -2139,7 +2156,7 @@
    "conformance": true,
    "oracle_author": "simulation-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "quota/overload scenarios with load generators"
    ]
   },
   {
@@ -2154,7 +2171,7 @@
    "conformance": true,
    "oracle_author": "functional-automation-soak",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "blend/collision reference paths and comfort-limit cases"
    ]
   },
   {
@@ -2185,7 +2202,7 @@
    "conformance": true,
    "oracle_author": "simulation-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "lag-compensation reference traces with known hit outcomes"
    ]
   },
   {

@@ -1175,12 +1175,14 @@
     "peer-state-hashes",
     "physics-assets",
     "player-model-prompts",
+    "player-profile-strings",
     "procedural-asset-eval",
     "project-tool-code",
     "push-payloads",
     "qos-probe-replies",
     "remote-build-results",
     "remote-config",
+    "remote-play-input",
     "replays",
     "replicated-state",
     "saves",
@@ -2425,7 +2427,8 @@
    ],
    "untrusted_inputs": [
     "clipboard-dragdrop",
-    "device-db-updates"
+    "device-db-updates",
+    "remote-play-input"
    ]
   },
   {
@@ -2694,7 +2697,10 @@
     "C-EDHOST"
    ],
    "implements": [],
-   "workstream": "platform"
+   "workstream": "platform",
+   "untrusted_inputs": [
+    "remote-play-input"
+   ]
   },
   {
    "id": "input-devices-haptics",
@@ -4268,9 +4274,9 @@
     "C-A11Y",
     "C-PAL",
     "C-VIEW",
-    "C-A11YRT?",
     "C-TEMPORAL?",
-    "C-SCENETEX?"
+    "C-SCENETEX?",
+    "C-A11YRT?"
    ],
    "expertise": [
     "color science",
@@ -4489,7 +4495,8 @@
     "C-RSCENE?",
     "C-MATIF?",
     "C-SCENETEX?",
-    "C-GAMEDATA?"
+    "C-GAMEDATA?",
+    "C-A11YRT?"
    ],
    "expertise": [
     "GPU particles",
@@ -5026,7 +5033,8 @@
     "C-EDCMD",
     "C-EDHOST",
     "C-EDPREVIEW",
-    "C-IMPORT"
+    "C-IMPORT",
+    "C-EDVIEW"
    ],
    "implements": [],
    "workstream": "simulation"
@@ -5213,7 +5221,8 @@
    ],
    "tool_consumes": [
     "C-EDCMD",
-    "C-EDHOST"
+    "C-EDHOST",
+    "C-EDVIEW"
    ],
    "implements": [],
    "workstream": "simulation"
@@ -5257,7 +5266,10 @@
    ],
    "tool_consumes": [
     "C-EDCMD",
-    "C-EDHOST"
+    "C-EDHOST",
+    "C-COOK",
+    "C-IMPORT",
+    "C-EDVIEW"
    ],
    "implements": [],
    "workstream": "simulation"
@@ -5319,7 +5331,9 @@
    "tool_consumes": [
     "C-EDCMD",
     "C-EDHOST",
-    "C-EDPREVIEW"
+    "C-EDPREVIEW",
+    "C-COOK",
+    "C-IMPORT"
    ],
    "implements": [],
    "workstream": "simulation"
@@ -5623,6 +5637,7 @@
     "lan-discovery",
     "packets",
     "qos-probe-replies",
+    "remote-play-input",
     "server-list-entries"
    ]
   },
@@ -5919,7 +5934,6 @@
     "C-A11Y",
     "C-EDIT?",
     "C-INTEGRITY?",
-    "C-A11YRT?",
     "C-AI?",
     "C-SCRIPT?",
     "C-LOC?",
@@ -5929,7 +5943,8 @@
     "C-VFX?",
     "C-CAMERA?",
     "C-REWIND?",
-    "C-SHARD?"
+    "C-SHARD?",
+    "C-A11YRT?"
    ],
    "expertise": [
     "ability systems",
@@ -6118,7 +6133,8 @@
    "tool_consumes": [
     "C-EDCMD",
     "C-EDHOST",
-    "C-EDVIEW"
+    "C-EDVIEW",
+    "C-COOK"
    ],
    "implements": [],
    "workstream": "gameplay"
@@ -6284,7 +6300,6 @@
     "C-DRAW2D",
     "C-TEXT",
     "C-LOC",
-    "C-A11YRT",
     "C-AUDIO?",
     "C-VIDEO?",
     "C-PAL",
@@ -6295,7 +6310,8 @@
     "C-SCRIPT?",
     "C-VIEW",
     "C-RELOAD?",
-    "C-VFX?"
+    "C-VFX?",
+    "C-A11YRT?"
    ],
    "expertise": [
     "UI frameworks",
@@ -6314,6 +6330,7 @@
    "implements": [],
    "workstream": "ui",
    "untrusted_inputs": [
+    "player-profile-strings",
     "web-content"
    ]
   },
@@ -6356,12 +6373,15 @@
     "client",
     "tools"
    ],
-   "tool_consumes": [],
+   "tool_consumes": [
+    "C-COOK"
+   ],
    "implements": [],
    "workstream": "ui",
    "untrusted_inputs": [
     "chat-text",
-    "fonts"
+    "fonts",
+    "player-profile-strings"
    ]
   },
   {
@@ -7567,7 +7587,9 @@
    "tool_consumes": [
     "C-EDCMD",
     "C-EDHOST",
-    "C-VCS"
+    "C-VCS",
+    "C-COOK",
+    "C-IMPORT"
    ],
    "expertise": [
     "data-driven design",
@@ -7791,6 +7813,7 @@
     "chat-text",
     "generated-content",
     "player-model-prompts",
+    "player-profile-strings",
     "qos-probe-replies",
     "remote-config",
     "service-responses"
@@ -8397,8 +8420,8 @@
     "C-GAME",
     "C-PHYS?",
     "C-INPUT?",
-    "C-A11YRT?",
-    "C-RELOAD?"
+    "C-RELOAD?",
+    "C-A11YRT?"
    ],
    "tool_consumes": [
     "C-EDCMD",
@@ -8538,6 +8561,40 @@
    "expertise": [
     "import/cook/package round-trip corpora",
     "command apply/invert property tests"
+   ],
+   "consumes": [
+    "C-TEST"
+   ],
+   "tool_consumes": [],
+   "provides": [],
+   "implements": []
+  },
+  {
+   "id": "services-conformance",
+   "name": "Services & Persistence Conformance",
+   "tier": "expert",
+   "parent": "test-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "process",
+   "targets": [],
+   "workstream": "quality",
+   "purpose": "Independent authoring of conformance suites for server, persistence, service-boundary and save contracts, distinct from their owners and implementers.",
+   "non_responsibilities": [
+    [
+     "Contract implementation",
+     "owning-skill"
+    ],
+    [
+     "Load tests",
+     "functional-automation-soak"
+    ]
+   ],
+   "expertise": [
+    "consistency and idempotency checking",
+    "service sandboxes",
+    "save migration corpora"
    ],
    "consumes": [
     "C-TEST"
