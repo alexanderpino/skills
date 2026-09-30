@@ -1,0 +1,821 @@
+{
+ "_doc": "Milestone ladder (checked): each milestone claims configurations ('name' or 'name@platform+platform'); every claimed configuration is closed over skills available by then; every configuration is claimed in full exactly once; every code contract is frozen exactly once, after its owner and a consumer arrive and never before what it requires; gates name capabilities. Process skills (oracle authors, validators, critics) are staffed from M0.",
+ "milestones": [
+  {
+   "id": "M0",
+   "name": "Walking skeleton",
+   "configurations": [],
+   "skills": [
+    "asset-cook-processors",
+    "asset-import-interchange",
+    "async-io-storage",
+    "build-system-toolchains",
+    "ci-cd-automation",
+    "concurrency-primitives",
+    "containers-core-types",
+    "content-pipeline-architect",
+    "core-runtime-architect",
+    "crash-diagnostics",
+    "determinism-replay",
+    "entity-object-model",
+    "frame-orchestration",
+    "gpu-memory-resources",
+    "gpu-platform-architect",
+    "input-devices-haptics",
+    "input-system",
+    "job-system-task-graph",
+    "material-system",
+    "math-simd-numerics",
+    "memory-allocators",
+    "observability-telemetry",
+    "package-formats-vfs",
+    "platform-architect",
+    "platform-desktop",
+    "post-color-hdr",
+    "reconstruction-upscaling",
+    "reflection-metadata",
+    "render-2d-vector",
+    "render-architect",
+    "render-graph-scheduling",
+    "resource-streaming-architect",
+    "rhi-core",
+    "rhi-vulkan",
+    "runtime-scalability",
+    "security-runtime",
+    "serialization-schema",
+    "shader-system",
+    "spatial-transforms",
+    "test-runtime-harness",
+    "text-fonts",
+    "texture-streaming-vt",
+    "visual-debugging-tools"
+   ],
+   "exit": "Boots on one PC platform, runs the task graph, opens a window, presents through the RHI, reads input, draws a sprite and text, loads one cooked and signed asset from a package, passes CI with sanitizer, fuzz (package/serialization parsers) and determinism smoke lanes. Perf: trace capture and the C-BENCH runner on the skeleton; C-BUDGET v0 for indie-2d tiers; CI perf lane (frame time, startup, memory).",
+   "gates": [
+    {
+     "capability": "QA.HOST.runner",
+     "validator": "QA.STRAT.integration"
+    },
+    {
+     "capability": "XC.DET.conformance",
+     "validator": "QA.ROBUST.concurrency"
+    },
+    {
+     "capability": "QA.ROBUST.fuzzing",
+     "validator": "QA.AGENT.gate-canaries"
+    },
+    {
+     "capability": "OBS.LOG.bench-runtime",
+     "validator": "PRF.BENCH.regression"
+    },
+    {
+     "capability": "QA.AGENT.test-integrity",
+     "validator": "XC.SEC.agent-redteam"
+    },
+    {
+     "capability": "QA.AGENT.holdout",
+     "validator": "XC.SEC.agent-redteam"
+    },
+    {
+     "capability": "QA.AGENT.mutation-gate",
+     "validator": "QA.ROBUST.fuzzing"
+    },
+    {
+     "capability": "QA.AGENT.gate-canaries",
+     "validator": "XC.SEC.agent-redteam"
+    },
+    {
+     "capability": "XC.SEC.agent-boundary",
+     "validator": "QA.AGENT.gate-canaries"
+    },
+    {
+     "capability": "XC.SEC.supply-chain",
+     "validator": "BLD.SYS.dev-surface-exclusion"
+    },
+    {
+     "capability": "XC.SEC.secrets",
+     "validator": "BLD.CI.hardening"
+    },
+    {
+     "capability": "XC.SEC.key-custody",
+     "validator": "QA.CERT.prechecks"
+    }
+   ],
+   "contracts_draft": [
+    "C-ASSET",
+    "C-AUTOMATION",
+    "C-BUILD",
+    "C-CMD",
+    "C-COLOR",
+    "C-COOK",
+    "C-DET",
+    "C-DEVICE",
+    "C-DEVUI",
+    "C-DRAW2D",
+    "C-FLOW",
+    "C-FRAME",
+    "C-GOVERN",
+    "C-GPUMEM",
+    "C-GPUTIER",
+    "C-ID",
+    "C-INPUT",
+    "C-IO",
+    "C-IPC",
+    "C-LIGHTENV",
+    "C-MATIF",
+    "C-PAL",
+    "C-PRESENT",
+    "C-REFL",
+    "C-REPLAY",
+    "C-RES",
+    "C-RG",
+    "C-RHI",
+    "C-RSCENE",
+    "C-SCENETEX",
+    "C-SER",
+    "C-SHADER",
+    "C-SNAPSHOT",
+    "C-SPATIAL",
+    "C-TARGETPLAT",
+    "C-TEMPORAL",
+    "C-TEXT",
+    "C-TRUST",
+    "C-VFS",
+    "C-VIEW",
+    "C-VT"
+   ],
+   "contracts_frozen": [
+    "C-ADR",
+    "C-ARCH",
+    "C-BASE",
+    "C-BUDGET",
+    "C-CFG",
+    "C-CRASH",
+    "C-ERR",
+    "C-INSTR",
+    "C-LIFETIME",
+    "C-MATH",
+    "C-MEM",
+    "C-MOD",
+    "C-ORCH",
+    "C-SCALE",
+    "C-SIGN",
+    "C-SYNC",
+    "C-TASK",
+    "C-TEST",
+    "C-TESTHOST",
+    "C-TYPES"
+   ],
+   "process_skills": [
+    "api-lifecycle-migration",
+    "architecture-governance",
+    "build-release-architect",
+    "certification-compliance",
+    "cpu-performance",
+    "developer-experience-docs",
+    "engine-architect",
+    "engine-product-management",
+    "foundation-conformance",
+    "functional-automation-soak",
+    "gpu-performance",
+    "loading-streaming-performance",
+    "memory-performance",
+    "online-performance",
+    "perf-benchmarking",
+    "performance-architect",
+    "pipeline-performance",
+    "privacy-data-protection",
+    "program-orchestration",
+    "render-validation",
+    "research-evidence",
+    "robustness-fuzzing",
+    "security-engineering",
+    "simulation-validation",
+    "test-architect",
+    "ui-text-conformance"
+   ]
+  },
+  {
+   "id": "M1",
+   "name": "Indie 2D slice on PC",
+   "configurations": [
+    "indie-2d-client@pc",
+    "minimal-client@pc"
+   ],
+   "skills": [
+    "accessibility",
+    "ai-behavior-perception",
+    "animation-architect",
+    "animation-graphs",
+    "animation-runtime",
+    "anti-cheat-integrity",
+    "audio-architect",
+    "audio-content-runtime",
+    "audio-dsp-mixing",
+    "character-movement",
+    "cinematics-sequencer",
+    "ecs-runtime",
+    "gameplay-architect",
+    "gameplay-camera",
+    "gameplay-data",
+    "gameplay-systems-toolkit",
+    "hot-reload-iteration",
+    "ik-procedural-animation",
+    "localization-i18n",
+    "media-playback",
+    "narrative-dialogue",
+    "navigation-pathfinding",
+    "net-session",
+    "network-architect",
+    "network-transport",
+    "online-services-liveops",
+    "packaging-release-patching",
+    "persistence-save",
+    "physics-2d",
+    "physics-architect",
+    "platform-services",
+    "plugin-system",
+    "prediction-rollback",
+    "procedural-generation",
+    "reference-games",
+    "replication",
+    "rhi-d3d12",
+    "rhi-metal",
+    "scripting-runtime",
+    "ui-architect",
+    "vfx-particles",
+    "world-architect",
+    "world-data-model"
+   ],
+   "exit": "The indie-2d and minimal reference games are playable on PC with save, localization, accessibility baseline and hot reload. Network design authorities (network-architect, transport, replication, prediction, sessions) draft C-NET/C-REP/C-PREDICT/C-NETSESSION and review every freeze; a two-instance loopback session (lockstep or rollback) runs under QA.SIM.netsim. Security: threat model for the configuration, fuzz harnesses for every registered input reaching it, hardened shipping build, dev-surface audit. Perf: within budget on min-spec PC; hitch gate active.",
+   "gates": [
+    {
+     "capability": "QA.REF.ladder",
+     "validator": "QA.STRAT.release-criteria"
+    },
+    {
+     "capability": "QA.SIM.netsim",
+     "validator": "QA.AGENT.oracle-change-control"
+    },
+    {
+     "capability": "XC.SEC.threats",
+     "validator": "QA.ROBUST.fuzzing"
+    },
+    {
+     "capability": "XC.SEC.hardening",
+     "validator": "QA.CERT.prechecks"
+    },
+    {
+     "capability": "BLD.SYS.dev-surface-exclusion",
+     "validator": "XC.SEC.testing"
+    },
+    {
+     "capability": "PRF.LOAD.hitch-gate",
+     "validator": "PRF.BENCH.regression"
+    },
+    {
+     "capability": "QA.RENDER.golden",
+     "validator": "QA.FUNC.compat"
+    },
+    {
+     "capability": "QA.SIM.stability-suite",
+     "validator": "QA.FUNC.soak"
+    },
+    {
+     "capability": "PRF.METH.asymptotics",
+     "validator": "PRF.BENCH.scale-content"
+    }
+   ],
+   "contracts_draft": [
+    "C-A11YRT",
+    "C-ABILITY",
+    "C-AI",
+    "C-AIAGENT",
+    "C-ANIM",
+    "C-AUDIO",
+    "C-CAMERA",
+    "C-DIALOGUE",
+    "C-ECS",
+    "C-ENV",
+    "C-GAME",
+    "C-GAMEDATA",
+    "C-HOSTAUTH",
+    "C-INTEGRITY",
+    "C-LIVE",
+    "C-LOC",
+    "C-MOVE",
+    "C-NAV",
+    "C-NET",
+    "C-NETLINK",
+    "C-NETSESSION",
+    "C-PCG",
+    "C-PHYS",
+    "C-PKG",
+    "C-PLUGIN",
+    "C-PREDICT",
+    "C-RELOAD",
+    "C-REP",
+    "C-SAVE",
+    "C-SCRIPT",
+    "C-SEQ",
+    "C-SIGNIF",
+    "C-SVC",
+    "C-UI",
+    "C-VFX",
+    "C-VIDEO",
+    "C-WORLD"
+   ],
+   "contracts_frozen": [
+    "C-A11Y",
+    "C-A11YRT",
+    "C-ANIM",
+    "C-API",
+    "C-ASSET",
+    "C-AUDIO",
+    "C-BUILD",
+    "C-CHARCTRL",
+    "C-COLOR",
+    "C-COOK",
+    "C-DET",
+    "C-DRAW2D",
+    "C-EVID",
+    "C-FLOW",
+    "C-FRAME",
+    "C-GAME",
+    "C-GAMEDATA",
+    "C-GPUMEM",
+    "C-GPUTIER",
+    "C-ID",
+    "C-IMPORT",
+    "C-INPUT",
+    "C-IO",
+    "C-IPC",
+    "C-LOC",
+    "C-MATIF",
+    "C-PAL",
+    "C-PERF",
+    "C-PHYS",
+    "C-PRESENT",
+    "C-REFL",
+    "C-RES",
+    "C-RG",
+    "C-RHI",
+    "C-RSCENE",
+    "C-SCENETEX",
+    "C-SER",
+    "C-SHADER",
+    "C-SNAPSHOT",
+    "C-SPATIAL",
+    "C-STATECLASS",
+    "C-TEXT",
+    "C-TRUST",
+    "C-VFS",
+    "C-VIEW",
+    "C-WORLD"
+   ]
+  },
+  {
+   "id": "M2",
+   "name": "Indie 2D ships everywhere, with tools",
+   "configurations": [
+    "indie-2d-client",
+    "minimal-client",
+    "indie-2d-tools",
+    "minimal-tools",
+    "mobile-async-client",
+    "fighting-2d-rollback-client",
+    "sandbox-2d-client",
+    "fighting-2d-rollback-tools",
+    "mobile-async-validator"
+   ],
+   "skills": [
+    "collaboration-version-control",
+    "editor-architect",
+    "editor-ui-framework",
+    "fluid-simulation",
+    "graph-editor-framework",
+    "physics-tools",
+    "platform-console",
+    "platform-mobile",
+    "platform-server-host",
+    "platform-web",
+    "rhi-console",
+    "rhi-webgpu",
+    "systems-simulation",
+    "voxel-worlds",
+    "world-editor-viewport"
+   ],
+   "exit": "indie-2d ships on PC, console, mobile and web with a TRC/store-review dry run; the editor and tools configuration closes with source control; rollback (8 frames under 150 ms / 5% loss) and async play proven. Local multiplayer: 2-player split-screen with independent UI focus, listeners and input. Perf: mobile tier within budget.",
+   "gates": [
+    {
+     "capability": "QA.CERT.prechecks",
+     "validator": "QA.STRAT.release-criteria"
+    },
+    {
+     "capability": "ED.COLLAB.vcs",
+     "validator": "QA.FUNC.editor"
+    },
+    {
+     "capability": "NET.PRED.rollback",
+     "validator": "QA.SIM.netsim"
+    },
+    {
+     "capability": "GAM.FW.local-players",
+     "validator": "QA.FUNC.automation"
+    },
+    {
+     "capability": "PRF.MEM.footprint",
+     "validator": "QA.FUNC.soak"
+    },
+    {
+     "capability": "PRF.LOAD.pacing-latency",
+     "validator": "PRF.BENCH.stats"
+    },
+    {
+     "capability": "QA.FUNC.soak",
+     "validator": "PRF.BENCH.stats"
+    },
+    {
+     "capability": "XC.SEC.data-rights",
+     "validator": "QA.CERT.privacy"
+    },
+    {
+     "capability": "XC.SEC.childrens-data",
+     "validator": "QA.CERT.privacy"
+    },
+    {
+     "capability": "XC.SEC.vuln-response",
+     "validator": "QA.ROBUST.fuzzing"
+    },
+    {
+     "capability": "PRF.NET.resim-cost",
+     "validator": "QA.SIM.netsim"
+    },
+    {
+     "capability": "PRF.MEM.size",
+     "validator": "PRF.BENCH.stats"
+    },
+    {
+     "capability": "XC.SEC.dev-trust",
+     "validator": "QA.FUNC.editor"
+    }
+   ],
+   "contracts_draft": [
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-EDVIEW",
+    "C-GRAPH",
+    "C-VCS"
+   ],
+   "contracts_frozen": [
+    "C-ABILITY",
+    "C-AUTOMATION",
+    "C-BENCH",
+    "C-CAMERA",
+    "C-CERT",
+    "C-CMD",
+    "C-DEVICE",
+    "C-DIALOGUE",
+    "C-ECS",
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-ENV",
+    "C-GOVERN",
+    "C-HOSTAUTH",
+    "C-INTEGRITY",
+    "C-LIVE",
+    "C-NET",
+    "C-NETLINK",
+    "C-NETSESSION",
+    "C-PCG",
+    "C-PKG",
+    "C-PLUGIN",
+    "C-PREDICT",
+    "C-PROD",
+    "C-RELEASE",
+    "C-RELOAD",
+    "C-REPLAY",
+    "C-REWIND",
+    "C-SAVE",
+    "C-SCRIPT",
+    "C-SEQ",
+    "C-SIGNIF",
+    "C-SVC",
+    "C-TARGETPLAT"
+   ]
+  },
+  {
+   "id": "M3",
+   "name": "Standard 3D",
+   "configurations": [
+    "standard-3d-client",
+    "standard-3d-tools",
+    "lite-3d-mobile-client",
+    "lite-3d-mobile-tools",
+    "lite-3d-portable-console-client",
+    "racing-3d-client"
+   ],
+   "skills": [
+    "atmosphere-weather",
+    "character-physics",
+    "character-rendering",
+    "cloth-deformables",
+    "collision-detection",
+    "deformation-skinning",
+    "destruction-fracture",
+    "direct-lighting-shadows",
+    "facial-animation",
+    "geometry-pipeline",
+    "global-illumination",
+    "motion-synthesis",
+    "path-tracing",
+    "ray-tracing-infrastructure",
+    "rigid-body-dynamics",
+    "spatial-audio-acoustics",
+    "terrain",
+    "translucency-decals",
+    "vegetation-foliage",
+    "vehicle-physics",
+    "virtualized-geometry-lod",
+    "water-ocean"
+   ],
+   "exit": "The standard-3d reference game runs on PC and console with GPU-driven and CPU-submission paths, reference path-tracer validation (itself validated), the lite-3d mobile and portable-console configurations; C-RHI reviewed against the tensor tier by ml-inference-runtime before freeze. Tools: iteration-latency targets met on standard-3d-tools and on-device iteration to console and mobile. Perf: std3d and lite3d budgets per tier; PSO first-encounter hitch gate; governor closed-loop test.",
+   "gates": [
+    {
+     "capability": "QA.RENDER.reference-validation",
+     "validator": "QA.AGENT.oracle-change-control"
+    },
+    {
+     "capability": "RND.SHADER.pso-lists",
+     "validator": "PRF.LOAD.hitch-gate"
+    },
+    {
+     "capability": "CORE.SCALE.governor",
+     "validator": "PRF.METH.gates"
+    },
+    {
+     "capability": "XC.ITER.metrics",
+     "validator": "QA.FUNC.editor"
+    },
+    {
+     "capability": "PRF.GPU.baselines",
+     "validator": "PRF.METH.gates"
+    },
+    {
+     "capability": "PRF.METH.pipeline-budgets",
+     "validator": "PRF.BENCH.tools"
+    },
+    {
+     "capability": "PRF.METH.energy",
+     "validator": "PRF.GPU.power"
+    }
+   ],
+   "contracts_draft": [
+    "C-ATMOS",
+    "C-GEOLOD",
+    "C-GI",
+    "C-INSTANCES",
+    "C-LIGHT",
+    "C-PTREF",
+    "C-RT",
+    "C-RTAS",
+    "C-TRANSLUCENT",
+    "C-VEHICLE"
+   ],
+   "contracts_frozen": [
+    "C-AI",
+    "C-DEVUI",
+    "C-EDPREVIEW",
+    "C-EDVIEW",
+    "C-GRAPH",
+    "C-INSTANCES",
+    "C-LIGHT",
+    "C-LIGHTENV",
+    "C-MOVE",
+    "C-NAV",
+    "C-TEMPORAL",
+    "C-UI",
+    "C-VCS",
+    "C-VFX",
+    "C-VIDEO",
+    "C-VT"
+   ]
+  },
+  {
+   "id": "M4",
+   "name": "Online",
+   "configurations": [
+    "online-3d-server",
+    "online-3d-client",
+    "online-3d-bot-client",
+    "online-3d-tools",
+    "online-3d-console-client",
+    "coop-3d-listen-client",
+    "lite-3d-mobile-online-client",
+    "standard-3d-team-tools",
+    "indie-2d-online-web-client",
+    "indie-2d-online-moddable-client",
+    "indie-2d-online-moddable-server",
+    "rts-2d-massim-client",
+    "rts-massim-lockstep-tools"
+   ],
+   "skills": [
+    "crowd-simulation",
+    "dedicated-server",
+    "modding-ugc"
+   ],
+   "exit": "Online reference games per netcode family: dedicated-server shooter with prediction and lag compensation, listen-server co-op, desync-free 2 h lockstep soak, web transports; bot load test; packet/handshake fuzzing, DoS test, server-authority review and external pen test (human gate; gates XC.SEC.server-validation, XC.SEC.info-hiding, XC.SEC.incident, NET.SRV.admin, NET.SRV.transactions, PLAT.COMM.receipts; XC.SEC.testing validates); patch + DLC + staged rollout + rollback executed on the online reference game. Perf: bandwidth per player within budget and latency gated; server density is gated at M4 (PRF.NET.server-density).",
+   "gates": [
+    {
+     "capability": "QA.FUNC.load",
+     "validator": "PRF.NET.load-analysis"
+    },
+    {
+     "capability": "NET.TRANS.dos",
+     "validator": "XC.SEC.testing"
+    },
+    {
+     "capability": "BLD.REL.staged-rollout",
+     "validator": "QA.FUNC.compat-corpus"
+    },
+    {
+     "capability": "BLD.REL.rollback",
+     "validator": "QA.STRAT.release-criteria"
+    },
+    {
+     "capability": "PRF.NET.bandwidth",
+     "validator": "QA.FUNC.load"
+    },
+    {
+     "capability": "PLAT.LIVE.operations",
+     "validator": "QA.FUNC.soak"
+    },
+    {
+     "capability": "PRF.NET.latency",
+     "validator": "QA.FUNC.load"
+    },
+    {
+     "capability": "XC.SEC.server-validation",
+     "validator": "QA.FUNC.network"
+    },
+    {
+     "capability": "XC.SEC.info-hiding",
+     "validator": "XC.SEC.testing"
+    },
+    {
+     "capability": "XC.SEC.incident",
+     "validator": "QA.CERT.prechecks"
+    },
+    {
+     "capability": "NET.SRV.admin",
+     "validator": "XC.SEC.testing"
+    },
+    {
+     "capability": "NET.SRV.transactions",
+     "validator": "QA.FUNC.load"
+    },
+    {
+     "capability": "PLAT.COMM.receipts",
+     "validator": "XC.SEC.testing"
+    }
+   ],
+   "contracts_draft": [
+    "C-CROWD",
+    "C-EDIT",
+    "C-SERVER"
+   ],
+   "contracts_frozen": [
+    "C-ATMOS",
+    "C-GEOLOD",
+    "C-GI",
+    "C-PTREF",
+    "C-REP",
+    "C-TRANSLUCENT",
+    "C-VEHICLE"
+   ]
+  },
+  {
+   "id": "M5",
+   "name": "Open world, simulation & XR",
+   "configurations": [
+    "open-world-client",
+    "rts-3d-massim-client",
+    "sandbox-online-server",
+    "xr-pc-client",
+    "xr-standalone-client",
+    "xr-console-client",
+    "xr-standalone-tools",
+    "lite-3d-mobile-openworld-online-client",
+    "lite-3d-portable-openworld-client",
+    "lite-3d-web-client"
+   ],
+   "skills": [
+    "ml-inference-runtime",
+    "server-scaleout-persistence",
+    "xr-runtime"
+   ],
+   "exit": "Open-world reference slice streams at target speed within the arbitration budget (arbiter without oscillation or starvation, A14); massim and sandbox configurations closed and benchmarked; XR on PC, standalone and console. Perf: scale-content stress worlds within declared asymptotics.",
+   "gates": [
+    {
+     "capability": "RES.MGMT.arbitration",
+     "validator": "PRF.MEM.peaks"
+    },
+    {
+     "capability": "RES.MGMT.validation",
+     "validator": "PRF.LOAD.load-time"
+    },
+    {
+     "capability": "PRF.BENCH.scale-content",
+     "validator": "QA.SIM.mass-agents"
+    }
+   ],
+   "contracts_draft": [
+    "C-ML",
+    "C-MLGPU",
+    "C-SHARD",
+    "C-SRVDATA",
+    "C-XRVIEW"
+   ],
+   "contracts_frozen": [
+    "C-CROWD",
+    "C-EDIT",
+    "C-SERVER"
+   ]
+  },
+  {
+   "id": "M6",
+   "name": "AAA & ecosystem",
+   "configurations": [
+    "aaa-open-world-online-client",
+    "aaa-open-world-online-server",
+    "aaa-open-world-online-tools",
+    "aaa-experimental-client",
+    "rt-required-3d-client"
+   ],
+   "skills": [
+    "ai-assisted-authoring"
+   ],
+   "exit": "AAA reference slice; zoned hand-off and persistence crash-consistency with ≥1k bot clients; mods with sandbox-escape and GPU-DoS tests; experimental features only behind the experimental profile. Tools: team-large pipeline (multi-user sessions, distributed cook, world builds) on aaa-open-world-online-tools.",
+   "gates": [
+    {
+     "capability": "NET.SRV.cross-server",
+     "validator": "QA.FUNC.load"
+    },
+    {
+     "capability": "XC.SEC.sandbox",
+     "validator": "QA.ROBUST.fuzzing"
+    },
+    {
+     "capability": "ED.COLLAB.multiuser",
+     "validator": "QA.FUNC.editor"
+    },
+    {
+     "capability": "PRF.NET.server-density",
+     "validator": "QA.FUNC.load"
+    }
+   ],
+   "contracts_draft": [],
+   "contracts_frozen": [
+    "C-AIAGENT",
+    "C-ML",
+    "C-MLGPU",
+    "C-RT",
+    "C-RTAS",
+    "C-SHARD",
+    "C-SRVDATA",
+    "C-XRVIEW"
+   ]
+  },
+  {
+   "id": "M7",
+   "name": "Engine 1.0 / first LTS",
+   "configurations": [],
+   "skills": [],
+   "exit": "Customer-corpus upgrade from the previous release, release notes, backport stream open, console certification pass of at least one reference game, live-ops and end-of-service rehearsal. Every milestone exit also runs the skill-library review (ARCH.ORG.skill-lifecycle).",
+   "gates": [
+    {
+     "capability": "ARCH.PROD.customer-corpus",
+     "validator": "QA.REF.upkeep"
+    },
+    {
+     "capability": "XC.EXT.lts",
+     "validator": "QA.FUNC.compat-corpus"
+    },
+    {
+     "capability": "BLD.REL.end-of-service",
+     "validator": "QA.FUNC.compat"
+    },
+    {
+     "capability": "QA.STRAT.release-criteria",
+     "validator": "QA.FUNC.compat-corpus"
+    },
+    {
+     "capability": "QA.FUNC.compat-corpus",
+     "validator": "QA.REF.upkeep"
+    }
+   ],
+   "contracts_draft": [],
+   "contracts_frozen": []
+  }
+ ]
+}

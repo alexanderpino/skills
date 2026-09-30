@@ -1,0 +1,680 @@
+{
+ "_doc": "Untrusted-input registry (K-SEC-1). Each input class has exactly one validating owner; parser owners also register it; 'harness' inputs are fuzz targets owned next to the parser, 'redteam' inputs are agent inputs covered by the prompt-injection corpus (XC.SEC.agent-redteam).",
+ "inputs": [
+  {
+   "id": "assets",
+   "validating_owner": "serialization-schema",
+   "parser_owners": [
+    "package-formats-vfs"
+   ],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "size/depth/count"
+  },
+  {
+   "id": "packets",
+   "validating_owner": "network-transport",
+   "parser_owners": [
+    "serialization-schema",
+    "net-session"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "size/rate"
+  },
+  {
+   "id": "replicated-state",
+   "validating_owner": "replication",
+   "parser_owners": [],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "count/depth/rate"
+  },
+  {
+   "id": "input-commands",
+   "validating_owner": "prediction-rollback",
+   "parser_owners": [],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "rate/tick window"
+  },
+  {
+   "id": "peer-inputs",
+   "validating_owner": "prediction-rollback",
+   "parser_owners": [],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "rate/tick window"
+  },
+  {
+   "id": "peer-state-hashes",
+   "validating_owner": "determinism-replay",
+   "parser_owners": [],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "rate"
+  },
+  {
+   "id": "saves",
+   "validating_owner": "persistence-save",
+   "parser_owners": [
+    "serialization-schema"
+   ],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "size/depth"
+  },
+  {
+   "id": "cloud-saves",
+   "validating_owner": "persistence-save",
+   "parser_owners": [],
+   "trust": "semi-trusted-signed",
+   "mode": "harness",
+   "limits": "size/depth"
+  },
+  {
+   "id": "scripts",
+   "validating_owner": "scripting-runtime",
+   "parser_owners": [],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "time/memory/instructions"
+  },
+  {
+   "id": "mods",
+   "validating_owner": "modding-ugc",
+   "parser_owners": [
+    "plugin-system"
+   ],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "size/permissions"
+  },
+  {
+   "id": "ugc-graphs",
+   "validating_owner": "modding-ugc",
+   "parser_owners": [
+    "shader-system"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "node count/GPU time"
+  },
+  {
+   "id": "replays",
+   "validating_owner": "determinism-replay",
+   "parser_owners": [],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "size/length"
+  },
+  {
+   "id": "remote-config",
+   "validating_owner": "online-services-liveops",
+   "parser_owners": [],
+   "trust": "semi-trusted-signed",
+   "mode": "harness",
+   "limits": "size/keys"
+  },
+  {
+   "id": "chat-text",
+   "validating_owner": "online-services-liveops",
+   "parser_owners": [
+    "text-fonts"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "length/rate"
+  },
+  {
+   "id": "fonts",
+   "validating_owner": "text-fonts",
+   "parser_owners": [],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "tables/glyphs"
+  },
+  {
+   "id": "media-decoders",
+   "validating_owner": "media-playback",
+   "parser_owners": [],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "resolution/duration"
+  },
+  {
+   "id": "decompressors",
+   "validating_owner": "containers-core-types",
+   "parser_owners": [
+    "package-formats-vfs"
+   ],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "ratio/output size"
+  },
+  {
+   "id": "invites-deep-links",
+   "validating_owner": "platform-services",
+   "parser_owners": [
+    "platform-mobile"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "length"
+  },
+  {
+   "id": "generated-content",
+   "validating_owner": "ai-behavior-perception",
+   "parser_owners": [
+    "online-services-liveops"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "length/moderation"
+  },
+  {
+   "id": "editor-plugins",
+   "validating_owner": "plugin-system",
+   "parser_owners": [],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "permissions"
+  },
+  {
+   "id": "imported-dcc-files",
+   "validating_owner": "asset-import-interchange",
+   "parser_owners": [],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "size/depth"
+  },
+  {
+   "id": "voice-streams",
+   "validating_owner": "audio-dsp-mixing",
+   "parser_owners": [],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "bitrate/frame size"
+  },
+  {
+   "id": "admin-commands",
+   "validating_owner": "dedicated-server",
+   "parser_owners": [],
+   "trust": "semi-trusted-signed",
+   "mode": "harness",
+   "limits": "rate/RBAC"
+  },
+  {
+   "id": "automation-commands",
+   "validating_owner": "visual-debugging-tools",
+   "parser_owners": [
+    "editor-architect"
+   ],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "dev-only/auth"
+  },
+  {
+   "id": "auth-tickets",
+   "validating_owner": "net-session",
+   "parser_owners": [],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "size/expiry"
+  },
+  {
+   "id": "transaction-requests",
+   "validating_owner": "server-scaleout-persistence",
+   "parser_owners": [],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "rate/idempotency"
+  },
+  {
+   "id": "client-integrity-reports",
+   "validating_owner": "anti-cheat-integrity",
+   "parser_owners": [],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "size/rate"
+  },
+  {
+   "id": "user-images",
+   "validating_owner": "ui-architect",
+   "parser_owners": [],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "dimensions/size"
+  },
+  {
+   "id": "ml-models",
+   "validating_owner": "ml-inference-runtime",
+   "parser_owners": [],
+   "trust": "semi-trusted-signed",
+   "mode": "harness",
+   "limits": "size/op set"
+  },
+  {
+   "id": "service-responses",
+   "validating_owner": "online-services-liveops",
+   "parser_owners": [
+    "platform-services",
+    "async-io-storage"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "size/depth"
+  },
+  {
+   "id": "logged-untrusted-strings",
+   "validating_owner": "observability-telemetry",
+   "parser_owners": [],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "no interpolation/lookups"
+  },
+  {
+   "id": "collab-session",
+   "validating_owner": "collaboration-version-control",
+   "parser_owners": [],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "size/rate"
+  },
+  {
+   "id": "shared-ddc",
+   "validating_owner": "content-pipeline-architect",
+   "parser_owners": [],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "content-addressed/verified"
+  },
+  {
+   "id": "dcc-live-link",
+   "validating_owner": "asset-import-interchange",
+   "parser_owners": [],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "rate/size"
+  },
+  {
+   "id": "procedural-asset-eval",
+   "validating_owner": "asset-import-interchange",
+   "parser_owners": [],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "sandboxed out-of-process"
+  },
+  {
+   "id": "launch-args",
+   "validating_owner": "core-runtime-architect",
+   "parser_owners": [
+    "platform-mobile",
+    "platform-desktop",
+    "platform-console"
+   ],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "allow-listed settable-from layers"
+  },
+  {
+   "id": "config-layers",
+   "validating_owner": "core-runtime-architect",
+   "parser_owners": [],
+   "trust": "semi-trusted-signed",
+   "mode": "harness",
+   "limits": "trust tier per layer"
+  },
+  {
+   "id": "patch-manifests",
+   "validating_owner": "packaging-release-patching",
+   "parser_owners": [],
+   "trust": "semi-trusted-signed",
+   "mode": "harness",
+   "limits": "size/signature"
+  },
+  {
+   "id": "crash-uploads",
+   "validating_owner": "crash-diagnostics",
+   "parser_owners": [],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "size"
+  },
+  {
+   "id": "telemetry-batches",
+   "validating_owner": "observability-telemetry",
+   "parser_owners": [],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "size/rate"
+  },
+  {
+   "id": "shader-caches",
+   "validating_owner": "shader-system",
+   "parser_owners": [
+    "rhi-core"
+   ],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "versioned/verified"
+  },
+  {
+   "id": "dev-endpoints",
+   "validating_owner": "hot-reload-iteration",
+   "parser_owners": [],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "dev-only/auth"
+  },
+  {
+   "id": "browser-bridge",
+   "validating_owner": "platform-web",
+   "parser_owners": [],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "message schema"
+  },
+  {
+   "id": "web-sources",
+   "validating_owner": "research-evidence",
+   "parser_owners": [],
+   "trust": "agent-input",
+   "mode": "redteam",
+   "limits": "provenance tiers"
+  },
+  {
+   "id": "external-reports",
+   "validating_owner": "engine-product-management",
+   "parser_owners": [
+    "program-orchestration"
+   ],
+   "trust": "agent-input",
+   "mode": "redteam",
+   "limits": "quarantined as data"
+  },
+  {
+   "id": "vuln-reports",
+   "validating_owner": "security-engineering",
+   "parser_owners": [],
+   "trust": "agent-input",
+   "mode": "redteam",
+   "limits": "quarantined as data"
+  },
+  {
+   "id": "third-party-source",
+   "validating_owner": "build-system-toolchains",
+   "parser_owners": [],
+   "trust": "agent-input",
+   "mode": "redteam",
+   "limits": "pinned/verified"
+  },
+  {
+   "id": "project-content-to-llm",
+   "validating_owner": "ai-assisted-authoring",
+   "parser_owners": [],
+   "trust": "agent-input",
+   "mode": "redteam",
+   "limits": "workspace trust"
+  },
+  {
+   "id": "project-tool-code",
+   "validating_owner": "editor-architect",
+   "parser_owners": [
+    "plugin-system"
+   ],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "no execution before workspace-trust grant; per-command permission classes"
+  },
+  {
+   "id": "device-db-updates",
+   "validating_owner": "platform-architect",
+   "parser_owners": [],
+   "trust": "semi-trusted-signed",
+   "mode": "harness",
+   "limits": "schema/rollback/staged rollout"
+  },
+  {
+   "id": "push-payloads",
+   "validating_owner": "platform-mobile",
+   "parser_owners": [],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "length/schema"
+  },
+  {
+   "id": "clipboard-dragdrop",
+   "validating_owner": "platform-architect",
+   "parser_owners": [
+    "editor-ui-framework"
+   ],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "size/type allow-list"
+  },
+  {
+   "id": "server-pushed-content",
+   "validating_owner": "modding-ugc",
+   "parser_owners": [
+    "net-session"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "size/type allow-list; signature required; sandboxed load"
+  },
+  {
+   "id": "client-rpcs",
+   "validating_owner": "replication",
+   "parser_owners": [],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "per-RPC rate, argument bounds, authority check"
+  },
+  {
+   "id": "ipc-messages",
+   "validating_owner": "core-runtime-architect",
+   "parser_owners": [
+    "crash-diagnostics",
+    "editor-architect"
+   ],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "frame size/rate/schema version; TOCTOU-safe copy-out from shared memory"
+  },
+  {
+   "id": "player-model-prompts",
+   "validating_owner": "ai-behavior-perception",
+   "parser_owners": [
+    "audio-content-runtime",
+    "online-services-liveops",
+    "modding-ugc"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "length/rate/token budget/moderation pre-filter"
+  },
+  {
+   "id": "web-content",
+   "validating_owner": "ui-architect",
+   "parser_owners": [
+    "platform-services"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "navigation allow-list; process isolation; no engine bridge by default"
+  },
+  {
+   "id": "triage-artifacts",
+   "validating_owner": "program-orchestration",
+   "parser_owners": [
+    "ci-cd-automation",
+    "crash-diagnostics"
+   ],
+   "trust": "agent-input",
+   "mode": "redteam",
+   "limits": "quarantined as data; triage agents may not change baselines or quarantine tests"
+  },
+  {
+   "id": "player-feedback",
+   "validating_owner": "crash-diagnostics",
+   "parser_owners": [
+    "engine-product-management"
+   ],
+   "trust": "agent-input",
+   "mode": "redteam",
+   "limits": "quarantined as data; no instruction authority"
+  },
+  {
+   "id": "inter-agent-messages",
+   "validating_owner": "program-orchestration",
+   "parser_owners": [],
+   "trust": "agent-input",
+   "mode": "redteam",
+   "limits": "provenance-tagged; no instruction authority; findings and commit messages are data"
+  },
+  {
+   "id": "store-notifications",
+   "validating_owner": "platform-services",
+   "parser_owners": [
+    "server-scaleout-persistence"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "signature verification, replay window, schema bounds"
+  },
+  {
+   "id": "physics-assets",
+   "validating_owner": "collision-detection",
+   "parser_owners": [
+    "package-formats-vfs",
+    "modding-ugc"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "hull vertices, triangles, cook time, body/constraint counts; UGC cooking async, budgeted and sandboxed"
+  },
+  {
+   "id": "server-list-entries",
+   "validating_owner": "net-session",
+   "parser_owners": [
+    "network-transport"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "length/count/rate; endpoint allow-list; pre-auth"
+  },
+  {
+   "id": "tabular-imports",
+   "validating_owner": "gameplay-data",
+   "parser_owners": [],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "zip-bomb, XXE and formula-injection limits"
+  },
+  {
+   "id": "localization-exchange",
+   "validating_owner": "localization-i18n",
+   "parser_owners": [],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "XLIFF/PO size/depth limits"
+  },
+  {
+   "id": "narrative-imports",
+   "validating_owner": "narrative-dialogue",
+   "parser_owners": [],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "screenplay import size/depth limits"
+  },
+  {
+   "id": "vendor-deliveries",
+   "validating_owner": "content-pipeline-architect",
+   "parser_owners": [],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "package manifest and size limits"
+  },
+  {
+   "id": "tracker-webhooks",
+   "validating_owner": "collaboration-version-control",
+   "parser_owners": [],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "signature and schema verification"
+  },
+  {
+   "id": "lan-discovery",
+   "validating_owner": "net-session",
+   "parser_owners": [
+    "network-transport"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "pre-auth broadcast/mDNS replies: length/rate limits"
+  },
+  {
+   "id": "community-server-config",
+   "validating_owner": "dedicated-server",
+   "parser_owners": [
+    "modding-ugc"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "ruleset/config file size/depth limits"
+  },
+  {
+   "id": "hid-reports",
+   "validating_owner": "input-devices-haptics",
+   "parser_owners": [],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "report/descriptor size and structure limits"
+  },
+  {
+   "id": "remote-build-results",
+   "validating_owner": "ci-cd-automation",
+   "parser_owners": [
+    "build-system-toolchains"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "cache/result signature and size limits"
+  },
+  {
+   "id": "patch-payloads",
+   "validating_owner": "packaging-release-patching",
+   "parser_owners": [
+    "package-formats-vfs"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "signature, size and chunk limits"
+  },
+  {
+   "id": "tool-outputs",
+   "validating_owner": "security-engineering",
+   "parser_owners": [],
+   "trust": "agent-input",
+   "mode": "redteam",
+   "limits": "quarantined as data; no instruction authority"
+  },
+  {
+   "id": "agent-memory",
+   "validating_owner": "program-orchestration",
+   "parser_owners": [],
+   "trust": "agent-input",
+   "mode": "redteam",
+   "limits": "quarantined as data; no instruction authority"
+  },
+  {
+   "id": "contributed-patches",
+   "validating_owner": "engine-product-management",
+   "parser_owners": [],
+   "trust": "agent-input",
+   "mode": "redteam",
+   "limits": "quarantined as data; no instruction authority"
+  }
+ ]
+}
