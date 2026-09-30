@@ -1,0 +1,74 @@
+[
+ {
+  "id": "K-TEST-9",
+  "fact_holds": true,
+  "material": true,
+  "severity_ok": true,
+  "checked": "capabilities.json QA.ROBUST.*, QA.SIM.netsim, contracts.json C-SHARD/C-SRVDATA, milestones.json M6",
+  "reason": "No capability owns distributed fault/consistency validation; netsim is single-process and M6 exit demands crash-consistency with no producing capability. Test-double part is weak (C-SHARD/C-SRVDATA are not boundary contracts) but the core omission stands."
+ },
+ {
+  "id": "K-TEST-10",
+  "fact_holds": true,
+  "material": true,
+  "severity_ok": true,
+  "checked": "contracts.json C-TEST evidence_bundle; untrusted-inputs.json; QA.ROBUST.fuzzing",
+  "reason": "Evidence is literally 'fuzz hours' with no coverage/reachability criterion; a shallow harness satisfies it. Change is sound."
+ },
+ {
+  "id": "K-TEST-11",
+  "fact_holds": true,
+  "material": true,
+  "severity_ok": true,
+  "checked": "untrusted-inputs.json saves; docs/09",
+  "reason": "saves is trusted-local with limits size/depth only, while assets and mods are hostile-local; user-editable/shared saves are a real attack surface. Fix is cheap and sound."
+ },
+ {
+  "id": "K-TEST-12",
+  "fact_holds": true,
+  "material": true,
+  "severity_ok": true,
+  "checked": "capabilities.json BLD.REL.staged-rollout, QA.STRAT.release-criteria",
+  "reason": "Capability named staged but text mandates simultaneous global rollout, removing the canary gate; contradicts the name and release-criteria oracle. Reword is sound."
+ },
+ {
+  "id": "K-TEST-13",
+  "fact_holds": true,
+  "material": true,
+  "severity_ok": false,
+  "checked": "capabilities.json QA.RENDER.*, UI.FW.validation, skills.json render-validation",
+  "reason": "No final-present/HDR/text capture exists in QA.RENDER, but UI.FW.validation already covers UI screenshot regression, so 'misses UI' is overstated; residual gap is swapchain/HDR/2D composition, closer to minor."
+ },
+ {
+  "id": "K-TEST-14",
+  "fact_holds": true,
+  "material": true,
+  "severity_ok": true,
+  "checked": "untrusted-inputs.json redteam entries; XC.SEC.agent-redteam",
+  "reason": "CI logs, fuzz reproducers, crash annotations and telemetry are not registered as agent inputs; existing redteam entries do not cover triage. Real injection path into baseline/quarantine changes."
+ },
+ {
+  "id": "K-TEST-15",
+  "fact_holds": true,
+  "material": true,
+  "severity_ok": true,
+  "checked": "contracts.json C-TEST evidence_bundle",
+  "reason": "Bundle lacks holdout, test-integrity diff, baseline change log, double conformance, flake events, provenance; critics need them for the integrity checks. Minor severity is right."
+ },
+ {
+  "id": "K-TEST-16",
+  "fact_holds": true,
+  "material": true,
+  "severity_ok": true,
+  "checked": "capabilities.json ARCH.ORG.critic-calibration, QA.AGENT.gate-canaries, ARCH.ORG.human-gates",
+  "reason": "Text says below-threshold critics 'stop counting as gates' with no replacement or blocking rule, so gates fail open. Fail-closed with human interim sign-off is sound."
+ },
+ {
+  "id": "K-TEST-17",
+  "fact_holds": true,
+  "material": true,
+  "severity_ok": true,
+  "checked": "capabilities.json QA.AGENT.*; radar.json 'Validation of autonomous-agent development'; docs/06 A13; check.py radar rules",
+  "reason": "holdout and oracle-change-control are E though A13 admits little evidence, and radar lists only 4 of 7 QA.AGENT caps. Re-marking to M plus radar addition satisfies check.py rules."
+ }
+]
