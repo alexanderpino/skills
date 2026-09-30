@@ -2,17 +2,6 @@
  "_doc": "Technology radar. Every non-established capability must appear here with owner, evidence, revisit trigger and fallback; non-goals are recorded explicitly. Owned by architecture-governance (ARCH.GOV.radar).",
  "entries": [
   {
-   "tech": "Cloud game streaming targets",
-   "class": "M",
-   "capabilities": [
-    "PLAT.PAL.cloud-streaming"
-   ],
-   "owner": "platform-architect",
-   "evidence": "Shipping services (GeForce NOW, xCloud) — platform docs",
-   "revisit": "Second streaming platform requiring engine-side encode/latency hooks",
-   "fallback": "Treat as a PC target"
-  },
-  {
    "tech": "Cloud-hybrid compute (split client/cloud simulation)",
    "class": "X",
    "capabilities": [
@@ -626,12 +615,12 @@
   },
   {
    "tech": "GLES / WebGL backends",
-   "class": "S",
+   "class": "E",
    "capabilities": [],
    "owner": "gpu-platform-architect",
    "non_goal": true,
    "evidence": "Vulkan/WebGPU coverage of the target device base (device DB share)",
-   "revisit": "Device DB shows >10% of a shipping configuration's audience without Vulkan/WebGPU"
+   "revisit": "Browser-capability share from web analytics/portal SDKs (measured by platform-web) shows >10% of a shipping web audience without WebGPU"
   },
   {
    "tech": "L4S low-latency congestion signalling",

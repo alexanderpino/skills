@@ -390,7 +390,7 @@
    "default_stance": "Asynchronous, cancellable editor jobs with progress",
    "justification_owner": "editor-architect",
    "stance_capabilities": [
-    "ED.ARCH.process"
+    "ED.ARCH.async-jobs"
    ]
   },
   {

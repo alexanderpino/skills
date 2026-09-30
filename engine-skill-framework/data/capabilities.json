@@ -39,7 +39,7 @@
       ],
       [
        "ARCH.REQ.platform-matrix",
-       "Supported-target matrix (OS × ISA × GPU API × store × support tier)",
+       "Platform matrix (OS × ISA × API × store) generated from skills.json platform_variants and implementer variants",
        "engine-architect",
        "E",
        [
@@ -548,7 +548,8 @@
         "async-io-storage",
         "rhi-core",
         "frame-orchestration",
-        "network-transport"
+        "network-transport",
+        "platform-web"
        ]
       ],
       [
@@ -559,9 +560,15 @@
       ],
       [
        "PLAT.PAL.cloud-streaming",
-       "Cloud-streaming targets (latency, encode, input)",
+       "Cloud-streaming policy (session detection, latency budget, device-kind changes); platform work in PLAT.CON/DESK.cloud-streaming",
        "platform-architect",
-       "M"
+       "E",
+       [
+        "input-system",
+        "ui-architect",
+        "runtime-scalability",
+        "frame-orchestration"
+       ]
       ],
       [
        "PLAT.PAL.base",
@@ -727,13 +734,14 @@
       ],
       [
        "PLAT.PAL.display",
-       "Display enumeration, modes, DPI, HDR & VRR capability",
+       "Display enumeration, modes, DPI, HDR & VRR capability, dynamic HDR/EDR headroom events",
        "platform-architect",
        "E",
        [
         "platform-desktop",
         "platform-console",
-        "platform-mobile"
+        "platform-mobile",
+        "post-color-hdr"
        ]
       ],
       [
@@ -800,6 +808,15 @@
        [
         "platform-architect"
        ]
+      ],
+      [
+       "PLAT.DESK.cloud-streaming",
+       "PC-build cloud streaming (touch-overlay controls, UI-scale tier)",
+       "platform-desktop",
+       "E",
+       [
+        "input-system"
+       ]
       ]
      ]
     },
@@ -857,7 +874,7 @@
       ],
       [
        "PLAT.CON.confidential-slots",
-       "Confidential implementations of registered slots (IO/decompression units, audio endpoints, save storage, crash upload, system keyboard, entitlement SDK, console XR SDK) behind public interfaces owned by domain skills",
+       "Confidential implementations of registered slots (IO/decompression units, audio endpoints, save storage, crash upload, system keyboard/IME/TTS bridge, entitlement SDK, console pad & adaptive-trigger libraries, sockets/relay, console XR SDK) behind public interfaces owned by domain skills",
        "platform-console",
        "E",
        [
@@ -866,8 +883,17 @@
         "persistence-save",
         "crash-diagnostics",
         "text-fonts",
-        "xr-runtime"
+        "xr-runtime",
+        "input-devices-haptics",
+        "network-transport",
+        "accessibility"
        ]
+      ],
+      [
+       "PLAT.CON.cloud-streaming",
+       "Console-build cloud streaming (streamed console titles)",
+       "platform-console",
+       "E"
       ]
      ]
     },
@@ -908,7 +934,7 @@
       ],
       [
        "PLAT.MOB.frame-pacing",
-       "Mobile frame pacing & refresh-rate selection",
+       "Mobile present-rate/pacing backends implementing C-PRESENT/C-PAL (selection policy in CORE.SCALE.actuators)",
        "platform-mobile",
        "E"
       ],
@@ -932,6 +958,12 @@
        [
         "platform-architect"
        ]
+      ],
+      [
+       "PLAT.MOB.windowing",
+       "Resizable/multi-window mobile apps (iPadOS windowing, foldable posture, ChromeOS/desktop modes)",
+       "platform-mobile",
+       "E"
       ]
      ]
     },
@@ -1271,6 +1303,16 @@
        [
         "privacy-data-protection"
        ]
+      ],
+      [
+       "PLAT.XR.editor-preview",
+       "XR authoring: play-in-headset, device simulator, in-headset editing, passthrough/anchor/scene-mesh preview",
+       "xr-runtime",
+       "E",
+       [
+        "editor-architect",
+        "world-editor-viewport"
+       ]
       ]
      ]
     },
@@ -1340,6 +1382,15 @@
        [],
        [
         "experimental"
+       ]
+      ],
+      [
+       "PLAT.WEB.audience-share",
+       "Browser-capability share measurement (WebGPU, threads, memory) from web analytics and portal SDKs",
+       "platform-web",
+       "E",
+       [
+        "observability-telemetry"
        ]
       ]
      ]
@@ -2397,6 +2448,17 @@
        [
         "security-engineering"
        ]
+      ],
+      [
+       "CORE.SER.commands",
+       "Serializable command/transaction core (schema, apply/invert, journal, merge hooks)",
+       "serialization-schema",
+       "E",
+       [
+        "editor-architect",
+        "modding-ugc",
+        "collaboration-version-control"
+       ]
       ]
      ]
     },
@@ -2948,7 +3010,8 @@
         "ci-cd-automation"
        ],
        [
-        "team-large"
+        "lite3d",
+        "std3d"
        ]
       ],
       [
@@ -2991,6 +3054,16 @@
        "Incremental cook equals clean cook (bit/tolerance per determinism class)",
        "content-pipeline-architect",
        "E"
+      ],
+      [
+       "CNT.COOK.cache-fleet",
+       "Multi-site derived-data cache fleet (replication, eviction, cost)",
+       "content-pipeline-architect",
+       "E",
+       [],
+       [
+        "team-large"
+       ]
       ]
      ]
     },
@@ -3983,7 +4056,8 @@
        "rhi-console",
        "E",
        [
-        "rhi-core"
+        "rhi-core",
+        "rhi-d3d12"
        ]
       ],
       [
@@ -6086,15 +6160,6 @@
        "GPU fluid solvers",
        "fluid-simulation",
        "M"
-      ],
-      [
-       "PHY.FLUID.cellular",
-       "Grid/cellular material & fluid simulation (falling sand, liquid/gas/heat grids), 2D-capable, deterministic",
-       "fluid-simulation",
-       "E",
-       [
-        "physics-2d"
-       ]
       ]
      ]
     },
@@ -6125,6 +6190,15 @@
        "2D collision-shape generation from sprites",
        "physics-2d",
        "E"
+      ],
+      [
+       "PHY.2D.cellular",
+       "Grid/cellular material & fluid simulation (falling sand, liquid/gas/heat grids), 2D-capable, deterministic",
+       "physics-2d",
+       "E",
+       [
+        "fluid-simulation"
+       ]
       ]
      ]
     },
@@ -7261,6 +7335,15 @@
        "Action/context mapping editor & device preview",
        "input-system",
        "E"
+      ],
+      [
+       "INP.TOOL.haptics",
+       "Haptic and trigger-effect authoring with on-controller preview",
+       "input-devices-haptics",
+       "E",
+       [
+        "audio-content-runtime"
+       ]
       ]
      ]
     }
@@ -8009,12 +8092,6 @@
        "E"
       ],
       [
-       "GAM.SYS.tags",
-       "Gameplay tags",
-       "gameplay-systems-toolkit",
-       "E"
-      ],
-      [
        "GAM.SYS.spawning",
        "Spawning (batched, deferred structural changes); pooling only where measured",
        "gameplay-systems-toolkit",
@@ -8529,6 +8606,15 @@
        "Server-delivered data overrides for tunables",
        "gameplay-data",
        "E"
+      ],
+      [
+       "GAM.DATA.tags",
+       "Gameplay tag dictionary, hierarchical tag queries, redirects/renames",
+       "gameplay-data",
+       "E",
+       [
+        "gameplay-systems-toolkit"
+       ]
       ]
      ]
     },
@@ -8621,7 +8707,7 @@
       ],
       [
        "GAM.TOOL.tags-abilities",
-       "Gameplay-tag dictionary, ability & effect authoring",
+       "Ability and effect authoring (tag dictionary editor in GAM.TOOL.data)",
        "gameplay-systems-toolkit",
        "E"
       ],
@@ -9279,7 +9365,9 @@
        "E",
        [
         "dedicated-server",
-        "network-transport"
+        "network-transport",
+        "net-session",
+        "prediction-rollback"
        ],
        [
         "online",
@@ -9307,6 +9395,7 @@
         "loading-streaming-performance"
        ],
        [
+        "team-mid",
         "team-large"
        ]
       ],
@@ -9336,6 +9425,12 @@
        [
         "security-engineering"
        ]
+      ],
+      [
+       "ED.ARCH.async-jobs",
+       "Editor background-job model: progress, cancellation, interaction with open transactions",
+       "editor-architect",
+       "E"
       ]
      ]
     },
@@ -9423,6 +9518,15 @@
        [
         "localization-i18n"
        ]
+      ],
+      [
+       "ED.UI.outliner",
+       "Virtualized scene outliner for 10⁶-object worlds (folders, filtering by data layer/cell)",
+       "editor-ui-framework",
+       "E",
+       [
+        "world-data-model"
+       ]
       ]
      ]
     },
@@ -9457,7 +9561,8 @@
         "world-architect"
        ],
        [
-        "openworld"
+        "lite3d",
+        "std3d"
        ]
       ],
       [
@@ -9581,6 +9686,7 @@
        "E",
        [],
        [
+        "team-mid",
         "team-large"
        ]
       ],
@@ -9644,6 +9750,20 @@
        "E",
        [],
        [
+        "team-large"
+       ]
+      ],
+      [
+       "ED.COLLAB.session-server",
+       "Collaboration session server: transport, auth via XC.SEC.dev-trust access classes, journal persistence, late join, presence and lock broadcast",
+       "collaboration-version-control",
+       "E",
+       [
+        "network-transport",
+        "security-engineering"
+       ],
+       [
+        "team-mid",
         "team-large"
        ]
       ]
@@ -10884,7 +11004,7 @@
       ],
       [
        "PRF.BENCH.regression",
-       "Regression detection & bisection",
+       "Regression detection (bisection via BLD.CI.bisection)",
        "perf-benchmarking",
        "E",
        [

@@ -270,10 +270,14 @@ def run(m):
                     for p in m.platform_set(name):
                         if c.get("platforms") and p not in c["platforms"]:
                             continue
-                        if not any(cid in m.skill(x)["implements"] and (m.skill(x)["platforms"] is None
-                                   or p in m.skill(x)["platforms"]) for x in members):
-                            E(f"configuration '{name}': {cid} is required but no implementer for platform '{p}' "
-                              f"is in the configuration")
+                        for v in (m.doc_variants.get(p) or [None]):
+                            key = f"{p}:{v}" if v else None
+                            if not any(cid in m.skill(x)["implements"] and (m.skill(x)["platforms"] is None
+                                       or p in m.skill(x)["platforms"]) and
+                                       (key is None or m.skill(x).get("variants") is None
+                                        or key in m.skill(x)["variants"]) for x in members):
+                                E(f"configuration '{name}': {cid} is required but no implementer for platform "
+                                  f"'{p}'" + (f" variant '{v}'" if v else "") + " is in the configuration")
         ncap = sum(1 for cid in m.caps if m.cap_in_configuration(cid, name))
         I(f"configuration {name:34s} {len(members):3d} build skills, {ncap:3d} capabilities")
 
@@ -648,7 +652,7 @@ TOOL_SIDE_EXEMPT = {
 }
 CONFIDENTIAL = re.compile(r"confidential|console (API|SDK)", re.I)
 CONFIDENTIAL_EXEMPT = {"PLAT.PAL.confidential-extensions"}   # the mechanism, owned by the public platform lead
-AUTHORING_WORKSTREAMS = {"world", "simulation", "audio", "ui", "gameplay"}
+AUTHORING_WORKSTREAMS = {"world", "simulation", "audio", "ui", "gameplay", "platform"}
 
 PLATFORM_AREAS = {"PLAT.CON": "console", "PLAT.MOB": "mobile", "PLAT.WEB": "web", "PLAT.DESK": "pc",
                   "PLAT.SRV": "server-host"}

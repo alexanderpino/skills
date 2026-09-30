@@ -92,7 +92,7 @@
    "layer": 1,
    "owner": "containers-core-types",
    "name": "Core types & containers",
-   "summary": "Containers, strings, versioned stable hashing, general-purpose compression codecs, vetted hashinggraphic primitives wrapper, ownership/view types.",
+   "summary": "Containers, strings, versioned stable hashing, general-purpose compression codecs, hashing, ownership/view types.",
    "requires": [
     "C-MEM"
    ],
@@ -686,7 +686,8 @@
    "requires": [
     "C-REFL",
     "C-SER",
-    "C-IPC"
+    "C-IPC",
+    "C-CMD"
    ],
    "conformance": true,
    "oracle_author": "functional-automation-soak"
@@ -1060,7 +1061,7 @@
    "id": "C-NETLINK",
    "layer": 2,
    "owner": "network-transport",
-   "name": "Network links & sessions",
+   "name": "Network links & channels",
    "summary": "Sessions, channels, reliability/ordering classes, send budgets, link statistics, connection events; used by replication, voice, rollback input exchange and telemetry streams; platform-SDK transports (Steam/EOS/console relays) register as backends implemented by platform-services and online-services-liveops.",
    "requires": [
     "C-PAL",
@@ -1240,7 +1241,7 @@
    "layer": "P",
    "owner": "certification-compliance",
    "name": "External requirements register",
-   "summary": "Register of external requirements per program (console cert, Steam Deck Verified, store review, law) each mapped to an owning capability; owners must satisfy their entries.",
+   "summary": "Register of external requirements per program (console cert, Steam Deck Verified, store review, law) each mapped to an owning capability; owners must satisfy their entries; the shared register is public: id, owner capability and a sanitized paraphrase; holder-specific TRC text lives only in per-holder confidential partitions under PLAT.CON.confidential-slots and is never published through the shared register.",
    "requires": [],
    "universal": "all"
   },
@@ -1479,11 +1480,12 @@
    "layer": 4,
    "owner": "modding-ugc",
    "name": "Runtime edit session",
-   "summary": "In-game creation sessions: serializable commands (schema shared with C-EDCMD per ED.ARCH.transactions), undo, selection, permissions and per-creation budgets, publish/version; runtime graph authoring and compilation (XC.EXT.runtime-graphs; node/pin schema shared with C-GRAPH).",
+   "summary": "In-game creation sessions: serializable commands (schema shared with C-EDCMD per ED.ARCH.transactions), undo, selection, permissions and per-creation budgets, publish/version; runtime graph authoring and compilation (XC.EXT.runtime-graphs; node/pin schema shared with C-GRAPH); command schema from C-CMD.",
    "requires": [
     "C-SER",
     "C-ID",
-    "C-FRAME"
+    "C-FRAME",
+    "C-CMD"
    ],
    "conformance": true,
    "oracle_author": "functional-automation-soak"
@@ -1544,7 +1546,7 @@
    "layer": 4,
    "owner": "gameplay-systems-toolkit",
    "name": "Abilities, effects & attributes",
-   "summary": "Ability activation, effects, attributes, tag queries, gameplay messages, hit results; marker registry (POIs) published to C-UI marker sources.",
+   "summary": "Ability activation, effects, attributes, gameplay messages, hit results; marker registry (POIs) published to C-UI marker sources.",
    "requires": [
     "C-GAME",
     "C-GAMEDATA"
@@ -1583,13 +1585,27 @@
    "layer": 4,
    "owner": "ai-behavior-perception",
    "name": "AI agents",
-   "summary": "Brain assignment (behavior/state trees, utility, HTN), perception stimulus sources, smart-object claim/release, environment query service; learned/LLM providers plug in through C-AIAGENT; per-faction visibility and explored-state queries; the visibility field is published to fog rendering and maps through a declared C-FLOW channel.",
+   "summary": "Brain assignment (behavior/state trees, utility, HTN), perception stimulus sources, smart-object claim/release, environment query service; learned/LLM providers plug in through C-AIAGENT; per-faction visibility and explored-state queries; the visibility field is published to fog rendering and maps through a declared C-FLOW channel; tactical/environment queries (EQS class), not world queries (C-ENV).",
    "requires": [
     "C-GAME",
     "C-NAV"
    ],
    "conformance": true,
    "oracle_author": "simulation-validation"
+  },
+  {
+   "id": "C-CMD",
+   "layer": 2,
+   "owner": "serialization-schema",
+   "name": "Command & transaction core",
+   "summary": "Serializable diff-based commands, apply/invert, transaction batching, journal and merge hooks; the schema shared by the editor (C-EDCMD) and runtime edit sessions (C-EDIT).",
+   "requires": [
+    "C-SER",
+    "C-REFL",
+    "C-ID"
+   ],
+   "conformance": true,
+   "oracle_author": "functional-automation-soak"
   }
  ]
 }

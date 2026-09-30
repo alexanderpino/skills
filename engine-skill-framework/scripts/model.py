@@ -39,6 +39,7 @@ class Model:
         self.radar_doc = _load("radar.json") if os.path.exists(os.path.join(DATA, "radar.json")) else {"entries": []}
         self.legacy_doc = _load("legacy-patterns.json") if os.path.exists(os.path.join(DATA, "legacy-patterns.json")) else {"patterns": []}
         self.milestone_doc = _load("milestones.json") if os.path.exists(os.path.join(DATA, "milestones.json")) else {"milestones": []}
+        self.doc_variants = self.skill_doc.get("platform_variants", {})
         self.org_doc = _load("organizations.json") if os.path.exists(os.path.join(DATA, "organizations.json")) else {"tiers": {}}
         self.untrusted_doc = _load("untrusted-inputs.json") if os.path.exists(os.path.join(DATA, "untrusted-inputs.json")) else {"inputs": []}
         self.reindex()

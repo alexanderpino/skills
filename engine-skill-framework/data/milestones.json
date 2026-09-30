@@ -47,7 +47,8 @@
     "spatial-transforms",
     "test-runtime-harness",
     "text-fonts",
-    "texture-streaming-vt"
+    "texture-streaming-vt",
+    "visual-debugging-tools"
    ],
    "exit": "Boots on one PC platform, runs the task graph, opens a window, presents through the RHI, reads input, draws a sprite and text, loads one cooked and signed asset from a package, passes CI with sanitizer, fuzz (package/serialization parsers) and determinism smoke lanes. Perf: trace capture and the C-BENCH runner on the skeleton; C-BUDGET v0 for indie-2d tiers; CI perf lane (frame time, startup, memory).",
    "gates": [
@@ -70,11 +71,14 @@
    ],
    "contracts_draft": [
     "C-ASSET",
+    "C-AUTOMATION",
     "C-BUILD",
+    "C-CMD",
     "C-COLOR",
     "C-COOK",
     "C-DET",
     "C-DEVICE",
+    "C-DEVUI",
     "C-DRAW2D",
     "C-FLOW",
     "C-FRAME",
@@ -181,7 +185,6 @@
     "scripting-runtime",
     "ui-architect",
     "vfx-particles",
-    "visual-debugging-tools",
     "world-architect",
     "world-data-model"
    ],
@@ -219,8 +222,6 @@
     "C-AIAGENT",
     "C-ANIM",
     "C-AUDIO",
-    "C-AUTOMATION",
-    "C-DEVUI",
     "C-DIALOGUE",
     "C-ECS",
     "C-ENV",
@@ -344,6 +345,7 @@
     "C-AUDIO",
     "C-BENCH",
     "C-CERT",
+    "C-CMD",
     "C-DIALOGUE",
     "C-ECS",
     "C-GAME",
@@ -454,6 +456,7 @@
     "online-3d-console-client",
     "coop-3d-listen-client",
     "lite-3d-mobile-online-client",
+    "standard-3d-team-tools",
     "indie-2d-online-web-client",
     "indie-2d-online-moddable-client",
     "indie-2d-online-moddable-server",

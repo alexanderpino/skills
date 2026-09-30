@@ -47,7 +47,7 @@ LADDER = [
      ["QA.RENDER.reference-validation", "RND.SHADER.pso-lists", "CORE.SCALE.governor", "XC.ITER.metrics",
       "PRF.GPU.baselines", "PRF.METH.pipeline-budgets"]),
     ("M4", "Online", ["online-3d-server", "online-3d-client", "online-3d-bot-client", "online-3d-tools",
-                      "online-3d-console-client", "coop-3d-listen-client", "lite-3d-mobile-online-client",
+                      "online-3d-console-client", "coop-3d-listen-client", "lite-3d-mobile-online-client", "standard-3d-team-tools",
                       "indie-2d-online-web-client", "indie-2d-online-moddable-client",
                       "indie-2d-online-moddable-server", "rts-2d-massim-client"],
      "Online reference games per netcode family: dedicated-server shooter with prediction and lag compensation, "

@@ -416,6 +416,42 @@
    "trust": "agent-input",
    "mode": "redteam",
    "limits": "workspace trust"
+  },
+  {
+   "id": "project-tool-code",
+   "validating_owner": "editor-architect",
+   "parser_owners": [
+    "plugin-system"
+   ],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "no execution before workspace-trust grant; per-command permission classes"
+  },
+  {
+   "id": "device-db-updates",
+   "validating_owner": "platform-architect",
+   "parser_owners": [],
+   "trust": "semi-trusted-signed",
+   "mode": "harness",
+   "limits": "schema/rollback/staged rollout"
+  },
+  {
+   "id": "push-payloads",
+   "validating_owner": "platform-mobile",
+   "parser_owners": [],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "length/schema"
+  },
+  {
+   "id": "clipboard-dragdrop",
+   "validating_owner": "platform-architect",
+   "parser_owners": [
+    "editor-ui-framework"
+   ],
+   "trust": "hostile-local",
+   "mode": "harness",
+   "limits": "size/type allow-list"
   }
  ]
 }

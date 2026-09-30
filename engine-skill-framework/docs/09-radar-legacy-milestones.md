@@ -10,13 +10,12 @@ Every non-established capability is on the radar with an owner, evidence, a revi
 |---|---|---|---|---|---|---|
 | Eye tracking as desktop input | established | input-devices-haptics | `INP.DEV.eye-tracking` | Tobii Game Integration SDK | n/a (established) | — |
 | Backend service implementation | established | engine-architect | non-goal | Scope decision | Engine becomes a service platform | — |
+| GLES / WebGL backends | established | gpu-platform-architect | non-goal | Vulkan/WebGPU coverage of the target device base (device DB share) | Browser-capability share from web analytics/portal SDKs (measured by platform-web) shows >10% of a shipping web audience without WebGPU | — |
 | RISC-V targets | speculative | platform-architect | non-goal | RVV 1.0 spec; no game hardware | A target console/PC ships on RISC-V | — |
 | Brain-computer input | speculative | input-devices-haptics | non-goal | Research only (OpenBCI/Galea) | Consumer device with SDK | — |
 | CXL memory tiers | speculative | memory-allocators | non-goal | Server-only hardware | Client/console hardware exposes tiered memory | — |
 | Linked/AFR multi-GPU rendering | speculative | gpu-platform-architect | non-goal | Vendor support withdrawn | Vendor re-investment | — |
-| GLES / WebGL backends | speculative | gpu-platform-architect | non-goal | Vulkan/WebGPU coverage of the target device base (device DB share) | Device DB shows >10% of a shipping configuration's audience without Vulkan/WebGPU | — |
 | Generative world models as renderer/simulator | speculative | render-architect | non-goal | Genie 3, Muse/WHAM (2025) research | Controllable, deterministic model at interactive rates on consumer hardware | — |
-| Cloud game streaming targets | emerging | platform-architect | `PLAT.PAL.cloud-streaming` | Shipping services (GeForce NOW, xCloud) — platform docs | Second streaming platform requiring engine-side encode/latency hooks | Treat as a PC target |
 | ECS relationships | emerging | ecs-runtime | `CORE.ECS.relationships` | Flecs relationships; Bevy relations work | Benchmarks on engine entity mixes show query cost acceptable | Component references + explicit indices |
 | C++26 static reflection | emerging | reflection-metadata | `CORE.REFL.generation` | P2996 adopted for C++26 | C++26 reflection available on every platform compiler | Code generation |
 | Memory-safe language components | emerging | core-runtime-architect | `CORE.LIFE.interop` | Android Rust adoption data; CISA/NSA roadmap guidance | Console toolchain support for chosen language | Hardened C++ subset + fuzzing |
@@ -145,7 +144,7 @@ A pattern is not forbidden. If it appears, the justification owner must record a
 | L34 | Global shared RNG used from parallel tasks | one generator object shared by jobs | Counter-based / per-stream RNG for parallel determinism | math-simd-numerics | `CORE.MATH.random` |
 | L35 | Stringly-typed or polling UI binding | property paths resolved and evaluated every frame | Change-notified view models with resolved bindings | ui-architect | `UI.FW.architecture`, `UI.FW.logic` |
 | L36 | Per-body sync callbacks & mid-step world mutation | O(bodies) transform write-back; queries mid-step | Active-set/change-set output, batched queries, deferred commands | physics-architect | `PHY.ARCH.events`, `PHY.ARCH.async` |
-| L37 | Modal, blocking editor operations | synchronous import/save/compile/bake on the editor UI thread | Asynchronous, cancellable editor jobs with progress | editor-architect | `ED.ARCH.process` |
+| L37 | Modal, blocking editor operations | synchronous import/save/compile/bake on the editor UI thread | Asynchronous, cancellable editor jobs with progress | editor-architect | `ED.ARCH.async-jobs` |
 | L38 | Snapshot-based undo | whole-object serialization per transaction | Serializable, diff-based commands | editor-architect | `ED.ARCH.transactions` |
 | L39 | Monolithic binary scene/asset files | one binary level file edited by exclusive lock | One-file-per-object layout with semantic merge | world-data-model | `WLD.MODEL.file-per-object` |
 | L40 | Editor-only data fields in runtime types | editor fields compiled into runtime structs | Editor/runtime data separation | editor-architect | `ED.ARCH.separation` |
@@ -221,12 +220,16 @@ Every input class has exactly one validating owner; parser owners register it to
 | vuln-reports | security-engineering | — | agent-input | redteam | quarantined as data |
 | third-party-source | build-system-toolchains | — | agent-input | redteam | pinned/verified |
 | project-content-to-llm | ai-assisted-authoring | — | agent-input | redteam | workspace trust |
+| project-tool-code | editor-architect | plugin-system | hostile-local | harness | no execution before workspace-trust grant; per-command permission classes |
+| device-db-updates | platform-architect | — | semi-trusted-signed | harness | schema/rollback/staged rollout |
+| push-payloads | platform-mobile | — | hostile-remote | harness | length/schema |
+| clipboard-dragdrop | platform-architect | editor-ui-framework | hostile-local | harness | size/type allow-list |
 
 ## Milestones (walking skeleton → engine 1.0)
 
 `check.py` proves: each milestone is closed over its own and earlier milestones' build skills; every configuration a milestone claims (optionally restricted to platforms, `name@pc`) has all its member skills built by then; every configuration is claimed in full exactly once; every build skill sits in exactly one milestone; every code contract is frozen exactly once, after its owner and at least one consumer exist and never before the contracts it requires; gates name existing capabilities.
 
-### M0 · Walking skeleton (42 new build skills)
+### M0 · Walking skeleton (43 new build skills)
 
 **Configurations proven:** — (skeleton / release)
 
@@ -236,11 +239,11 @@ Every input class has exactly one validating owner; parser owners register it to
 
 **Contracts frozen:** C-ADR, C-ARCH, C-BASE, C-BUDGET, C-CFG, C-CRASH, C-ERR, C-INSTR, C-LIFETIME, C-MATH, C-MEM, C-MOD, C-ORCH, C-SCALE, C-SIGN, C-SYNC, C-TASK, C-TEST, C-TESTHOST, C-TYPES
 
-**Contracts drafted:** C-ASSET, C-BUILD, C-COLOR, C-COOK, C-DET, C-DEVICE, C-DRAW2D, C-FLOW, C-FRAME, C-GOVERN, C-GPUMEM, C-GPUTIER, C-ID, C-INPUT, C-IO, C-IPC, C-LIGHTENV, C-MATIF, C-PAL, C-PRESENT, C-REFL, C-REPLAY, C-RES, C-RG, C-RHI, C-RSCENE, C-SCENETEX, C-SER, C-SHADER, C-SNAPSHOT, C-SPATIAL, C-TARGETPLAT, C-TEMPORAL, C-TEXT, C-TRUST, C-VFS, C-VIEW, C-VT
+**Contracts drafted:** C-ASSET, C-AUTOMATION, C-BUILD, C-CMD, C-COLOR, C-COOK, C-DET, C-DEVICE, C-DEVUI, C-DRAW2D, C-FLOW, C-FRAME, C-GOVERN, C-GPUMEM, C-GPUTIER, C-ID, C-INPUT, C-IO, C-IPC, C-LIGHTENV, C-MATIF, C-PAL, C-PRESENT, C-REFL, C-REPLAY, C-RES, C-RG, C-RHI, C-RSCENE, C-SCENETEX, C-SER, C-SHADER, C-SNAPSHOT, C-SPATIAL, C-TARGETPLAT, C-TEMPORAL, C-TEXT, C-TRUST, C-VFS, C-VIEW, C-VT
 
-Skills: asset-cook-processors, asset-import-interchange, async-io-storage, build-system-toolchains, ci-cd-automation, concurrency-primitives, containers-core-types, content-pipeline-architect, core-runtime-architect, crash-diagnostics, determinism-replay, entity-object-model, frame-orchestration, gpu-memory-resources, gpu-platform-architect, input-devices-haptics, input-system, job-system-task-graph, material-system, math-simd-numerics, memory-allocators, observability-telemetry, package-formats-vfs, platform-architect, platform-desktop, post-color-hdr, reconstruction-upscaling, reflection-metadata, render-2d-vector, render-architect, render-graph-scheduling, resource-streaming-architect, rhi-core, rhi-vulkan, runtime-scalability, security-runtime, serialization-schema, shader-system, spatial-transforms, test-runtime-harness, text-fonts, texture-streaming-vt
+Skills: asset-cook-processors, asset-import-interchange, async-io-storage, build-system-toolchains, ci-cd-automation, concurrency-primitives, containers-core-types, content-pipeline-architect, core-runtime-architect, crash-diagnostics, determinism-replay, entity-object-model, frame-orchestration, gpu-memory-resources, gpu-platform-architect, input-devices-haptics, input-system, job-system-task-graph, material-system, math-simd-numerics, memory-allocators, observability-telemetry, package-formats-vfs, platform-architect, platform-desktop, post-color-hdr, reconstruction-upscaling, reflection-metadata, render-2d-vector, render-architect, render-graph-scheduling, resource-streaming-architect, rhi-core, rhi-vulkan, runtime-scalability, security-runtime, serialization-schema, shader-system, spatial-transforms, test-runtime-harness, text-fonts, texture-streaming-vt, visual-debugging-tools
 
-### M1 · Indie 2D slice on PC (45 new build skills)
+### M1 · Indie 2D slice on PC (44 new build skills)
 
 **Configurations proven:** `indie-2d-client@pc`, `minimal-client@pc`
 
@@ -250,9 +253,9 @@ Skills: asset-cook-processors, asset-import-interchange, async-io-storage, build
 
 **Contracts frozen:** C-API, C-ASSET, C-BUILD, C-COOK, C-DET, C-EVID, C-FLOW, C-FRAME, C-ID, C-INPUT, C-PERF, C-PRESENT, C-REFL, C-REPLAY, C-SER, C-SNAPSHOT, C-SPATIAL, C-TEXT, C-TRUST, C-VIEW
 
-**Contracts drafted:** C-A11YRT, C-ABILITY, C-AI, C-AIAGENT, C-ANIM, C-AUDIO, C-AUTOMATION, C-DEVUI, C-DIALOGUE, C-ECS, C-ENV, C-GAME, C-GAMEDATA, C-INTEGRITY, C-LIVE, C-LOC, C-ML, C-MLGPU, C-MOVE, C-NAV, C-NET, C-NETLINK, C-NETSESSION, C-PCG, C-PHYS, C-PKG, C-PLUGIN, C-PREDICT, C-RELOAD, C-REP, C-SAVE, C-SCRIPT, C-SEQ, C-SIGNIF, C-SVC, C-UI, C-VIDEO, C-WORLD
+**Contracts drafted:** C-A11YRT, C-ABILITY, C-AI, C-AIAGENT, C-ANIM, C-AUDIO, C-DIALOGUE, C-ECS, C-ENV, C-GAME, C-GAMEDATA, C-INTEGRITY, C-LIVE, C-LOC, C-ML, C-MLGPU, C-MOVE, C-NAV, C-NET, C-NETLINK, C-NETSESSION, C-PCG, C-PHYS, C-PKG, C-PLUGIN, C-PREDICT, C-RELOAD, C-REP, C-SAVE, C-SCRIPT, C-SEQ, C-SIGNIF, C-SVC, C-UI, C-VIDEO, C-WORLD
 
-Skills: accessibility, ai-behavior-perception, animation-architect, animation-graphs, animation-runtime, anti-cheat-integrity, audio-architect, audio-content-runtime, audio-dsp-mixing, character-movement, cinematics-sequencer, ecs-runtime, gameplay-architect, gameplay-camera, gameplay-data, gameplay-systems-toolkit, hot-reload-iteration, ik-procedural-animation, localization-i18n, media-playback, ml-inference-runtime, narrative-dialogue, navigation-pathfinding, net-session, network-architect, network-transport, online-services-liveops, packaging-release-patching, persistence-save, physics-2d, physics-architect, platform-services, plugin-system, prediction-rollback, procedural-generation, reference-games, replication, rhi-d3d12, rhi-metal, scripting-runtime, ui-architect, vfx-particles, visual-debugging-tools, world-architect, world-data-model
+Skills: accessibility, ai-behavior-perception, animation-architect, animation-graphs, animation-runtime, anti-cheat-integrity, audio-architect, audio-content-runtime, audio-dsp-mixing, character-movement, cinematics-sequencer, ecs-runtime, gameplay-architect, gameplay-camera, gameplay-data, gameplay-systems-toolkit, hot-reload-iteration, ik-procedural-animation, localization-i18n, media-playback, ml-inference-runtime, narrative-dialogue, navigation-pathfinding, net-session, network-architect, network-transport, online-services-liveops, packaging-release-patching, persistence-save, physics-2d, physics-architect, platform-services, plugin-system, prediction-rollback, procedural-generation, reference-games, replication, rhi-d3d12, rhi-metal, scripting-runtime, ui-architect, vfx-particles, world-architect, world-data-model
 
 ### M2 · Indie 2D ships everywhere, with tools (14 new build skills)
 
@@ -262,7 +265,7 @@ Skills: accessibility, ai-behavior-perception, animation-architect, animation-gr
 
 **Gates (capability → independent validator):** `QA.CERT.prechecks` → `QA.STRAT.release-criteria`, `ED.COLLAB.vcs` → `QA.FUNC.editor`, `NET.PRED.rollback` → `QA.SIM.netsim`, `GAM.FW.local-players` → `QA.FUNC.automation`, `PRF.MEM.footprint` → `QA.FUNC.soak`, `PRF.LOAD.pacing-latency` → `PRF.BENCH.stats`
 
-**Contracts frozen:** C-A11YRT, C-ABILITY, C-ANIM, C-AUDIO, C-BENCH, C-CERT, C-DIALOGUE, C-ECS, C-GAME, C-GAMEDATA, C-INTEGRITY, C-LOC, C-NET, C-PLUGIN, C-PROD, C-RELEASE, C-SAVE, C-SCRIPT, C-SEQ, C-SIGNIF
+**Contracts frozen:** C-A11YRT, C-ABILITY, C-ANIM, C-AUDIO, C-BENCH, C-CERT, C-CMD, C-DIALOGUE, C-ECS, C-GAME, C-GAMEDATA, C-INTEGRITY, C-LOC, C-NET, C-PLUGIN, C-PROD, C-RELEASE, C-SAVE, C-SCRIPT, C-SEQ, C-SIGNIF
 
 **Contracts drafted:** C-EDCMD, C-EDHOST, C-EDVIEW, C-GRAPH, C-VCS
 
@@ -284,7 +287,7 @@ Skills: atmosphere-weather, character-physics, character-rendering, cloth-deform
 
 ### M4 · Online (5 new build skills)
 
-**Configurations proven:** `online-3d-server`, `online-3d-client`, `online-3d-bot-client`, `online-3d-tools`, `online-3d-console-client`, `coop-3d-listen-client`, `lite-3d-mobile-online-client`, `indie-2d-online-web-client`, `indie-2d-online-moddable-client`, `indie-2d-online-moddable-server`, `rts-2d-massim-client`
+**Configurations proven:** `online-3d-server`, `online-3d-client`, `online-3d-bot-client`, `online-3d-tools`, `online-3d-console-client`, `coop-3d-listen-client`, `lite-3d-mobile-online-client`, `standard-3d-team-tools`, `indie-2d-online-web-client`, `indie-2d-online-moddable-client`, `indie-2d-online-moddable-server`, `rts-2d-massim-client`
 
 **Exit criteria:** Online reference games per netcode family: dedicated-server shooter with prediction and lag compensation, listen-server co-op, desync-free 2 h lockstep soak, web transports; bot load test; packet/handshake fuzzing, DoS test, server-authority review and external pen test (human gate); patch + DLC + staged rollout + rollback executed on the online reference game. Perf: bandwidth per player and server density within budget.
 

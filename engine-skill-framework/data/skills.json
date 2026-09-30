@@ -20,7 +20,8 @@
    "online-lockstep": "Deterministic lockstep command networking (RTS, sims)",
    "online-rollback": "Input-exchange rollback networking (fighting, P2P action)",
    "online-async": "Asynchronous / turn-based backend-mediated play (no real-time transport)",
-   "experimental": "Opt-in experimental (X/S) capabilities"
+   "experimental": "Opt-in experimental (X/S) capabilities",
+   "team-mid": "Studios of about 10–150 people (shared DDC, tool telemetry, small-session multi-user)"
   }
  },
  "configurations": {
@@ -421,6 +422,22 @@
    "platforms": [
     "pc"
    ]
+  },
+  "standard-3d-team-tools": {
+   "profiles": [
+    "std3d",
+    "online",
+    "team-mid"
+   ],
+   "target": "tools",
+   "platforms": [
+    "pc"
+   ],
+   "target_platforms": [
+    "pc",
+    "console",
+    "server-host"
+   ]
   }
  },
  "skills": [
@@ -659,7 +676,8 @@
    ],
    "consumes": [
     "C-INSTR",
-    "C-BUDGET"
+    "C-BUDGET",
+    "C-AUTOMATION"
    ],
    "expertise": [
     "benchmark statistics",
@@ -859,7 +877,8 @@
     "C-RHI",
     "C-RSCENE",
     "C-RT?",
-    "C-SCENETEX"
+    "C-SCENETEX",
+    "C-AUTOMATION"
    ],
    "expertise": [
     "image metrics (FLIP, SSIM)",
@@ -895,7 +914,8 @@
    "consumes": [
     "C-GAME?",
     "C-INPUT?",
-    "C-NET?"
+    "C-NET?",
+    "C-AUTOMATION"
    ],
    "expertise": [
     "game automation",
@@ -924,7 +944,7 @@
     ],
     [
      "Fixing parsers",
-     "serialization-schema"
+     "owning-skill"
     ]
    ],
    "provides": [],
@@ -951,6 +971,7 @@
     "browser-bridge",
     "chat-text",
     "client-integrity-reports",
+    "clipboard-dragdrop",
     "cloud-saves",
     "collab-session",
     "config-layers",
@@ -958,6 +979,7 @@
     "dcc-live-link",
     "decompressors",
     "dev-endpoints",
+    "device-db-updates",
     "editor-plugins",
     "fonts",
     "generated-content",
@@ -974,6 +996,8 @@
     "peer-inputs",
     "peer-state-hashes",
     "procedural-asset-eval",
+    "project-tool-code",
+    "push-payloads",
     "remote-config",
     "replays",
     "replicated-state",
@@ -1460,7 +1484,8 @@
    "workstream": "foundation",
    "untrusted_inputs": [
     "editor-plugins",
-    "mods"
+    "mods",
+    "project-tool-code"
    ]
   },
   {
@@ -1491,7 +1516,8 @@
     "C-PLUGIN",
     "C-SVC",
     "C-SIGN",
-    "C-SHADER?"
+    "C-SHADER?",
+    "C-CMD"
    ],
    "expertise": [
     "mod ecosystems",
@@ -1579,7 +1605,7 @@
     ],
     [
      "GPU queue/budget arbitration of C-MLGPU work",
-     "gpu-platform-architect"
+     "render-graph-scheduling"
     ]
    ],
    "provides": [
@@ -2106,7 +2132,8 @@
     ]
    ],
    "provides": [
-    "C-SER"
+    "C-SER",
+    "C-CMD"
    ],
    "consumes": [
     "C-REFL",
@@ -2179,6 +2206,10 @@
    "workstream": "platform",
    "dev_surfaces": [
     "devlink"
+   ],
+   "untrusted_inputs": [
+    "clipboard-dragdrop",
+    "device-db-updates"
    ]
   },
   {
@@ -2227,7 +2258,8 @@
    ],
    "untrusted_inputs": [
     "launch-args"
-   ]
+   ],
+   "authoring": "OS integration has no designer-authored content."
   },
   {
    "id": "platform-console",
@@ -2276,7 +2308,8 @@
    "instances": "one agent per platform-holder family",
    "untrusted_inputs": [
     "launch-args"
-   ]
+   ],
+   "authoring": "Platform integration; content authored in domain editors."
   },
   {
    "id": "platform-mobile",
@@ -2323,8 +2356,10 @@
    ],
    "untrusted_inputs": [
     "invites-deep-links",
-    "launch-args"
-   ]
+    "launch-args",
+    "push-payloads"
+   ],
+   "authoring": "Platform integration; mobile preview via RND.TOOL.scalability-preview."
   },
   {
    "id": "platform-services",
@@ -2382,7 +2417,8 @@
    "untrusted_inputs": [
     "invites-deep-links",
     "service-responses"
-   ]
+   ],
+   "authoring": "Service integration; content authored by the games' tooling."
   },
   {
    "id": "input-system",
@@ -2413,7 +2449,8 @@
     "C-A11Y",
     "C-FLOW",
     "C-A11YRT?",
-    "C-LOC?"
+    "C-LOC?",
+    "C-RELOAD?"
    ],
    "expertise": [
     "input systems",
@@ -2469,7 +2506,10 @@
     "client",
     "tools"
    ],
-   "tool_consumes": [],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
    "implements": [],
    "workstream": "platform"
   },
@@ -2516,9 +2556,13 @@
     "client",
     "tools"
    ],
-   "tool_consumes": [],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDVIEW"
+   ],
    "implements": [],
-   "workstream": "platform"
+   "workstream": "platform",
+   "authoring": "XR content is authored in domain editors; PLAT.XR.editor-preview covers headset preview."
   },
   {
    "id": "content-pipeline-architect",
@@ -3518,7 +3562,8 @@
     "C-ASSET",
     "C-MLGPU?",
     "C-GPUTIER",
-    "C-LIGHTENV?"
+    "C-LIGHTENV?",
+    "C-RELOAD?"
    ],
    "expertise": [
     "PBR",
@@ -3752,7 +3797,7 @@
     "lite3d",
     "std3d"
    ],
-   "purpose": "Indirect lighting across tiers: baked lightmaps, probe volumes, screen-space GI and AO, surface/radiance-cache hybrid GI, ReSTIR GI, reflections, sky lighting, specular occlusion, SDF scene representations.",
+   "purpose": "Indirect lighting across tiers: baked lightmaps, probe volumes, screen-space GI and AO, surface/radiance-cache hybrid GI, ReSTIR GI, reflections, sky lighting, specular occlusion, SDF/software ray queries consumed via C-RTAS.",
    "non_responsibilities": [
     [
      "RT infrastructure",
@@ -4174,7 +4219,8 @@
     "C-COLOR",
     "C-LIGHTENV?",
     "C-TRANSLUCENT?",
-    "C-MATIF"
+    "C-MATIF",
+    "C-RELOAD?"
    ],
    "expertise": [
     "GPU particles",
@@ -4498,7 +4544,7 @@
     "sandbox",
     "massim"
    ],
-   "purpose": "Particle fluids, grid smoke and fire, shallow-water simulation, GPU fluid solvers.",
+   "purpose": "Particle fluids, grid smoke and fire, GPU fluid solvers.",
    "non_responsibilities": [
     [
      "Ocean surface",
@@ -4514,7 +4560,10 @@
     "C-PHYS",
     "C-RG?",
     "C-RSCENE?",
-    "C-ENV?"
+    "C-ENV?",
+    "C-DET",
+    "C-TASK",
+    "C-SNAPSHOT?"
    ],
    "expertise": [
     "SPH/FLIP",
@@ -4653,7 +4702,8 @@
    "provides": [],
    "consumes": [
     "C-ANIM",
-    "C-MATH"
+    "C-MATH",
+    "C-RELOAD?"
    ],
    "expertise": [
     "ACL-class compression",
@@ -4747,7 +4797,8 @@
    ],
    "provides": [],
    "consumes": [
-    "C-ANIM"
+    "C-ANIM",
+    "C-RELOAD?"
    ],
    "expertise": [
     "state machines",
@@ -4939,7 +4990,8 @@
     "C-A11Y",
     "C-ANIM?",
     "C-A11YRT?",
-    "C-SCRIPT?"
+    "C-SCRIPT?",
+    "C-RELOAD?"
    ],
    "expertise": [
     "sequencers",
@@ -5129,7 +5181,8 @@
     "C-ML?",
     "C-A11Y",
     "C-VEHICLE?",
-    "C-A11YRT"
+    "C-A11YRT",
+    "C-RELOAD?"
    ],
    "expertise": [
     "sound design systems",
@@ -5496,7 +5549,7 @@
    "profiles": [
     "all"
    ],
-   "purpose": "Reusable gameplay systems: abilities, effects and attributes, gameplay tags, camera system, batched deferred spawning (pooling only where measured), gameplay message routing, photo mode.",
+   "purpose": "Reusable gameplay systems: abilities, effects and attributes, gameplay tags, batched deferred spawning (pooling only where measured), gameplay message routing.",
    "non_responsibilities": [
     [
      "Generic events",
@@ -5505,6 +5558,10 @@
     [
      "Cinematic cameras",
      "cinematics-sequencer"
+    ],
+    [
+     "Gameplay cameras & photo mode",
+     "gameplay-camera"
     ]
    ],
    "provides": [
@@ -5512,7 +5569,6 @@
    ],
    "consumes": [
     "C-GAME",
-    "C-VIEW",
     "C-PHYS?",
     "C-ANIM?",
     "C-AUDIO?",
@@ -5529,7 +5585,8 @@
     "C-SCRIPT?",
     "C-LOC?",
     "C-DET?",
-    "C-UI?"
+    "C-UI?",
+    "C-VIEW?"
    ],
    "expertise": [
     "ability systems",
@@ -5639,7 +5696,8 @@
     "C-TASK",
     "C-ENV?",
     "C-FRAME",
-    "C-DET?"
+    "C-DET?",
+    "C-RELOAD?"
    ],
    "expertise": [
     "Recast-class navmesh",
@@ -5885,7 +5943,8 @@
     "C-COLOR",
     "C-TRANSLUCENT?",
     "C-SCRIPT?",
-    "C-VIEW"
+    "C-VIEW",
+    "C-RELOAD?"
    ],
    "expertise": [
     "UI frameworks",
@@ -5930,7 +5989,8 @@
     "C-TYPES",
     "C-ASSET",
     "C-A11Y",
-    "C-PAL"
+    "C-PAL",
+    "C-RELOAD?"
    ],
    "expertise": [
     "HarfBuzz",
@@ -5976,7 +6036,8 @@
     "C-ASSET",
     "C-TEXT?",
     "C-VFS?",
-    "C-REFL"
+    "C-REFL",
+    "C-RELOAD?"
    ],
    "expertise": [
     "ICU",
@@ -6035,7 +6096,12 @@
     "C-NET?",
     "C-REP?",
     "C-AUTOMATION",
-    "C-ML?"
+    "C-ML?",
+    "C-CMD",
+    "C-NETSESSION?",
+    "C-NETLINK?",
+    "C-PREDICT?",
+    "C-SERVER?"
    ],
    "expertise": [
     "editor architecture",
@@ -6052,7 +6118,8 @@
    "implements": [],
    "workstream": "tools",
    "untrusted_inputs": [
-    "automation-commands"
+    "automation-commands",
+    "project-tool-code"
    ]
   },
   {
@@ -6101,7 +6168,10 @@
     "C-VCS"
    ],
    "implements": [],
-   "workstream": "tools"
+   "workstream": "tools",
+   "untrusted_inputs": [
+    "clipboard-dragdrop"
+   ]
   },
   {
    "id": "world-editor-viewport",
@@ -6221,7 +6291,10 @@
     "C-EDCMD",
     "C-SER",
     "C-ASSET",
-    "C-RELEASE"
+    "C-RELEASE",
+    "C-NETLINK?",
+    "C-IPC",
+    "C-CMD"
    ],
    "expertise": [
     "Perforce",
@@ -6443,7 +6516,8 @@
    "provides": [],
    "consumes": [
     "C-BUILD",
-    "C-COOK"
+    "C-COOK",
+    "C-AUTOMATION"
    ],
    "expertise": [
     "CI systems",
@@ -6713,7 +6787,11 @@
     "DXGI"
    ],
    "tool_consumes": [],
-   "provides": []
+   "provides": [],
+   "variants": [
+    "pc:win-x64",
+    "pc:win-arm64"
+   ]
   },
   {
    "id": "rhi-vulkan",
@@ -6759,7 +6837,14 @@
     "Android GPU drivers"
    ],
    "tool_consumes": [],
-   "provides": []
+   "provides": [],
+   "variants": [
+    "pc:win-x64",
+    "pc:win-arm64",
+    "pc:linux-steamos",
+    "mobile:android",
+    "xr-standalone:android-xr"
+   ]
   },
   {
    "id": "rhi-metal",
@@ -6804,7 +6889,12 @@
     "Apple GPU families"
    ],
    "tool_consumes": [],
-   "provides": []
+   "provides": [],
+   "variants": [
+    "pc:macos",
+    "mobile:ios",
+    "xr-standalone:visionos"
+   ]
   },
   {
    "id": "rhi-webgpu",
@@ -7090,7 +7180,8 @@
     "C-LIVE?",
     "C-CFG",
     "C-LOC?",
-    "C-DET?"
+    "C-DET?",
+    "C-RELOAD?"
    ],
    "tool_consumes": [
     "C-EDCMD",
@@ -7253,7 +7344,8 @@
    ],
    "untrusted_inputs": [
     "browser-bridge"
-   ]
+   ],
+   "authoring": "Platform integration; web preview via the standard editor play mode."
   },
   {
    "id": "online-services-liveops",
@@ -7311,7 +7403,8 @@
     "generated-content",
     "remote-config",
     "service-responses"
-   ]
+   ],
+   "authoring": "Live-ops configuration is data through C-GAMEDATA tooling."
   },
   {
    "id": "memory-performance",
@@ -7571,7 +7664,8 @@
     "C-BASE"
    ],
    "tool_consumes": [],
-   "provides": []
+   "provides": [],
+   "authoring": "Server-host OS integration; no authored content."
   },
   {
    "id": "rhi-console",
@@ -7604,6 +7698,10 @@
     [
      "Console OS integration",
      "platform-console"
+    ],
+    [
+     "Shared D3D12 code base (Xbox-class backend reuses it)",
+     "rhi-d3d12"
     ]
    ],
    "expertise": [
@@ -7893,7 +7991,8 @@
     "C-GAME",
     "C-PHYS?",
     "C-INPUT?",
-    "C-A11YRT?"
+    "C-A11YRT?",
+    "C-RELOAD?"
    ],
    "tool_consumes": [
     "C-EDCMD",
@@ -7903,5 +8002,25 @@
    "provides": [],
    "implements": []
   }
- ]
+ ],
+ "platform_variants": {
+  "pc": [
+   "win-x64",
+   "win-arm64",
+   "linux-steamos",
+   "macos"
+  ],
+  "mobile": [
+   "ios",
+   "android"
+  ],
+  "xr-standalone": [
+   "android-xr",
+   "visionos"
+  ],
+  "server-host": [
+   "linux-x64",
+   "linux-arm64"
+  ]
+ }
 }

@@ -4,28 +4,28 @@
 
 Everything required to build **and ship** the engine, decomposed as domain → area → capability. Each capability has exactly one owning skill (**bold**); contributors coordinate through the owner's contract. Maturity: unmarked = established production; `emerging` = shipping in some titles, evaluate per ADR; `experimental` = research, never an architectural baseline; `speculative` = watch only.
 
-**1364 capabilities** in 21 domains — 1245 established, 98 emerging, 21 experimental, 0 speculative.
+**1375 capabilities** in 21 domains — 1257 established, 97 emerging, 21 experimental, 0 speculative.
 
 ## Domains
 
 | Domain | Areas | Capabilities |
 |---|---|---|
 | [ARCH · Engine architecture, governance & agent organization](#arch) | 6 | 55 |
-| [PLAT · Platform & hardware abstraction](#plat) | 10 | 106 |
-| [CORE · Core runtime foundations](#core) | 12 | 115 |
+| [PLAT · Platform & hardware abstraction](#plat) | 10 | 111 |
+| [CORE · Core runtime foundations](#core) | 12 | 116 |
 | [RES · Resources, IO, packaging & streaming](#res) | 3 | 26 |
-| [CNT · Asset identity & content pipeline](#cnt) | 4 | 40 |
+| [CNT · Asset identity & content pipeline](#cnt) | 4 | 41 |
 | [WLD · World representation, streaming & environment](#wld) | 7 | 63 |
 | [RND · Rendering](#rnd) | 22 | 219 |
 | [ML · Machine-learning runtime](#ml) | 1 | 11 |
 | [PHY · Physics & simulation](#phy) | 9 | 73 |
 | [ANM · Animation](#anm) | 9 | 58 |
 | [AUD · Audio](#aud) | 5 | 36 |
-| [INP · Input](#inp) | 3 | 28 |
+| [INP · Input](#inp) | 3 | 29 |
 | [NET · Networking & multiplayer](#net) | 7 | 71 |
 | [GAM · Gameplay, scripting, AI & persistence](#gam) | 11 | 100 |
 | [UI · UI, text, localization & accessibility](#ui) | 5 | 52 |
-| [ED · Editor & content tools](#ed) | 7 | 62 |
+| [ED · Editor & content tools](#ed) | 7 | 65 |
 | [BLD · Build, CI/CD & release](#bld) | 3 | 42 |
 | [QA · Testing & validation](#qa) | 9 | 72 |
 | [PRF · Performance engineering](#prf) | 7 | 41 |
@@ -42,7 +42,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `ARCH.REQ.profiles` Engine configuration profiles & feature sets (indie 2D → AAA open-world online) — **engine-architect**
 - `ARCH.REQ.hardware-tiers` Hardware tier definitions (the only definition of tier names) incl. server instance classes and refresh-rate classes — **engine-architect** · with performance-architect, dedicated-server
 - `ARCH.REQ.non-goals` Capability & non-goal register (radar non-goals) — **engine-architect**
-- `ARCH.REQ.platform-matrix` Supported-target matrix (OS × ISA × GPU API × store × support tier) — **engine-architect** · with platform-architect, build-system-toolchains, ci-cd-automation, certification-compliance
+- `ARCH.REQ.platform-matrix` Platform matrix (OS × ISA × API × store) generated from skills.json platform_variants and implementer variants — **engine-architect** · with platform-architect, build-system-toolchains, ci-cd-automation, certification-compliance
 
 **ARCH.STRUCT — Structure & boundaries**
 
@@ -118,9 +118,9 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `PLAT.PAL.os` OS services abstraction (VM, files, time, dynamic libraries) — **platform-architect**
 - `PLAT.PAL.cpu-topology` CPU topology & feature discovery (hybrid cores, SMT, caches, NUMA, ISA) — **platform-architect** · with job-system-task-graph
 - `PLAT.PAL.windowing` Windowing & surfaces — **platform-architect**
-- `PLAT.PAL.lifecycle` Process lifecycle (suspend, resume, constrained, terminate) — **platform-architect** · with platform-console, platform-mobile, async-io-storage, rhi-core, frame-orchestration, network-transport
+- `PLAT.PAL.lifecycle` Process lifecycle (suspend, resume, constrained, terminate) — **platform-architect** · with platform-console, platform-mobile, async-io-storage, rhi-core, frame-orchestration, network-transport, platform-web
 - `PLAT.PAL.capability-tiers` Platform capability feature query (tier names from ARCH.REQ.hardware-tiers) — **platform-architect**
-- `PLAT.PAL.cloud-streaming` Cloud-streaming targets (latency, encode, input) `emerging` — **platform-architect**
+- `PLAT.PAL.cloud-streaming` Cloud-streaming policy (session detection, latency budget, device-kind changes); platform work in PLAT.CON/DESK.cloud-streaming — **platform-architect** · with input-system, ui-architect, runtime-scalability, frame-orchestration
 - `PLAT.PAL.base` Bootstrap base (C-BASE): raw allocator, raw sinks, hook tables — **platform-architect** · with core-runtime-architect
 - `PLAT.PAL.threads` Thread creation, affinity & QoS per OS — **platform-architect** · with job-system-task-graph
 - `PLAT.PAL.thread-affinity` Thread-affinity registry & isolation of OS-thread-bound APIs behind queues; engine loop never assumes the OS main thread — **platform-architect** · with job-system-task-graph, platform-mobile, platform-console
@@ -138,7 +138,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `PLAT.PAL.devlink` Development host↔target connection service — **platform-architect** · with editor-architect, observability-telemetry
 - `PLAT.PAL.confidential-extensions` NDA platform extensions: segregated modules/repos, public stubs, sanitized CI results, access classes — **platform-architect** · with build-system-toolchains, security-engineering, program-orchestration, platform-console
 - `PLAT.PAL.cloud-hybrid` Split client/cloud compute boundary `experimental` — **platform-architect**
-- `PLAT.PAL.display` Display enumeration, modes, DPI, HDR & VRR capability — **platform-architect** · with platform-desktop, platform-console, platform-mobile
+- `PLAT.PAL.display` Display enumeration, modes, DPI, HDR & VRR capability, dynamic HDR/EDR headroom events — **platform-architect** · with platform-desktop, platform-console, platform-mobile, post-color-hdr
 - `PLAT.PAL.event-injection` Lifecycle & system-event injection (suspend/resume, constrained mode, sign-out, controller disconnect, memory pressure, thermal) — **platform-architect** · with test-runtime-harness, certification-compliance
 - `PLAT.PAL.pointer-shell` Cursor management (hardware/software cursors, confinement, relative mode), clipboard, file dialogs, drag-and-drop — **platform-architect** · with input-devices-haptics, platform-desktop
 
@@ -149,6 +149,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `PLAT.DESK.os-security` OS security interplay (Defender scanning, controlled folders, notarization, TCC, sandboxes, anti-cheat on Proton) — **platform-desktop** · with async-io-storage, shader-system, persistence-save, anti-cheat-integrity
 - `PLAT.DESK.arm64` Windows on ARM (ARM64EC, emulation interop, middleware availability) — **platform-desktop**
 - `PLAT.DESK.pal` PAL implementation for Windows/Linux/SteamOS/macOS (C-PAL backend: OS services, windowing, threads, clocks, IO, display, power, events) — **platform-desktop** · with platform-architect
+- `PLAT.DESK.cloud-streaming` PC-build cloud streaming (touch-overlay controls, UI-scale tier) — **platform-desktop** · with input-system
 
 **PLAT.CON — Console-class platforms**
 
@@ -159,7 +160,8 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `PLAT.CON.portable` Portable-console integration — **platform-console**
 - `PLAT.CON.cross-gen` Cross-generation SKUs & backward-compatibility modes — **platform-console**
 - `PLAT.CON.pal` PAL implementation for console OS (C-PAL backend: OS services, windowing, threads, clocks, IO, display, power, events) — **platform-console** · with platform-architect
-- `PLAT.CON.confidential-slots` Confidential implementations of registered slots (IO/decompression units, audio endpoints, save storage, crash upload, system keyboard, entitlement SDK, console XR SDK) behind public interfaces owned by domain skills — **platform-console** · with async-io-storage, audio-architect, persistence-save, crash-diagnostics, text-fonts, xr-runtime
+- `PLAT.CON.confidential-slots` Confidential implementations of registered slots (IO/decompression units, audio endpoints, save storage, crash upload, system keyboard/IME/TTS bridge, entitlement SDK, console pad & adaptive-trigger libraries, sockets/relay, console XR SDK) behind public interfaces owned by domain skills — **platform-console** · with async-io-storage, audio-architect, persistence-save, crash-diagnostics, text-fonts, xr-runtime, input-devices-haptics, network-transport, accessibility
+- `PLAT.CON.cloud-streaming` Console-build cloud streaming (streamed console titles) — **platform-console**
 
 **PLAT.MOB — Mobile & portable**
 
@@ -167,10 +169,11 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `PLAT.MOB.tbdr` Tile-based GPU implications (bandwidth, on-chip memory) — **platform-mobile** · with render-graph-scheduling
 - `PLAT.MOB.thermal` Mobile thermal/power signal backends (ADPF thermal headroom, performance-hint sessions, iOS thermal state) feeding CORE.SCALE.governor; no independent control loop — **platform-mobile** · with performance-architect, runtime-scalability
 - `PLAT.MOB.storage` Runtime storage constraints (free-space checks, OS cache purge) — **platform-mobile**
-- `PLAT.MOB.frame-pacing` Mobile frame pacing & refresh-rate selection — **platform-mobile**
+- `PLAT.MOB.frame-pacing` Mobile present-rate/pacing backends implementing C-PRESENT/C-PAL (selection policy in CORE.SCALE.actuators) — **platform-mobile**
 - `PLAT.MOB.notifications` Local & push notifications — **platform-mobile**
 - `PLAT.MOB.links` Deep links & attribution boundary (ATT consent) — **platform-mobile**
 - `PLAT.MOB.pal` PAL implementation for iOS/Android/visionOS (C-PAL backend: OS services, windowing, threads, clocks, IO, display, power, events) — **platform-mobile** · with platform-architect
+- `PLAT.MOB.windowing` Resizable/multi-window mobile apps (iPadOS windowing, foldable posture, ChromeOS/desktop modes) — **platform-mobile**
 
 **PLAT.SVC — Platform & online services integration**
 
@@ -217,6 +220,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `PLAT.XR.runtime-backends` XR runtime backends: OpenXR, visionOS Compositor Services (console XR SDK slot in PLAT.CON.confidential-slots) — **xr-runtime** · with platform-mobile, rhi-metal
 - `PLAT.XR.scene-export` OS-composited shared-space scenes (engine exports a scene description via C-RSCENE change streams) `emerging` — **xr-runtime** · with render-architect
 - `PLAT.XR.body-face` Body, face & eye-expression tracking inputs (OpenXR extensions) with biometric privacy class `emerging` — **xr-runtime** · with privacy-data-protection
+- `PLAT.XR.editor-preview` XR authoring: play-in-headset, device simulator, in-headset editing, passthrough/anchor/scene-mesh preview — **xr-runtime** · with editor-architect, world-editor-viewport
 
 **PLAT.WEB — Web platform**
 
@@ -227,6 +231,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `PLAT.WEB.webgpu-target` WebGPU-class 3D on the web `emerging` — **platform-web** · with rhi-webgpu
 - `PLAT.WEB.pal` PAL implementation for browser (WASM) (C-PAL backend: OS services, windowing, threads, clocks, IO, display, power, events) — **platform-web** · with platform-architect
 - `PLAT.WEB.std3d` std3d-class web tier gated by C-GPUTIER (bindless, memory64) `experimental` — **platform-web**
+- `PLAT.WEB.audience-share` Browser-capability share measurement (WebGPU, threads, memory) from web analytics and portal SDKs — **platform-web** · with observability-telemetry
 
 **PLAT.LIVE — Live operations**
 
@@ -396,6 +401,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `CORE.SER.canonical` Deterministic canonical serialization — **serialization-schema** · with determinism-replay
 - `CORE.SER.portability` Endianness & ABI portability — **serialization-schema**
 - `CORE.SER.untrusted` Untrusted-input validation during deserialization — **serialization-schema** · with security-engineering
+- `CORE.SER.commands` Serializable command/transaction core (schema, apply/invert, journal, merge hooks) — **serialization-schema** · with editor-architect, modding-ugc, collaboration-version-control
 
 **CORE.SCALE — Runtime scalability**
 
@@ -491,6 +497,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `CNT.COOK.geometry-ops` Mesh boolean, remesh & UV-unwrap operations for processors and blockout — **asset-cook-processors** · with world-editor-viewport
 - `CNT.COOK.ml-assisted` ML-assisted retopology/UV/LOD techniques as processor options `emerging` — **asset-cook-processors** · with ai-assisted-authoring, virtualized-geometry-lod
 - `CNT.COOK.incremental-equivalence` Incremental cook equals clean cook (bit/tolerance per determinism class) — **content-pipeline-architect**
+- `CNT.COOK.cache-fleet` Multi-site derived-data cache fleet (replication, eviction, cost) — **content-pipeline-architect**
 
 **CNT.VAL — Content validation**
 
@@ -638,7 +645,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `RND.RHI.webgpu-validation` WebGPU backend: validation layers & conformance runs — **rhi-webgpu** · with render-validation
 - `RND.RHI.webgpu-quirks` WebGPU backend: vendor/driver quirk handling — **rhi-webgpu** · with rhi-core
 - `RND.RHI.work-graph-programs` Work-graph programs & mesh nodes (fallback: indirect dispatch) `experimental` — **rhi-core** · with render-graph-scheduling
-- `RND.RHI.console` Console graphics API backends (confidential, per platform holder) — **rhi-console** · with rhi-core
+- `RND.RHI.console` Console graphics API backends (confidential, per platform holder) — **rhi-console** · with rhi-core, rhi-d3d12
 - `RND.RHI.console-validation` Console backends: platform validation layers & conformance runs — **rhi-console** · with render-validation
 - `RND.RHI.console-quirks` Console backends: GPU crash tooling integration & quirk handling — **rhi-console** · with rhi-core, crash-diagnostics
 - `RND.RHI.adapter-selection` Adapter selection (high-performance vs low-power) & cross-adapter present on hybrid laptops — **rhi-core**
@@ -976,7 +983,6 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `PHY.FLUID.particles` Particle fluids (SPH, PBF, FLIP) `emerging` — **fluid-simulation**
 - `PHY.FLUID.grid` Real-time interactive grid smoke & fire `emerging` — **fluid-simulation**
 - `PHY.FLUID.gpu` GPU fluid solvers `emerging` — **fluid-simulation**
-- `PHY.FLUID.cellular` Grid/cellular material & fluid simulation (falling sand, liquid/gas/heat grids), 2D-capable, deterministic — **fluid-simulation** · with physics-2d
 
 **PHY.2D — 2D physics**
 
@@ -984,6 +990,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `PHY.2D.controllers` 2D character controllers — **physics-2d**
 - `PHY.2D.determinism` 2D determinism — **physics-2d**
 - `PHY.2D.shape-gen` 2D collision-shape generation from sprites — **physics-2d**
+- `PHY.2D.cellular` Grid/cellular material & fluid simulation (falling sand, liquid/gas/heat grids), 2D-capable, deterministic — **physics-2d** · with fluid-simulation
 
 **PHY.TOOL — Physics authoring tools**
 
@@ -1182,6 +1189,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 **INP.TOOL — Input tooling**
 
 - `INP.TOOL.actions` Action/context mapping editor & device preview — **input-system**
+- `INP.TOOL.haptics` Haptic and trigger-effect authoring with on-controller preview — **input-devices-haptics** · with audio-content-runtime
 
 ## NET
 
@@ -1300,7 +1308,6 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 **GAM.SYS — Gameplay systems toolkit**
 
 - `GAM.SYS.abilities` Abilities, effects & attributes — **gameplay-systems-toolkit**
-- `GAM.SYS.tags` Gameplay tags — **gameplay-systems-toolkit**
 - `GAM.SYS.spawning` Spawning (batched, deferred structural changes); pooling only where measured — **gameplay-systems-toolkit**
 - `GAM.SYS.messages` Gameplay-tag message channels built on C-ID events — **gameplay-systems-toolkit** · with entity-object-model
 - `GAM.SYS.predicted-abilities` Predicted abilities & effects (prediction keys, rollback of effects) — **gameplay-systems-toolkit** · with prediction-rollback
@@ -1379,6 +1386,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `GAM.DATA.spreadsheets` Spreadsheet round-trip (CSV/Sheets/Excel) — **gameplay-data**
 - `GAM.DATA.balance-sim` Balance simulation runs (combat/economy) — **gameplay-data**
 - `GAM.DATA.hotfix` Server-delivered data overrides for tunables — **gameplay-data**
+- `GAM.DATA.tags` Gameplay tag dictionary, hierarchical tag queries, redirects/renames — **gameplay-data** · with gameplay-systems-toolkit
 
 **GAM.NARR — Narrative & dialogue**
 
@@ -1394,7 +1402,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `GAM.TOOL.ai-editors` Behavior-tree, state-tree & environment-query editors and testing — **ai-behavior-perception** · with graph-editor-framework
 - `GAM.TOOL.ai-debug` AI debugger — **ai-behavior-perception** · with visual-debugging-tools
 - `GAM.TOOL.nav` Nav modifiers, links & navigation debugging — **navigation-pathfinding** · with visual-debugging-tools
-- `GAM.TOOL.tags-abilities` Gameplay-tag dictionary, ability & effect authoring — **gameplay-systems-toolkit**
+- `GAM.TOOL.tags-abilities` Ability and effect authoring (tag dictionary editor in GAM.TOOL.data) — **gameplay-systems-toolkit**
 - `GAM.TOOL.data` Data-table, curve & tuning editors — **gameplay-data** · with editor-ui-framework
 - `GAM.TOOL.dialogue` Dialogue editor & screenplay/narrative-tool import — **narrative-dialogue** · with graph-editor-framework
 - `GAM.TOOL.crowd-lanes` Crowd zone & lane-graph authoring, spawners — **crowd-simulation**
@@ -1503,12 +1511,13 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `ED.ARCH.headless` Headless editor & commandlets — **editor-architect** · with ci-cd-automation
 - `ED.ARCH.scale` Editor performance for large projects — **editor-architect**
 - `ED.ARCH.recovery` Autosave, transaction journal & crash recovery — **editor-architect** · with crash-diagnostics
-- `ED.ARCH.pie-net` Multiplayer play-in-editor & network emulation — **editor-architect** · with dedicated-server, network-transport
+- `ED.ARCH.pie-net` Multiplayer play-in-editor & network emulation — **editor-architect** · with dedicated-server, network-transport, net-session, prediction-rollback
 - `ED.ARCH.discipline-workflows` Per-discipline end-to-end workflow specs & iteration targets — **editor-architect** · with hot-reload-iteration
 - `ED.ARCH.telemetry` Studio tool telemetry: usage, slow tasks, crash and DDC/cook health dashboards — **editor-architect** · with observability-telemetry, crash-diagnostics, loading-streaming-performance
 - `ED.ARCH.llm-agent-frontend` LLM/agent front end (MCP class) over C-AUTOMATION and editor commands `emerging` — **editor-architect** · with visual-debugging-tools
 - `ED.ARCH.transaction-invariants` Property-based do→undo→redo equivalence incl. multi-user merges — **editor-architect** · with functional-automation-soak
 - `ED.ARCH.automation-security` Copilot/agent action security: capability-scoped tokens, per-command permission classes, confirmation for code-exec/destructive/network actions, workspace-trust gating — **editor-architect** · with security-engineering
+- `ED.ARCH.async-jobs` Editor background-job model: progress, cancellation, interaction with open transactions — **editor-architect**
 
 **ED.UI — Editor UI framework**
 
@@ -1522,6 +1531,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `ED.UI.tabular` Tabular/bulk editing & spreadsheet round-trip — **editor-ui-framework** · with gameplay-data
 - `ED.UI.toolkit-basis` Editor toolkit basis: shared with or separate from game UI (ADR) — **editor-ui-framework** · with ui-architect
 - `ED.UI.localization` Editor & tool UI localization — **editor-ui-framework** · with localization-i18n
+- `ED.UI.outliner` Virtualized scene outliner for 10⁶-object worlds (folders, filtering by data layer/cell) — **editor-ui-framework** · with world-data-model
 
 **ED.WORLD — World editor**
 
@@ -1557,6 +1567,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `ED.COLLAB.concurrent-world` Conflict-free concurrent world editing at studio scale (CRDT/OT class) `emerging` — **collaboration-version-control**
 - `ED.COLLAB.codev` Co-development & outsourcing: partner-scoped workspaces and permissions, vendor delivery/acceptance via CNT.VAL.submit-gate and CNT.ID.rights, access revocation — **collaboration-version-control** · with security-engineering, ci-cd-automation
 - `ED.COLLAB.production-tracking` Production-tracking integration (asset/shot status, task-tracker links) — **collaboration-version-control**
+- `ED.COLLAB.session-server` Collaboration session server: transport, auth via XC.SEC.dev-trust access classes, journal persistence, late join, presence and lock broadcast — **collaboration-version-control** · with network-transport, security-engineering
 
 **ED.DEBUG — Visual debugging**
 
@@ -1752,7 +1763,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `PRF.BENCH.micro` Microbenchmark harness — **perf-benchmarking**
 - `PRF.BENCH.workloads` Benchmark scenarios over QA.REF.content — **perf-benchmarking** · with test-architect
 - `PRF.BENCH.stats` Automated capture & statistics — **perf-benchmarking**
-- `PRF.BENCH.regression` Regression detection & bisection — **perf-benchmarking** · with ci-cd-automation
+- `PRF.BENCH.regression` Regression detection (bisection via BLD.CI.bisection) — **perf-benchmarking** · with ci-cd-automation
 - `PRF.BENCH.dashboards` Performance dashboards — **perf-benchmarking** · with observability-telemetry
 - `PRF.BENCH.scale-content` Procedural synthetic stress worlds per configuration & scale dimension — **perf-benchmarking** · with procedural-generation, functional-automation-soak, reference-games
 - `PRF.BENCH.replay` Replay- and flythrough-driven deterministic benchmark runs — **perf-benchmarking** · with determinism-replay
