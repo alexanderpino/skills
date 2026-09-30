@@ -276,6 +276,17 @@ instead of after. A `DEP` edge between two proposed slices is a guarantee that t
 verification rounds will cascade. Merge them and the cascade becomes an ordinary
 within-slice re-open, which is the cheap case this whole design is built around.
 
+The one alternative to merging is a **contract**. When the provider lists the symbol under
+`provides` with a contract stated as an observation, and the consumer lists it under
+`consumes`, the consumer builds against the contract rather than the provider's code, and
+the provider promises not to move it. A revision of the provider that keeps the contract
+has nothing to re-open on the other side; `plan` reports the edge as `CONTRACT` instead of
+`DEP`. The promise is checked, not trusted: the integration critic takes every contract as
+a `check` at the seam (SKILL.md, Step 6), and a seam still open after one fix round
+escalates, because by then it is the contract that was wrong. Pin an edge only when the
+contract can be stated in a sentence a second critic would decide the same way — if it
+cannot, the coupling is real and the slices should merge.
+
 ## The ratchet guard
 
 Without an explicit rule, a verifier will raise new findings anywhere it looks, and the
@@ -334,7 +345,7 @@ Three properties keep `remedy` from becoming the target:
   `remedy` — a builder who satisfies the check by a different route is `verified`, and one
   who follows the remedy exactly while the check still fails is `unresolved`. The verifier
   prompt says this in as many words.
-- **It is non-binding to the builder**, who is asked to say in its notes when it took
+- **It is non-binding to the builder**, who is asked to say in its report when it took
   another route. That sentence is what lets you tell a bad remedy from a bad builder.
 - **It is not a new status.** The state machine stays at three transitions. `remedy` is a
   field on a finding that is still `unresolved` and still holds the gate.
