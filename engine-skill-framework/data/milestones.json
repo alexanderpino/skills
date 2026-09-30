@@ -67,6 +67,38 @@
     {
      "capability": "OBS.LOG.bench-runtime",
      "validator": "PRF.BENCH.regression"
+    },
+    {
+     "capability": "QA.AGENT.test-integrity",
+     "validator": "XC.SEC.agent-redteam"
+    },
+    {
+     "capability": "QA.AGENT.holdout",
+     "validator": "QA.SIM.golden-traces"
+    },
+    {
+     "capability": "QA.AGENT.mutation-gate",
+     "validator": "QA.ROBUST.fuzzing"
+    },
+    {
+     "capability": "QA.AGENT.gate-canaries",
+     "validator": "XC.SEC.agent-redteam"
+    },
+    {
+     "capability": "XC.SEC.agent-boundary",
+     "validator": "QA.AGENT.gate-canaries"
+    },
+    {
+     "capability": "XC.SEC.supply-chain",
+     "validator": "BLD.SYS.dev-surface-exclusion"
+    },
+    {
+     "capability": "XC.SEC.secrets",
+     "validator": "BLD.CI.hardening"
+    },
+    {
+     "capability": "XC.SEC.key-custody",
+     "validator": "QA.CERT.prechecks"
     }
    ],
    "contracts_draft": [
@@ -212,6 +244,14 @@
     {
      "capability": "PRF.LOAD.hitch-gate",
      "validator": "PRF.BENCH.regression"
+    },
+    {
+     "capability": "QA.RENDER.golden",
+     "validator": "QA.FUNC.compat"
+    },
+    {
+     "capability": "QA.SIM.stability-suite",
+     "validator": "QA.FUNC.soak"
     }
    ],
    "contracts_draft": [
@@ -221,6 +261,7 @@
     "C-AIAGENT",
     "C-ANIM",
     "C-AUDIO",
+    "C-CAMERA",
     "C-DIALOGUE",
     "C-ECS",
     "C-ENV",
@@ -329,6 +370,22 @@
     {
      "capability": "PRF.LOAD.pacing-latency",
      "validator": "PRF.BENCH.stats"
+    },
+    {
+     "capability": "QA.FUNC.soak",
+     "validator": "PRF.MEM.footprint"
+    },
+    {
+     "capability": "XC.SEC.data-rights",
+     "validator": "QA.CERT.privacy"
+    },
+    {
+     "capability": "XC.SEC.childrens-data",
+     "validator": "QA.CERT.privacy"
+    },
+    {
+     "capability": "XC.SEC.vuln-response",
+     "validator": "QA.ROBUST.fuzzing"
     }
    ],
    "contracts_draft": [
@@ -345,6 +402,7 @@
     "C-AUDIO",
     "C-AUTOMATION",
     "C-BENCH",
+    "C-CAMERA",
     "C-CERT",
     "C-CMD",
     "C-DEVICE",
@@ -664,6 +722,14 @@
     {
      "capability": "BLD.REL.end-of-service",
      "validator": "QA.FUNC.compat"
+    },
+    {
+     "capability": "QA.STRAT.release-criteria",
+     "validator": "QA.FUNC.compat-corpus"
+    },
+    {
+     "capability": "QA.FUNC.compat-corpus",
+     "validator": "QA.CERT.prechecks"
     }
    ],
    "contracts_draft": [],

@@ -17,7 +17,10 @@
    "test_double": {
     "kind": "null/fake platform + event injection",
     "owner": "platform-architect"
-   }
+   },
+   "oracle_reference": [
+    "platform conformance suites per OS; syscall-behaviour differential runs"
+   ]
   },
   {
    "id": "C-ERR",
@@ -30,7 +33,10 @@
    ],
    "universal": "runtime",
    "conformance": true,
-   "oracle_author": "robustness-fuzzing"
+   "oracle_author": "robustness-fuzzing",
+   "oracle_reference": [
+    "error-model conformance scenarios; sanitizer corpora"
+   ]
   },
   {
    "id": "C-MOD",
@@ -44,7 +50,10 @@
    ],
    "conformance": true,
    "universal": "runtime",
-   "oracle_author": "robustness-fuzzing"
+   "oracle_author": "robustness-fuzzing",
+   "oracle_reference": [
+    "dependency-graph reference cases; dlopen/loader edge cases per OS"
+   ]
   },
   {
    "id": "C-CFG",
@@ -57,7 +66,10 @@
    ],
    "conformance": true,
    "universal": "runtime",
-   "oracle_author": "robustness-fuzzing"
+   "oracle_author": "robustness-fuzzing",
+   "oracle_reference": [
+    "layered-config golden cases; schema fuzz corpora"
+   ]
   },
   {
    "id": "C-MATH",
@@ -67,7 +79,10 @@
    "summary": "Vector/matrix types, precision classes, deterministic-math variants, fixed and scalable (vector-length-agnostic) SIMD kernels, convention enforcement.",
    "requires": [],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing"
+   "oracle_author": "robustness-fuzzing",
+   "oracle_reference": [
+    "CORE-MATH / IEEE-754 reference vectors; arbitrary-precision differential runs"
+   ]
   },
   {
    "id": "C-MEM",
@@ -86,7 +101,10 @@
    "test_double": {
     "kind": "tracking/failing allocator",
     "owner": "memory-allocators"
-   }
+   },
+   "oracle_reference": [
+    "allocator stress and fragmentation corpora; ASan/Valgrind-class runs"
+   ]
   },
   {
    "id": "C-TYPES",
@@ -98,7 +116,10 @@
     "C-MEM"
    ],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing"
+   "oracle_author": "robustness-fuzzing",
+   "oracle_reference": [
+    "SMHasher and known-answer hash vectors; container model-based tests"
+   ]
   },
   {
    "id": "C-SYNC",
@@ -110,7 +131,10 @@
     "C-BASE"
    ],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing"
+   "oracle_author": "robustness-fuzzing",
+   "oracle_reference": [
+    "herd7/litmus tests for ARM64 and x86; model checking (loom/CDSChecker class); linearizability checkers"
+   ]
   },
   {
    "id": "C-TASK",
@@ -123,7 +147,10 @@
     "C-MEM"
    ],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing"
+   "oracle_author": "robustness-fuzzing",
+   "oracle_reference": [
+    "task-graph model checking; starvation/QoS scenario corpus; litmus lanes"
+   ]
   },
   {
    "id": "C-INSTR",
@@ -136,7 +163,10 @@
    ],
    "universal": "runtime",
    "conformance": true,
-   "oracle_author": "robustness-fuzzing"
+   "oracle_author": "robustness-fuzzing",
+   "oracle_reference": [
+    "trace-format conformance corpus (Perfetto/Chrome trace importers)"
+   ]
   },
   {
    "id": "C-CRASH",
@@ -150,7 +180,10 @@
    ],
    "universal": "runtime",
    "conformance": true,
-   "oracle_author": "robustness-fuzzing"
+   "oracle_author": "robustness-fuzzing",
+   "oracle_reference": [
+    "minidump/symbolication corpora per platform"
+   ]
   },
   {
    "id": "C-DET",
@@ -162,7 +195,10 @@
     "C-MATH"
    ],
    "conformance": true,
-   "oracle_author": "simulation-validation"
+   "oracle_author": "simulation-validation",
+   "oracle_reference": [
+    "cross-platform golden state-hash traces"
+   ]
   },
   {
    "id": "C-BUDGET",
@@ -183,7 +219,10 @@
     "C-MOD"
    ],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing"
+   "oracle_author": "robustness-fuzzing",
+   "oracle_reference": [
+    "malformed-plugin corpora; ABI conformance kits"
+   ]
   },
   {
    "id": "C-FRAME",
@@ -195,7 +234,10 @@
     "C-TASK"
    ],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing"
+   "oracle_author": "robustness-fuzzing",
+   "oracle_reference": [
+    "frame-graph reference schedules; phase-violation corpus"
+   ]
   },
   {
    "id": "C-ID",
@@ -207,7 +249,10 @@
     "C-TYPES"
    ],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing"
+   "oracle_author": "robustness-fuzzing",
+   "oracle_reference": [
+    "collision and generation-wrap corpora"
+   ]
   },
   {
    "id": "C-ECS",
@@ -221,7 +266,10 @@
     "C-FRAME"
    ],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing"
+   "oracle_author": "robustness-fuzzing",
+   "oracle_reference": [
+    "ECS model-based tests against a naive reference implementation"
+   ]
   },
   {
    "id": "C-REFL",
@@ -233,7 +281,10 @@
     "C-TYPES"
    ],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing"
+   "oracle_author": "robustness-fuzzing",
+   "oracle_reference": [
+    "reflection round-trip corpora against generated metadata"
+   ]
   },
   {
    "id": "C-SER",
@@ -245,7 +296,10 @@
     "C-REFL"
    ],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing"
+   "oracle_author": "robustness-fuzzing",
+   "oracle_reference": [
+    "malformed and versioned-blob corpora; protobuf/flatbuffers-class conformance suites"
+   ]
   },
   {
    "id": "C-IO",
@@ -263,7 +317,10 @@
    "test_double": {
     "kind": "in-memory IO with fault points",
     "owner": "async-io-storage"
-   }
+   },
+   "oracle_reference": [
+    "fio-class workloads and per-platform IO conformance suites"
+   ]
   },
   {
    "id": "C-VFS",
@@ -276,7 +333,10 @@
     "C-SER"
    ],
    "conformance": true,
-   "oracle_author": "functional-automation-soak"
+   "oracle_author": "functional-automation-soak",
+   "oracle_reference": [
+    "path-normalisation and mount-ordering corpora"
+   ]
   },
   {
    "id": "C-ASSET",
@@ -289,7 +349,10 @@
     "C-ID"
    ],
    "conformance": true,
-   "oracle_author": "functional-automation-soak"
+   "oracle_author": "functional-automation-soak",
+   "oracle_reference": [
+    "asset-database consistency reference cases"
+   ]
   },
   {
    "id": "C-RES",
@@ -303,7 +366,10 @@
     "C-MEM"
    ],
    "conformance": true,
-   "oracle_author": "functional-automation-soak"
+   "oracle_author": "functional-automation-soak",
+   "oracle_reference": [
+    "load-order and cancellation scenario corpora"
+   ]
   },
   {
    "id": "C-RELOAD",
@@ -316,7 +382,10 @@
     "C-MOD"
    ],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing"
+   "oracle_author": "robustness-fuzzing",
+   "oracle_reference": [
+    "hot-reload state-preservation scenario corpora"
+   ]
   },
   {
    "id": "C-SPATIAL",
@@ -329,7 +398,10 @@
     "C-ID"
    ],
    "conformance": true,
-   "oracle_author": "simulation-validation"
+   "oracle_author": "simulation-validation",
+   "oracle_reference": [
+    "analytic transform and large-world precision reference cases"
+   ]
   },
   {
    "id": "C-RHI",
@@ -356,7 +428,10 @@
    "test_double": {
     "kind": "null/software device",
     "owner": "rhi-core"
-   }
+   },
+   "oracle_reference": [
+    "Vulkan CTS, D3D12 conformance/WARP and Metal validation suites"
+   ]
   },
   {
    "id": "C-GPUMEM",
@@ -368,7 +443,10 @@
     "C-RHI"
    ],
    "conformance": true,
-   "oracle_author": "render-validation"
+   "oracle_author": "render-validation",
+   "oracle_reference": [
+    "API validation layers; aliasing and residency reference cases"
+   ]
   },
   {
    "id": "C-ML",
@@ -382,7 +460,10 @@
    ],
    "conformance": true,
    "gated": true,
-   "oracle_author": "robustness-fuzzing"
+   "oracle_author": "robustness-fuzzing",
+   "oracle_reference": [
+    "parity against a reference framework (ONNX Runtime/PyTorch) with tolerance tables"
+   ]
   },
   {
    "id": "C-WORLD",
@@ -769,17 +850,24 @@
    "layer": "P",
    "owner": "test-architect",
    "name": "Test & validation definition of done",
-   "summary": "Required test kinds per skill, test determinism, coverage & mutation thresholds, the evidence bundle an implementer hands to S3/S4 critics, oracle independence, conformance suites owned by contract owners with consumer-driven additions; a provider change merges only when the contract's conformance suite, including consumer-contributed cases, passes.",
+   "summary": "Required test kinds per skill, test determinism, coverage & mutation thresholds, the evidence bundle an implementer hands to S3/S4 critics, oracle independence, conformance suites authored by the contract's oracle_author (the contract owner owns the specification text; consumers add cases by change request; implementers maintain only harness hooks); fuzz evidence is per-target coverage and reachability of the registered parser functions plus plateau evidence, harnesses are co-signed by robustness-fuzzing and fall under oracle change control; a provider change merges only when the contract's conformance suite, including consumer-contributed cases, passes.",
    "requires": [],
    "universal": "all",
    "evidence_bundle": [
     "unit+acceptance results",
     "mutation score",
     "coverage",
-    "fuzz hours on registered inputs",
+    "fuzz coverage/reachability of registered parser functions and plateau evidence",
     "determinism lanes",
     "perf gate results",
-    "validation-layer/sanitizer runs"
+    "validation-layer/sanitizer runs",
+    "holdout results",
+    "test-integrity diff",
+    "baseline/golden/tolerance change log",
+    "test-double conformance",
+    "flake and quarantine events",
+    "provenance attestation",
+    "compat-corpus results"
    ]
   },
   {
@@ -816,7 +904,10 @@
    "summary": "Raw page allocator, raw log/assert/abort sink, monotonic clock, raw thread primitives and late-bound hook tables that higher layers install (allocator, log sink, assert handler, crash annotator). Depends on nothing.",
    "requires": [],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing"
+   "oracle_author": "robustness-fuzzing",
+   "oracle_reference": [
+    "compiler/ABI conformance suites; static-assert corpora"
+   ]
   },
   {
    "id": "C-LIFETIME",
@@ -829,7 +920,10 @@
    ],
    "conformance": true,
    "universal": "runtime",
-   "oracle_author": "robustness-fuzzing"
+   "oracle_author": "robustness-fuzzing",
+   "oracle_reference": [
+    "leak/lifetime torture corpora"
+   ]
   },
   {
    "id": "C-IPC",
@@ -842,7 +936,10 @@
     "C-TASK"
    ],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing"
+   "oracle_author": "robustness-fuzzing",
+   "oracle_reference": [
+    "framing/TOCTOU fuzz corpora; transport conformance cases"
+   ]
   },
   {
    "id": "C-SCALE",
@@ -855,7 +952,10 @@
    ],
    "universal": "runtime",
    "conformance": true,
-   "oracle_author": "perf-benchmarking"
+   "oracle_author": "perf-benchmarking",
+   "oracle_reference": [
+    "control-loop reference step-response cases"
+   ]
   },
   {
    "id": "C-FLOW",
@@ -867,7 +967,10 @@
     "C-FRAME"
    ],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing"
+   "oracle_author": "robustness-fuzzing",
+   "oracle_reference": [
+    "channel ordering and back-pressure reference cases"
+   ]
   },
   {
    "id": "C-PRESENT",
@@ -879,7 +982,10 @@
     "C-FRAME"
    ],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing"
+   "oracle_author": "robustness-fuzzing",
+   "oracle_reference": [
+    "present-timeline captures with reference pacing metrics"
+   ]
   },
   {
    "id": "C-SNAPSHOT",
@@ -892,7 +998,10 @@
     "C-SER"
    ],
    "conformance": true,
-   "oracle_author": "simulation-validation"
+   "oracle_author": "simulation-validation",
+   "oracle_reference": [
+    "snapshot/restore round-trip and hash-equality corpora"
+   ]
   },
   {
    "id": "C-REPLAY",
@@ -912,12 +1021,15 @@
    "layer": 2,
    "owner": "spatial-transforms",
    "name": "Views & view arbitration",
-   "summary": "View registry: view sources (gameplay camera, cinematic, editor, photo mode, XR pose) with priority/blend stack and shake/FOV channels, per-local-player views, view origin for LWC rebasing; derived listener and streaming-source signals for sinks.",
+   "summary": "View registry: view sources (gameplay camera, cinematic, editor, photo mode, XR pose) with priority/blend stack and shake/FOV channels, per-local-player views, view origin for LWC rebasing; derived listener and streaming-source signals for sinks; shake and FOV channels are final composition of view sources; shake content and its accessibility scaling belong to C-CAMERA.",
    "requires": [
     "C-SPATIAL"
    ],
    "conformance": true,
-   "oracle_author": "simulation-validation"
+   "oracle_author": "simulation-validation",
+   "oracle_reference": [
+    "view-composition reference cases"
+   ]
   },
   {
    "id": "C-SIGNIF",
@@ -929,7 +1041,10 @@
     "C-VIEW"
    ],
    "conformance": true,
-   "oracle_author": "simulation-validation"
+   "oracle_author": "simulation-validation",
+   "oracle_reference": [
+    "tier-transition scenario corpora"
+   ]
   },
   {
    "id": "C-ENV",
@@ -953,7 +1068,10 @@
     "C-RHI"
    ],
    "conformance": true,
-   "oracle_author": "render-validation"
+   "oracle_author": "render-validation",
+   "oracle_reference": [
+    "tier capability tables from vendor conformance runs"
+   ]
   },
   {
    "id": "C-INSTANCES",
@@ -1056,7 +1174,10 @@
    "test_double": {
     "kind": "virtual devices / injection",
     "owner": "input-devices-haptics"
-   }
+   },
+   "oracle_reference": [
+    "device-report corpora from real controllers"
+   ]
   },
   {
    "id": "C-NETLINK",
@@ -1074,7 +1195,10 @@
    "test_double": {
     "kind": "loopback + link conditioner",
     "owner": "network-transport"
-   }
+   },
+   "oracle_reference": [
+    "netem-class link-condition scenarios; wire-format corpora"
+   ]
   },
   {
    "id": "C-REP",
@@ -1292,7 +1416,10 @@
     "C-RES"
    ],
    "conformance": true,
-   "oracle_author": "perf-benchmarking"
+   "oracle_author": "perf-benchmarking",
+   "oracle_reference": [
+    "closed-loop step-load and oscillation reference cases"
+   ]
   },
   {
    "id": "C-SCENETEX",
@@ -1358,7 +1485,10 @@
    ],
    "conformance": true,
    "gated": true,
-   "oracle_author": "render-validation"
+   "oracle_author": "render-validation",
+   "oracle_reference": [
+    "reference ray-query scenes with analytic hit results"
+   ]
   },
   {
    "id": "C-PCG",
@@ -1437,7 +1567,12 @@
     "C-NET"
    ],
    "conformance": true,
-   "oracle_author": "simulation-validation"
+   "oracle_author": "simulation-validation",
+   "boundary": true,
+   "test_double": {
+    "kind": "in-process multi-node simulator with fault injection",
+    "owner": "server-scaleout-persistence"
+   }
   },
   {
    "id": "C-SRVDATA",
@@ -1450,7 +1585,12 @@
     "C-NET"
    ],
    "conformance": true,
-   "oracle_author": "functional-automation-soak"
+   "oracle_author": "functional-automation-soak",
+   "boundary": true,
+   "test_double": {
+    "kind": "in-process multi-node simulator with fault injection",
+    "owner": "server-scaleout-persistence"
+   }
   },
   {
    "id": "C-EDVIEW",
@@ -1529,7 +1669,10 @@
    ],
    "universal": "runtime",
    "conformance": true,
-   "oracle_author": "robustness-fuzzing"
+   "oracle_author": "robustness-fuzzing",
+   "oracle_reference": [
+    "host-conformance scenarios shipped with the runner"
+   ]
   },
   {
    "id": "C-SIGN",
@@ -1541,7 +1684,10 @@
     "C-TYPES"
    ],
    "conformance": true,
-   "oracle_author": "security-engineering"
+   "oracle_author": "security-engineering",
+   "oracle_reference": [
+    "Wycheproof, ACVP and TUF vectors"
+   ]
   },
   {
    "id": "C-ABILITY",
@@ -1607,7 +1753,10 @@
     "C-ID"
    ],
    "conformance": true,
-   "oracle_author": "functional-automation-soak"
+   "oracle_author": "functional-automation-soak",
+   "oracle_reference": [
+    "command apply/invert/merge property tests"
+   ]
   },
   {
    "id": "C-VFX",
@@ -1646,6 +1795,18 @@
    ],
    "conformance": true,
    "oracle_author": "simulation-validation"
+  },
+  {
+   "id": "C-CAMERA",
+   "layer": 4,
+   "owner": "gameplay-camera",
+   "name": "Gameplay camera requests",
+   "summary": "Camera mode/hint requests with priority and blend, per-local-player rig binding, shake/impulse assets scaled by accessibility settings, framing targets; output is a view source for C-VIEW.",
+   "requires": [
+    "C-VIEW"
+   ],
+   "conformance": true,
+   "oracle_author": "functional-automation-soak"
   }
  ]
 }

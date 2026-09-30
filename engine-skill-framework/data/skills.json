@@ -631,7 +631,9 @@
    "implements": [],
    "workstream": "governance",
    "untrusted_inputs": [
-    "external-reports"
+    "external-reports",
+    "inter-agent-messages",
+    "triage-artifacts"
    ]
   },
   {
@@ -944,7 +946,10 @@
     "C-RT?",
     "C-SCENETEX",
     "C-AUTOMATION",
-    "C-PTREF?"
+    "C-PTREF?",
+    "C-DRAW2D?",
+    "C-TEXT?",
+    "C-PRESENT"
    ],
    "expertise": [
     "image metrics (FLIP, SSIM)",
@@ -1076,11 +1081,13 @@
     "service-responses",
     "shader-caches",
     "shared-ddc",
+    "store-notifications",
     "telemetry-batches",
     "transaction-requests",
     "ugc-graphs",
     "user-images",
-    "voice-streams"
+    "voice-streams",
+    "web-content"
    ]
   },
   {
@@ -1129,7 +1136,7 @@
    "profiles": [
     "all"
    ],
-   "purpose": "Threat modeling and trust boundaries for every untrusted input, secure-coding and memory-safety policy, supply-chain security, secrets, anti-tamper boundary, privacy engineering, mod/UGC sandbox policy.",
+   "purpose": "Threat modeling and trust boundaries for every untrusted input, secure-coding and memory-safety policy, supply-chain security, secrets, anti-tamper boundary, mod/UGC sandbox policy.",
    "non_responsibilities": [
     [
      "Cheat detection",
@@ -1142,6 +1149,14 @@
     [
      "Transport encryption implementation",
      "network-transport"
+    ],
+    [
+     "Privacy engineering",
+     "privacy-data-protection"
+    ],
+    [
+     "Crypto and signed-artifact code",
+     "security-runtime"
     ]
    ],
    "provides": [
@@ -1151,8 +1166,7 @@
    "expertise": [
     "threat modeling (STRIDE)",
     "memory safety",
-    "SLSA/SBOM",
-    "privacy engineering"
+    "SLSA/SBOM"
    ],
    "kind": "process",
    "targets": [],
@@ -1311,7 +1325,9 @@
    "workstream": "foundation",
    "untrusted_inputs": [
     "crash-uploads",
-    "ipc-messages"
+    "ipc-messages",
+    "player-feedback",
+    "triage-artifacts"
    ]
   },
   {
@@ -2491,7 +2507,9 @@
    "workstream": "platform",
    "untrusted_inputs": [
     "invites-deep-links",
-    "service-responses"
+    "service-responses",
+    "store-notifications",
+    "web-content"
    ],
    "authoring": "Service integration; content authored by the games' tooling."
   },
@@ -5093,7 +5111,8 @@
     "C-SCRIPT?",
     "C-RELOAD?",
     "C-VFX?",
-    "C-PTREF?"
+    "C-PTREF?",
+    "C-CAMERA?"
    ],
    "expertise": [
     "sequencers",
@@ -5299,6 +5318,7 @@
    ],
    "tool_consumes": [
     "C-GRAPH",
+    "C-COOK",
     "C-EDCMD",
     "C-EDHOST"
    ],
@@ -5700,7 +5720,8 @@
     "C-DET?",
     "C-UI?",
     "C-VIEW?",
-    "C-VFX?"
+    "C-VFX?",
+    "C-CAMERA?"
    ],
    "expertise": [
     "ability systems",
@@ -6077,7 +6098,10 @@
     "C-EDHOST"
    ],
    "implements": [],
-   "workstream": "ui"
+   "workstream": "ui",
+   "untrusted_inputs": [
+    "web-content"
+   ]
   },
   {
    "id": "text-fonts",
@@ -6649,7 +6673,10 @@
     "C-VCS"
    ],
    "implements": [],
-   "workstream": "release"
+   "workstream": "release",
+   "untrusted_inputs": [
+    "triage-artifacts"
+   ]
   },
   {
    "id": "packaging-release-patching",
@@ -7096,7 +7123,9 @@
     "hardware decoders",
     "A/V sync"
    ],
-   "tool_consumes": [],
+   "tool_consumes": [
+    "C-COOK"
+   ],
    "provides": [
     "C-VIDEO"
    ],
@@ -7246,14 +7275,20 @@
     "C-PREDICT?",
     "C-DET",
     "C-VEHICLE?",
-    "C-INTEGRITY?"
+    "C-INTEGRITY?",
+    "C-CAMERA?",
+    "C-GAMEDATA"
    ],
    "expertise": [
     "character movement",
     "movement netcode",
     "game feel"
    ],
-   "tool_consumes": [],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-EDVIEW"
+   ],
    "provides": [
     "C-MOVE"
    ],
@@ -7643,7 +7678,8 @@
    ],
    "implements": [],
    "untrusted_inputs": [
-    "external-reports"
+    "external-reports",
+    "player-feedback"
    ]
   },
   {
@@ -7940,6 +7976,7 @@
     "C-SAVE?"
    ],
    "untrusted_inputs": [
+    "store-notifications",
     "transaction-requests"
    ],
    "tool_consumes": [],
@@ -8122,7 +8159,9 @@
     "C-EDHOST",
     "C-EDVIEW"
    ],
-   "provides": [],
+   "provides": [
+    "C-CAMERA"
+   ],
    "implements": []
   },
   {

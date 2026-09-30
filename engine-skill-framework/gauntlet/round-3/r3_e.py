@@ -146,6 +146,7 @@ def apply(ed):
                "buildable; RT-required products are expressed as the hwrt profile plus the 'rt' GPU tier (partial)")
 
     t = "K-FUTURE-4"
+    ed.note(t, "radar entries rewritten with their own fallback/evidence/trigger (autodiff, agent-exploration, ml-assisted cook, hair, PT, webgpu, splats, work graphs, genai)")
     _radar_set(ed, "Agent/automation control API (MCP class) (QA.FUNC", fallback="scripted bots and random-walk monkeys",
                evidence="EA SEED RL testing; academic game-testing agents", revisit="Agent-found defects exceed the "
                "scripted-bot rate over two milestones")

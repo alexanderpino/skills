@@ -36,6 +36,7 @@ Cross-cutting disciplines own an **obligation** that every other skill must meet
 | authoring path | editor-architect | Every user-facing runtime feature has tool logic in a <DOMAIN>.TOOL capability owned by the domain skill, hosted via C-EDCMD/C-EDHOST; ship creator-facing docs for every TOOL capability. |
 | localizability | localization-i18n | Declare every player-visible text, audio and image output; use stable string IDs; support expansion, RTL and culturalized variants. |
 | live changeability | online-services-liveops | Declare remote-tunable parameters, patch-stable data layout and behaviour under client/server/content version skew (with packaging-release-patching). |
+| personal data | privacy-data-protection | Declare the personal data classes the skill collects, logs or transmits, their purpose, retention, on-device default and deletion path; feeds XC.SEC.data-rights. |
 
 ## Independence matrix
 
@@ -48,6 +49,8 @@ These pairs are never hosted by the same agent at any organization tier (`check.
 | program-orchestration | reference-games | milestone owner vs gate content |
 | security-engineering | owning-skill | security reviewer vs reviewed code |
 | test-architect | owning-skill | oracle author vs implementer |
+| security-engineering | security-runtime | reviewer vs implementer of crypto and trust-root code |
+| robustness-fuzzing | owning-skill | fuzz-harness co-signer vs parser owner |
 
 ## Cross-cutting and orchestration skills
 
@@ -57,7 +60,7 @@ These pairs are never hosted by the same agent at any organization tier (`check.
 - **research-evidence** (cross-cutting) — Research discipline for every major decision: finds and grades authoritative evidence (production talks, platform docs, peer-reviewed work, reproducible benchmarks), classifies techniques as established / emerging / experimental / speculative, and runs spikes where literature is thin.
 - **performance-architect** (cross-cutting) — Owns performance as a discipline: the hypothesis → instrumentation → measurement → optimization → regression-test loop, budgets per subsystem and hardware tier, the scalability / device-profile framework, and performance gates.
 - **test-architect** (cross-cutting) — Test strategy and architecture: per-subsystem test pyramid, frameworks, the test definition of done every skill must meet, contract tests, test content, coverage and mutation policy, flakiness policy.
-- **security-engineering** (cross-cutting) — Threat modeling and trust boundaries for every untrusted input, secure-coding and memory-safety policy, supply-chain security, secrets, anti-tamper boundary, privacy engineering, mod/UGC sandbox policy.
+- **security-engineering** (cross-cutting) — Threat modeling and trust boundaries for every untrusted input, secure-coding and memory-safety policy, supply-chain security, secrets, anti-tamper boundary, mod/UGC sandbox policy.
 - **observability-telemetry** (cross-cutting) — Instrumentation substrate: structured logging, trace zones (CPU, GPU, IO, memory), counters and metrics, profiler integrations, in-game stats, development and live telemetry with privacy consent; zero cost when compiled out.
 - **crash-diagnostics** (cross-cutting) — Crash, hang and GPU-fault capture and reporting: minidumps, symbolication, bucketing and triage, GPU crash dumps, watchdogs, OOM reports, assert reporting.
 - **determinism-replay** (cross-cutting) — Defines determinism levels (none, same-binary, cross-platform) per subsystem and the floating-point and parallel-execution rules that achieve them; owns input/state record-replay and desync detection.

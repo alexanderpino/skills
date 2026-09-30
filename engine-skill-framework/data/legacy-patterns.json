@@ -1,5 +1,5 @@
 {
- "_doc": "Anti-legacy pattern catalogue. A pattern is not forbidden; if present it needs an ADR by the justification owner. Checked by K-LEGACY at G2 and S1–S4.",
+ "_doc": "Anti-legacy pattern catalogue. A pattern is not forbidden; if present it needs an ADR by the justification owner. Checked by K-LEGACY at G2 and S1–S4. contradiction_terms are regexes: check.py fails when a capability name, contract name/summary or skill purpose matches one, unless adr_exceptions names the pattern and the item with its ADR.",
  "patterns": [
   {
    "id": "L01",
@@ -203,6 +203,9 @@
    "justification_owner": "entity-object-model",
    "stance_capabilities": [
     "CORE.OBJ.events"
+   ],
+   "contradiction_terms": [
+    "immediate synchronous|global event bus"
    ]
   },
   {
@@ -242,6 +245,8 @@
    "default_stance": "Tool-side modules; tools target only",
    "justification_owner": "editor-architect",
    "stance_capabilities": [
+    "ARCH.STRUCT.layering",
+    "BLD.SYS.dev-surface-exclusion",
     "ED.ARCH.separation"
    ]
   },
@@ -320,6 +325,9 @@
    "justification_owner": "frame-orchestration",
    "stance_capabilities": [
     "CORE.FRAME.fixed-step"
+   ],
+   "contradiction_terms": [
+    "variable[- ]timestep|render frame delta"
    ]
   },
   {
@@ -403,6 +411,9 @@
    "justification_owner": "editor-architect",
    "stance_capabilities": [
     "ED.ARCH.transactions"
+   ],
+   "contradiction_terms": [
+    "snapshot-based undo"
    ]
   },
   {
@@ -413,6 +424,9 @@
    "justification_owner": "world-data-model",
    "stance_capabilities": [
     "WLD.MODEL.file-per-object"
+   ],
+   "contradiction_terms": [
+    "monolithic binary"
    ]
   },
   {
@@ -444,6 +458,9 @@
    "stance_capabilities": [
     "NET.TRANS.reliability",
     "NET.TRANS.web"
+   ],
+   "contradiction_terms": [
+    "\\bTCP\\b|all-reliable"
    ]
   },
   {
@@ -476,6 +493,9 @@
    "stance_capabilities": [
     "NET.ARCH.versioning",
     "NET.REP.compat"
+   ],
+   "contradiction_terms": [
+    "exact-build"
    ]
   },
   {
@@ -614,6 +634,9 @@
    "stance_capabilities": [
     "RND.POST.color",
     "RND.POST.effects"
+   ],
+   "contradiction_terms": [
+    "after tonemapping"
    ]
   },
   {
@@ -626,6 +649,209 @@
     "RND.GEO.mesh-shaders",
     "RND.LOD.displacement"
    ]
+  },
+  {
+   "id": "L60",
+   "pattern": "float32 world positions & whole-world origin rebasing",
+   "detection": "single-precision absolute positions; teleporting the world to hide jitter",
+   "default_stance": "Large-world coordinates: double/tiled positions and local-frame rendering",
+   "justification_owner": "world-architect",
+   "stance_capabilities": [
+    "WLD.SPACE.lwc",
+    "WLD.PART.lwc-policy"
+   ],
+   "contradiction_terms": [
+    "float32 world position|whole-world origin rebas"
+   ]
+  },
+  {
+   "id": "L61",
+   "pattern": "Locks, allocation or IO in the real-time audio callback",
+   "detection": "mutex, malloc or file read reachable from the audio render thread",
+   "default_stance": "Lock-free, allocation-free audio render thread; control via lock-free queues",
+   "justification_owner": "audio-architect",
+   "stance_capabilities": [
+    "AUD.ARCH.engine",
+    "CORE.JOBS.thread-model"
+   ],
+   "contradiction_terms": [
+    "locks? in the (?:audio )?callback"
+   ]
+  },
+  {
+   "id": "L62",
+   "pattern": "#ifdef über-shader permutation explosion",
+   "detection": "unbounded static permutations per material",
+   "default_stance": "Permutation budgets with specialization constants and pipeline libraries",
+   "justification_owner": "shader-system",
+   "stance_capabilities": [
+    "RND.SHADER.permutation-budget",
+    "RND.SHADER.permutations"
+   ],
+   "contradiction_terms": [
+    "über-?shader|permutation explosion"
+   ]
+  },
+  {
+   "id": "L63",
+   "pattern": "Gameplay reading raw device state or key codes",
+   "detection": "key/button codes or polling in gameplay code",
+   "default_stance": "Actions and contexts through C-INPUT mapping",
+   "justification_owner": "input-system",
+   "stance_capabilities": [
+    "INP.ACT.mapping"
+   ],
+   "contradiction_terms": [
+    "raw (?:key|device) (?:codes|state)"
+   ]
+  },
+  {
+   "id": "L64",
+   "pattern": "Raw struct-dump saves without a schema",
+   "detection": "memcpy'd structs as save files",
+   "default_stance": "Schema-versioned saves with migration",
+   "justification_owner": "persistence-save",
+   "stance_capabilities": [
+    "GAM.SAVE.model",
+    "GAM.SAVE.migration"
+   ],
+   "contradiction_terms": [
+    "struct[- ]dump"
+   ]
+  },
+  {
+   "id": "L65",
+   "pattern": "Fixed 30/60 Hz assumptions, sleep limiters and blocking vsync present",
+   "detection": "sleep-based frame limiting; constants of 1/60",
+   "default_stance": "Present timeline with pacing feedback and latency-aware limiters",
+   "justification_owner": "frame-orchestration",
+   "stance_capabilities": [
+    "CORE.FRAME.present-timeline",
+    "CORE.FRAME.latency"
+   ],
+   "contradiction_terms": [
+    "sleep[- ]based (?:frame )?limit|fixed 60 ?hz"
+   ]
+  },
+  {
+   "id": "L66",
+   "pattern": "Per-item general heap allocation on hot paths",
+   "detection": "malloc/new per entity, event or command",
+   "default_stance": "Pools, arenas and budget-enforced allocators",
+   "justification_owner": "memory-allocators",
+   "stance_capabilities": [
+    "CORE.MEM.allocators",
+    "CORE.MEM.budget-enforcement"
+   ],
+   "contradiction_terms": [
+    "per-item (?:heap )?allocation"
+   ]
+  },
+  {
+   "id": "L67",
+   "pattern": "#ifdef platform sprawl",
+   "detection": "platform conditionals in shared code",
+   "default_stance": "Platform backends behind contracts",
+   "justification_owner": "platform-architect",
+   "stance_capabilities": [
+    "ARCH.STRUCT.platform-backends"
+   ],
+   "contradiction_terms": [
+    "platform #ifdef|ifdef sprawl"
+   ]
+  },
+  {
+   "id": "L68",
+   "pattern": "Timestamp-based derived data",
+   "detection": "cook/build outputs keyed by file times",
+   "default_stance": "Content-addressed derived data cache",
+   "justification_owner": "content-pipeline-architect",
+   "stance_capabilities": [
+    "CNT.COOK.ddc"
+   ],
+   "contradiction_terms": [
+    "timestamp[- ]based (?:cook|derived)"
+   ]
+  },
+  {
+   "id": "L69",
+   "pattern": "Flaky-test tolerance (retry until green)",
+   "detection": "retries or quarantines that hide nondeterminism",
+   "default_stance": "Flake classification and root-cause policy",
+   "justification_owner": "test-architect",
+   "stance_capabilities": [
+    "QA.STRAT.flaky"
+   ],
+   "contradiction_terms": [
+    "retry until green"
+   ]
+  },
+  {
+   "id": "L70",
+   "pattern": "Average-fps performance targets",
+   "detection": "budgets stated as mean fps",
+   "default_stance": "Per-tier frame-time budgets with percentiles",
+   "justification_owner": "performance-architect",
+   "stance_capabilities": [
+    "PRF.METH.budgets"
+   ],
+   "contradiction_terms": [
+    "average[- ]fps|mean fps"
+   ]
+  },
+  {
+   "id": "L71",
+   "pattern": "Big-bang releases without staged rollout",
+   "detection": "all-at-once patch to every client",
+   "default_stance": "Canary/staged rollout with kill switches",
+   "justification_owner": "packaging-release-patching",
+   "stance_capabilities": [
+    "BLD.REL.staged-rollout"
+   ],
+   "contradiction_terms": [
+    "big-bang release"
+   ]
+  },
+  {
+   "id": "L72",
+   "pattern": "Baked-string localization",
+   "detection": "translated text embedded in code or textures",
+   "default_stance": "Keyed string tables with plural/gender rules",
+   "justification_owner": "localization-i18n",
+   "stance_capabilities": [
+    "UI.LOC.strings"
+   ],
+   "contradiction_terms": [
+    "hard-?coded (?:ui )?strings"
+   ]
+  },
+  {
+   "id": "L73",
+   "pattern": "Reconstruction/frame generation as budget substitute",
+   "detection": "budgets or latency judged on generated frames",
+   "default_stance": "Upscaling/frame generation is an optional presentation layer; budgets and latency judged on rendered frames with a minimum base rate per tier",
+   "justification_owner": "performance-architect",
+   "stance_capabilities": [
+    "RND.RECON.framegen",
+    "PRF.LOAD.pacing-latency"
+   ],
+   "contradiction_terms": [
+    "counted toward (?:the )?(?:simulation|latency) budget"
+   ]
+  },
+  {
+   "id": "L74",
+   "pattern": "Long-lived static CI/cloud credentials",
+   "detection": "keys in CI variables or images",
+   "default_stance": "OIDC workload identity, short-lived tokens, ephemeral runners",
+   "justification_owner": "ci-cd-automation",
+   "stance_capabilities": [
+    "BLD.CI.hardening"
+   ],
+   "contradiction_terms": [
+    "static (?:ci|cloud) credentials"
+   ]
   }
- ]
+ ],
+ "adr_exceptions": []
 }

@@ -493,6 +493,55 @@
    "trust": "hostile-remote",
    "mode": "harness",
    "limits": "length/rate/token budget/moderation pre-filter"
+  },
+  {
+   "id": "web-content",
+   "validating_owner": "ui-architect",
+   "parser_owners": [
+    "platform-services"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "navigation allow-list; process isolation; no engine bridge by default"
+  },
+  {
+   "id": "triage-artifacts",
+   "validating_owner": "program-orchestration",
+   "parser_owners": [
+    "ci-cd-automation",
+    "crash-diagnostics"
+   ],
+   "trust": "agent-input",
+   "mode": "redteam",
+   "limits": "quarantined as data; triage agents may not change baselines or quarantine tests"
+  },
+  {
+   "id": "player-feedback",
+   "validating_owner": "crash-diagnostics",
+   "parser_owners": [
+    "engine-product-management"
+   ],
+   "trust": "agent-input",
+   "mode": "redteam",
+   "limits": "quarantined as data; no instruction authority"
+  },
+  {
+   "id": "inter-agent-messages",
+   "validating_owner": "program-orchestration",
+   "parser_owners": [],
+   "trust": "agent-input",
+   "mode": "redteam",
+   "limits": "provenance-tagged; no instruction authority; findings and commit messages are data"
+  },
+  {
+   "id": "store-notifications",
+   "validating_owner": "platform-services",
+   "parser_owners": [
+    "server-scaleout-persistence"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "signature verification, replay window, schema bounds"
   }
  ]
 }

@@ -182,7 +182,7 @@ Threat model, trust boundaries, memory safety, supply chain, privacy, incident r
 | platform-mobile | · |  |  |  |  |  | ◆ | · | · | · | · | · |  | · | · |
 | platform-services | · |  |  |  | ◆ |  | ◆ | · | · | · | · | · |  | · | ◆ |
 | input-system | · |  |  |  | ◆ | ◆ | ◆ | · | · | · | · | · | ◆ | · | · |
-| input-devices-haptics | · |  |  |  |  | ◆ | ◆ | · | · | · | · | · | ◆ | · | · |
+| input-devices-haptics | · |  |  |  |  |  | ◆ | · | · | · | · | · | ◆ | · | · |
 | xr-runtime | · | ◆ |  |  |  |  | ◆ | · | · | · | · | · |  | · | · |
 | content-pipeline-architect | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
 | asset-import-interchange | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · | ◆ |
@@ -273,7 +273,7 @@ Threat model, trust boundaries, memory safety, supply chain, privacy, incident r
 | media-playback | · | ◆ | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
 | vehicle-physics | · |  |  | ◆ | ◆ | ◆ |  | · | · | · | · | · |  | · | · |
 | physics-tools | · |  |  | ◆ |  | ◆ |  | · | · | · | · | · |  | · | · |
-| character-movement | · |  |  | ◆ | ◆ |  |  | · | · | · | · | · | ◆ | · | · |
+| character-movement | · |  |  | ◆ | ◆ | ◆ |  | · | · | · | · | · | ◆ | · | · |
 | gameplay-data | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
 | narrative-dialogue | · |  |  |  | ◆ | ◆ |  | · | · | · | · | · | ◆ | · | · |
 | reference-games | · |  |  |  |  |  |  | · | ◆ | · | · | · |  | ◆ | · |

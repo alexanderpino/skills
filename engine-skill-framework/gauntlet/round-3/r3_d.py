@@ -90,6 +90,7 @@ def apply(ed):
             e["fallback"] = "RND.RECON.denoise (spatiotemporal denoisers)"
 
     t = "K-RENDER-9"
+    ed.note(t, "radar: autodiff entry gets its own fallback; neural-evaluation evidence refreshed to API-neutral matrix intrinsics")
     for e in ed.doc["radar"]["entries"]:
         if "RND.SHADER.autodiff" in e["capabilities"] and e["tech"] != "In-shader neural evaluation & differentiable shaders":
             e["fallback"] = "hand-derived gradients or finite differences in tool code"
@@ -101,6 +102,7 @@ def apply(ed):
                 e["capabilities"] = [c for c in e["capabilities"] if c != "RND.SHADER.autodiff"]
 
     t = "K-RENDER-10"
+    ed.note(t, "legacy catalogue: L58 (display-referred pipeline), L59 (GS/HW-tessellation/stream-out); L29 stance capabilities extended")
     ed.doc["legacy"]["patterns"] += [
         {"id": "L58", "pattern": "Display-referred / LDR effect pipeline", "detection": "bloom, DOF or motion blur after "
          "tonemapping; 8-bit intermediate targets on HDR-capable tiers",

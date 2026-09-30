@@ -41,7 +41,7 @@ Every non-established capability is on the radar with an owner, evidence, a revi
 | Particle & GPU fluids | emerging | fluid-simulation | `PHY.FLUID.particles`, `PHY.FLUID.gpu`, `PHY.FLUID.grid` | Niagara Fluids (beta); Flex titles | Gameplay-interactive shipped use | Baked volume/flipbook playback (RND.VFX.volume-playback) |
 | ML deformers | emerging | deformation-skinning | `ANM.DEF.ml` | UE ML Deformer | Training pipeline & runtime cost fit | Linear/DQ skinning + correctives |
 | Learned motion & neural controllers | emerging | motion-synthesis | `ANM.SYN.learned` | Holden et al. 2020 | Memory/runtime vs quality evidence on engine data | Motion matching |
-| Audio-driven & ML lip sync | emerging | facial-animation | `ANM.FACE.lipsync` | Production phoneme lip sync; ML variants | Localization coverage & quality | Phoneme/viseme lip sync |
+| Audio-driven & ML lip sync | emerging | facial-animation | `ANM.FACE.lipsync-ml` | Production phoneme lip sync; ML variants | Localization coverage & quality | ANM.FACE.lipsync (phoneme/viseme lip sync) |
 | Wave-based acoustic propagation | emerging | spatial-audio-acoustics | `AUD.SPAT.propagation` | Project Acoustics; Steam Audio | Bake/runtime cost fit | Reverb zones + occlusion |
 | Runtime neural speech (TTS/ASR) | emerging | audio-content-runtime | `AUD.CONTENT.speech` | Shipped AI-NPC titles 2025 | Latency, cost & localization quality | Recorded VO |
 | Seamless server meshing | emerging | server-scaleout-persistence | `NET.ARCH.meshing` | Star Citizen server meshing live since late 2024; few technical postmortems | Two shipped-title technical postmortems | Zoned/instanced servers (NET.SRV.zoning) |
@@ -58,7 +58,7 @@ Every non-established capability is on the radar with an owner, evidence, a revi
 | Conflict-free concurrent world editing | emerging | collaboration-version-control | `ED.COLLAB.concurrent-world` | CRDT editing outside games (Figma, Omniverse live layers) | Two engine postmortems at 100+ concurrent editors | Cell/actor-granular locks + one-file-per-object |
 | Post-quantum signatures | emerging | security-runtime | `XC.SEC.pqc-signatures` | NIST FIPS 204/205 (2024); deprecation track 2030–2035 | Platform/store acceptance of PQC signatures | Classical signatures with algorithm agility |
 | User-mode & attestation-based anti-cheat | emerging | anti-cheat-integrity | `XC.SEC.usermode-anticheat` | Windows Resiliency Initiative (2024–2025); Proton compatibility | Windows kernel-access policy change | Middleware kernel anti-cheat where platform permits |
-| Validation of autonomous-agent development (test side) | emerging | test-architect | `QA.AGENT.oracle-independence`, `QA.AGENT.baseline-governance`, `QA.AGENT.test-integrity`, `QA.AGENT.mutation-gate` | docs/06 A13; reward-hacking reports in agentic coding (2025) | Measured seeded-defect escape rate below threshold across N milestones | Mandatory human review sampling per tier (ARCH.ORG.human-gates) and frozen agent authority over oracles |
+| Validation of autonomous-agent development (test side) | emerging | test-architect | `QA.AGENT.baseline-governance`, `QA.AGENT.gate-canaries`, `QA.AGENT.holdout`, `QA.AGENT.mutation-gate`, `QA.AGENT.oracle-change-control`, `QA.AGENT.oracle-independence`, `QA.AGENT.test-integrity` | docs/06 A13; reward-hacking reports in agentic coding (2025) | Measured seeded-defect escape rate below threshold across N milestones | Mandatory human review sampling per tier (ARCH.ORG.human-gates) and frozen agent authority over oracles |
 | Governance of autonomous-agent development (review side) | emerging | architecture-governance | `ARCH.ORG.critic-calibration`, `ARCH.ORG.adjudication` | docs/06 A13; LLM-as-judge bias literature | Calibrated critic recall and precision stable across three milestones | Mandatory human review sampling per tier (ARCH.ORG.human-gates) and frozen agent authority over oracles |
 | Agent provenance & boundaries | emerging | program-orchestration | `ARCH.ORG.provenance` | SLSA provenance applied to agents (new) | Industry provenance standard for AI-authored code | Mandatory human review sampling per tier (ARCH.ORG.human-gates) and frozen agent authority over oracles |
 | Development-agent security boundary | emerging | security-engineering | `XC.SEC.agent-boundary`, `XC.SEC.agent-redteam` | OWASP LLM01; CVE-2025-53773, CVE-2025-54135 | Demonstrated robust prompt-injection defence | Mandatory human review sampling per tier (ARCH.ORG.human-gates) and frozen agent authority over oracles |
@@ -83,6 +83,7 @@ Every non-established capability is on the radar with an owner, evidence, a revi
 | Cross-platform bit-reproducible float math | emerging | math-simd-numerics | `CORE.MATH.deterministic` | Same-binary determinism is established; cross-ISA/compiler reproducibility of floats is not (A4) | Two shipped titles run mixed-platform lockstep on float math without desync | CORE.MATH.fixed-point (fixed-point numerics) or same-binary determinism |
 | Runtime procedural fracture at scale | emerging | destruction-fracture | `PHY.DEST.procedural` | Pre-fractured destruction is established; impact-time fracture at scale is research-grade | A shipped title fractures at impact within the debris budget on consoles | PHY.DEST.runtime (pre-fractured assets) |
 | On-device autoregressive execution | emerging | ml-inference-runtime | `ML.RT.sequence-exec` | OS-provided and open on-device speech/language runtimes (2024–2026) | Two shipping consumers stay within KV-cache and latency budgets on min-spec | remote model via C-LIVE (ML.RT.local-remote) |
+| Geospatial localization (VPS) & Earth-anchored content | emerging | xr-runtime | `PLAT.XR.geospatial` | Platform VPS/geospatial APIs (2022–2025) | Two platforms expose stable geospatial anchors | PLAT.XR.anchors (local/shared anchors) with PLAT.MOB.location |
 | Cloud-hybrid compute (split client/cloud simulation) | experimental | network-architect | `PLAT.PAL.cloud-hybrid` | Crackdown 3 cloud destruction (2019) — limited | Two shipped titles publish latency/cost postmortems | Local simulation only |
 | ML-generated content in PCG | experimental | procedural-generation | `WLD.PCG.ml` | Research & tool demos | Deterministic, licensable models with provenance | Rule-based PCG |
 | Work graphs & mesh nodes | experimental | render-graph-scheduling | `RND.GRAPH.work-graphs` | D3D12 Work Graphs 1.0 (2024); vendor samples; no shipped titles | Support on ≥2 console/desktop APIs and one shipped-title postmortem | Indirect / device-generated commands |
@@ -135,7 +136,7 @@ A pattern is not forbidden. If it appears, the justification owner must record a
 | L20 | Stringly-typed reflection on runtime paths | name lookups per frame | Static reflection & resolved IDs; strings at tool/script boundaries | reflection-metadata | `CORE.REFL.static-default` |
 | L21 | Tracing-GC-managed engine objects | engine objects reachable via GC | Explicit ownership + generational handles; weak script refs | entity-object-model | `CORE.OBJ.references` |
 | L22 | Global script VM on one thread | single interpreter mutating the world | Per-worker VMs/isolates, deferred mutation | scripting-runtime | `GAM.SCR.concurrency` |
-| L23 | Editor-in-runtime monolith | editor code linked into shipping builds | Tool-side modules; tools target only | editor-architect | `ED.ARCH.separation` |
+| L23 | Editor-in-runtime monolith | editor code linked into shipping builds | Tool-side modules; tools target only | editor-architect | `ARCH.STRUCT.layering`, `BLD.SYS.dev-surface-exclusion`, `ED.ARCH.separation` |
 | L24 | Blocking cook-before-play | full cook required before running | On-demand cooking & cook-server streaming | content-pipeline-architect | `CNT.COOK.on-demand` |
 | L25 | Single-thread-first design | systems that must run serially by construction | Parallel by construction, correct on one worker (inline mode) | architecture-governance | `CORE.JOBS.scheduler`, `CORE.JOBS.degenerate`, `ARCH.GOV.fitness` |
 | L26 | Monolithic subsystems | one module owning a whole domain | Contracts + focused experts | engine-architect | `ARCH.STRUCT.contracts`, `ARCH.STRUCT.replaceability` |
@@ -172,6 +173,21 @@ A pattern is not forbidden. If it appears, the justification owner must record a
 | L57 | Wall-clock time and exact-pixel goldens in tests | sleeps, real clocks, bit-exact images across GPUs | Injectable clocks, perceptual metrics with per-GPU tolerances | test-architect | `QA.STRAT.oracles`, `CORE.FRAME.test-clock` |
 | L58 | Display-referred / LDR effect pipeline | bloom, DOF or motion blur after tonemapping; 8-bit intermediate targets on HDR-capable tiers | Scene-referred linear HDR chain with a single output transform; only grain, dithering and UI-safe sharpening after it | post-color-hdr | `RND.POST.color`, `RND.POST.effects` |
 | L59 | Geometry shaders, HW tessellation and stream-out pipelines on capable tiers | GS/HS/DS stages or stream-out in material or LOD paths | Mesh shaders or compute expansion; cluster/displacement paths on GPU-driven tiers | geometry-pipeline | `RND.GEO.mesh-shaders`, `RND.LOD.displacement` |
+| L60 | float32 world positions & whole-world origin rebasing | single-precision absolute positions; teleporting the world to hide jitter | Large-world coordinates: double/tiled positions and local-frame rendering | world-architect | `WLD.SPACE.lwc`, `WLD.PART.lwc-policy` |
+| L61 | Locks, allocation or IO in the real-time audio callback | mutex, malloc or file read reachable from the audio render thread | Lock-free, allocation-free audio render thread; control via lock-free queues | audio-architect | `AUD.ARCH.engine`, `CORE.JOBS.thread-model` |
+| L62 | #ifdef über-shader permutation explosion | unbounded static permutations per material | Permutation budgets with specialization constants and pipeline libraries | shader-system | `RND.SHADER.permutation-budget`, `RND.SHADER.permutations` |
+| L63 | Gameplay reading raw device state or key codes | key/button codes or polling in gameplay code | Actions and contexts through C-INPUT mapping | input-system | `INP.ACT.mapping` |
+| L64 | Raw struct-dump saves without a schema | memcpy'd structs as save files | Schema-versioned saves with migration | persistence-save | `GAM.SAVE.model`, `GAM.SAVE.migration` |
+| L65 | Fixed 30/60 Hz assumptions, sleep limiters and blocking vsync present | sleep-based frame limiting; constants of 1/60 | Present timeline with pacing feedback and latency-aware limiters | frame-orchestration | `CORE.FRAME.present-timeline`, `CORE.FRAME.latency` |
+| L66 | Per-item general heap allocation on hot paths | malloc/new per entity, event or command | Pools, arenas and budget-enforced allocators | memory-allocators | `CORE.MEM.allocators`, `CORE.MEM.budget-enforcement` |
+| L67 | #ifdef platform sprawl | platform conditionals in shared code | Platform backends behind contracts | platform-architect | `ARCH.STRUCT.platform-backends` |
+| L68 | Timestamp-based derived data | cook/build outputs keyed by file times | Content-addressed derived data cache | content-pipeline-architect | `CNT.COOK.ddc` |
+| L69 | Flaky-test tolerance (retry until green) | retries or quarantines that hide nondeterminism | Flake classification and root-cause policy | test-architect | `QA.STRAT.flaky` |
+| L70 | Average-fps performance targets | budgets stated as mean fps | Per-tier frame-time budgets with percentiles | performance-architect | `PRF.METH.budgets` |
+| L71 | Big-bang releases without staged rollout | all-at-once patch to every client | Canary/staged rollout with kill switches | packaging-release-patching | `BLD.REL.staged-rollout` |
+| L72 | Baked-string localization | translated text embedded in code or textures | Keyed string tables with plural/gender rules | localization-i18n | `UI.LOC.strings` |
+| L73 | Reconstruction/frame generation as budget substitute | budgets or latency judged on generated frames | Upscaling/frame generation is an optional presentation layer; budgets and latency judged on rendered frames with a minimum base rate per tier | performance-architect | `RND.RECON.framegen`, `PRF.LOAD.pacing-latency` |
+| L74 | Long-lived static CI/cloud credentials | keys in CI variables or images | OIDC workload identity, short-lived tokens, ephemeral runners | ci-cd-automation | `BLD.CI.hardening` |
 
 ## Untrusted-input registry
 
@@ -235,6 +251,11 @@ Every input class has exactly one validating owner; parser owners register it to
 | client-rpcs | replication | — | hostile-remote | harness | per-RPC rate, argument bounds, authority check |
 | ipc-messages | core-runtime-architect | crash-diagnostics, editor-architect | hostile-local | harness | frame size/rate/schema version; TOCTOU-safe copy-out from shared memory |
 | player-model-prompts | ai-behavior-perception | audio-content-runtime, online-services-liveops, modding-ugc | hostile-remote | harness | length/rate/token budget/moderation pre-filter |
+| web-content | ui-architect | platform-services | hostile-remote | harness | navigation allow-list; process isolation; no engine bridge by default |
+| triage-artifacts | program-orchestration | ci-cd-automation, crash-diagnostics | agent-input | redteam | quarantined as data; triage agents may not change baselines or quarantine tests |
+| player-feedback | crash-diagnostics | engine-product-management | agent-input | redteam | quarantined as data; no instruction authority |
+| inter-agent-messages | program-orchestration | — | agent-input | redteam | provenance-tagged; no instruction authority; findings and commit messages are data |
+| store-notifications | platform-services | server-scaleout-persistence | hostile-remote | harness | signature verification, replay window, schema bounds |
 
 ## Milestones (walking skeleton → engine 1.0)
 
@@ -246,7 +267,7 @@ Every input class has exactly one validating owner; parser owners register it to
 
 **Exit criteria:** Boots on one PC platform, runs the task graph, opens a window, presents through the RHI, reads input, draws a sprite and text, loads one cooked and signed asset from a package, passes CI with sanitizer, fuzz (package/serialization parsers) and determinism smoke lanes. Perf: trace capture and the C-BENCH runner on the skeleton; C-BUDGET v0 for indie-2d tiers; CI perf lane (frame time, startup, memory).
 
-**Gates (capability → independent validator):** `QA.HOST.runner` → `QA.STRAT.integration`, `XC.DET.conformance` → `QA.ROBUST.concurrency`, `QA.ROBUST.fuzzing` → `QA.AGENT.gate-canaries`, `OBS.LOG.bench-runtime` → `PRF.BENCH.regression`
+**Gates (capability → independent validator):** `QA.HOST.runner` → `QA.STRAT.integration`, `XC.DET.conformance` → `QA.ROBUST.concurrency`, `QA.ROBUST.fuzzing` → `QA.AGENT.gate-canaries`, `OBS.LOG.bench-runtime` → `PRF.BENCH.regression`, `QA.AGENT.test-integrity` → `XC.SEC.agent-redteam`, `QA.AGENT.holdout` → `QA.SIM.golden-traces`, `QA.AGENT.mutation-gate` → `QA.ROBUST.fuzzing`, `QA.AGENT.gate-canaries` → `XC.SEC.agent-redteam`, `XC.SEC.agent-boundary` → `QA.AGENT.gate-canaries`, `XC.SEC.supply-chain` → `BLD.SYS.dev-surface-exclusion`, `XC.SEC.secrets` → `BLD.CI.hardening`, `XC.SEC.key-custody` → `QA.CERT.prechecks`
 
 **Contracts frozen:** C-ADR, C-ARCH, C-BASE, C-BUDGET, C-CFG, C-CRASH, C-ERR, C-INSTR, C-LIFETIME, C-MATH, C-MEM, C-MOD, C-ORCH, C-SCALE, C-SIGN, C-SYNC, C-TASK, C-TEST, C-TESTHOST, C-TYPES
 
@@ -260,11 +281,11 @@ Skills: asset-cook-processors, asset-import-interchange, async-io-storage, build
 
 **Exit criteria:** The indie-2d and minimal reference games are playable on PC with save, localization, accessibility baseline and hot reload. Network design authorities (network-architect, transport, replication, prediction, sessions) draft C-NET/C-REP/C-PREDICT/C-NETSESSION and review every freeze; a two-instance loopback session (lockstep or rollback) runs under QA.SIM.netsim. Security: threat model for the configuration, fuzz harnesses for every registered input reaching it, hardened shipping build, dev-surface audit. Perf: within budget on min-spec PC; hitch gate active.
 
-**Gates (capability → independent validator):** `QA.REF.ladder` → `QA.STRAT.release-criteria`, `QA.SIM.netsim` → `QA.AGENT.oracle-change-control`, `XC.SEC.threats` → `QA.ROBUST.fuzzing`, `XC.SEC.hardening` → `QA.CERT.prechecks`, `BLD.SYS.dev-surface-exclusion` → `XC.SEC.testing`, `PRF.LOAD.hitch-gate` → `PRF.BENCH.regression`
+**Gates (capability → independent validator):** `QA.REF.ladder` → `QA.STRAT.release-criteria`, `QA.SIM.netsim` → `QA.AGENT.oracle-change-control`, `XC.SEC.threats` → `QA.ROBUST.fuzzing`, `XC.SEC.hardening` → `QA.CERT.prechecks`, `BLD.SYS.dev-surface-exclusion` → `XC.SEC.testing`, `PRF.LOAD.hitch-gate` → `PRF.BENCH.regression`, `QA.RENDER.golden` → `QA.FUNC.compat`, `QA.SIM.stability-suite` → `QA.FUNC.soak`
 
 **Contracts frozen:** C-API, C-ASSET, C-BUILD, C-COOK, C-DET, C-EVID, C-FLOW, C-FRAME, C-ID, C-INPUT, C-PERF, C-PRESENT, C-REFL, C-SER, C-SPATIAL, C-TEXT, C-TRUST, C-VIEW
 
-**Contracts drafted:** C-A11YRT, C-ABILITY, C-AI, C-AIAGENT, C-ANIM, C-AUDIO, C-DIALOGUE, C-ECS, C-ENV, C-GAME, C-GAMEDATA, C-HOSTAUTH, C-INTEGRITY, C-LIVE, C-LOC, C-MOVE, C-NAV, C-NET, C-NETLINK, C-NETSESSION, C-PCG, C-PHYS, C-PKG, C-PLUGIN, C-PREDICT, C-RELOAD, C-REP, C-SAVE, C-SCRIPT, C-SEQ, C-SIGNIF, C-SVC, C-UI, C-VFX, C-VIDEO, C-WORLD
+**Contracts drafted:** C-A11YRT, C-ABILITY, C-AI, C-AIAGENT, C-ANIM, C-AUDIO, C-CAMERA, C-DIALOGUE, C-ECS, C-ENV, C-GAME, C-GAMEDATA, C-HOSTAUTH, C-INTEGRITY, C-LIVE, C-LOC, C-MOVE, C-NAV, C-NET, C-NETLINK, C-NETSESSION, C-PCG, C-PHYS, C-PKG, C-PLUGIN, C-PREDICT, C-RELOAD, C-REP, C-SAVE, C-SCRIPT, C-SEQ, C-SIGNIF, C-SVC, C-UI, C-VFX, C-VIDEO, C-WORLD
 
 Skills: accessibility, ai-behavior-perception, animation-architect, animation-graphs, animation-runtime, anti-cheat-integrity, audio-architect, audio-content-runtime, audio-dsp-mixing, character-movement, cinematics-sequencer, ecs-runtime, gameplay-architect, gameplay-camera, gameplay-data, gameplay-systems-toolkit, hot-reload-iteration, ik-procedural-animation, localization-i18n, media-playback, narrative-dialogue, navigation-pathfinding, net-session, network-architect, network-transport, online-services-liveops, packaging-release-patching, persistence-save, physics-2d, physics-architect, platform-services, plugin-system, prediction-rollback, procedural-generation, reference-games, replication, rhi-d3d12, rhi-metal, scripting-runtime, ui-architect, vfx-particles, world-architect, world-data-model
 
@@ -274,9 +295,9 @@ Skills: accessibility, ai-behavior-perception, animation-architect, animation-gr
 
 **Exit criteria:** indie-2d ships on PC, console, mobile and web with a TRC/store-review dry run; the editor and tools configuration closes with source control; rollback (8 frames under 150 ms / 5% loss) and async play proven. Local multiplayer: 2-player split-screen with independent UI focus, listeners and input. Perf: mobile tier within budget.
 
-**Gates (capability → independent validator):** `QA.CERT.prechecks` → `QA.STRAT.release-criteria`, `ED.COLLAB.vcs` → `QA.FUNC.editor`, `NET.PRED.rollback` → `QA.SIM.netsim`, `GAM.FW.local-players` → `QA.FUNC.automation`, `PRF.MEM.footprint` → `QA.FUNC.soak`, `PRF.LOAD.pacing-latency` → `PRF.BENCH.stats`
+**Gates (capability → independent validator):** `QA.CERT.prechecks` → `QA.STRAT.release-criteria`, `ED.COLLAB.vcs` → `QA.FUNC.editor`, `NET.PRED.rollback` → `QA.SIM.netsim`, `GAM.FW.local-players` → `QA.FUNC.automation`, `PRF.MEM.footprint` → `QA.FUNC.soak`, `PRF.LOAD.pacing-latency` → `PRF.BENCH.stats`, `QA.FUNC.soak` → `PRF.MEM.footprint`, `XC.SEC.data-rights` → `QA.CERT.privacy`, `XC.SEC.childrens-data` → `QA.CERT.privacy`, `XC.SEC.vuln-response` → `QA.ROBUST.fuzzing`
 
-**Contracts frozen:** C-A11YRT, C-ABILITY, C-ANIM, C-AUDIO, C-AUTOMATION, C-BENCH, C-CERT, C-CMD, C-DEVICE, C-DIALOGUE, C-ECS, C-GAME, C-GAMEDATA, C-GOVERN, C-GPUMEM, C-GPUTIER, C-HOSTAUTH, C-INTEGRITY, C-IO, C-IPC, C-LIVE, C-LOC, C-NET, C-NETLINK, C-NETSESSION, C-PAL, C-PKG, C-PLUGIN, C-PREDICT, C-PROD, C-RELEASE, C-RELOAD, C-REP, C-REPLAY, C-RES, C-RHI, C-SAVE, C-SCRIPT, C-SEQ, C-SIGNIF, C-SNAPSHOT, C-SVC, C-TARGETPLAT, C-VFS, C-WORLD
+**Contracts frozen:** C-A11YRT, C-ABILITY, C-ANIM, C-AUDIO, C-AUTOMATION, C-BENCH, C-CAMERA, C-CERT, C-CMD, C-DEVICE, C-DIALOGUE, C-ECS, C-GAME, C-GAMEDATA, C-GOVERN, C-GPUMEM, C-GPUTIER, C-HOSTAUTH, C-INTEGRITY, C-IO, C-IPC, C-LIVE, C-LOC, C-NET, C-NETLINK, C-NETSESSION, C-PAL, C-PKG, C-PLUGIN, C-PREDICT, C-PROD, C-RELEASE, C-RELOAD, C-REP, C-REPLAY, C-RES, C-RHI, C-SAVE, C-SCRIPT, C-SEQ, C-SIGNIF, C-SNAPSHOT, C-SVC, C-TARGETPLAT, C-VFS, C-WORLD
 
 **Contracts drafted:** C-EDCMD, C-EDHOST, C-EDVIEW, C-GRAPH, C-VCS
 
@@ -342,7 +363,7 @@ Skills: ai-assisted-authoring
 
 **Exit criteria:** Customer-corpus upgrade from the previous release, release notes, backport stream open, console certification pass of at least one reference game, live-ops and end-of-service rehearsal. Every milestone exit also runs the skill-library review (ARCH.ORG.skill-lifecycle).
 
-**Gates (capability → independent validator):** `ARCH.PROD.customer-corpus` → `QA.REF.upkeep`, `XC.EXT.lts` → `QA.FUNC.compat-corpus`, `BLD.REL.end-of-service` → `QA.FUNC.compat`
+**Gates (capability → independent validator):** `ARCH.PROD.customer-corpus` → `QA.REF.upkeep`, `XC.EXT.lts` → `QA.FUNC.compat-corpus`, `BLD.REL.end-of-service` → `QA.FUNC.compat`, `QA.STRAT.release-criteria` → `QA.FUNC.compat-corpus`, `QA.FUNC.compat-corpus` → `QA.CERT.prechecks`
 
 Skills: 
 

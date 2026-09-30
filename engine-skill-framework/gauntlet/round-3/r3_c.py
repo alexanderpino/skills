@@ -103,6 +103,7 @@ def apply(ed):
     _unt(ed, "plugin-system", "project-tool-code")
     ed.skill("robustness-fuzzing")["fuzz_targets"] = sorted(set(ed.skill("robustness-fuzzing")["fuzz_targets"])
                                                             | {"project-tool-code"})
+    ed.note(t, "untrusted input project-tool-code registered (workspace trust before execution)")
 
     t = "K-TOOLS-14"
     ed.cap("ED.ARCH.async-jobs", "Editor background-job model: progress, cancellation, interaction with open "
@@ -173,6 +174,7 @@ def apply(ed):
     ed.cap_set("PLAT.PAL.lifecycle", add_contrib=["platform-web"], tags=t)
 
     t = "K-PLATFORM-14"
+    ed.note(t, "untrusted inputs device-db-updates, push-payloads, clipboard-dragdrop registered with fuzz targets")
     for i, own, par, tr, lim in (("device-db-updates", "platform-architect", [], "semi-trusted-signed",
                                   "schema/rollback/staged rollout"),
                                  ("push-payloads", "platform-mobile", [], "hostile-remote", "length/schema"),
@@ -191,7 +193,7 @@ def apply(ed):
                "keeps the cross-store model")
 
     # ================================================================ ARCH minors
-    t = "K-ARCH-5"
+    t = "K-ARCH-5 K-GAMEPLAY-5"
     s = ed.skill("gameplay-systems-toolkit")
     ed.skill_set("gameplay-systems-toolkit", purpose=s["purpose"].replace(", camera system", "").replace(", photo mode", ""),
                  tags=t)

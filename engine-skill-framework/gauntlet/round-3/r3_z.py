@@ -18,7 +18,9 @@ LADDER = [
      "sprite and text, loads one cooked and signed asset from a package, passes CI with sanitizer, fuzz (package/"
      "serialization parsers) and determinism smoke lanes. Perf: trace capture and the C-BENCH runner on the skeleton; "
      "C-BUDGET v0 for indie-2d tiers; CI perf lane (frame time, startup, memory).",
-     ["QA.HOST.runner", "XC.DET.conformance", "QA.ROBUST.fuzzing", "OBS.LOG.bench-runtime"]),
+     ["QA.HOST.runner", "XC.DET.conformance", "QA.ROBUST.fuzzing", "OBS.LOG.bench-runtime", "QA.AGENT.test-integrity",
+      "QA.AGENT.holdout", "QA.AGENT.mutation-gate", "QA.AGENT.gate-canaries", "XC.SEC.agent-boundary",
+      "XC.SEC.supply-chain", "XC.SEC.secrets", "XC.SEC.key-custody"]),
     ("M1", "Indie 2D slice on PC", ["indie-2d-client@pc", "minimal-client@pc"],
      "The indie-2d and minimal reference games are playable on PC with save, localization, accessibility baseline "
      "and hot reload. Network design authorities (network-architect, transport, replication, prediction, sessions) "
@@ -27,7 +29,7 @@ LADDER = [
      "registered input reaching it, hardened shipping build, dev-surface audit. Perf: within budget on min-spec PC; "
      "hitch gate active.",
      ["QA.REF.ladder", "QA.SIM.netsim", "XC.SEC.threats", "XC.SEC.hardening", "BLD.SYS.dev-surface-exclusion",
-      "PRF.LOAD.hitch-gate"]),
+      "PRF.LOAD.hitch-gate", "QA.RENDER.golden", "QA.SIM.stability-suite"]),
     ("M2", "Indie 2D ships everywhere, with tools", ["indie-2d-client", "minimal-client", "indie-2d-tools",
                                                      "minimal-tools", "mobile-async-client",
                                                      "fighting-2d-rollback-client", "sandbox-2d-client"],
@@ -36,7 +38,7 @@ LADDER = [
      "multiplayer: 2-player split-screen with independent UI focus, listeners and input. Perf: mobile tier within "
      "budget.",
      ["QA.CERT.prechecks", "ED.COLLAB.vcs", "NET.PRED.rollback", "GAM.FW.local-players", "PRF.MEM.footprint",
-      "PRF.LOAD.pacing-latency"]),
+      "PRF.LOAD.pacing-latency", "QA.FUNC.soak", "XC.SEC.data-rights", "XC.SEC.childrens-data", "XC.SEC.vuln-response"]),
     ("M3", "Standard 3D", ["standard-3d-client", "standard-3d-tools", "lite-3d-mobile-client", "lite-3d-mobile-tools",
                            "lite-3d-portable-console-client", "racing-3d-client"],
      "The standard-3d reference game runs on PC and console with GPU-driven and CPU-submission paths, reference "
@@ -72,12 +74,12 @@ LADDER = [
      "Customer-corpus upgrade from the previous release, release notes, backport stream open, console certification "
      "pass of at least one reference game, live-ops and end-of-service rehearsal. Every milestone exit also runs the "
      "skill-library review (ARCH.ORG.skill-lifecycle).",
-     ["ARCH.PROD.customer-corpus", "XC.EXT.lts", "BLD.REL.end-of-service", "PLAT.LIVE.operations"]),
+     ["ARCH.PROD.customer-corpus", "XC.EXT.lts", "BLD.REL.end-of-service", "QA.STRAT.release-criteria", "QA.FUNC.compat-corpus"]),
 ]
 
 LADDER = [list(r) for r in LADDER]   # mutable: earlier parts (r3_d, r3_e) claim their configurations
 
-GATE_VALIDATOR = {'PRF.METH.asymptotics': 'PRF.BENCH.scale-content', 'RES.MGMT.validation': 'PRF.LOAD.load-time', 'QA.HOST.runner': 'QA.STRAT.integration', 'XC.DET.conformance': 'QA.ROBUST.concurrency', 'QA.ROBUST.fuzzing': 'QA.AGENT.gate-canaries', 'OBS.LOG.bench-runtime': 'PRF.BENCH.regression', 'QA.REF.ladder': 'QA.STRAT.release-criteria', 'QA.SIM.netsim': 'QA.AGENT.oracle-change-control', 'XC.SEC.threats': 'QA.ROBUST.fuzzing', 'XC.SEC.hardening': 'QA.CERT.prechecks', 'BLD.SYS.dev-surface-exclusion': 'XC.SEC.testing', 'PRF.LOAD.hitch-gate': 'PRF.BENCH.regression', 'QA.CERT.prechecks': 'QA.STRAT.release-criteria', 'ED.COLLAB.vcs': 'QA.FUNC.editor', 'NET.PRED.rollback': 'QA.SIM.netsim', 'GAM.FW.local-players': 'QA.FUNC.automation', 'QA.RENDER.reference-validation': 'QA.AGENT.oracle-change-control', 'RND.SHADER.pso-lists': 'PRF.LOAD.hitch-gate', 'CORE.SCALE.governor': 'PRF.METH.gates', 'XC.ITER.metrics': 'QA.FUNC.editor', 'QA.FUNC.load': 'PRF.NET.load-analysis', 'NET.TRANS.dos': 'XC.SEC.testing', 'BLD.REL.staged-rollout': 'QA.FUNC.compat-corpus', 'BLD.REL.rollback': 'QA.STRAT.release-criteria', 'PRF.NET.bandwidth': 'QA.FUNC.load', 'RES.MGMT.arbitration': 'PRF.MEM.peaks', 'PRF.BENCH.scale-content': 'PRF.METH.asymptotics', 'NET.SRV.cross-server': 'QA.FUNC.load', 'XC.SEC.sandbox': 'QA.ROBUST.fuzzing', 'ED.COLLAB.multiuser': 'QA.FUNC.editor', 'ARCH.PROD.customer-corpus': 'QA.REF.upkeep', 'XC.EXT.lts': 'QA.FUNC.compat-corpus', 'BLD.REL.end-of-service': 'QA.FUNC.compat', 'PLAT.LIVE.operations': 'QA.FUNC.soak', 'PRF.MEM.footprint': 'QA.FUNC.soak', 'PRF.LOAD.pacing-latency': 'PRF.BENCH.stats', 'PRF.GPU.baselines': 'PRF.METH.gates', 'PRF.METH.pipeline-budgets': 'PRF.BENCH.tools', 'PRF.NET.server-density': 'QA.FUNC.load', 'RND.RHI.conformance': 'QA.RENDER.api-validation'}
+GATE_VALIDATOR = {'PRF.METH.asymptotics': 'PRF.BENCH.scale-content', 'QA.AGENT.test-integrity': 'XC.SEC.agent-redteam', 'QA.AGENT.holdout': 'QA.SIM.golden-traces', 'QA.AGENT.mutation-gate': 'QA.ROBUST.fuzzing', 'QA.AGENT.gate-canaries': 'XC.SEC.agent-redteam', 'QA.RENDER.golden': 'QA.FUNC.compat', 'QA.SIM.stability-suite': 'QA.FUNC.soak', 'QA.FUNC.soak': 'PRF.MEM.footprint', 'QA.STRAT.release-criteria': 'QA.FUNC.compat-corpus', 'QA.FUNC.compat-corpus': 'QA.CERT.prechecks', 'XC.SEC.agent-boundary': 'QA.AGENT.gate-canaries', 'XC.SEC.supply-chain': 'BLD.SYS.dev-surface-exclusion', 'XC.SEC.secrets': 'BLD.CI.hardening', 'XC.SEC.key-custody': 'QA.CERT.prechecks', 'XC.SEC.data-rights': 'QA.CERT.privacy', 'XC.SEC.childrens-data': 'QA.CERT.privacy', 'XC.SEC.vuln-response': 'QA.ROBUST.fuzzing', 'RES.MGMT.validation': 'PRF.LOAD.load-time', 'QA.HOST.runner': 'QA.STRAT.integration', 'XC.DET.conformance': 'QA.ROBUST.concurrency', 'QA.ROBUST.fuzzing': 'QA.AGENT.gate-canaries', 'OBS.LOG.bench-runtime': 'PRF.BENCH.regression', 'QA.REF.ladder': 'QA.STRAT.release-criteria', 'QA.SIM.netsim': 'QA.AGENT.oracle-change-control', 'XC.SEC.threats': 'QA.ROBUST.fuzzing', 'XC.SEC.hardening': 'QA.CERT.prechecks', 'BLD.SYS.dev-surface-exclusion': 'XC.SEC.testing', 'PRF.LOAD.hitch-gate': 'PRF.BENCH.regression', 'QA.CERT.prechecks': 'QA.STRAT.release-criteria', 'ED.COLLAB.vcs': 'QA.FUNC.editor', 'NET.PRED.rollback': 'QA.SIM.netsim', 'GAM.FW.local-players': 'QA.FUNC.automation', 'QA.RENDER.reference-validation': 'QA.AGENT.oracle-change-control', 'RND.SHADER.pso-lists': 'PRF.LOAD.hitch-gate', 'CORE.SCALE.governor': 'PRF.METH.gates', 'XC.ITER.metrics': 'QA.FUNC.editor', 'QA.FUNC.load': 'PRF.NET.load-analysis', 'NET.TRANS.dos': 'XC.SEC.testing', 'BLD.REL.staged-rollout': 'QA.FUNC.compat-corpus', 'BLD.REL.rollback': 'QA.STRAT.release-criteria', 'PRF.NET.bandwidth': 'QA.FUNC.load', 'RES.MGMT.arbitration': 'PRF.MEM.peaks', 'PRF.BENCH.scale-content': 'PRF.METH.asymptotics', 'NET.SRV.cross-server': 'QA.FUNC.load', 'XC.SEC.sandbox': 'QA.ROBUST.fuzzing', 'ED.COLLAB.multiuser': 'QA.FUNC.editor', 'ARCH.PROD.customer-corpus': 'QA.REF.upkeep', 'XC.EXT.lts': 'QA.FUNC.compat-corpus', 'BLD.REL.end-of-service': 'QA.FUNC.compat', 'PLAT.LIVE.operations': 'QA.FUNC.soak', 'PRF.MEM.footprint': 'QA.FUNC.soak', 'PRF.LOAD.pacing-latency': 'PRF.BENCH.stats', 'PRF.GPU.baselines': 'PRF.METH.gates', 'PRF.METH.pipeline-budgets': 'PRF.BENCH.tools', 'PRF.NET.server-density': 'QA.FUNC.load', 'RND.RHI.conformance': 'QA.RENDER.api-validation'}
 
 SKELETON = ["platform-architect", "platform-desktop", "core-runtime-architect", "math-simd-numerics",
             "memory-allocators", "containers-core-types", "concurrency-primitives", "job-system-task-graph",
@@ -185,6 +187,9 @@ def apply(ed):
             f = max(f, median)
         if m.contract(c).get("needs_implementer") and impl_of.get(c):
             f = max(f, max(impl_of[c]))
+        oa = m.contract(c).get("oracle_author")
+        if oa in ms_of:
+            f = max(f, ms_of[oa])
         if m.contract(c).get("gated"):
             f = max(f, GATED_FREEZE)
         freeze[c] = min(f, len(LADDER) - 1)
@@ -214,7 +219,7 @@ def apply(ed):
                                    "every code contract is frozen exactly once, after its owner and a consumer "
                                    "arrive and never before what it requires; gates name capabilities.")
     tags = ("K-PROD-1 K-PROD-7 K-NET-1 K-NET-15 K-RENDER-13 K-SYSTEMS-8 K-TOOLS-4 K-TEST-13 K-SEC-6 K-FUTURE-10 "
-            "K-GAMEPLAY-14 K-GAMEPLAY-15 K-PERF-10")
+            "K-GAMEPLAY-14 K-GAMEPLAY-15 K-PERF-10 K-TOOLS-1 K-PLATFORM-3 K-SIM-2 K-FUTURE-2 K-PROD-3 K-TEST-1 K-TEST-7 K-SEC-4 K-SEC-9")
     ed.note(tags, "milestone ladder rebuilt: M0–M7, configurations claimed per milestone, skills placed by closure, "
                   f"contract freezes derived ({len(code)} code contracts); leftovers placed late: {leftovers}")
     ed.note(tags, "check.py: milestone configuration closure, full-claim coverage, contract freeze order, gates exist")

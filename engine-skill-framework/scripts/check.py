@@ -363,6 +363,11 @@ def run(m):
             impl_ms = [ms_of[x] for x in m.skill_order if x in ms_of and cid in m.skill(x).get("implements", [])]
             if m.contract(cid).get("needs_implementer") and impl_ms and max(impl_ms) > f:
                 E(f"contract {cid} frozen at {frozen_at[cid]} before its last implementer is built")
+            oa = m.contract(cid).get("oracle_author")
+            if m.layer(cid) in (0, 1, 2) and not m.contract(cid).get("oracle_reference"):
+                E(f"contract {cid} (layer {m.layer(cid)}) names no oracle_reference (external corpora or reference)")
+            if oa in ms_of and ms_of[oa] > f:
+                E(f"contract {cid} frozen at {frozen_at[cid]} before its oracle author {oa} is built")
             for tier, tms in (m.contract(cid).get("extension_tiers") or {}).items():
                 if tms not in idx_of or idx_of[tms] < f:
                     E(f"contract {cid} extension tier '{tier}' names milestone {tms} that does not follow the core freeze")
@@ -506,6 +511,19 @@ def run(m):
                 ok_owner = True
         if caps_ and not ok_owner:
             E(f"legacy pattern {p['id']}: justification owner owns, contributes to or leads none of its stance caps")
+
+    # -- legacy contradiction terms: capability names, contract text and skill purposes must not state a legacy pattern
+    excepted = {(x.get("pattern"), x.get("id")) for x in m.legacy_doc.get("adr_exceptions", []) if x.get("adr")}
+    scanned = [("capability", cid, m.cap(cid)["name"]) for cid in m.caps]
+    scanned += [("contract", c["id"], c["name"] + " " + c["summary"]) for c in m.contract_doc["contracts"]]
+    scanned += [("skill", sk["id"], sk["purpose"]) for sk in m.skill_doc["skills"]]
+    for p in m.legacy_doc["patterns"]:
+        for term in p.get("contradiction_terms") or []:
+            rx = re.compile(term, re.I)
+            for kind_, ident, text in scanned:
+                if rx.search(text) and (p["id"], ident) not in excepted:
+                    E(f"{kind_} {ident} states legacy pattern {p['id']} ('{term}'); reword it or record an ADR in "
+                      f"legacy-patterns adr_exceptions")
 
     # -- tool-side territory reaches the editor/cook through tool contracts
     for cid in m.caps:
@@ -688,6 +706,8 @@ def selftest():
         ("radar class mismatch", lambda m: [e.__setitem__("class", "E") for e in m.radar_doc["entries"] if "RND.GRAPH.work-graphs" in e.get("capabilities", [])], "but RND.GRAPH.work-graphs is X"),
         ("dangling capability reference", lambda m: first_cap(m).__setitem__(1, first_cap(m)[1] + " (see RES.MGMT.nothing)"), "refers to unknown capability"),
         ("experimental capability in a shipping profile", lambda m: [c.__setitem__(5, ["aaa"]) for d in m.cap_doc["domains"] for a in d["areas"] for c in a["caps"] if c[0] == "RND.GRAPH.work-graphs"], "must carry exactly the 'experimental' profile"),
+        ("legacy contradiction term", lambda m: m.contract("C-FRAME").__setitem__("summary", m.contract("C-FRAME")["summary"] + " Variable-timestep simulation on the render frame delta."), "states legacy pattern"),
+        ("oracle reference missing", lambda m: m.contract("C-MEM").pop("oracle_reference"), "oracle_reference"),
         ("legacy pattern without stance", lambda m: m.legacy_doc["patterns"][0].__setitem__("stance_capabilities", []), "has no stance capabilities"),
         ("untrusted input not fuzzed", lambda m: [s["fuzz_targets"].remove("packets") for s in m.skill_doc["skills"] if s.get("fuzz_targets")], "has no fuzz target"),
         ("implementer grades itself", lambda m: m.contract("C-NAV").__setitem__("oracle_author", "navigation-pathfinding"), "is also its oracle author"),
@@ -700,6 +720,7 @@ def selftest():
         ("oracle author in owner workstream", lambda m: m.contract("C-PAL").__setitem__("oracle_author", "perf-benchmarking") or m.skill("rhi-core").__setitem__("workstream", "performance") or m.contract("C-RHI").__setitem__("oracle_author", "perf-benchmarking"), "shares a workstream"),
         ("gate validator owned by gated owner", lambda m: m.milestone_doc["milestones"][0]["gates"][0].__setitem__("validator", m.milestone_doc["milestones"][0]["gates"][0]["capability"]), "owned by the gated owner"),
         ("organization hosts a pair together", lambda m: m.org_doc["tiers"]["small"]["agents"]["build"].extend(m.org_doc["tiers"]["small"]["agents"].pop("verify")), "hosted with"),
+        ("contract frozen before oracle author", lambda m: [ms["contracts_frozen"].remove("C-RG") for ms in m.milestone_doc["milestones"] if "C-RG" in ms["contracts_frozen"]] and (m.milestone_doc["milestones"][0]["contracts_frozen"].append("C-RG"), m.contract("C-RG").__setitem__("oracle_author", "hot-reload-iteration")), "before its oracle author"),
         ("needs_implementer frozen before implementer", lambda m: [ms["contracts_frozen"].remove("C-PHYS") for ms in m.milestone_doc["milestones"] if "C-PHYS" in ms["contracts_frozen"]] and m.milestone_doc["milestones"][0]["contracts_frozen"].append("C-PHYS"), "before"),
         ("missing implementer", lambda m: [m.skill(s)["implements"].remove("C-RHI") for s in m.skill_order if "C-RHI" in m.skill(s)["implements"]], "no implementer"),
     ]
