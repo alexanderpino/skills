@@ -27,6 +27,7 @@ Recurring themes worth fixing first in round 3: check.py should detect legacy wo
 
 - Keep workflows small (about 30 agents per round: 15 critics plus one batch verifier each, not two per finding).
 - Blind critics review a seeded copy in the scratchpad, never the repository; seeds are planted by an independent agent and sealed until all critics report.
+- Checkpoint (commit + push, saving any workflow result/journal into `gauntlet/round-N/workflow/`) after every step **and after roughly every 15–20 agents finish** inside a workflow.
 - Commit and push after every step. Scripts reproduce every data change (`apply.py` resets `data/` to the previous commit and replays the parts).
 - The framework is self-contained; do not link it to any other skill or repository.
 
