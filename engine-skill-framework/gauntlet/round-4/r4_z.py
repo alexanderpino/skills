@@ -2,7 +2,7 @@
 author, requirements and dependants (the ladder itself was built in round 3)."""
 
 
-def apply(ed):
+def apply(ed, tagged=True):
     ms = ed.doc["milestone"]["milestones"]
     idx = {m["id"]: i for i, m in enumerate(ms)}
     placed = {s: i for i, m in enumerate(ms) for s in m["skills"]}
@@ -25,8 +25,9 @@ def apply(ed):
                 m["contracts_draft"].remove(cid)
         ms[frozen[cid]]["contracts_frozen"] = sorted(ms[frozen[cid]]["contracts_frozen"] + [cid])
         ed.note("", f"contract {cid} frozen at {ms[frozen[cid]]['id']}")
-    freeze_before_claim(ed)
-    notes(ed)
+    freeze_before_claim(ed, tagged)
+    if tagged:
+        notes(ed)
     rd = ed.doc["radar"]
     for e in rd["entries"]:
         e.setdefault("reviewed", rd.get("as_of", "2026-09-30"))
@@ -54,7 +55,7 @@ def _model(ed):
         model_mod.DATA = old
 
 
-def freeze_before_claim(ed):
+def freeze_before_claim(ed, tagged=True):
     """K-ARCH-7: every non-optional contract in a claimed configuration's closure is frozen at or before the claim;
     contracts that must freeze earlier than the round-3 rule keep their later additions as an extension tier."""
     m = _model(ed)
@@ -95,7 +96,7 @@ def freeze_before_claim(ed):
             c = next(c for c in ed.doc["contract"]["contracts"] if c["id"] == cid)
             c.setdefault("extension_tiers", {})["late-consumers"] = ms[fr[cid]]["id"]
             moved.append(f"{cid} {ms[fr[cid]]['id']}->{ms[k]['id']}")
-    ed.note("K-ARCH-7", "contracts frozen at or before the first claim that needs them; the round-3 freeze milestone "
+    ed.note("K-ARCH-7" if tagged else "", "contracts frozen at or before the first claim that needs them; the round-3 freeze milestone "
                         "becomes the extension tier 'late-consumers': " + ", ".join(moved))
 
 

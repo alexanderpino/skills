@@ -192,6 +192,7 @@
     "security-engineering",
     "simulation-validation",
     "test-architect",
+    "tools-pipeline-conformance",
     "ui-text-conformance"
    ]
   },
@@ -345,6 +346,7 @@
     "C-GAMEDATA",
     "C-GPUMEM",
     "C-GPUTIER",
+    "C-GRAPHRT",
     "C-ID",
     "C-IMPORT",
     "C-INPUT",

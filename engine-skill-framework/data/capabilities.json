@@ -659,7 +659,7 @@
       ],
       [
        "PLAT.PAL.process",
-       "Processes, pipes, shared memory, local/dev sockets, HTTP(S)/TLS client (platform stacks)",
+       "Processes, pipes, shared memory, local/dev sockets, HTTP(S)/TLS client (platform stacks) (crash-time use goes through the C-BASE signal-safe subset)",
        "platform-architect",
        "E",
        [
@@ -844,6 +844,12 @@
         "network-transport",
         "input-system"
        ]
+      ],
+      [
+       "PLAT.PAL.storage-class",
+       "Storage class discovery (rotational/SATA-SSD/NVMe/removable/network) with a throughput and latency probe",
+       "platform-architect",
+       "E"
       ]
      ]
     },
@@ -2046,6 +2052,17 @@
         "crash-diagnostics",
         "security-engineering"
        ]
+      ],
+      [
+       "CORE.MEM.exec-pages",
+       "Executable-memory policy: W^X, JIT entitlement, code-page allocation, icache flush, per-platform executable-mapping queries from PAL",
+       "memory-allocators",
+       "E",
+       [
+        "scripting-runtime",
+        "hot-reload-iteration",
+        "security-engineering"
+       ]
       ]
      ]
     },
@@ -2327,7 +2344,7 @@
      "caps": [
       [
        "CORE.FRAME.pipelining",
-       "Frame pipelining & frames in flight (incl. whether any dedicated render/RHI thread exists, by ADR)",
+       "Frame pipelining & frames in flight (the ADR fixes pipeline depth and lane roles; CORE.JOBS.thread-model registers the resulting threads)",
        "frame-orchestration",
        "E"
       ],
@@ -2503,7 +2520,7 @@
       ],
       [
        "CORE.OBJ.references",
-       "Reference kinds & explicit lifetime (owner + generational handles; no tracing GC over engine objects; script references are weak handles)",
+       "Reference kinds & explicit lifetime in the object model (policy from CORE.LIFE.ownership-model; handles generational, script references weak)",
        "entity-object-model",
        "E",
        [
@@ -3006,6 +3023,16 @@
        [
         "platform-architect",
         "persistence-save"
+       ]
+      ],
+      [
+       "RES.IO.media-policy",
+       "Media-aware IO policy: seek-aware ordering, low queue depth, duplication or clustering per storage class; storage-class axis in tier records",
+       "async-io-storage",
+       "E",
+       [
+        "package-formats-vfs",
+        "platform-architect"
        ]
       ]
      ]
@@ -3571,7 +3598,7 @@
       ],
       [
        "WLD.PART.hlod",
-       "HLOD strategy & generation orchestration (builder implemented as a C-COOK world-scope processor; invalidation and distribution belong to CNT.COOK.world-build)",
+       "HLOD strategy, partitioning and invalidation (formats and builders belong to RND.LOD.hlod; orchestration to CNT.COOK.world-build)",
        "world-architect",
        "E",
        [
@@ -4139,9 +4166,12 @@
        "RND.ARCH.multiview-nview",
        "N-view outputs (autostereo / light-field displays)",
        "render-architect",
-       "M",
+       "X",
        [
         "xr-runtime"
+       ],
+       [
+        "experimental"
        ]
       ],
       [
@@ -4425,7 +4455,7 @@
        "RND.RHI.webgpu-validation",
        "WebGPU backend: validation layers & conformance runs",
        "rhi-webgpu",
-       "E",
+       "M",
        [
         "render-validation"
        ]
@@ -4434,7 +4464,7 @@
        "RND.RHI.webgpu-quirks",
        "WebGPU backend: vendor/driver quirk handling",
        "rhi-webgpu",
-       "E",
+       "M",
        [
         "rhi-core"
        ]
@@ -4658,7 +4688,7 @@
       ],
       [
        "RND.SHADER.toolchain",
-       "Compilation toolchain (DXC, Slang, SPIR-V, Metal shader converter)",
+       "Compilation toolchain (DXC, SPIR-V, Metal shader converter; Slang via RND.SHADER.slang)",
        "shader-system",
        "E"
       ],
@@ -4755,7 +4785,11 @@
        "RND.SHADER.autodiff",
        "Differentiable shader compilation (Slang-class autodiff)",
        "shader-system",
-       "M"
+       "X",
+       [],
+       [
+        "experimental"
+       ]
       ],
       [
        "RND.SHADER.binding-abstraction",
@@ -5081,7 +5115,7 @@
       ],
       [
        "RND.LOD.hlod",
-       "HLOD proxy meshes & impostors",
+       "HLOD proxy/impostor formats, builders and runtime selection",
        "virtualized-geometry-lod",
        "E"
       ],
@@ -5116,7 +5150,7 @@
        "RND.LOD.instanced-clusters",
        "Instance sharing inside a cluster hierarchy (assemblies, per-instance bounds expansion for WPO)",
        "virtualized-geometry-lod",
-       "E",
+       "M",
        [
         "vegetation-foliage",
         "geometry-pipeline"
@@ -5126,7 +5160,7 @@
        "RND.LOD.foliage",
        "Dense masked and thin-geometry LOD in the virtualized tier (voxel/impostor transition)",
        "virtualized-geometry-lod",
-       "E",
+       "M",
        [
         "vegetation-foliage",
         "geometry-pipeline"
@@ -5152,7 +5186,7 @@
       ],
       [
        "RND.TEX.feedback",
-       "Sampler-feedback streaming",
+       "Sampler-feedback streaming; backend abstraction: hardware sampler feedback where present, shader-written feedback elsewhere",
        "texture-streaming-vt",
        "M",
        [],
@@ -5357,7 +5391,7 @@
       ],
       [
        "RND.GI.bake-pipeline",
-       "Incremental/distributed lighting bake orchestration (implemented as C-COOK world-scope processors; orchestration belongs to CNT.COOK.world-build)",
+       "Incremental/distributed lighting bake orchestration (implemented as C-COOK world-scope processors; orchestration belongs to CNT.COOK.world-build); GI-owned bake processors hosted by CNT.COOK.world-build",
        "global-illumination",
        "E",
        [
@@ -5403,6 +5437,17 @@
        ],
        [
         "hwrt"
+       ]
+      ],
+      [
+       "RND.GI.baked-streaming",
+       "Cell-streamed baked lighting: lightmaps, probe volumes, reflection captures and lighting-scenario/time-of-day blending, with a pool registered in RES.MGMT.arbitration and C-GI",
+       "global-illumination",
+       "E",
+       [
+        "world-architect",
+        "resource-streaming-architect",
+        "async-io-storage"
        ]
       ]
      ]
@@ -6449,6 +6494,16 @@
         "crowd-simulation",
         "systems-simulation"
        ]
+      ],
+      [
+       "PHY.ARCH.migration",
+       "Live body, joint-graph and controller hand-off across authority boundaries; ghost-body policy; declared unsupported cases",
+       "physics-architect",
+       "E",
+       [
+        "server-scaleout-persistence",
+        "replication"
+       ]
       ]
      ]
     },
@@ -6776,7 +6831,7 @@
       ],
       [
        "PHY.FLUID.grid",
-       "Real-time interactive grid smoke & fire",
+       "Real-time interactive grid smoke & fire; decision table: gameplay-authoritative liquid or fire is cellular (GAM.SIM.cellular/GAM.SIM.fields); PHY.FLUID.* is presentation-grade with one-way coupling into C-PHYS bodies; the C-ENV water volume is authoritative for buoyancy",
        "fluid-simulation",
        "M"
       ],
@@ -8473,7 +8528,7 @@
       ],
       [
        "NET.REP.physics-bodies",
-       "Physics-body replication: active-set/change-set from C-PHYS, sleep flags, quantized pose/velocity, significance priority, prop extrapolation, prop and vehicle ownership hand-off",
+       "Physics-body replication: wire content, priority and ownership hand-off (client-side presentation belongs to NET.PRED.physics)",
        "replication",
        "E",
        [
@@ -8516,7 +8571,7 @@
       ],
       [
        "NET.PRED.physics",
-       "Networked physics: server-authoritative replicated dynamic bodies with interpolation, extrapolation and smoothing",
+       "Networked physics: server-authoritative replicated dynamic bodies with interpolation, extrapolation and smoothing; owns all client-side presentation of replicated bodies (extrapolation, smoothing, snap thresholds)",
        "prediction-rollback",
        "E",
        [
@@ -9605,6 +9660,16 @@
        "Grid movement",
        "character-movement",
        "E"
+      ],
+      [
+       "GAM.MOVE.ragdoll-transition",
+       "Capsule to ragdoll to get-up transition: state machine, capsule/body-set handover, authority class (cosmetic by default), ragdoll body budget",
+       "character-movement",
+       "E",
+       [
+        "ik-procedural-animation",
+        "character-physics"
+       ]
       ]
      ]
     },
@@ -12394,6 +12459,33 @@
        [
         "test-architect"
        ]
+      ],
+      [
+       "QA.CONF.tools-pipeline",
+       "Tools and pipeline conformance suites (cook, build, package, editor commands, graphs)",
+       "tools-pipeline-conformance",
+       "E",
+       [
+        "test-architect"
+       ]
+      ],
+      [
+       "QA.CONF.import-roundtrip",
+       "Import/cook round-trip corpora",
+       "tools-pipeline-conformance",
+       "E",
+       [
+        "test-architect"
+       ]
+      ],
+      [
+       "QA.CONF.command-properties",
+       "Command apply/invert/merge property tests",
+       "tools-pipeline-conformance",
+       "E",
+       [
+        "test-architect"
+       ]
       ]
      ]
     }
@@ -12483,6 +12575,18 @@
         "gpu-performance",
         "cpu-performance",
         "platform-mobile"
+       ]
+      ],
+      [
+       "PRF.METH.tier-emulation",
+       "Lower-tier emulation on stronger machines: core-count and P/E affinity masks, hard memory ceiling at the tier budget, IO throttle, GPU clock caps; run per configuration in a CI lane",
+       "performance-architect",
+       "E",
+       [
+        "test-runtime-harness",
+        "ci-cd-automation",
+        "memory-allocators",
+        "async-io-storage"
        ]
       ]
      ]

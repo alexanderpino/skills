@@ -1498,7 +1498,7 @@
    "profiles": [
     "all"
    ],
-   "purpose": "Maps XAG/GAG and legal requirements to engine features and owns subtitles and captions, screen-reader/TTS/STT hooks, colorblind and contrast modes, text scaling, motion and photosensitivity options, assist hooks, and their validation.",
+   "purpose": "Maps XAG/GAG and legal requirements to engine features; defines the requirement mapping, services (C-A11YRT), settings and validation; presentation is owned by ui-architect (subtitles, text scaling), post-color-hdr (colorblind and contrast passes) and input-system.",
    "non_responsibilities": [
     [
      "Input remapping implementation",
@@ -1663,7 +1663,8 @@
     "C-SIGN",
     "C-SHADER?",
     "C-CMD",
-    "C-NETSESSION?"
+    "C-NETSESSION?",
+    "C-GRAPHRT"
    ],
    "expertise": [
     "mod ecosystems",
@@ -3209,7 +3210,8 @@
     "C-LIGHT?",
     "C-RT?",
     "C-GI?",
-    "C-SCENETEX?"
+    "C-SCENETEX?",
+    "C-GAMEDATA?"
    ],
    "expertise": [
     "terrain LOD",
@@ -3750,7 +3752,8 @@
     "C-GPUTIER",
     "C-LIGHTENV?",
     "C-RELOAD?",
-    "C-VT?"
+    "C-VT?",
+    "C-GAMEDATA?"
    ],
    "expertise": [
     "PBR",
@@ -4094,7 +4097,6 @@
    "tier": "expert",
    "parent": "render-architect",
    "profiles": [
-    "lite3d",
     "std3d"
    ],
    "purpose": "Reference path tracer as ground-truth oracle for validation, real-time path tracing, offline cinematic render mode.",
@@ -4426,7 +4428,8 @@
     "C-PREDICT?",
     "C-RSCENE?",
     "C-MATIF?",
-    "C-SCENETEX?"
+    "C-SCENETEX?",
+    "C-GAMEDATA?"
    ],
    "expertise": [
     "GPU particles",
@@ -4490,7 +4493,9 @@
     "C-FLOW",
     "C-SAVE?",
     "C-WORLD?",
-    "C-ML?"
+    "C-ML?",
+    "C-GAMEDATA?",
+    "C-SHARD?"
    ],
    "expertise": [
     "physics engines (Jolt, PhysX, Havok, Box2D)",
@@ -4554,7 +4559,9 @@
     "C-COOK",
     "C-IMPORT"
    ],
-   "implements": [],
+   "implements": [
+    "C-PHYS"
+   ],
    "workstream": "simulation",
    "untrusted_inputs": [
     "physics-assets"
@@ -4635,7 +4642,8 @@
     "C-PHYS",
     "C-DET",
     "C-ENV?",
-    "C-SIGNIF?"
+    "C-SIGNIF?",
+    "C-SHARD?"
    ],
    "expertise": [
     "character controllers"
@@ -4683,7 +4691,9 @@
     "C-RG?",
     "C-ENV?",
     "C-DET?",
-    "C-ML?"
+    "C-ML?",
+    "C-SNAPSHOT?",
+    "C-STATECLASS"
    ],
    "expertise": [
     "XPBD",
@@ -5425,7 +5435,8 @@
     "C-VEHICLE?",
     "C-A11YRT",
     "C-RELOAD?",
-    "C-PREDICT?"
+    "C-PREDICT?",
+    "C-GAMEDATA?"
    ],
    "expertise": [
     "sound design systems",
@@ -5894,7 +5905,8 @@
     ]
    ],
    "provides": [
-    "C-SCRIPT"
+    "C-SCRIPT",
+    "C-GRAPHRT"
    ],
    "consumes": [
     "C-REFL",
@@ -6541,7 +6553,8 @@
     "tools"
    ],
    "tool_consumes": [
-    "C-VCS"
+    "C-VCS",
+    "C-GRAPHRT"
    ],
    "implements": [],
    "workstream": "tools"
@@ -7317,7 +7330,8 @@
     "C-ENV?",
     "C-DEVICE?",
     "C-PREDICT?",
-    "C-SIGNIF?"
+    "C-SIGNIF?",
+    "C-SHARD?"
    ],
    "expertise": [
     "tire models (Pacejka, brush)",
@@ -8424,6 +8438,35 @@
    "expertise": [
     "text shaping and CLDR corpora",
     "layout and focus-graph oracles"
+   ],
+   "consumes": [
+    "C-TEST"
+   ],
+   "tool_consumes": [],
+   "provides": [],
+   "implements": []
+  },
+  {
+   "id": "tools-pipeline-conformance",
+   "name": "Tools & Pipeline Conformance",
+   "tier": "expert",
+   "parent": "test-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "process",
+   "targets": [],
+   "workstream": "quality",
+   "purpose": "Independent authoring of conformance suites for tool, cook, build and editor-command contracts, distinct from their owners and implementers.",
+   "non_responsibilities": [
+    [
+     "Contract implementation",
+     "owning-skill"
+    ]
+   ],
+   "expertise": [
+    "import/cook/package round-trip corpora",
+    "command apply/invert property tests"
    ],
    "consumes": [
     "C-TEST"

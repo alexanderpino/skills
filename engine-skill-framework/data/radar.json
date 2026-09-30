@@ -139,12 +139,14 @@
    "class": "M",
    "capabilities": [
     "RND.LOD.deforming",
-    "RND.LOD.displacement"
+    "RND.LOD.displacement",
+    "RND.LOD.foliage",
+    "RND.LOD.instanced-clusters"
    ],
    "owner": "virtualized-geometry-lod",
    "evidence": "UE 5.4+ Nanite skinning/tessellation",
    "revisit": "Production use at target budgets",
-   "fallback": "Discrete LOD for deforming meshes",
+   "fallback": "Discrete LOD + HLOD/impostors + instanced draws",
    "reviewed": "2026-09-30"
   },
   {
@@ -156,7 +158,7 @@
    "owner": "texture-streaming-vt",
    "evidence": "D3D12 sampler feedback; SFS samples",
    "revisit": "Hardware coverage across target tiers",
-   "fallback": "Mip streaming",
+   "fallback": "Shader-written feedback buffer (VT feedback pass), then mip streaming",
    "reviewed": "2026-09-30"
   },
   {
@@ -309,7 +311,9 @@
    "tech": "WebGPU backend & web 3D",
    "class": "M",
    "capabilities": [
-    "RND.RHI.webgpu"
+    "RND.RHI.webgpu",
+    "RND.RHI.webgpu-quirks",
+    "RND.RHI.webgpu-validation"
    ],
    "owner": "rhi-webgpu",
    "evidence": "WebGPU in Chrome/Edge/Safari/Firefox (2023–2025)",
@@ -572,7 +576,7 @@
   },
   {
    "tech": "Autostereo / light-field displays",
-   "class": "M",
+   "class": "X",
    "capabilities": [
     "RND.ARCH.multiview-nview"
    ],
@@ -1024,8 +1028,8 @@
    "reviewed": "2026-09-30"
   },
   {
-   "tech": "In-shader neural evaluation & differentiable shaders (RND.SHADER.autodiff)",
-   "class": "M",
+   "tech": "Differentiable shader compilation (autodiff)",
+   "class": "X",
    "capabilities": [
     "RND.SHADER.autodiff"
    ],

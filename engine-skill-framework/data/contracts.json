@@ -12,7 +12,7 @@
    ],
    "conformance": true,
    "needs_implementer": true,
-   "oracle_author": "robustness-fuzzing",
+   "oracle_author": "foundation-conformance",
    "boundary": true,
    "test_double": {
     "kind": "null/fake platform + event injection",
@@ -53,7 +53,7 @@
    ],
    "conformance": true,
    "universal": "runtime",
-   "oracle_author": "robustness-fuzzing",
+   "oracle_author": "foundation-conformance",
    "oracle_reference": [
     "dependency-graph reference cases; dlopen/loader edge cases per OS"
    ]
@@ -134,7 +134,7 @@
     "C-BASE"
    ],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing",
+   "oracle_author": "foundation-conformance",
    "oracle_reference": [
     "herd7/litmus tests for ARM64 and x86; model checking (loom/CDSChecker class); linearizability checkers"
    ]
@@ -144,7 +144,7 @@
    "layer": 1,
    "owner": "job-system-task-graph",
    "name": "Task graph & job API",
-   "summary": "Task creation, dependencies, priorities/QoS, blocking rules, completion-token integration, process-wide thread inventory with pinned/affinity lanes and middleware adapters, serial deterministic test mode and schedule-perturbation hooks, task tracing; cancel/stop-token and cancel-vs-completion semantics (CORE.JOBS.cancellation).",
+   "summary": "Task creation, dependencies, priorities/QoS, blocking rules, completion-token integration, process-wide thread inventory with pinned/affinity lanes and middleware adapters, serial deterministic test mode and schedule-perturbation hooks, task tracing; cancel/stop-token and cancel-vs-completion semantics (CORE.JOBS.cancellation); threads and lanes are obtained only through the thread-model inventory (lint-enforced).",
    "requires": [
     "C-SYNC",
     "C-MEM"
@@ -237,7 +237,7 @@
     "C-TASK"
    ],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing",
+   "oracle_author": "foundation-conformance",
    "oracle_reference": [
     "frame-graph reference schedules; phase-violation corpus"
    ]
@@ -252,7 +252,7 @@
     "C-TYPES"
    ],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing",
+   "oracle_author": "foundation-conformance",
    "oracle_reference": [
     "collision and generation-wrap corpora"
    ]
@@ -284,7 +284,7 @@
     "C-TYPES"
    ],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing",
+   "oracle_author": "foundation-conformance",
    "oracle_reference": [
     "reflection round-trip corpora against generated metadata"
    ]
@@ -299,7 +299,7 @@
     "C-REFL"
    ],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing",
+   "oracle_author": "foundation-conformance",
    "oracle_reference": [
     "malformed and versioned-blob corpora; protobuf/flatbuffers-class conformance suites"
    ]
@@ -371,8 +371,9 @@
    "summary": "Resource handles and explicit lifetime; load requests with priority/deadline; the staged load pipeline (IO → decompress → fixup → GPU upload → publish) that every resource type implements; pool registration, pressure signals and shrink-by-deadline requests; residency notifications drained at a declared C-FRAME phase; fallbacks; every CPU/GPU pool registers with the arbiter and never sizes itself.",
    "requires": [
     "C-ASSET",
-    "C-VFS",
-    "C-MEM"
+    "C-FRAME",
+    "C-MEM",
+    "C-VFS"
    ],
    "conformance": true,
    "oracle_author": "functional-automation-soak",
@@ -654,7 +655,7 @@
    "layer": 3,
    "owner": "physics-architect",
    "name": "Physics world & scene queries",
-   "summary": "Bodies, shapes, queries (handle-addressed, batched), contact events with budgets, stepping phases, batch add/remove O(batch), snapshot/restore/resimulate participation, collider history for rewind; world instances and local simulation spaces; conformance: restore + resimulate N ticks reproduces the state hash at the declared determinism level; backends (in-house 2D, in-house 3D, or middleware behind the integration layer PHY.ARCH.middleware-layer) implement it; every configuration that requires it contains one; substep policy hook whose outputs are recorded or deterministic; active-set/change-set output for replication; contact events are delivered as batched, filtered outputs (no per-body synchronous callbacks)",
+   "summary": "Bodies, shapes, queries (handle-addressed, batched), contact events with budgets, stepping phases, batch add/remove O(batch), snapshot/restore/resimulate participation, collider history for rewind; world instances and local simulation spaces; conformance: restore + resimulate N ticks reproduces the state hash at the declared determinism level; backends (in-house 2D, in-house 3D, or middleware behind the integration layer PHY.ARCH.middleware-layer) implement it; every configuration that requires it contains one; substep policy hook whose outputs are recorded or deterministic; active-set/change-set output for replication; contact events are delivered as batched, filtered outputs (no per-body synchronous callbacks); implementers split: rigid-body-dynamics implements bodies, stepping and snapshot; collision-detection implements shapes, queries and collider history.",
    "requires": [
     "C-SPATIAL",
     "C-FRAME",
@@ -666,7 +667,7 @@
    "oracle_author": "simulation-validation",
    "needs_implementer": true,
    "oracle_reference": [
-    "analytic physics scenes (pendulum, stacking, restitution) and Bullet/Jolt differential runs"
+    "analytic physics scenes (pendulum, stacking, restitution) and a differential run against a backend other than the shipped one"
    ],
    "extension_tiers": {
     "late-consumers": "M3"
@@ -877,7 +878,7 @@
     "C-TASK"
    ],
    "conformance": true,
-   "oracle_author": "functional-automation-soak",
+   "oracle_author": "tools-pipeline-conformance",
    "oracle_reference": [
     "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
    ]
@@ -895,7 +896,7 @@
     "C-CMD"
    ],
    "conformance": true,
-   "oracle_author": "functional-automation-soak",
+   "oracle_author": "tools-pipeline-conformance",
    "oracle_reference": [
     "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
    ],
@@ -910,10 +911,11 @@
    "name": "Graph authoring & compilation",
    "summary": "Node/pin model, validation, compilation hooks for domain graphs.",
    "requires": [
-    "C-EDCMD"
+    "C-EDCMD",
+    "C-GRAPHRT"
    ],
    "conformance": true,
-   "oracle_author": "functional-automation-soak",
+   "oracle_author": "tools-pipeline-conformance",
    "oracle_reference": [
     "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
    ]
@@ -926,7 +928,7 @@
    "summary": "Targets, configurations, toolchains, codegen steps.",
    "requires": [],
    "conformance": true,
-   "oracle_author": "functional-automation-soak",
+   "oracle_author": "tools-pipeline-conformance",
    "oracle_reference": [
     "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
    ]
@@ -942,7 +944,7 @@
     "C-BUILD"
    ],
    "conformance": true,
-   "oracle_author": "functional-automation-soak",
+   "oracle_author": "tools-pipeline-conformance",
    "oracle_reference": [
     "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
    ]
@@ -1039,7 +1041,7 @@
    "layer": 0,
    "owner": "platform-architect",
    "name": "Bootstrap base",
-   "summary": "Raw page allocator, raw log/assert/abort sink, monotonic clock, raw thread primitives and late-bound hook tables that higher layers install (allocator, log sink, assert handler, crash annotator). Depends on nothing.",
+   "summary": "Raw page allocator, raw log/assert/abort sink, monotonic clock, raw thread primitives and late-bound hook tables that higher layers install (allocator, log sink, assert handler, crash annotator). Depends on nothing; signal-safe subset: pre-opened fd/pipe write, raw file write, alternate-stack reservation, exception/signal handler registration hook, monitor-process spawn.",
    "requires": [],
    "conformance": true,
    "oracle_author": "foundation-conformance",
@@ -1052,13 +1054,14 @@
    "layer": 1,
    "owner": "concurrency-primitives",
    "name": "Ownership & retirement",
-   "summary": "Engine-wide ownership and cross-thread reference rules; deferred-destruction/retirement service keyed to completion tokens (task completion, frames in flight, GPU fences).",
+   "summary": "Engine-wide ownership and cross-thread reference rules; deferred-destruction/retirement service keyed to completion tokens (task completion, frames in flight, GPU fences). Mechanism only (retirement service, completion tokens, epochs); ownership policy belongs to CORE.LIFE.ownership-model (core-runtime-architect).",
    "requires": [
+    "C-MEM",
     "C-SYNC"
    ],
    "conformance": true,
    "universal": "runtime",
-   "oracle_author": "robustness-fuzzing",
+   "oracle_author": "foundation-conformance",
    "oracle_reference": [
     "leak/lifetime torture corpora"
    ]
@@ -1074,7 +1077,7 @@
     "C-TASK"
    ],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing",
+   "oracle_author": "foundation-conformance",
    "oracle_reference": [
     "framing/TOCTOU fuzz corpora; transport conformance cases"
    ],
@@ -1108,7 +1111,7 @@
     "C-FRAME"
    ],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing",
+   "oracle_author": "foundation-conformance",
    "oracle_reference": [
     "channel ordering and back-pressure reference cases"
    ]
@@ -1123,7 +1126,7 @@
     "C-FRAME"
    ],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing",
+   "oracle_author": "foundation-conformance",
    "oracle_reference": [
     "present-timeline captures with reference pacing metrics"
    ]
@@ -1440,7 +1443,7 @@
    "conformance": true,
    "oracle_author": "simulation-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "character-controller edge-case corpora (step, slope, ledge, moving platform) from published test scenes"
    ]
   },
   {
@@ -1537,7 +1540,7 @@
     "C-EDCMD"
    ],
    "conformance": true,
-   "oracle_author": "functional-automation-soak",
+   "oracle_author": "tools-pipeline-conformance",
    "oracle_reference": [
     "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
    ],
@@ -1786,7 +1789,7 @@
    "conformance": true,
    "oracle_author": "simulation-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "reference manoeuvres (ISO 3888 double lane change, skidpad) and Pacejka tire-model reference curves"
    ]
   },
   {
@@ -1892,7 +1895,7 @@
     "C-EDCMD"
    ],
    "conformance": true,
-   "oracle_author": "functional-automation-soak",
+   "oracle_author": "tools-pipeline-conformance",
    "oracle_reference": [
     "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
    ]
@@ -1908,7 +1911,7 @@
     "C-SER"
    ],
    "conformance": true,
-   "oracle_author": "functional-automation-soak",
+   "oracle_author": "tools-pipeline-conformance",
    "oracle_reference": [
     "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
    ],
@@ -1925,10 +1928,11 @@
    "name": "Runtime edit session",
    "summary": "In-game creation sessions: serializable commands (schema shared with C-EDCMD per ED.ARCH.transactions), undo, selection, permissions and per-creation budgets, publish/version; runtime graph authoring and compilation (XC.EXT.runtime-graphs; node/pin schema shared with C-GRAPH); command schema from C-CMD.",
    "requires": [
-    "C-SER",
-    "C-ID",
+    "C-CMD",
     "C-FRAME",
-    "C-CMD"
+    "C-GRAPHRT",
+    "C-ID",
+    "C-SER"
    ],
    "conformance": true,
    "oracle_author": "functional-automation-soak",
@@ -2038,7 +2042,7 @@
    "conformance": true,
    "oracle_author": "simulation-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "ORCA/RVO reference scenarios and flow-rate benchmarks (fundamental diagram data)"
    ]
   },
   {
@@ -2070,7 +2074,7 @@
    "conformance": true,
    "oracle_author": "simulation-validation",
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "behavior-tree/utility reference traces and EQS analytic cases"
    ]
   },
   {
@@ -2085,7 +2089,7 @@
     "C-ID"
    ],
    "conformance": true,
-   "oracle_author": "functional-automation-soak",
+   "oracle_author": "tools-pipeline-conformance",
    "oracle_reference": [
     "command apply/invert/merge property tests"
    ]
@@ -2157,7 +2161,7 @@
    "layer": 2,
    "owner": "reflection-metadata",
    "name": "State-class declaration",
-   "summary": "One declaration of the state class of every component and reflected property; C-SNAPSHOT, C-REP, C-PREDICT, C-SAVE and C-SRVDATA registries derive from it; a fitness function requires every declared component or property to have a class.",
+   "summary": "One declaration of the state class of every component and reflected property; C-SNAPSHOT, C-REP, C-PREDICT, C-SAVE and C-SRVDATA registries derive from it; a fitness function requires every declared component or property to have a class; soft bodies: cloth and hair are derived/cosmetic and excluded from hashes; ropes and softbody are restorable when gameplay-visible.",
    "requires": [
     "C-REFL"
    ],
@@ -2196,7 +2200,7 @@
    "oracle_author": "simulation-validation",
    "needs_implementer": true,
    "oracle_reference": [
-    "reference scenes or analytic cases declared in the conformance suite; derived goldens are regression-only"
+    "collide-and-slide analytic cases and a second-backend differential run"
    ],
    "extension_tiers": {
     "late-consumers": "M3"
@@ -2229,9 +2233,24 @@
     "C-COOK"
    ],
    "conformance": true,
-   "oracle_author": "functional-automation-soak",
+   "oracle_author": "tools-pipeline-conformance",
    "oracle_reference": [
     "round-trip import corpora (FBX/glTF/USD samples), reimport-preserve cases"
+   ]
+  },
+  {
+   "id": "C-GRAPHRT",
+   "layer": 2,
+   "owner": "scripting-runtime",
+   "name": "Runtime graph schema",
+   "summary": "Node/pin schema, validation and the restricted node-set profile for graphs compiled at runtime (UGC graphs, visual script); consumed tool-side by C-GRAPH.",
+   "requires": [
+    "C-SER"
+   ],
+   "conformance": true,
+   "oracle_author": "functional-automation-soak",
+   "oracle_reference": [
+    "malformed and adversarial graph corpora; restricted-profile conformance cases"
    ]
   }
  ]
