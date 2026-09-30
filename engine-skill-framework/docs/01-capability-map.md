@@ -4,7 +4,7 @@
 
 Everything required to build **and ship** the engine, decomposed as domain → area → capability. Each capability has exactly one owning skill (**bold**); contributors coordinate through the owner's contract. Maturity: unmarked = established production; `emerging` = shipping in some titles, evaluate per ADR; `experimental` = research, never an architectural baseline; `speculative` = watch only.
 
-**1375 capabilities** in 21 domains — 1257 established, 97 emerging, 21 experimental, 0 speculative.
+**1396 capabilities** in 21 domains — 1275 established, 99 emerging, 22 experimental, 0 speculative.
 
 ## Domains
 
@@ -12,22 +12,22 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 |---|---|---|
 | [ARCH · Engine architecture, governance & agent organization](#arch) | 6 | 55 |
 | [PLAT · Platform & hardware abstraction](#plat) | 10 | 111 |
-| [CORE · Core runtime foundations](#core) | 12 | 116 |
+| [CORE · Core runtime foundations](#core) | 12 | 117 |
 | [RES · Resources, IO, packaging & streaming](#res) | 3 | 26 |
 | [CNT · Asset identity & content pipeline](#cnt) | 4 | 41 |
 | [WLD · World representation, streaming & environment](#wld) | 7 | 63 |
-| [RND · Rendering](#rnd) | 22 | 219 |
+| [RND · Rendering](#rnd) | 22 | 221 |
 | [ML · Machine-learning runtime](#ml) | 1 | 11 |
-| [PHY · Physics & simulation](#phy) | 9 | 73 |
-| [ANM · Animation](#anm) | 9 | 58 |
+| [PHY · Physics & simulation](#phy) | 9 | 77 |
+| [ANM · Animation](#anm) | 9 | 59 |
 | [AUD · Audio](#aud) | 5 | 36 |
 | [INP · Input](#inp) | 3 | 29 |
-| [NET · Networking & multiplayer](#net) | 7 | 71 |
+| [NET · Networking & multiplayer](#net) | 7 | 81 |
 | [GAM · Gameplay, scripting, AI & persistence](#gam) | 11 | 100 |
 | [UI · UI, text, localization & accessibility](#ui) | 5 | 52 |
 | [ED · Editor & content tools](#ed) | 7 | 65 |
 | [BLD · Build, CI/CD & release](#bld) | 3 | 42 |
-| [QA · Testing & validation](#qa) | 9 | 72 |
+| [QA · Testing & validation](#qa) | 9 | 75 |
 | [PRF · Performance engineering](#prf) | 7 | 41 |
 | [OBS · Observability & diagnostics](#obs) | 2 | 21 |
 | [XC · Cross-cutting runtime disciplines](#xc) | 5 | 73 |
@@ -282,12 +282,13 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `CORE.MATH.compgeo` Computational geometry (hulls, triangulation, booleans) — **math-simd-numerics**
 - `CORE.MATH.robustness` Numerical robustness & precision analysis — **math-simd-numerics**
 - `CORE.MATH.precision` Double & mixed-precision math for large worlds — **math-simd-numerics** · with spatial-transforms
-- `CORE.MATH.deterministic` Cross-platform reproducible math library — **math-simd-numerics** · with determinism-replay
+- `CORE.MATH.deterministic` Cross-platform reproducible math library `emerging` — **math-simd-numerics** · with determinism-replay
 - `CORE.MATH.random` Random numbers (counter-based / per-stream for parallel determinism) & noise — **math-simd-numerics**
 - `CORE.MATH.curves` Curves, splines & interpolation — **math-simd-numerics**
 - `CORE.MATH.spmd` Wide-SIMD / SPMD kernels for fixed and scalable (VLA) vector ISAs, runtime ISA dispatch — **math-simd-numerics** · with cpu-performance
 - `CORE.MATH.formats` Half, packed & quantized numeric formats — **math-simd-numerics**
 - `CORE.MATH.bignum` Large-magnitude/arbitrary-precision numeric types with canonical serialization — **math-simd-numerics**
+- `CORE.MATH.fixed-point` Fixed-point numerics for cross-platform lockstep and rollback — **math-simd-numerics** · with determinism-replay
 
 **CORE.MEM — Memory**
 
@@ -743,6 +744,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `RND.TEX.ntc` Neural texture compression `experimental` — **texture-streaming-vt** · with ml-inference-runtime
 - `RND.TEX.mip-layout` Streaming-friendly mip & tile layout in cook — **texture-streaming-vt** · with asset-cook-processors
 - `RND.TEX.runtime-decode` Runtime image decode for player-supplied images (avatars, sprays, UGC thumbnails) — **texture-streaming-vt** · with security-engineering
+- `RND.TEX.transcode` Load-time transcoding from supercompressed universal formats (KTX2/UASTC/ETC1S) to device formats — **texture-streaming-vt** · with platform-web, asset-cook-processors
 
 **RND.LIGHT — Direct lighting & shadows**
 
@@ -798,12 +800,13 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `RND.RECON.framegen` Frame generation / interpolation — **reconstruction-upscaling** · with frame-orchestration
 - `RND.RECON.dynres` Dynamic resolution scaling — **reconstruction-upscaling** · with frame-orchestration
 - `RND.RECON.motion-vectors` Motion vector, jitter & history contract — **reconstruction-upscaling** · with post-color-hdr, deformation-skinning, geometry-pipeline
-- `RND.RECON.denoise` Spatiotemporal & ML denoising (ray reconstruction class) `emerging` — **reconstruction-upscaling** · with global-illumination
+- `RND.RECON.denoise` Spatiotemporal denoising (established) — **reconstruction-upscaling** · with global-illumination
 - `RND.RECON.vrs` Variable-rate shading — **reconstruction-upscaling**
 - `RND.RECON.msaa` MSAA incl. on-tile resolve & alpha-to-coverage — **reconstruction-upscaling**
 - `RND.RECON.post-aa` Post-process AA (SMAA/FXAA class) — **reconstruction-upscaling**
 - `RND.RECON.specular-aa` Specular/geometric anti-aliasing — **material-system** · with reconstruction-upscaling
 - `RND.RECON.foveation` Foveated rendering implementation (VRS, fragment density maps, multi-res) `emerging` — **reconstruction-upscaling** · with xr-runtime
+- `RND.RECON.ml-denoise` ML / joint ray-reconstruction denoising `emerging` — **reconstruction-upscaling** · with global-illumination, ml-inference-runtime
 
 **RND.POST — Post-processing, HDR & color**
 
@@ -925,6 +928,9 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `PHY.ARCH.local-frames` Moving local simulation spaces (physics grids): body/controller transitions between frames, LWC interplay `emerging` — **physics-architect** · with vehicle-physics, character-physics, spatial-transforms, prediction-rollback
 - `PHY.ARCH.tier-transitions` Physics participation in simulation-tier promotion/demotion — **physics-architect** · with vehicle-physics, character-physics, crowd-simulation
 - `PHY.ARCH.fields` Gravity & force fields (volumes, radial/non-uniform gravity, impulse/explosion fields) applied to bodies, controllers and cloth — **physics-architect** · with character-physics, vehicle-physics
+- `PHY.ARCH.debug-capture` Physics frame capture (bodies, contacts, queries, islands) on client, headless and server builds; compiled out of shipping — **physics-architect** · with determinism-replay, visual-debugging-tools
+- `PHY.ARCH.persistence` Physics state dehydrate/rehydrate on cell deactivation and save (moved props, sleep, broken joints, fracture state) — **physics-architect** · with persistence-save, world-architect, destruction-fracture
+- `PHY.ARCH.fixed-point-backend` Fixed-point physics backend option — **physics-architect** · with physics-2d, rigid-body-dynamics
 
 **PHY.COL — Collision**
 
@@ -973,10 +979,11 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 
 **PHY.DEST — Destruction**
 
-- `PHY.DEST.runtime` Runtime fracture & debris management (large-scale runtime fracture per ADR) — **destruction-fracture**
+- `PHY.DEST.runtime` Pre-fractured destruction & debris management — **destruction-fracture**
 - `PHY.DEST.replication` Destruction replication strategy — **destruction-fracture** · with replication
 - `PHY.DEST.propagation` Destruction → navigation / render / audio updates — **destruction-fracture**
 - `PHY.DEST.structural` Structural integrity / load-path evaluation & collapse — **destruction-fracture** · with gameplay-systems-toolkit, voxel-worlds
+- `PHY.DEST.procedural` Runtime procedural fracture at impact time at scale `emerging` — **destruction-fracture**
 
 **PHY.FLUID — Fluids**
 
@@ -996,7 +1003,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 
 - `PHY.TOOL.collision-authoring` Collision authoring (primitive fitting, convex decomposition UI) — **physics-tools** · with collision-detection
 - `PHY.TOOL.physics-asset` Physics-asset / ragdoll body & constraint editor — **physics-tools** · with ik-procedural-animation, rigid-body-dynamics
-- `PHY.TOOL.visual-debugger` Physics visual debugger & recorder — **physics-tools** · with visual-debugging-tools, determinism-replay
+- `PHY.TOOL.visual-debugger` Physics visual debugger (viewer for PHY.ARCH.debug-capture) — **physics-tools** · with visual-debugging-tools, determinism-replay
 - `PHY.TOOL.simulate-in-editor` Simulate-in-editor & simulation-driven placement — **physics-tools** · with editor-architect
 - `PHY.TOOL.2d-shapes` 2D collision-shape editing — **physics-2d**
 - `PHY.TOOL.fracture` Fracture authoring & precomputation — **destruction-fracture**
@@ -1065,6 +1072,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `ANM.IK.physical` Physical animation, active ragdoll & ragdoll blending — **ik-procedural-animation** · with rigid-body-dynamics
 - `ANM.IK.2d` 2D IK constraints — **ik-procedural-animation**
 - `ANM.IK.avatar-embodiment` Full-body avatar IK from sparse tracking & tracked-expression retargeting — **ik-procedural-animation** · with facial-animation, replication, xr-runtime
+- `ANM.IK.learned-physics` Physically simulated characters driven by learned (RL) policies `experimental` — **ik-procedural-animation** · with rigid-body-dynamics, ml-inference-runtime
 
 **ANM.FACE — Facial animation**
 
@@ -1207,6 +1215,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `NET.ARCH.connectivity` Connectivity loss, sign-out & suspend/resume session policy — **network-architect** · with platform-console, platform-mobile, gameplay-architect
 - `NET.ARCH.validation` Netcode oracle scenarios & acceptance thresholds (co-signed by simulation-validation per QA.AGENT.oracle-change-control) — **network-architect** · with functional-automation-soak, simulation-validation
 - `NET.ARCH.meshing` Seamless dynamic server meshing / cross-server entity authority `emerging` — **server-scaleout-persistence** · with network-architect
+- `NET.ARCH.async-validation` Deterministic re-simulation of submitted async results (PvP, leaderboards) in a headless backend worker — **determinism-replay** · with online-services-liveops, anti-cheat-integrity
 
 **NET.TRANS — Transport**
 
@@ -1218,14 +1227,15 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `NET.TRANS.nat` NAT traversal & relays — **network-transport** · with platform-services
 - `NET.TRANS.lifecycle` Connection lifecycle & timeouts — **network-transport**
 - `NET.TRANS.simulation` Network link conditioner seam (latency, loss, jitter) — **network-transport**
-- `NET.TRANS.quic` QUIC / WebTransport evaluation `emerging` — **network-transport**
-- `NET.TRANS.web` Browser transports (WebSocket, WebRTC data channels; WebTransport where available) — **network-transport** · with platform-web
+- `NET.TRANS.quic` QUIC/WebTransport as native transport `emerging` — **network-transport**
+- `NET.TRANS.web` Browser transports: WebTransport datagrams and WebRTC unreliable channels preferred; WebSocket fallback for async/turn-based play or by ADR — **network-transport** · with platform-web
 - `NET.TRANS.voice` Game-transport voice path (P2P/server-relayed) — **network-transport** · with audio-dsp-mixing
 - `NET.TRANS.dos` Anti-amplification handshake, stateless challenges, rate limiting, relay-shielded addressing — **network-transport** · with security-engineering, dedicated-server
 - `NET.TRANS.platform-requirements` Platform networking requirements (IPv6-only/NAT64, network change & migration, connectivity state) — **network-transport** · with platform-console, platform-mobile
 - `NET.TRANS.web-server` Server-side browser transport endpoints & certificate handling — **network-transport** · with dedicated-server
 - `NET.TRANS.l4s` L4S low-latency congestion signalling `experimental` — **network-transport**
 - `NET.TRANS.local-network` LAN/local-wireless session discovery & hosting without online services (broadcast/mDNS, console ad-hoc) — **network-transport** · with platform-console, net-session
+- `NET.TRANS.qos-probe` Client latency and loss probing to regions, data centres and relays (matchmaking input) — **network-transport** · with online-services-liveops
 
 **NET.REP — Replication**
 
@@ -1242,6 +1252,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `NET.REP.change-tracking` Change-driven replication: dirty tracking at the write site, per-object serialized deltas shared across connections, batch-parallel filtering/prioritization; cost O(changes + relevant set per connection) — **replication**
 - `NET.REP.parallel` Parallel per-connection packet building with shared per-object serialization — **replication**
 - `NET.REP.moq-spectator` Media-over-QUIC spectator/broadcast streams `experimental` — **replication**
+- `NET.REP.compat` Wire-level replicated-schema compatibility: layout hashes, per-connection layout negotiation, tolerant decode — **replication** · with serialization-schema, network-architect
 
 **NET.PRED — Prediction & latency hiding**
 
@@ -1253,6 +1264,9 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `NET.PRED.clock` Clock synchronization — **prediction-rollback**
 - `NET.PRED.input-commands` Network delivery of C-INPUT command frames: redundancy, jitter buffering, server-side validation hooks (format owned by input-system) — **prediction-rollback** · with input-system, anti-cheat-integrity
 - `NET.PRED.lockstep-replay` Shipping input-stream replays for lockstep games — **prediction-rollback** · with determinism-replay
+- `NET.PRED.presentation` Rollback/prediction-aware presentation: predicted cosmetic event keys, dedup on resim, cancel/fade of mispredicted cosmetics, late-confirm offset playback — **prediction-rollback** · with vfx-particles, audio-content-runtime, animation-runtime, input-devices-haptics
+- `NET.PRED.spectator` Input-stream spectators for lockstep and rollback games — **prediction-rollback** · with determinism-replay
+- `NET.PRED.sync-test` Sync-test sessions: forced rollback and state-hash comparison in CI and dev builds — **prediction-rollback** · with determinism-replay
 
 **NET.SRV — Servers**
 
@@ -1265,27 +1279,31 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `NET.SRV.zoning` Zoned/instanced multi-server worlds & player handoff — **server-scaleout-persistence** · with world-architect, replication, dedicated-server
 - `NET.SRV.lifecycle` Server lifecycle for rolling deploys: health/readiness, graceful drain, session hand-off, fleet-version coexistence — **dedicated-server** · with network-architect, online-services-liveops
 - `NET.SRV.admin` Authenticated admin/GM command surface on shipping servers: RBAC, audit log, rate limits — **dedicated-server** · with security-engineering, anti-cheat-integrity
-- `NET.SRV.overload` Overload degradation (time dilation, adaptive tick, relevancy throttling) — **dedicated-server** · with replication, frame-orchestration
-- `NET.SRV.budgets` Per-connection memory/CPU/RPC quotas & limits on client-triggered work — **dedicated-server** · with replication, anti-cheat-integrity
 - `NET.SRV.cross-server` Cross-server messaging & entity/player hand-off — **server-scaleout-persistence** · with replication, world-architect
 
 **NET.DBG — Network debugging & profiling**
 
-- `NET.DBG.profiler` Network profiler: bandwidth attribution per connection/entity/property — **replication**
 - `NET.DBG.inspect` Packet capture & protocol dissector — **network-transport**
 - `NET.DBG.visualize` Relevancy, priority & prediction-error visualization — **replication** · with visual-debugging-tools
 - `NET.DBG.session-replay` Record/replay of full network sessions for debugging — **replication** · with determinism-replay
+- `NET.DBG.profiler` Network profiler: channel attribution with registered categories, bandwidth per connection/entity/property — **network-transport** · with replication, prediction-rollback
+- `NET.DBG.prediction-viz` Prediction-error and rollback visualization — **prediction-rollback** · with visual-debugging-tools
 
 **NET.SESS — Network sessions**
 
 - `NET.SESS.handshake` Connect handshake: compatibility/version check, auth token, capability negotiation — **net-session** · with network-architect
 - `NET.SESS.join` Load-gated join readiness & spawn hand-off — **net-session** · with gameplay-architect
-- `NET.SESS.baseline` Join-in-progress baseline snapshot — **net-session** · with replication
-- `NET.SESS.reconnect` Reconnect/rejoin with ownership & state restore in a grace window — **net-session**
+- `NET.SESS.baseline` Join-in-progress baseline: replicated snapshot or C-SNAPSHOT + command catch-up — **net-session** · with replication, prediction-rollback, determinism-replay
+- `NET.SESS.reconnect` Reconnect/rejoin with ownership & state restore in a grace window — **net-session** · with prediction-rollback, determinism-replay
 - `NET.SESS.travel` Server-driven travel with connected clients — **net-session** · with world-architect
 - `NET.SESS.disconnect` Disconnect/kick reasons & ban hook — **net-session** · with anti-cheat-integrity
-- `NET.SESS.host-mode` Hosting modes (dedicated, listen, P2P host, relay-hosted) & host migration — **net-session** · with network-architect, dedicated-server
+- `NET.SESS.host-mode` Hosting modes (dedicated, listen, P2P host, relay-hosted, self-hosted/community servers) & host migration — **net-session** · with network-architect, dedicated-server
 - `NET.SESS.auth` Auth-ticket & service-identity validation in every host mode — **net-session** · with network-transport, dedicated-server
+- `NET.SESS.budgets` Per-connection memory/CPU/RPC quotas & limits on client-triggered work — **net-session** · with replication, anti-cheat-integrity, dedicated-server
+- `NET.SESS.overload` Overload degradation (time dilation, adaptive tick, relevancy throttling) — **net-session** · with replication, frame-orchestration, dedicated-server
+- `NET.SESS.content-set` Session content-set agreement: mods, DLC and content versions checked at join; match, download, subset play or refuse — **net-session** · with modding-ugc, packaging-release-patching, platform-services
+- `NET.SESS.server-browser` Server registration, listing and query via backend, master server or LAN; auth without a first-party backend — **net-session** · with online-services-liveops, network-transport
+- `NET.SESS.local-players` Several local players per connection: per-player identity/auth, sub-connections and per-player command streams — **net-session** · with gameplay-architect, platform-services, input-system
 
 ## GAM
 
@@ -1736,6 +1754,9 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `QA.SIM.deformables` Cloth & soft-body stability validation runs — **simulation-validation** · with cloth-deformables
 - `QA.SIM.mass-agents` Mass-agent throughput & determinism validation runs incl. desync-hash lanes on lockstep configurations — **simulation-validation** · with crowd-simulation, determinism-replay
 - `QA.SIM.controllers` Character-controller edge-case validation runs (step, slope, ledge, platforms) — **simulation-validation** · with character-physics, character-movement
+- `QA.SIM.collision` Collision robustness runs (CCD tunnelling, degenerate GJK/EPA inputs, query correctness vs brute force) — **simulation-validation** · with collision-detection
+- `QA.SIM.destruction` Destruction validation runs (determinism, debris budgets, replicated consistency) — **simulation-validation** · with destruction-fracture
+- `QA.SIM.fluids-fields` Fluid and field simulation runs (conservation, stability, desync lanes) — **simulation-validation** · with fluid-simulation, systems-simulation
 
 **QA.HOST — Test host runtime**
 
@@ -1877,7 +1898,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `XC.SEC.server-validation` Server-side cheat validation — **anti-cheat-integrity**
 - `XC.SEC.anticheat` Client anti-cheat middleware integration boundary — **anti-cheat-integrity**
 - `XC.SEC.abuse` Exploit & economy-abuse detection signals — **anti-cheat-integrity** · with platform-services
-- `XC.SEC.score-integrity` Leaderboard & achievement submission validation — **anti-cheat-integrity**
+- `XC.SEC.score-integrity` Leaderboard & achievement submission validation — **anti-cheat-integrity** · with determinism-replay
 - `XC.SEC.memory-safety` Memory-safety posture: hardened library modes, shipping bounds checks, memory-safe language for untrusted-input parsers, MTE/PAC `emerging` — **security-engineering** · with core-runtime-architect
 - `XC.SEC.hardening` Exploit-mitigation & hardened-build matrix per platform (CFI, shadow stacks, allocator hardening) — **security-engineering** · with build-system-toolchains, memory-allocators
 - `XC.SEC.crypto-policy` Cryptography & TLS/certificate policy — **security-engineering** · with containers-core-types

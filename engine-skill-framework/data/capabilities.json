@@ -1690,7 +1690,7 @@
        "CORE.MATH.deterministic",
        "Cross-platform reproducible math library",
        "math-simd-numerics",
-       "E",
+       "M",
        [
         "determinism-replay"
        ]
@@ -1727,6 +1727,15 @@
        "Large-magnitude/arbitrary-precision numeric types with canonical serialization",
        "math-simd-numerics",
        "E"
+      ],
+      [
+       "CORE.MATH.fixed-point",
+       "Fixed-point numerics for cross-platform lockstep and rollback",
+       "math-simd-numerics",
+       "E",
+       [
+        "determinism-replay"
+       ]
       ]
      ]
     },
@@ -4731,6 +4740,16 @@
        [
         "security-engineering"
        ]
+      ],
+      [
+       "RND.TEX.transcode",
+       "Load-time transcoding from supercompressed universal formats (KTX2/UASTC/ETC1S) to device formats",
+       "texture-streaming-vt",
+       "E",
+       [
+        "platform-web",
+        "asset-cook-processors"
+       ]
       ]
      ]
     },
@@ -5084,9 +5103,9 @@
       ],
       [
        "RND.RECON.denoise",
-       "Spatiotemporal & ML denoising (ray reconstruction class)",
+       "Spatiotemporal denoising (established)",
        "reconstruction-upscaling",
-       "M",
+       "E",
        [
         "global-illumination"
        ]
@@ -5125,6 +5144,16 @@
        "M",
        [
         "xr-runtime"
+       ]
+      ],
+      [
+       "RND.RECON.ml-denoise",
+       "ML / joint ray-reconstruction denoising",
+       "reconstruction-upscaling",
+       "M",
+       [
+        "global-illumination",
+        "ml-inference-runtime"
        ]
       ]
      ]
@@ -5840,6 +5869,37 @@
         "character-physics",
         "vehicle-physics"
        ]
+      ],
+      [
+       "PHY.ARCH.debug-capture",
+       "Physics frame capture (bodies, contacts, queries, islands) on client, headless and server builds; compiled out of shipping",
+       "physics-architect",
+       "E",
+       [
+        "determinism-replay",
+        "visual-debugging-tools"
+       ]
+      ],
+      [
+       "PHY.ARCH.persistence",
+       "Physics state dehydrate/rehydrate on cell deactivation and save (moved props, sleep, broken joints, fracture state)",
+       "physics-architect",
+       "E",
+       [
+        "persistence-save",
+        "world-architect",
+        "destruction-fracture"
+       ]
+      ],
+      [
+       "PHY.ARCH.fixed-point-backend",
+       "Fixed-point physics backend option",
+       "physics-architect",
+       "E",
+       [
+        "physics-2d",
+        "rigid-body-dynamics"
+       ]
       ]
      ]
     },
@@ -6108,7 +6168,7 @@
      "caps": [
       [
        "PHY.DEST.runtime",
-       "Runtime fracture & debris management (large-scale runtime fracture per ADR)",
+       "Pre-fractured destruction & debris management",
        "destruction-fracture",
        "E"
       ],
@@ -6136,6 +6196,12 @@
         "gameplay-systems-toolkit",
         "voxel-worlds"
        ]
+      ],
+      [
+       "PHY.DEST.procedural",
+       "Runtime procedural fracture at impact time at scale",
+       "destruction-fracture",
+       "M"
       ]
      ]
     },
@@ -6231,7 +6297,7 @@
       ],
       [
        "PHY.TOOL.visual-debugger",
-       "Physics visual debugger & recorder",
+       "Physics visual debugger (viewer for PHY.ARCH.debug-capture)",
        "physics-tools",
        "E",
        [
@@ -6633,6 +6699,19 @@
         "facial-animation",
         "replication",
         "xr-runtime"
+       ]
+      ],
+      [
+       "ANM.IK.learned-physics",
+       "Physically simulated characters driven by learned (RL) policies",
+       "ik-procedural-animation",
+       "X",
+       [
+        "rigid-body-dynamics",
+        "ml-inference-runtime"
+       ],
+       [
+        "experimental"
        ]
       ]
      ]
@@ -7441,6 +7520,16 @@
        [
         "network-architect"
        ]
+      ],
+      [
+       "NET.ARCH.async-validation",
+       "Deterministic re-simulation of submitted async results (PvP, leaderboards) in a headless backend worker",
+       "determinism-replay",
+       "E",
+       [
+        "online-services-liveops",
+        "anti-cheat-integrity"
+       ]
       ]
      ]
     },
@@ -7504,13 +7593,13 @@
       ],
       [
        "NET.TRANS.quic",
-       "QUIC / WebTransport evaluation",
+       "QUIC/WebTransport as native transport",
        "network-transport",
        "M"
       ],
       [
        "NET.TRANS.web",
-       "Browser transports (WebSocket, WebRTC data channels; WebTransport where available)",
+       "Browser transports: WebTransport datagrams and WebRTC unreliable channels preferred; WebSocket fallback for async/turn-based play or by ADR",
        "network-transport",
        "E",
        [
@@ -7573,6 +7662,15 @@
        [
         "platform-console",
         "net-session"
+       ]
+      ],
+      [
+       "NET.TRANS.qos-probe",
+       "Client latency and loss probing to regions, data centres and relays (matchmaking input)",
+       "network-transport",
+       "E",
+       [
+        "online-services-liveops"
        ]
       ]
      ]
@@ -7672,6 +7770,16 @@
        [
         "experimental"
        ]
+      ],
+      [
+       "NET.REP.compat",
+       "Wire-level replicated-schema compatibility: layout hashes, per-connection layout negotiation, tolerant decode",
+       "replication",
+       "E",
+       [
+        "serialization-schema",
+        "network-architect"
+       ]
       ]
      ]
     },
@@ -7734,6 +7842,36 @@
       [
        "NET.PRED.lockstep-replay",
        "Shipping input-stream replays for lockstep games",
+       "prediction-rollback",
+       "E",
+       [
+        "determinism-replay"
+       ]
+      ],
+      [
+       "NET.PRED.presentation",
+       "Rollback/prediction-aware presentation: predicted cosmetic event keys, dedup on resim, cancel/fade of mispredicted cosmetics, late-confirm offset playback",
+       "prediction-rollback",
+       "E",
+       [
+        "vfx-particles",
+        "audio-content-runtime",
+        "animation-runtime",
+        "input-devices-haptics"
+       ]
+      ],
+      [
+       "NET.PRED.spectator",
+       "Input-stream spectators for lockstep and rollback games",
+       "prediction-rollback",
+       "E",
+       [
+        "determinism-replay"
+       ]
+      ],
+      [
+       "NET.PRED.sync-test",
+       "Sync-test sessions: forced rollback and state-hash comparison in CI and dev builds",
        "prediction-rollback",
        "E",
        [
@@ -7829,26 +7967,6 @@
        ]
       ],
       [
-       "NET.SRV.overload",
-       "Overload degradation (time dilation, adaptive tick, relevancy throttling)",
-       "dedicated-server",
-       "E",
-       [
-        "replication",
-        "frame-orchestration"
-       ]
-      ],
-      [
-       "NET.SRV.budgets",
-       "Per-connection memory/CPU/RPC quotas & limits on client-triggered work",
-       "dedicated-server",
-       "E",
-       [
-        "replication",
-        "anti-cheat-integrity"
-       ]
-      ],
-      [
        "NET.SRV.cross-server",
        "Cross-server messaging & entity/player hand-off",
        "server-scaleout-persistence",
@@ -7864,12 +7982,6 @@
      "id": "NET.DBG",
      "name": "Network debugging & profiling",
      "caps": [
-      [
-       "NET.DBG.profiler",
-       "Network profiler: bandwidth attribution per connection/entity/property",
-       "replication",
-       "E"
-      ],
       [
        "NET.DBG.inspect",
        "Packet capture & protocol dissector",
@@ -7892,6 +8004,25 @@
        "E",
        [
         "determinism-replay"
+       ]
+      ],
+      [
+       "NET.DBG.profiler",
+       "Network profiler: channel attribution with registered categories, bandwidth per connection/entity/property",
+       "network-transport",
+       "E",
+       [
+        "replication",
+        "prediction-rollback"
+       ]
+      ],
+      [
+       "NET.DBG.prediction-viz",
+       "Prediction-error and rollback visualization",
+       "prediction-rollback",
+       "E",
+       [
+        "visual-debugging-tools"
        ]
       ]
      ]
@@ -7920,18 +8051,24 @@
       ],
       [
        "NET.SESS.baseline",
-       "Join-in-progress baseline snapshot",
+       "Join-in-progress baseline: replicated snapshot or C-SNAPSHOT + command catch-up",
        "net-session",
        "E",
        [
-        "replication"
+        "replication",
+        "prediction-rollback",
+        "determinism-replay"
        ]
       ],
       [
        "NET.SESS.reconnect",
        "Reconnect/rejoin with ownership & state restore in a grace window",
        "net-session",
-       "E"
+       "E",
+       [
+        "prediction-rollback",
+        "determinism-replay"
+       ]
       ],
       [
        "NET.SESS.travel",
@@ -7953,7 +8090,7 @@
       ],
       [
        "NET.SESS.host-mode",
-       "Hosting modes (dedicated, listen, P2P host, relay-hosted) & host migration",
+       "Hosting modes (dedicated, listen, P2P host, relay-hosted, self-hosted/community servers) & host migration",
        "net-session",
        "E",
        [
@@ -7969,6 +8106,60 @@
        [
         "network-transport",
         "dedicated-server"
+       ]
+      ],
+      [
+       "NET.SESS.budgets",
+       "Per-connection memory/CPU/RPC quotas & limits on client-triggered work",
+       "net-session",
+       "E",
+       [
+        "replication",
+        "anti-cheat-integrity",
+        "dedicated-server"
+       ]
+      ],
+      [
+       "NET.SESS.overload",
+       "Overload degradation (time dilation, adaptive tick, relevancy throttling)",
+       "net-session",
+       "E",
+       [
+        "replication",
+        "frame-orchestration",
+        "dedicated-server"
+       ]
+      ],
+      [
+       "NET.SESS.content-set",
+       "Session content-set agreement: mods, DLC and content versions checked at join; match, download, subset play or refuse",
+       "net-session",
+       "E",
+       [
+        "modding-ugc",
+        "packaging-release-patching",
+        "platform-services"
+       ]
+      ],
+      [
+       "NET.SESS.server-browser",
+       "Server registration, listing and query via backend, master server or LAN; auth without a first-party backend",
+       "net-session",
+       "E",
+       [
+        "online-services-liveops",
+        "network-transport"
+       ]
+      ],
+      [
+       "NET.SESS.local-players",
+       "Several local players per connection: per-player identity/auth, sub-connections and per-player command streams",
+       "net-session",
+       "E",
+       [
+        "gameplay-architect",
+        "platform-services",
+        "input-system"
        ]
       ]
      ]
@@ -10862,6 +11053,34 @@
         "character-physics",
         "character-movement"
        ]
+      ],
+      [
+       "QA.SIM.collision",
+       "Collision robustness runs (CCD tunnelling, degenerate GJK/EPA inputs, query correctness vs brute force)",
+       "simulation-validation",
+       "E",
+       [
+        "collision-detection"
+       ]
+      ],
+      [
+       "QA.SIM.destruction",
+       "Destruction validation runs (determinism, debris budgets, replicated consistency)",
+       "simulation-validation",
+       "E",
+       [
+        "destruction-fracture"
+       ]
+      ],
+      [
+       "QA.SIM.fluids-fields",
+       "Fluid and field simulation runs (conservation, stability, desync lanes)",
+       "simulation-validation",
+       "E",
+       [
+        "fluid-simulation",
+        "systems-simulation"
+       ]
       ]
      ]
     },
@@ -11715,7 +11934,10 @@
        "XC.SEC.score-integrity",
        "Leaderboard & achievement submission validation",
        "anti-cheat-integrity",
-       "E"
+       "E",
+       [
+        "determinism-replay"
+       ]
       ],
       [
        "XC.SEC.memory-safety",

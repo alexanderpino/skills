@@ -306,8 +306,10 @@
    "default_stance": "PSO coverage from play traces, precompiled/pipeline libraries, async creation with fallbacks",
    "justification_owner": "shader-system",
    "stance_capabilities": [
-    "RND.SHADER.pso-lists",
-    "RND.SHADER.cache"
+    "RND.RHI.pso",
+    "RND.SHADER.cache",
+    "RND.SHADER.precache",
+    "RND.SHADER.pso-lists"
    ]
   },
   {
@@ -440,7 +442,8 @@
    "default_stance": "UDP-class channels with per-message reliability classes",
    "justification_owner": "network-transport",
    "stance_capabilities": [
-    "NET.TRANS.reliability"
+    "NET.TRANS.reliability",
+    "NET.TRANS.web"
    ]
   },
   {
@@ -471,7 +474,8 @@
    "default_stance": "Compatibility windows",
    "justification_owner": "network-architect",
    "stance_capabilities": [
-    "NET.ARCH.versioning"
+    "NET.ARCH.versioning",
+    "NET.REP.compat"
    ]
   },
   {
@@ -599,6 +603,28 @@
    "stance_capabilities": [
     "QA.STRAT.oracles",
     "CORE.FRAME.test-clock"
+   ]
+  },
+  {
+   "id": "L58",
+   "pattern": "Display-referred / LDR effect pipeline",
+   "detection": "bloom, DOF or motion blur after tonemapping; 8-bit intermediate targets on HDR-capable tiers",
+   "default_stance": "Scene-referred linear HDR chain with a single output transform; only grain, dithering and UI-safe sharpening after it",
+   "justification_owner": "post-color-hdr",
+   "stance_capabilities": [
+    "RND.POST.color",
+    "RND.POST.effects"
+   ]
+  },
+  {
+   "id": "L59",
+   "pattern": "Geometry shaders, HW tessellation and stream-out pipelines on capable tiers",
+   "detection": "GS/HS/DS stages or stream-out in material or LOD paths",
+   "default_stance": "Mesh shaders or compute expansion; cluster/displacement paths on GPU-driven tiers",
+   "justification_owner": "geometry-pipeline",
+   "stance_capabilities": [
+    "RND.GEO.mesh-shaders",
+    "RND.LOD.displacement"
    ]
   }
  ]

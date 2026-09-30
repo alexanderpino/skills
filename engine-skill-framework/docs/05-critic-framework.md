@@ -28,7 +28,7 @@ Architectural completeness and subsystem boundaries: ownership overlaps, missing
 Graphics architecture and currency of rendering techniques; GPU-driven, bindless, explicit-API assumptions; scalability from 2D mobile to path tracing.
 
 - Stages: G1, G2, S1, S2, S3, S4
-- Scope: subtree:render-architect, render-validation, gpu-performance, terrain, vegetation-foliage, water-ocean, atmosphere-weather, deformation-skinning, xr-runtime, ml-inference-runtime, subtree:gpu-platform-architect, media-playback, voxel-worlds, platform-console
+- Scope: atmosphere-weather, deformation-skinning, gpu-performance, media-playback, ml-inference-runtime, platform-console, render-validation, subtree:gpu-platform-architect, subtree:render-architect, terrain, text-fonts, vegetation-foliage, visual-debugging-tools, voxel-worlds, water-ocean, world-editor-viewport, xr-runtime
 - Checks: no draw-call-centric or DX11-era assumptions on capable tiers; CPU-batched submission on TBDR/lite3d follows RND.ARCH.submission-strategy; render graph owns sync and aliasing; technique maturity labels are honest; scale-down path exists for each feature
 
 ### K-SYSTEMS · Systems Critic
@@ -44,15 +44,15 @@ Concurrency, memory, scheduling, IO and low-level architecture.
 Simulation domains: physics, destruction, fluids, cloth, crowds, large-scale simulation, determinism of simulation.
 
 - Stages: G1, G2, S1, S2, S3, S4
-- Scope: subtree:physics-architect, crowd-simulation, ik-procedural-animation, prediction-rollback, determinism-replay, procedural-generation, water-ocean, vfx-particles, character-movement, simulation-validation, voxel-worlds, systems-simulation
-- Checks: stepping and sync with frame phases are explicit; determinism levels are declared; simulation LOD exists for large scales; build-vs-integrate evidence
+- Scope: character-movement, crowd-simulation, determinism-replay, gameplay-systems-toolkit, ik-procedural-animation, navigation-pathfinding, prediction-rollback, procedural-generation, simulation-validation, subtree:physics-architect, systems-simulation, vfx-particles, voxel-worlds, water-ocean
+- Checks: stepping and sync with frame phases are explicit; determinism levels are declared; simulation LOD exists for large scales; build-vs-integrate evidence; fixed-step only; sub-rates declared; snapshot/resim participation and cost declared; C-SIGNIF tier-transition handlers declared
 
 ### K-NET · Networking Critic
 
 Online and multiplayer architecture: models, replication, prediction, servers, security, online-service boundaries.
 
 - Stages: G1, G2, S1, S2, S3, S4
-- Scope: subtree:network-architect, anti-cheat-integrity, platform-services, destruction-fracture, persistence-save, packaging-release-patching, character-movement, online-services-liveops, narrative-dialogue, vehicle-physics, gameplay-systems-toolkit, animation-architect, animation-runtime, voxel-worlds, cinematics-sequencer, determinism-replay, input-system, editor-architect, functional-automation-soak, simulation-validation, net-session, server-scaleout-persistence
+- Scope: animation-architect, animation-runtime, anti-cheat-integrity, audio-dsp-mixing, character-movement, cinematics-sequencer, crowd-simulation, destruction-fracture, determinism-replay, editor-architect, frame-orchestration, functional-automation-soak, gameplay-systems-toolkit, input-system, modding-ugc, narrative-dialogue, net-session, online-performance, online-services-liveops, packaging-release-patching, persistence-save, physics-2d, physics-architect, platform-server-host, platform-services, platform-web, rigid-body-dynamics, server-scaleout-persistence, simulation-validation, subtree:network-architect, vehicle-physics, voxel-worlds
 - Checks: netcode model matches game type; authority and trust explicit; bandwidth and scale budgets; version compatibility; service boundaries clear
 
 ### K-TOOLS · Tools & Editor Critic
@@ -162,7 +162,7 @@ Threat model, trust boundaries, memory safety, supply chain, privacy, incident r
 | accessibility | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
 | api-lifecycle-migration | ◆ |  |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
 | plugin-system | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | ◆ |
-| modding-ugc | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · | ◆ |
+| modding-ugc | · |  |  |  | ◆ |  |  | · | · | · | · | · | ◆ | · | ◆ |
 | developer-experience-docs | ◆ |  |  |  |  | ◆ |  | · | ◆ | · | · | · |  | · | · |
 | ml-inference-runtime | · | ◆ | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
 | core-runtime-architect | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
@@ -171,7 +171,7 @@ Threat model, trust boundaries, memory safety, supply chain, privacy, incident r
 | containers-core-types | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
 | concurrency-primitives | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
 | job-system-task-graph | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
-| frame-orchestration | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
+| frame-orchestration | · |  | ◆ |  | ◆ |  |  | · | · | · | · | · |  | · | · |
 | entity-object-model | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
 | ecs-runtime | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
 | reflection-metadata | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
@@ -217,14 +217,14 @@ Threat model, trust boundaries, memory safety, supply chain, privacy, incident r
 | character-rendering | · | ◆ |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
 | render-2d-vector | · | ◆ |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
 | vfx-particles | · | ◆ |  | ◆ |  | ◆ |  | · | · | · | · | · |  | · | · |
-| physics-architect | · |  |  | ◆ |  |  |  | · | · | · | · | · |  | · | · |
+| physics-architect | · |  |  | ◆ | ◆ |  |  | · | · | · | · | · |  | · | · |
 | collision-detection | · |  |  | ◆ |  |  |  | · | · | · | · | · |  | · | · |
-| rigid-body-dynamics | · |  |  | ◆ |  |  |  | · | · | · | · | · |  | · | · |
+| rigid-body-dynamics | · |  |  | ◆ | ◆ |  |  | · | · | · | · | · |  | · | · |
 | character-physics | · |  |  | ◆ |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
 | cloth-deformables | · |  |  | ◆ |  | ◆ |  | · | · | · | · | · |  | · | · |
 | destruction-fracture | · |  |  | ◆ | ◆ | ◆ |  | · | · | · | · | · |  | · | · |
 | fluid-simulation | · |  |  | ◆ |  | ◆ |  | · | · | · | · | · |  | · | · |
-| physics-2d | · |  |  | ◆ |  | ◆ |  | · | · | · | · | · |  | · | · |
+| physics-2d | · |  |  | ◆ | ◆ | ◆ |  | · | · | · | · | · |  | · | · |
 | animation-architect | · |  |  |  | ◆ |  |  | · | · | · | · | · | ◆ | · | · |
 | animation-runtime | · |  |  |  | ◆ | ◆ |  | · | · | · | · | · | ◆ | · | · |
 | deformation-skinning | · | ◆ |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
@@ -234,7 +234,7 @@ Threat model, trust boundaries, memory safety, supply chain, privacy, incident r
 | facial-animation | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
 | cinematics-sequencer | · |  |  |  | ◆ | ◆ |  | · | · | · | · | · | ◆ | · | · |
 | audio-architect | · |  | ◆ |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
-| audio-dsp-mixing | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · | · |
+| audio-dsp-mixing | · |  |  |  | ◆ |  |  | · | · | · | · | · | ◆ | · | · |
 | spatial-audio-acoustics | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
 | audio-content-runtime | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
 | network-architect | · |  |  |  | ◆ |  |  | · | · | · | · | · |  | · | · |
@@ -243,21 +243,21 @@ Threat model, trust boundaries, memory safety, supply chain, privacy, incident r
 | prediction-rollback | · |  |  | ◆ | ◆ |  |  | · | · | · | · | · |  | · | · |
 | dedicated-server | · |  |  |  | ◆ |  |  | · | · | · | · | · |  | · | ◆ |
 | gameplay-architect | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · | · |
-| gameplay-systems-toolkit | · |  |  |  | ◆ | ◆ |  | · | · | · | · | · | ◆ | · | · |
+| gameplay-systems-toolkit | · |  |  | ◆ | ◆ | ◆ |  | · | · | · | · | · | ◆ | · | · |
 | scripting-runtime | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | ◆ |
-| navigation-pathfinding | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
-| crowd-simulation | · |  |  | ◆ |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
+| navigation-pathfinding | · |  |  | ◆ |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
+| crowd-simulation | · |  |  | ◆ | ◆ | ◆ |  | · | · | · | · | · | ◆ | · | · |
 | ai-behavior-perception | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | ◆ |
 | persistence-save | · |  |  |  | ◆ |  |  | · | · | · | · | · | ◆ | · | ◆ |
 | ui-architect | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
-| text-fonts | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · | · |
+| text-fonts | · | ◆ |  |  |  |  |  | · | · | · | · | · | ◆ | · | · |
 | localization-i18n | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
 | editor-architect | · |  |  |  | ◆ | ◆ |  | · | · | · | · | · |  | · | ◆ |
 | editor-ui-framework | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
-| world-editor-viewport | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
+| world-editor-viewport | · | ◆ |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
 | graph-editor-framework | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
 | collaboration-version-control | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
-| visual-debugging-tools | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
+| visual-debugging-tools | · | ◆ |  |  |  | ◆ |  | · | · | · | · | · |  | · | · |
 | ai-assisted-authoring | · |  |  |  |  | ◆ |  | · | · | · | · | · |  | · | ◆ |
 | build-release-architect | · |  |  |  |  | ◆ | ◆ | · | ◆ | · | · | · |  | · | · |
 | build-system-toolchains | · |  |  |  |  | ◆ | ◆ | · | ◆ | · | · | · |  | · | ◆ |
@@ -277,14 +277,14 @@ Threat model, trust boundaries, memory safety, supply chain, privacy, incident r
 | gameplay-data | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
 | narrative-dialogue | · |  |  |  | ◆ | ◆ |  | · | · | · | · | · | ◆ | · | · |
 | reference-games | · |  |  |  |  |  |  | · | ◆ | · | · | · |  | ◆ | · |
-| platform-web | · |  |  |  |  |  | ◆ | · | · | · | · | · |  | · | · |
+| platform-web | · |  |  |  | ◆ |  | ◆ | · | · | · | · | · |  | · | · |
 | online-services-liveops | · |  |  |  | ◆ |  | ◆ | · | · | · | · | · |  | · | ◆ |
 | memory-performance | · |  |  |  |  |  |  | ◆ | · | · | · | · |  | ◆ | · |
 | simulation-validation | · |  |  | ◆ | ◆ |  |  | · | · | · | · | · |  | ◆ | · |
 | engine-product-management | ◆ |  |  |  |  |  |  | · | ◆ | · | · | · |  | · | · |
-| online-performance | · |  |  |  |  |  |  | ◆ | · | · | · | · |  | ◆ | · |
+| online-performance | · |  |  |  | ◆ |  |  | ◆ | · | · | · | · |  | ◆ | · |
 | systems-simulation | · |  |  | ◆ |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
-| platform-server-host | · |  |  |  |  |  | ◆ | · | · | · | · | · |  | · | · |
+| platform-server-host | · |  |  |  | ◆ |  | ◆ | · | · | · | · | · |  | · | · |
 | rhi-console | · | ◆ | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
 | net-session | · |  |  |  | ◆ |  |  | · | · | · | · | · |  | · | · |
 | server-scaleout-persistence | · |  |  |  | ◆ |  |  | · | · | · | · | · |  | · | · |

@@ -207,12 +207,12 @@
    "tech": "ML denoising & ray reconstruction",
    "class": "M",
    "capabilities": [
-    "RND.RECON.denoise"
+    "RND.RECON.ml-denoise"
    ],
    "owner": "reconstruction-upscaling",
    "evidence": "DLSS RR; NRD",
    "revisit": "Vendor-neutral path or per-vendor integration cost acceptable",
-   "fallback": "Spatiotemporal denoisers"
+   "fallback": "RND.RECON.denoise (spatiotemporal denoisers)"
   },
   {
    "tech": "Strand hair simulation & rendering",
@@ -276,8 +276,8 @@
     "RND.SHADER.neural"
    ],
    "owner": "shader-system",
-   "evidence": "SM 6.9 cooperative vectors (preview); Slang autodiff",
-   "revisit": "Non-preview cross-vendor support",
+   "evidence": "API-neutral matrix/tensor intrinsics: DXIL linear algebra, Vulkan cooperative matrix/vector, Metal tensor operations (2025–2026 previews)",
+   "revisit": "Two shipping backends expose the same matrix intrinsic set in retail drivers",
    "fallback": "Standalone inference dispatch"
   },
   {
@@ -945,7 +945,7 @@
    "owner": "shader-system",
    "evidence": "SM 6.9 cooperative vectors (preview); Slang autodiff",
    "revisit": "Non-preview cross-vendor support",
-   "fallback": "Standalone inference dispatch"
+   "fallback": "hand-derived gradients or finite differences in tool code"
   },
   {
    "tech": "WebGPU backend & web 3D (PLAT.WEB.webgpu-target)",
@@ -1041,6 +1041,39 @@
    "evidence": "LLM-as-judge self-preference and correlated errors (2023–2024)",
    "revisit": "Measured escape rate of seeded defects stable across model changes",
    "fallback": "Human coordinator role per workstream and mandatory human review sampling per tier (ARCH.ORG.human-gates)"
+  },
+  {
+   "tech": "Cross-platform bit-reproducible float math",
+   "class": "M",
+   "owner": "math-simd-numerics",
+   "capabilities": [
+    "CORE.MATH.deterministic"
+   ],
+   "evidence": "Same-binary determinism is established; cross-ISA/compiler reproducibility of floats is not (A4)",
+   "revisit": "Two shipped titles run mixed-platform lockstep on float math without desync",
+   "fallback": "CORE.MATH.fixed-point (fixed-point numerics) or same-binary determinism"
+  },
+  {
+   "tech": "Runtime procedural fracture at scale",
+   "class": "M",
+   "owner": "destruction-fracture",
+   "capabilities": [
+    "PHY.DEST.procedural"
+   ],
+   "evidence": "Pre-fractured destruction is established; impact-time fracture at scale is research-grade",
+   "revisit": "A shipped title fractures at impact within the debris budget on consoles",
+   "fallback": "PHY.DEST.runtime (pre-fractured assets)"
+  },
+  {
+   "tech": "Learned physics-based character control",
+   "class": "X",
+   "owner": "ik-procedural-animation",
+   "capabilities": [
+    "ANM.IK.learned-physics"
+   ],
+   "evidence": "Research and early middleware; no shipped engine feature",
+   "revisit": "A shipped title uses a learned physics policy",
+   "fallback": "ANM.IK.physical (active ragdoll with PD motors)"
   }
  ]
 }

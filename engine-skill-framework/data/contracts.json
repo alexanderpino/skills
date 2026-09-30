@@ -898,7 +898,7 @@
    "layer": 3,
    "owner": "determinism-replay",
    "name": "Replay container & streams",
-   "summary": "Replay container, timeline, stream registration (input, replication, visual log, animation debug, external/nondeterministic inputs) and cross-build versioning.",
+   "summary": "Replay container, timeline, stream registration (input, replication, visual log, animation debug, external/nondeterministic inputs) and cross-build versioning; physics-debug stream (bodies, contacts, queries).",
    "requires": [
     "C-SNAPSHOT",
     "C-SER"
@@ -984,7 +984,7 @@
    "layer": 3,
    "owner": "texture-streaming-vt",
    "name": "Texture residency & virtual texturing",
-   "summary": "Texture residency requests, VT page tables/feedback and allocation for terrain, materials and runtime-composited textures.",
+   "summary": "Texture residency requests, VT page tables/feedback and allocation for terrain, materials and runtime-composited textures; shader-side VT sampling and feedback interface for material-generated code.",
    "requires": [
     "C-RG",
     "C-GPUMEM"
@@ -1080,7 +1080,7 @@
    "layer": 3,
    "owner": "replication",
    "name": "Replication",
-   "summary": "Replicated state declaration, relevancy hooks, RPCs, net IDs, batch registration, replay and spectator streams; producers mark dirty state; no per-connection full-state comparison; per-faction visibility registers as a relevancy filter through the relevancy hooks (basis of XC.SEC.info-hiding).",
+   "summary": "Replicated state declaration, relevancy hooks, RPCs, net IDs, batch registration, replay and spectator streams; producers mark dirty state; no per-connection full-state comparison; per-faction visibility registers as a relevancy filter through the relevancy hooks (basis of XC.SEC.info-hiding); layout negotiation within the compatibility window; per-RPC validator and authority declaration.",
    "requires": [
     "C-NETLINK",
     "C-SER",
@@ -1347,12 +1347,12 @@
   },
   {
    "id": "C-RTAS",
-   "layer": 2,
+   "layer": 3,
    "owner": "ray-tracing-infrastructure",
    "name": "Acceleration structures & ray queries",
    "summary": "Acceleration-structure build/refit/compaction, instance and geometry inputs, ray-query API with hardware and software backends; independent of the render scene.",
    "requires": [
-    "C-RHI",
+    "C-RG",
     "C-GPUMEM"
    ],
    "conformance": true,
@@ -1402,7 +1402,7 @@
    "layer": 3,
    "owner": "net-session",
    "name": "Network session",
-   "summary": "Session lifecycle events (connect, join-ready, spawn, reconnect, travel, disconnect with reason), host mode, baseline hand-off, auth results.",
+   "summary": "Session lifecycle events (connect, join-ready, spawn, reconnect, travel, disconnect with reason), host mode, baseline hand-off, auth results; content-set agreement results.",
    "requires": [
     "C-NETLINK",
     "C-NET"
@@ -1415,10 +1415,11 @@
    "layer": 3,
    "owner": "dedicated-server",
    "name": "Server host lifecycle",
-   "summary": "Host lifecycle (allocate, ready, health, drain, shutdown), instance metadata, per-connection budgets and overload state, authenticated admin command surface.",
+   "summary": "Host process and fleet lifecycle (allocate, ready, health, drain, shutdown), instance metadata, authenticated admin command surface; per-connection budgets and overload live in C-HOSTAUTH.",
    "requires": [
     "C-NET",
-    "C-FRAME"
+    "C-FRAME",
+    "C-HOSTAUTH"
    ],
    "conformance": true,
    "oracle_author": "functional-automation-soak"
@@ -1606,6 +1607,44 @@
    ],
    "conformance": true,
    "oracle_author": "functional-automation-soak"
+  },
+  {
+   "id": "C-VFX",
+   "layer": 3,
+   "owner": "vfx-particles",
+   "name": "Effect instances & data-source bindings",
+   "summary": "Batched effect-instance requests with pooled handles (spawn, attach, parameterize, stop), user parameters, event payloads, data-source bindings (deformation streams, C-PHYS contacts, C-ENV fields), significance/budget class and determinism class.",
+   "requires": [
+    "C-RSCENE"
+   ],
+   "conformance": true,
+   "oracle_author": "functional-automation-soak"
+  },
+  {
+   "id": "C-PTREF",
+   "layer": 3,
+   "owner": "path-tracing",
+   "name": "Reference render service",
+   "summary": "Reference render request (scene snapshot, view, convergence criterion, seed, AOVs) and converged, undenoised output with a per-pixel variance estimate; shares no sampling code with the real-time lighting modules.",
+   "requires": [
+    "C-RSCENE",
+    "C-MATIF"
+   ],
+   "conformance": true,
+   "oracle_author": "render-validation"
+  },
+  {
+   "id": "C-HOSTAUTH",
+   "layer": 3,
+   "owner": "net-session",
+   "name": "Host authority services",
+   "summary": "Per-connection quotas and budgets, overload state and degradation signals, kick/ban and the host-local admin surface; available in every host mode (dedicated, listen, P2P host, rollback and lockstep hosts).",
+   "requires": [
+    "C-NETLINK",
+    "C-NET"
+   ],
+   "conformance": true,
+   "oracle_author": "simulation-validation"
   }
  ]
 }

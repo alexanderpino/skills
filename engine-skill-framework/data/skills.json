@@ -21,7 +21,8 @@
    "online-rollback": "Input-exchange rollback networking (fighting, P2P action)",
    "online-async": "Asynchronous / turn-based backend-mediated play (no real-time transport)",
    "experimental": "Opt-in experimental (X/S) capabilities",
-   "team-mid": "Studios of about 10–150 people (shared DDC, tool telemetry, small-session multi-user)"
+   "team-mid": "Studios of about 10–150 people (shared DDC, tool telemetry, small-session multi-user)",
+   "persistent-world": "Persistent multi-server worlds (zoning, meshing, hand-off, leases, transactions)"
   }
  },
  "configurations": {
@@ -210,7 +211,8 @@
    "profiles": [
     "std3d",
     "sandbox",
-    "online"
+    "online",
+    "persistent-world"
    ],
    "target": "server",
    "platforms": [
@@ -245,7 +247,8 @@
     "aaa",
     "ugc",
     "vehicles",
-    "team-large"
+    "team-large",
+    "persistent-world"
    ],
    "target": "client",
    "platforms": [
@@ -261,7 +264,8 @@
     "aaa",
     "ugc",
     "vehicles",
-    "team-large"
+    "team-large",
+    "persistent-world"
    ],
    "target": "server",
    "platforms": [
@@ -276,7 +280,8 @@
     "aaa",
     "ugc",
     "vehicles",
-    "team-large"
+    "team-large",
+    "persistent-world"
    ],
    "target": "tools",
    "platforms": [
@@ -436,6 +441,44 @@
    "target_platforms": [
     "pc",
     "console",
+    "server-host"
+   ]
+  },
+  "fighting-2d-rollback-tools": {
+   "profiles": [
+    "min2d",
+    "online-rollback"
+   ],
+   "target": "tools",
+   "platforms": [
+    "pc"
+   ],
+   "target_platforms": [
+    "pc",
+    "console"
+   ]
+  },
+  "rts-massim-lockstep-tools": {
+   "profiles": [
+    "min2d",
+    "massim",
+    "online-lockstep"
+   ],
+   "target": "tools",
+   "platforms": [
+    "pc"
+   ],
+   "target_platforms": [
+    "pc"
+   ]
+  },
+  "mobile-async-validator": {
+   "profiles": [
+    "minimal",
+    "online-async"
+   ],
+   "target": "headless-client",
+   "platforms": [
     "server-host"
    ]
   }
@@ -878,7 +921,8 @@
     "C-RSCENE",
     "C-RT?",
     "C-SCENETEX",
-    "C-AUTOMATION"
+    "C-AUTOMATION",
+    "C-PTREF?"
    ],
    "expertise": [
     "image metrics (FLIP, SSIM)",
@@ -971,6 +1015,7 @@
     "browser-bridge",
     "chat-text",
     "client-integrity-reports",
+    "client-rpcs",
     "clipboard-dragdrop",
     "cloud-saves",
     "collab-session",
@@ -1001,8 +1046,10 @@
     "remote-config",
     "replays",
     "replicated-state",
+    "runtime-collision-geometry",
     "saves",
     "scripts",
+    "server-pushed-content",
     "service-responses",
     "shader-caches",
     "shared-ddc",
@@ -1517,7 +1564,8 @@
     "C-SVC",
     "C-SIGN",
     "C-SHADER?",
-    "C-CMD"
+    "C-CMD",
+    "C-NETSESSION?"
    ],
    "expertise": [
     "mod ecosystems",
@@ -1540,6 +1588,8 @@
    "workstream": "gameplay",
    "untrusted_inputs": [
     "mods",
+    "runtime-collision-geometry",
+    "server-pushed-content",
     "ugc-graphs"
    ],
    "authoring": "Authoring through XC.EXT.mod-editor and XC.EXT.player-creation."
@@ -3195,7 +3245,8 @@
     "C-FRAME",
     "C-ENV",
     "C-LIGHT?",
-    "C-TEMPORAL?"
+    "C-TEMPORAL?",
+    "C-VFX?"
    ],
    "expertise": [
     "atmospheric scattering",
@@ -3563,7 +3614,8 @@
     "C-MLGPU?",
     "C-GPUTIER",
     "C-LIGHTENV?",
-    "C-RELOAD?"
+    "C-RELOAD?",
+    "C-VT"
    ],
    "expertise": [
     "PBR",
@@ -3617,7 +3669,8 @@
     "C-RES",
     "C-SCENETEX",
     "C-TRANSLUCENT?",
-    "C-MATIF"
+    "C-MATIF",
+    "C-VT?"
    ],
    "expertise": [
     "GPU culling",
@@ -3717,7 +3770,10 @@
     "C-GPUMEM",
     "C-RG",
     "C-ML?",
-    "C-MLGPU?"
+    "C-MLGPU?",
+    "C-RSCENE",
+    "C-INSTANCES?",
+    "C-VIEW?"
    ],
    "expertise": [
     "virtual texturing",
@@ -3872,10 +3928,10 @@
     "C-GPUTIER",
     "C-RES",
     "C-RSCENE@C-RT",
-    "C-RG@C-RT",
     "C-INSTANCES@C-RT",
     "C-MATIF@C-RT",
-    "C-GEOLOD?@C-RT"
+    "C-GEOLOD?@C-RT",
+    "C-RG"
    ],
    "expertise": [
     "DXR/Vulkan RT",
@@ -3911,15 +3967,17 @@
      "render-validation"
     ]
    ],
-   "provides": [],
+   "provides": [
+    "C-PTREF"
+   ],
    "consumes": [
     "C-RT?",
     "C-MATIF",
     "C-RSCENE",
-    "C-LIGHT",
-    "C-TEMPORAL",
     "C-INSTANCES",
-    "C-SCENETEX"
+    "C-SCENETEX",
+    "C-LIGHT?",
+    "C-TEMPORAL?"
    ],
    "expertise": [
     "Monte Carlo rendering",
@@ -4062,7 +4120,8 @@
     "C-TEMPORAL",
     "C-SCENETEX",
     "C-COLOR",
-    "C-LIGHTENV"
+    "C-LIGHTENV",
+    "C-VT?"
    ],
    "expertise": [
     "OIT",
@@ -4204,7 +4263,9 @@
      "translucency-decals"
     ]
    ],
-   "provides": [],
+   "provides": [
+    "C-VFX"
+   ],
    "consumes": [
     "C-RSCENE",
     "C-RG",
@@ -4220,7 +4281,10 @@
     "C-LIGHTENV?",
     "C-TRANSLUCENT?",
     "C-MATIF",
-    "C-RELOAD?"
+    "C-RELOAD?",
+    "C-ANIM?",
+    "C-VT?",
+    "C-PREDICT?"
    ],
    "expertise": [
     "GPU particles",
@@ -4274,13 +4338,14 @@
     "C-DET",
     "C-TASK",
     "C-ECS?",
-    "C-WORLD?",
     "C-RES",
     "C-SIGNIF?",
     "C-SNAPSHOT",
     "C-ENV?",
     "C-RG?",
-    "C-FLOW"
+    "C-FLOW",
+    "C-SAVE?",
+    "C-WORLD?"
    ],
    "expertise": [
     "physics engines (Jolt, PhysX, Havok, Box2D)",
@@ -4344,7 +4409,10 @@
     "C-COOK"
    ],
    "implements": [],
-   "workstream": "simulation"
+   "workstream": "simulation",
+   "untrusted_inputs": [
+    "runtime-collision-geometry"
+   ]
   },
   {
    "id": "rigid-body-dynamics",
@@ -4511,7 +4579,12 @@
     "C-REP?",
     "C-NAV?",
     "C-AUDIO?",
-    "C-INSTANCES?"
+    "C-INSTANCES?",
+    "C-VFX?",
+    "C-WORLD?",
+    "C-SAVE?",
+    "C-SNAPSHOT?",
+    "C-SIGNIF?"
    ],
    "expertise": [
     "Voronoi fracture",
@@ -4703,7 +4776,9 @@
    "consumes": [
     "C-ANIM",
     "C-MATH",
-    "C-RELOAD?"
+    "C-RELOAD?",
+    "C-VFX?",
+    "C-PREDICT?"
    ],
    "expertise": [
     "ACL-class compression",
@@ -4889,7 +4964,8 @@
    "provides": [],
    "consumes": [
     "C-ANIM",
-    "C-PHYS"
+    "C-PHYS",
+    "C-ML?"
    ],
    "expertise": [
     "IK",
@@ -4991,7 +5067,9 @@
     "C-ANIM?",
     "C-A11YRT?",
     "C-SCRIPT?",
-    "C-RELOAD?"
+    "C-RELOAD?",
+    "C-VFX?",
+    "C-PTREF?"
    ],
    "expertise": [
     "sequencers",
@@ -5182,7 +5260,8 @@
     "C-A11Y",
     "C-VEHICLE?",
     "C-A11YRT",
-    "C-RELOAD?"
+    "C-RELOAD?",
+    "C-PREDICT?"
    ],
    "expertise": [
     "sound design systems",
@@ -5338,7 +5417,9 @@
     "C-FLOW",
     "C-SHARD?",
     "C-FRAME",
-    "C-TASK"
+    "C-TASK",
+    "C-HOSTAUTH?",
+    "C-INTEGRITY?"
    ],
    "expertise": [
     "state synchronization",
@@ -5356,6 +5437,7 @@
    "implements": [],
    "workstream": "online",
    "untrusted_inputs": [
+    "client-rpcs",
     "replicated-state"
    ]
   },
@@ -5394,7 +5476,9 @@
     "C-FRAME",
     "C-NETLINK",
     "C-REP?",
-    "C-INTEGRITY?"
+    "C-INTEGRITY?",
+    "C-HOSTAUTH?",
+    "C-NETSESSION"
    ],
    "expertise": [
     "rollback",
@@ -5451,11 +5535,12 @@
     "C-NETLINK",
     "C-FRAME",
     "C-SVC?",
-    "C-LIVE",
     "C-WORLD?",
     "C-NETSESSION",
     "C-SHARD?",
-    "C-INTEGRITY"
+    "C-INTEGRITY",
+    "C-HOSTAUTH",
+    "C-LIVE?"
    ],
    "expertise": [
     "headless builds",
@@ -5524,7 +5609,8 @@
     "C-CROWD?",
     "C-AI?",
     "C-SCRIPT?",
-    "C-DET?"
+    "C-DET?",
+    "C-HOSTAUTH?"
    ],
    "expertise": [
     "gameplay frameworks",
@@ -5586,7 +5672,8 @@
     "C-LOC?",
     "C-DET?",
     "C-UI?",
-    "C-VIEW?"
+    "C-VIEW?",
+    "C-VFX?"
    ],
    "expertise": [
     "ability systems",
@@ -5944,7 +6031,8 @@
     "C-TRANSLUCENT?",
     "C-SCRIPT?",
     "C-VIEW",
-    "C-RELOAD?"
+    "C-RELOAD?",
+    "C-VFX?"
    ],
    "expertise": [
     "UI frameworks",
@@ -6653,16 +6741,16 @@
    "purpose": "Chunked voxel/block worlds end to end: sparse storage and compression, meshing and remeshing on edit, runtime edit replication and persistence hand-off, block light propagation.",
    "non_responsibilities": [
     [
-     "Player construction gameplay (snapping, structural integrity)",
-     "gameplay-systems-toolkit"
-    ],
-    [
      "Heightfield terrain",
      "terrain"
     ],
     [
      "Replication mechanics",
      "replication"
+    ],
+    [
+     "Structural integrity & collapse",
+     "destruction-fracture"
     ]
    ],
    "consumes": [
@@ -6690,7 +6778,10 @@
     "C-EDHOST",
     "C-EDVIEW"
    ],
-   "provides": []
+   "provides": [],
+   "untrusted_inputs": [
+    "runtime-collision-geometry"
+   ]
   },
   {
    "id": "gpu-platform-architect",
@@ -7072,7 +7163,7 @@
     "C-EDHOST",
     "C-PHYS",
     "C-INSTR",
-    "C-REPLAY?"
+    "C-REPLAY"
    ],
    "expertise": [
     "physics debugging",
@@ -7534,7 +7625,9 @@
    "tier": "expert",
    "parent": "performance-architect",
    "profiles": [
-    "online"
+    "online",
+    "online-lockstep",
+    "online-rollback"
    ],
    "kind": "process",
    "targets": [],
@@ -7563,7 +7656,8 @@
     "C-INSTR",
     "C-BUDGET",
     "C-NET",
-    "C-REP"
+    "C-REP?",
+    "C-PREDICT?"
    ],
    "tool_consumes": [],
    "provides": [],
@@ -7766,11 +7860,13 @@
    ],
    "untrusted_inputs": [
     "auth-tickets",
-    "packets"
+    "packets",
+    "server-pushed-content"
    ],
    "tool_consumes": [],
    "provides": [
-    "C-NETSESSION"
+    "C-NETSESSION",
+    "C-HOSTAUTH"
    ],
    "implements": []
   },
@@ -7780,7 +7876,7 @@
    "tier": "expert",
    "parent": "network-architect",
    "profiles": [
-    "online"
+    "persistent-world"
    ],
    "kind": "runtime",
    "targets": [

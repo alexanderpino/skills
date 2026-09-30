@@ -452,6 +452,35 @@
    "trust": "hostile-local",
    "mode": "harness",
    "limits": "size/type allow-list"
+  },
+  {
+   "id": "runtime-collision-geometry",
+   "validating_owner": "collision-detection",
+   "parser_owners": [
+    "voxel-worlds",
+    "modding-ugc"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "triangle count/extents/degeneracy/rebuild time per tick"
+  },
+  {
+   "id": "server-pushed-content",
+   "validating_owner": "modding-ugc",
+   "parser_owners": [
+    "net-session"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "size/type allow-list; signature required; sandboxed load"
+  },
+  {
+   "id": "client-rpcs",
+   "validating_owner": "replication",
+   "parser_owners": [],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "per-RPC rate, argument bounds, authority check"
   }
  ]
 }

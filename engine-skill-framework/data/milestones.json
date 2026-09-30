@@ -227,6 +227,7 @@
     "C-ENV",
     "C-GAME",
     "C-GAMEDATA",
+    "C-HOSTAUTH",
     "C-INTEGRITY",
     "C-LIVE",
     "C-LOC",
@@ -250,6 +251,7 @@
     "C-SIGNIF",
     "C-SVC",
     "C-UI",
+    "C-VFX",
     "C-VIDEO",
     "C-WORLD"
    ],
@@ -267,9 +269,7 @@
     "C-PERF",
     "C-PRESENT",
     "C-REFL",
-    "C-REPLAY",
     "C-SER",
-    "C-SNAPSHOT",
     "C-SPATIAL",
     "C-TEXT",
     "C-TRUST",
@@ -286,7 +286,9 @@
     "minimal-tools",
     "mobile-async-client",
     "fighting-2d-rollback-client",
-    "sandbox-2d-client"
+    "sandbox-2d-client",
+    "fighting-2d-rollback-tools",
+    "mobile-async-validator"
    ],
    "skills": [
     "collaboration-version-control",
@@ -297,6 +299,7 @@
     "physics-tools",
     "platform-console",
     "platform-mobile",
+    "platform-server-host",
     "platform-web",
     "rhi-console",
     "rhi-webgpu",
@@ -343,23 +346,47 @@
     "C-ABILITY",
     "C-ANIM",
     "C-AUDIO",
+    "C-AUTOMATION",
     "C-BENCH",
     "C-CERT",
     "C-CMD",
+    "C-DEVICE",
     "C-DIALOGUE",
     "C-ECS",
     "C-GAME",
     "C-GAMEDATA",
+    "C-GOVERN",
+    "C-GPUMEM",
+    "C-GPUTIER",
+    "C-HOSTAUTH",
     "C-INTEGRITY",
+    "C-IO",
+    "C-IPC",
+    "C-LIVE",
     "C-LOC",
     "C-NET",
+    "C-NETLINK",
+    "C-NETSESSION",
+    "C-PAL",
+    "C-PKG",
     "C-PLUGIN",
+    "C-PREDICT",
     "C-PROD",
     "C-RELEASE",
+    "C-RELOAD",
+    "C-REP",
+    "C-REPLAY",
+    "C-RES",
+    "C-RHI",
     "C-SAVE",
     "C-SCRIPT",
     "C-SEQ",
-    "C-SIGNIF"
+    "C-SIGNIF",
+    "C-SNAPSHOT",
+    "C-SVC",
+    "C-TARGETPLAT",
+    "C-VFS",
+    "C-WORLD"
    ]
   },
   {
@@ -430,6 +457,7 @@
     "C-GI",
     "C-INSTANCES",
     "C-LIGHT",
+    "C-PTREF",
     "C-RT",
     "C-RTAS",
     "C-TRANSLUCENT",
@@ -437,12 +465,30 @@
    ],
    "contracts_frozen": [
     "C-AI",
+    "C-COLOR",
+    "C-DEVUI",
+    "C-DRAW2D",
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-EDVIEW",
     "C-ENV",
+    "C-GRAPH",
+    "C-LIGHTENV",
+    "C-MATIF",
     "C-MOVE",
     "C-NAV",
     "C-PCG",
     "C-PHYS",
-    "C-VCS"
+    "C-RG",
+    "C-RSCENE",
+    "C-SCENETEX",
+    "C-SHADER",
+    "C-TEMPORAL",
+    "C-UI",
+    "C-VCS",
+    "C-VFX",
+    "C-VIDEO",
+    "C-VT"
    ]
   },
   {
@@ -460,14 +506,13 @@
     "indie-2d-online-web-client",
     "indie-2d-online-moddable-client",
     "indie-2d-online-moddable-server",
-    "rts-2d-massim-client"
+    "rts-2d-massim-client",
+    "rts-massim-lockstep-tools"
    ],
    "skills": [
     "crowd-simulation",
     "dedicated-server",
-    "modding-ugc",
-    "platform-server-host",
-    "server-scaleout-persistence"
+    "modding-ugc"
    ],
    "exit": "Online reference games per netcode family: dedicated-server shooter with prediction and lag compensation, listen-server co-op, desync-free 2 h lockstep soak, web transports; bot load test; packet/handshake fuzzing, DoS test, server-authority review and external pen test (human gate); patch + DLC + staged rollout + rollback executed on the online reference game. Perf: bandwidth per player and server density within budget.",
    "gates": [
@@ -495,56 +540,17 @@
    "contracts_draft": [
     "C-CROWD",
     "C-EDIT",
-    "C-SERVER",
-    "C-SHARD",
-    "C-SRVDATA"
+    "C-SERVER"
    ],
    "contracts_frozen": [
     "C-ATMOS",
-    "C-AUTOMATION",
-    "C-COLOR",
-    "C-DEVICE",
-    "C-DEVUI",
-    "C-DRAW2D",
-    "C-EDCMD",
-    "C-EDHOST",
-    "C-EDVIEW",
     "C-GEOLOD",
     "C-GI",
-    "C-GOVERN",
-    "C-GPUMEM",
-    "C-GPUTIER",
-    "C-GRAPH",
     "C-INSTANCES",
-    "C-IO",
-    "C-IPC",
     "C-LIGHT",
-    "C-LIGHTENV",
-    "C-LIVE",
-    "C-MATIF",
-    "C-NETLINK",
-    "C-NETSESSION",
-    "C-PAL",
-    "C-PKG",
-    "C-PREDICT",
-    "C-RELOAD",
-    "C-REP",
-    "C-RES",
-    "C-RG",
-    "C-RHI",
-    "C-RSCENE",
-    "C-SCENETEX",
-    "C-SHADER",
-    "C-SVC",
-    "C-TARGETPLAT",
-    "C-TEMPORAL",
+    "C-PTREF",
     "C-TRANSLUCENT",
-    "C-UI",
-    "C-VEHICLE",
-    "C-VFS",
-    "C-VIDEO",
-    "C-VT",
-    "C-WORLD"
+    "C-VEHICLE"
    ]
   },
   {
@@ -559,6 +565,7 @@
     "xr-console-client"
    ],
    "skills": [
+    "server-scaleout-persistence",
     "xr-runtime"
    ],
    "exit": "Open-world reference slice streams at target speed within the arbitration budget (arbiter without oscillation or starvation, A14); massim and sandbox configurations closed and benchmarked; XR on PC, standalone and console. Perf: scale-content stress worlds within declared asymptotics.",
@@ -577,14 +584,14 @@
     }
    ],
    "contracts_draft": [
+    "C-SHARD",
+    "C-SRVDATA",
     "C-XRVIEW"
    ],
    "contracts_frozen": [
     "C-CROWD",
     "C-EDIT",
-    "C-SERVER",
-    "C-SHARD",
-    "C-SRVDATA"
+    "C-SERVER"
    ]
   },
   {
@@ -629,6 +636,8 @@
     "C-MLGPU",
     "C-RT",
     "C-RTAS",
+    "C-SHARD",
+    "C-SRVDATA",
     "C-XRVIEW"
    ]
   },
