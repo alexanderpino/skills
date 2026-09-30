@@ -295,7 +295,7 @@
       ],
       [
        "ARCH.ORG.escalation",
-       "Escalation tiers & decision SLAs; delegated arbitration inside a lead's subtree; disputes between leads of one workstream, and disputes in which the arbitrating lead is a party, go to engine-architect",
+       "Escalation tiers & decision SLAs; a non-party lead of the workstream is the first-instance arbiter of intra-workstream disputes; engine-architect decides cross-workstream disputes and disputes in which the arbitrating lead is a party",
        "program-orchestration",
        "E",
        [
@@ -1817,7 +1817,7 @@
       ],
       [
        "CORE.MEM.allocators",
-       "Allocator families (linear/frame, pool, TLSF, slab, buddy)",
+       "Allocator family with scoped arenas: reset keyed to a completion token or frame-in-flight slot (C-LIFETIME), pools, thread caches",
        "memory-allocators",
        "E"
       ],
@@ -1873,6 +1873,16 @@
        "E",
        [
         "gpu-memory-resources"
+       ]
+      ],
+      [
+       "CORE.MEM.field-detection",
+       "Field detection of heap corruption in shipping builds: sampled guard allocator (E) and hardware memory-tagging mode (M), overhead budgets in C-BUDGET",
+       "memory-allocators",
+       "E",
+       [
+        "crash-diagnostics",
+        "security-engineering"
        ]
       ]
      ]
@@ -1962,7 +1972,7 @@
       ],
       [
        "CORE.CONC.sync",
-       "Synchronization primitives (futex-backed locks, events, spin with backoff); no subsystem-wide locks on frame paths",
+       "Synchronization primitives (futex-backed locks, events, spin with backoff); no subsystem-wide locks on frame paths; priority inheritance/donation where the OS offers it, no spinning across QoS classes, lock-class registry (frame-critical, RT-forbidden)",
        "concurrency-primitives",
        "E"
       ],
@@ -1996,6 +2006,16 @@
         "core-runtime-architect",
         "rhi-core",
         "gpu-memory-resources"
+       ]
+      ],
+      [
+       "CORE.CONC.layout",
+       "Cross-thread data layout: per-target destructive-interference size, padding and sharding rules, per-worker sharded counters and queues, padding lint",
+       "concurrency-primitives",
+       "E",
+       [
+        "containers-core-types",
+        "platform-architect"
        ]
       ]
      ]
@@ -2071,7 +2091,7 @@
       ],
       [
        "CORE.JOBS.thread-model",
-       "Engine thread inventory (sole authority on which threads exist), core reservation, OS priority/QoS mapping, real-time thread rules, middleware pool adapters, oversubscription detection",
+       "Engine thread inventory (sole authority on which threads exist), core reservation, OS priority/QoS mapping, real-time thread rules, middleware pool adapters, oversubscription detection; forbidden-primitive lint for real-time threads",
        "job-system-task-graph",
        "E",
        [
@@ -2124,6 +2144,17 @@
        [
         "platform-web",
         "frame-orchestration"
+       ]
+      ],
+      [
+       "CORE.JOBS.cancellation",
+       "Task cancellation: stop tokens, propagation to dependents, cancelling in-flight IO/GPU work, cancel-vs-completion and cancel-vs-retire ordering",
+       "job-system-task-graph",
+       "E",
+       [
+        "async-io-storage",
+        "resource-streaming-architect",
+        "concurrency-primitives"
        ]
       ]
      ]
@@ -2474,6 +2505,18 @@
        [
         "ui-architect"
        ]
+      ],
+      [
+       "CORE.REFL.state-classes",
+       "State classes on reflected properties (transient, derived, saved, replicated, predicted, persisted, stripped from shipping) declared once; registries derive from them",
+       "reflection-metadata",
+       "E",
+       [
+        "ecs-runtime",
+        "replication",
+        "persistence-save",
+        "prediction-rollback"
+       ]
       ]
      ]
     },
@@ -2690,7 +2733,7 @@
       ],
       [
        "RES.MGMT.validation",
-       "Streaming-correctness oracle: no required cell missing at traversal speed, residency invariants under arbitration",
+       "Streaming-correctness oracle: no required cell missing at traversal speed, residency invariants under arbitration (hooks, reference scenes and threshold proposals only; suite authorship belongs to the contract's oracle_author)",
        "resource-streaming-architect",
        "E",
        [
@@ -2768,6 +2811,16 @@
        "M",
        [
         "platform-services"
+       ]
+      ],
+      [
+       "RES.IO.write",
+       "Durable write primitives: write queues and coalescing, durability classes (fsync/F_FULLFSYNC, directory sync), atomic replace, quota and disk-full errors, read-deadline protection",
+       "async-io-storage",
+       "E",
+       [
+        "platform-architect",
+        "persistence-save"
        ]
       ]
      ]
@@ -3625,6 +3678,15 @@
         "fluid-simulation",
         "translucency-decals"
        ]
+      ],
+      [
+       "WLD.ENV.terrain-rt",
+       "Terrain in ray tracing and SDF scenes: heightfield/clipmap to BLAS or SDF proxy",
+       "terrain",
+       "E",
+       [
+        "ray-tracing-infrastructure"
+       ]
       ]
      ]
     },
@@ -3936,6 +3998,17 @@
        "Spanned multi-display output with per-display off-axis projection and bezel correction",
        "render-architect",
        "E"
+      ],
+      [
+       "RND.ARCH.depth-convention",
+       "Depth and projection conventions (reverse-Z, float depth, infinite far plane, clip-space jitter, pixel-centre and Y-flip differences across D3D/Vulkan/Metal/WebGPU), referenced by C-SCENETEX",
+       "render-architect",
+       "E",
+       [
+        "math-simd-numerics",
+        "reconstruction-upscaling",
+        "xr-runtime"
+       ]
       ]
      ]
     },
@@ -4251,6 +4324,15 @@
        "Resource lifetime tracking decoupled from frame boundaries",
        "gpu-memory-resources",
        "E"
+      ],
+      [
+       "RND.MEM.cpu-visible",
+       "CPU-visible GPU memory rules: memory-type and coherence matrix per platform (write-combined vs cached, ReBAR), no CPU reads from upload memory (lint), cache maintenance on non-coherent paths",
+       "gpu-memory-resources",
+       "E",
+       [
+        "memory-allocators"
+       ]
       ]
      ]
     },
@@ -4491,6 +4573,17 @@
        [
         "modding-ugc"
        ]
+      ],
+      [
+       "RND.SHADER.precision",
+       "Shader numeric-precision policy per tier and pass (FP16/min16, packed math, subgroup size assumptions) with FP32-reference validation",
+       "shader-system",
+       "E",
+       [
+        "platform-mobile",
+        "material-system",
+        "render-validation"
+       ]
       ]
      ]
     },
@@ -4558,6 +4651,17 @@
        "material-system",
        "E",
        [
+        "render-architect"
+       ]
+      ],
+      [
+       "RND.MAT.pso-miss-policy",
+       "Behaviour when a PSO is not ready: per-pass and material-domain policy table (skip, hold, fallback material, block), telemetry to PRF.LOAD.hitch-gate",
+       "material-system",
+       "E",
+       [
+        "rhi-core",
+        "shader-system",
         "render-architect"
        ]
       ]
@@ -4695,6 +4799,9 @@
        [
         "world-data-model",
         "world-architect"
+       ],
+       [
+        "lite3d"
        ]
       ],
       [
@@ -4790,6 +4897,26 @@
        ],
        [
         "experimental"
+       ]
+      ],
+      [
+       "RND.LOD.instanced-clusters",
+       "Instance sharing inside a cluster hierarchy (assemblies, per-instance bounds expansion for WPO)",
+       "virtualized-geometry-lod",
+       "E",
+       [
+        "vegetation-foliage",
+        "geometry-pipeline"
+       ]
+      ],
+      [
+       "RND.LOD.foliage",
+       "Dense masked and thin-geometry LOD in the virtualized tier (voxel/impostor transition)",
+       "virtualized-geometry-lod",
+       "E",
+       [
+        "vegetation-foliage",
+        "geometry-pipeline"
        ]
       ]
      ]
@@ -5081,7 +5208,12 @@
        "RND.RT.instances",
        "TLAS instance management at scale",
        "ray-tracing-infrastructure",
-       "E"
+       "E",
+       [
+        "terrain",
+        "water-ocean",
+        "vegetation-foliage"
+       ]
       ],
       [
        "RND.RT.pipelines",
@@ -5105,7 +5237,10 @@
        "ray-tracing-infrastructure",
        "E",
        [
-        "virtualized-geometry-lod"
+        "virtualized-geometry-lod",
+        "terrain",
+        "water-ocean",
+        "vegetation-foliage"
        ]
       ],
       [
@@ -5918,7 +6053,7 @@
       ],
       [
        "PHY.ARCH.materials",
-       "Physics materials & surface types",
+       "Physics parameters bound to shared surface types (GAM.DATA.surface-types)",
        "physics-architect",
        "E"
       ],
@@ -5978,7 +6113,7 @@
       ],
       [
        "PHY.ARCH.validation",
-       "Physics oracle suite: analytic & reference scenes",
+       "Physics oracle suite: analytic & reference scenes (hooks, reference scenes and threshold proposals only; suite authorship belongs to the contract's oracle_author)",
        "physics-architect",
        "E",
        [
@@ -6595,7 +6730,7 @@
       ],
       [
        "ANM.ARCH.validation",
-       "Animation oracle suite: pose/compression/retarget error metrics",
+       "Animation oracle suite: pose/compression/retarget error metrics (hooks, reference scenes and threshold proposals only; suite authorship belongs to the contract's oracle_author)",
        "animation-architect",
        "E",
        [
@@ -7142,7 +7277,7 @@
       ],
       [
        "AUD.ARCH.validation",
-       "Audio oracle suite: bit-exact offline render, loudness, glitch & latency",
+       "Audio oracle suite: bit-exact offline render, loudness, glitch & latency (hooks, reference scenes and threshold proposals only; suite authorship belongs to the contract's oracle_author)",
        "audio-architect",
        "E",
        [
@@ -8108,6 +8243,17 @@
        [
         "determinism-replay"
        ]
+      ],
+      [
+       "NET.PRED.rewound-world-query",
+       "Hit volumes with poses as of tick T: composite of collider history and pose history with declared consistency and memory cost per tick of history",
+       "prediction-rollback",
+       "E",
+       [
+        "rigid-body-dynamics",
+        "animation-runtime",
+        "gameplay-systems-toolkit"
+       ]
       ]
      ]
     },
@@ -8846,7 +8992,7 @@
       ],
       [
        "GAM.AI.validation",
-       "Navigation/AI oracles: navmesh connectivity & coverage, path optimality vs exact A*, avoidance without interpenetration",
+       "Navigation/AI oracles: navmesh connectivity & coverage, path optimality vs exact A*, avoidance without interpenetration (hooks, reference scenes and threshold proposals only; suite authorship belongs to the contract's oracle_author)",
        "navigation-pathfinding",
        "E",
        [
@@ -8926,7 +9072,7 @@
       ],
       [
        "GAM.SAVE.atomic",
-       "Atomic writes & corruption resistance",
+       "Save-format atomicity policy on RES.IO.write",
        "persistence-save",
        "E"
       ],
@@ -9071,6 +9217,19 @@
        "E",
        [
         "gameplay-systems-toolkit"
+       ]
+      ],
+      [
+       "GAM.DATA.surface-types",
+       "Surface-type taxonomy (IDs, hierarchy, parameters) shared by physics, terrain, audio, VFX, decals, projectiles and haptics",
+       "gameplay-data",
+       "E",
+       [
+        "physics-architect",
+        "terrain",
+        "audio-content-runtime",
+        "vfx-particles",
+        "material-system"
        ]
       ]
      ]
@@ -9446,7 +9605,7 @@
       ],
       [
        "UI.FW.validation",
-       "UI layout/screenshot regression, focus-graph completeness, safe-area compliance",
+       "UI layout/screenshot regression, focus-graph completeness, safe-area compliance (hooks, reference scenes and threshold proposals only; suite authorship belongs to the contract's oracle_author)",
        "ui-architect",
        "E",
        [
@@ -11542,6 +11701,24 @@
        [
         "server-scaleout-persistence"
        ]
+      ],
+      [
+       "QA.SIM.navigation",
+       "Navigation/AI validation runs (navmesh connectivity, path optimality)",
+       "simulation-validation",
+       "E",
+       [
+        "navigation-pathfinding"
+       ]
+      ],
+      [
+       "QA.SIM.streaming",
+       "Streaming-correctness validation runs (no required cell missing at traversal speed)",
+       "simulation-validation",
+       "E",
+       [
+        "resource-streaming-architect"
+       ]
       ]
      ]
     },
@@ -11574,6 +11751,66 @@
         "memory-allocators",
         "rhi-core",
         "robustness-fuzzing"
+       ]
+      ]
+     ]
+    },
+    {
+     "id": "QA.CONF",
+     "name": "Conf",
+     "caps": [
+      [
+       "QA.CONF.foundation",
+       "Foundation conformance suites (memory model, numeric references, containers, allocators, config, ECS model tests)",
+       "foundation-conformance",
+       "E",
+       [
+        "test-architect"
+       ]
+      ],
+      [
+       "QA.CONF.ui-text",
+       "UI and text conformance suites (shaping, CLDR, layout, focus)",
+       "ui-text-conformance",
+       "E",
+       [
+        "test-architect"
+       ]
+      ],
+      [
+       "QA.CONF.memory-model",
+       "Memory-model litmus and model-checking lanes for foundation contracts",
+       "foundation-conformance",
+       "E",
+       [
+        "test-architect"
+       ]
+      ],
+      [
+       "QA.CONF.numerics",
+       "Numeric reference vectors and precision oracles",
+       "foundation-conformance",
+       "E",
+       [
+        "test-architect"
+       ]
+      ],
+      [
+       "QA.CONF.text-shaping",
+       "Text shaping, bidi and CLDR corpora",
+       "ui-text-conformance",
+       "E",
+       [
+        "test-architect"
+       ]
+      ],
+      [
+       "QA.CONF.layout-focus",
+       "Layout, safe-area and focus-graph oracles",
+       "ui-text-conformance",
+       "E",
+       [
+        "test-architect"
        ]
       ]
      ]
@@ -12243,6 +12480,16 @@
        "E",
        [
         "functional-automation-soak"
+       ]
+      ],
+      [
+       "OBS.CRASH.safe-path",
+       "Crash-time safety: async-signal-safe/SEH-safe code, pre-reserved emergency heap, alternate stack, out-of-process capture over PAL pipes, OOM inside the handler",
+       "crash-diagnostics",
+       "E",
+       [
+        "platform-architect",
+        "memory-allocators"
        ]
       ]
      ]

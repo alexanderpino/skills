@@ -33,7 +33,7 @@
    ],
    "universal": "runtime",
    "conformance": true,
-   "oracle_author": "robustness-fuzzing",
+   "oracle_author": "foundation-conformance",
    "oracle_reference": [
     "error-model conformance scenarios; sanitizer corpora"
    ]
@@ -66,7 +66,7 @@
    ],
    "conformance": true,
    "universal": "runtime",
-   "oracle_author": "robustness-fuzzing",
+   "oracle_author": "foundation-conformance",
    "oracle_reference": [
     "layered-config golden cases; schema fuzz corpora"
    ]
@@ -79,7 +79,7 @@
    "summary": "Vector/matrix types, precision classes, deterministic-math variants, fixed and scalable (vector-length-agnostic) SIMD kernels, convention enforcement.",
    "requires": [],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing",
+   "oracle_author": "foundation-conformance",
    "oracle_reference": [
     "CORE-MATH / IEEE-754 reference vectors; arbitrary-precision differential runs"
    ]
@@ -96,7 +96,7 @@
    ],
    "universal": "runtime",
    "conformance": true,
-   "oracle_author": "robustness-fuzzing",
+   "oracle_author": "foundation-conformance",
    "boundary": true,
    "test_double": {
     "kind": "tracking/failing allocator",
@@ -116,7 +116,7 @@
     "C-MEM"
    ],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing",
+   "oracle_author": "foundation-conformance",
    "oracle_reference": [
     "SMHasher and known-answer hash vectors; container model-based tests"
    ]
@@ -141,7 +141,7 @@
    "layer": 1,
    "owner": "job-system-task-graph",
    "name": "Task graph & job API",
-   "summary": "Task creation, dependencies, priorities/QoS, blocking rules, completion-token integration, process-wide thread inventory with pinned/affinity lanes and middleware adapters, serial deterministic test mode and schedule-perturbation hooks, task tracing.",
+   "summary": "Task creation, dependencies, priorities/QoS, blocking rules, completion-token integration, process-wide thread inventory with pinned/affinity lanes and middleware adapters, serial deterministic test mode and schedule-perturbation hooks, task tracing; cancel/stop-token and cancel-vs-completion semantics (CORE.JOBS.cancellation).",
    "requires": [
     "C-SYNC",
     "C-MEM"
@@ -173,7 +173,7 @@
    "layer": 1,
    "owner": "crash-diagnostics",
    "name": "Crash & diagnostic hooks",
-   "summary": "Crash context annotations, breadcrumbs, watchdog registration.",
+   "summary": "Crash context annotations, breadcrumbs, watchdog registration; the handler uses PAL process/pipe primitives via C-BASE only and is not a C-IPC dependency; crash-in-OOM and crash-with-lock-held conformance cases.",
    "requires": [
     "C-BASE",
     "C-INSTR"
@@ -266,7 +266,7 @@
     "C-FRAME"
    ],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing",
+   "oracle_author": "foundation-conformance",
    "oracle_reference": [
     "ECS model-based tests against a naive reference implementation"
    ]
@@ -306,7 +306,7 @@
    "layer": 2,
    "owner": "async-io-storage",
    "name": "Async IO",
-   "summary": "IO requests, priorities, deadlines, completions, decompression targets; GPU decompression is declared as external work items executed as render-graph nodes where no dedicated decompression queue exists.",
+   "summary": "IO requests, priorities, deadlines, completions, decompression targets; GPU decompression is declared as external work items executed as render-graph nodes where no dedicated decompression queue exists; write path with durability classes and atomic replace; power-cut crash-consistency oracle.",
    "requires": [
     "C-PAL",
     "C-TASK"
@@ -565,7 +565,7 @@
     "C-TYPES"
    ],
    "conformance": true,
-   "oracle_author": "functional-automation-soak"
+   "oracle_author": "ui-text-conformance"
   },
   {
    "id": "C-DRAW2D",
@@ -677,7 +677,7 @@
     "C-ASSET"
    ],
    "conformance": true,
-   "oracle_author": "functional-automation-soak"
+   "oracle_author": "ui-text-conformance"
   },
   {
    "id": "C-UI",
@@ -693,7 +693,7 @@
     "C-LOC"
    ],
    "conformance": true,
-   "oracle_author": "functional-automation-soak"
+   "oracle_author": "ui-text-conformance"
   },
   {
    "id": "C-NAV",
@@ -740,7 +740,8 @@
    "summary": "Save participation, versioned save records, async save/load; persisted player-settings store per scope, populating the C-CFG user layer.",
    "requires": [
     "C-SER",
-    "C-ID"
+    "C-ID",
+    "C-STATECLASS"
    ],
    "conformance": true,
    "oracle_author": "functional-automation-soak"
@@ -904,7 +905,7 @@
    "summary": "Raw page allocator, raw log/assert/abort sink, monotonic clock, raw thread primitives and late-bound hook tables that higher layers install (allocator, log sink, assert handler, crash annotator). Depends on nothing.",
    "requires": [],
    "conformance": true,
-   "oracle_author": "robustness-fuzzing",
+   "oracle_author": "foundation-conformance",
    "oracle_reference": [
     "compiler/ABI conformance suites; static-assert corpora"
    ]
@@ -930,7 +931,7 @@
    "layer": 2,
    "owner": "core-runtime-architect",
    "name": "Engine IPC",
-   "summary": "Process model and IPC/RPC transport for editor↔runtime, tool workers, crash handler, profiler and script debugger; dev-only port security; untrusted-frame validation (ipc-messages input) on every endpoint that survives into shipping.",
+   "summary": "Process model and IPC/RPC transport for editor↔runtime, tool workers, profiler and script debugger; dev-only port security; untrusted-frame validation (ipc-messages input) on every endpoint that survives into shipping.",
    "requires": [
     "C-PAL",
     "C-TASK"
@@ -995,7 +996,8 @@
    "summary": "Snapshot/restore, resimulate N ticks, history ring, per-participant cost declaration.",
    "requires": [
     "C-FRAME",
-    "C-SER"
+    "C-SER",
+    "C-STATECLASS"
    ],
    "conformance": true,
    "oracle_author": "simulation-validation",
@@ -1209,7 +1211,8 @@
    "requires": [
     "C-NETLINK",
     "C-SER",
-    "C-ID"
+    "C-ID",
+    "C-STATECLASS"
    ],
    "conformance": true,
    "oracle_author": "simulation-validation"
@@ -1224,7 +1227,8 @@
     "C-NETLINK",
     "C-DET",
     "C-SNAPSHOT",
-    "C-INPUT"
+    "C-INPUT",
+    "C-STATECLASS"
    ],
    "conformance": true,
    "oracle_author": "simulation-validation"
@@ -1247,7 +1251,7 @@
    "layer": 3,
    "owner": "gameplay-data",
    "name": "Gameplay data",
-   "summary": "Data tables, curve assets, tuning assets with overrides, live override layer; gameplay tag registry and tag queries; the live override layer is a sink of the single C-LIVE remote-config payload (precedence in CORE.LIFE.config).",
+   "summary": "Data tables, curve assets, tuning assets with overrides, live override layer; gameplay tag registry and tag queries; the live override layer is a sink of the single C-LIVE remote-config payload (precedence in CORE.LIFE.config); surface-type IDs (GAM.DATA.surface-types) referenced by C-ENV, audio, VFX and materials.",
    "requires": [
     "C-REFL",
     "C-ASSET"
@@ -1291,7 +1295,7 @@
     "C-TEXT"
    ],
    "conformance": true,
-   "oracle_author": "functional-automation-soak"
+   "oracle_author": "ui-text-conformance"
   },
   {
    "id": "C-DEVUI",
@@ -1426,7 +1430,7 @@
    "layer": 3,
    "owner": "render-architect",
    "name": "Per-view scene textures",
-   "summary": "Named per-view render-graph resources and their producer phases: depth, HZB, visibility IDs, surface-attribute decode (visibility buffer and deferred), velocity, scene color, denoiser/upscaler guide buffers; variants per shading path and tier.",
+   "summary": "Named per-view render-graph resources and their producer phases: depth, HZB, visibility IDs, surface-attribute decode (visibility buffer and deferred), velocity, scene color, denoiser/upscaler guide buffers; variants per shading path and tier; depth and projection conventions per RND.ARCH.depth-convention.",
    "requires": [
     "C-RG",
     "C-MATIF"
@@ -1582,7 +1586,8 @@
    "summary": "Persistent records with leases and write-behind, idempotent transactions, schema migration hooks.",
    "requires": [
     "C-SER",
-    "C-NET"
+    "C-NET",
+    "C-STATECLASS"
    ],
    "conformance": true,
    "oracle_author": "functional-automation-soak",
@@ -1807,6 +1812,34 @@
    ],
    "conformance": true,
    "oracle_author": "functional-automation-soak"
+  },
+  {
+   "id": "C-STATECLASS",
+   "layer": 2,
+   "owner": "reflection-metadata",
+   "name": "State-class declaration",
+   "summary": "One declaration of the state class of every component and reflected property; C-SNAPSHOT, C-REP, C-PREDICT, C-SAVE and C-SRVDATA registries derive from it; a fitness function requires every declared component or property to have a class.",
+   "requires": [
+    "C-REFL"
+   ],
+   "conformance": true,
+   "oracle_author": "functional-automation-soak",
+   "oracle_reference": [
+    "property round-trip cases per class; registry-derivation golden cases"
+   ]
+  },
+  {
+   "id": "C-REWIND",
+   "layer": 3,
+   "owner": "prediction-rollback",
+   "name": "Rewound world queries",
+   "summary": "Hit volumes with poses as of tick T: collider-history and pose-history providers, consistency and memory-cost declaration per tick of history.",
+   "requires": [
+    "C-SNAPSHOT",
+    "C-NET"
+   ],
+   "conformance": true,
+   "oracle_author": "simulation-validation"
   }
  ]
 }

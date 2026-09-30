@@ -311,6 +311,7 @@
    "default_stance": "PSO coverage from play traces, precompiled/pipeline libraries, async creation with fallbacks",
    "justification_owner": "shader-system",
    "stance_capabilities": [
+    "RND.MAT.pso-miss-policy",
     "RND.RHI.pso",
     "RND.SHADER.cache",
     "RND.SHADER.precache",
@@ -850,6 +851,21 @@
    ],
    "contradiction_terms": [
     "static (?:ci|cloud) credentials"
+   ]
+  },
+  {
+   "id": "L75",
+   "pattern": "Baked visibility (PVS/portals) on GPU-driven tiers",
+   "detection": "precomputed visibility sets used where HZB culling is available",
+   "default_stance": "GPU HZB culling; baked visibility only on the CPU-culled tier by ADR",
+   "justification_owner": "geometry-pipeline",
+   "stance_capabilities": [
+    "RND.GEO.culling",
+    "RND.GEO.cpu-occlusion",
+    "RND.GEO.precomputed-visibility"
+   ],
+   "contradiction_terms": [
+    "baked pvs (?:everywhere|default)"
    ]
   }
  ],

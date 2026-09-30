@@ -1855,7 +1855,8 @@
    "consumes": [
     "C-PAL",
     "C-BASE",
-    "C-SYNC"
+    "C-SYNC",
+    "C-LIFETIME"
    ],
    "expertise": [
     "allocator design",
@@ -2134,7 +2135,8 @@
     "C-FRAME",
     "C-REFL?",
     "C-SNAPSHOT",
-    "C-RELOAD?"
+    "C-RELOAD?",
+    "C-STATECLASS"
    ],
    "expertise": [
     "ECS architectures",
@@ -2178,7 +2180,8 @@
     ]
    ],
    "provides": [
-    "C-REFL"
+    "C-REFL",
+    "C-STATECLASS"
    ],
    "consumes": [
     "C-TYPES"
@@ -3126,7 +3129,11 @@
     "C-RG?",
     "C-GEOLOD?",
     "C-TEMPORAL?",
-    "C-PCG?"
+    "C-PCG?",
+    "C-LIGHT?",
+    "C-RT?",
+    "C-GI?",
+    "C-SCENETEX?"
    ],
    "expertise": [
     "terrain LOD",
@@ -3168,6 +3175,10 @@
     [
      "Impostor generation",
      "virtualized-geometry-lod"
+    ],
+    [
+     "Cluster LOD of foliage geometry",
+     "virtualized-geometry-lod"
     ]
    ],
    "provides": [],
@@ -3182,7 +3193,8 @@
     "C-GEOLOD?",
     "C-RT?",
     "C-LIGHT?",
-    "C-PCG?"
+    "C-PCG?",
+    "C-SCENETEX?"
    ],
    "expertise": [
     "foliage rendering",
@@ -3289,7 +3301,10 @@
     "C-ENV",
     "C-LIGHT?",
     "C-TEMPORAL?",
-    "C-VFX?"
+    "C-VFX?",
+    "C-SCENETEX?",
+    "C-COLOR?",
+    "C-GI?"
    ],
    "expertise": [
     "atmospheric scattering",
@@ -3658,7 +3673,7 @@
     "C-GPUTIER",
     "C-LIGHTENV?",
     "C-RELOAD?",
-    "C-VT"
+    "C-VT?"
    ],
    "expertise": [
     "PBR",
@@ -4107,10 +4122,10 @@
     "C-CFG",
     "C-A11Y",
     "C-PAL",
-    "C-SCENETEX",
-    "C-TEMPORAL",
     "C-VIEW",
-    "C-A11YRT?"
+    "C-A11YRT?",
+    "C-TEMPORAL?",
+    "C-SCENETEX?"
    ],
    "expertise": [
     "color science",
@@ -4267,7 +4282,7 @@
     "C-RSCENE?",
     "C-MATIF?",
     "C-LIGHT?",
-    "C-VT"
+    "C-VT?"
    ],
    "expertise": [
     "2D batching",
@@ -4310,7 +4325,6 @@
     "C-VFX"
    ],
    "consumes": [
-    "C-RSCENE",
     "C-RG",
     "C-PHYS?",
     "C-LIGHT?",
@@ -4319,15 +4333,16 @@
     "C-TEMPORAL?",
     "C-ENV?",
     "C-A11Y",
-    "C-SCENETEX",
     "C-COLOR",
     "C-LIGHTENV?",
     "C-TRANSLUCENT?",
-    "C-MATIF",
     "C-RELOAD?",
     "C-ANIM?",
     "C-VT?",
-    "C-PREDICT?"
+    "C-PREDICT?",
+    "C-RSCENE?",
+    "C-MATIF?",
+    "C-SCENETEX?"
    ],
    "expertise": [
     "GPU particles",
@@ -4482,7 +4497,8 @@
     "C-DET",
     "C-ANIM?",
     "C-ENV?",
-    "C-ML?"
+    "C-ML?",
+    "C-REWIND?"
    ],
    "expertise": [
     "TGS/XPBD",
@@ -4820,7 +4836,8 @@
     "C-MATH",
     "C-RELOAD?",
     "C-VFX?",
-    "C-PREDICT?"
+    "C-PREDICT?",
+    "C-REWIND?"
    ],
    "expertise": [
     "ACL-class compression",
@@ -5466,7 +5483,8 @@
     "C-FRAME",
     "C-TASK",
     "C-HOSTAUTH?",
-    "C-INTEGRITY?"
+    "C-INTEGRITY?",
+    "C-STATECLASS"
    ],
    "expertise": [
     "state synchronization",
@@ -5510,7 +5528,8 @@
     ]
    ],
    "provides": [
-    "C-PREDICT"
+    "C-PREDICT",
+    "C-REWIND"
    ],
    "consumes": [
     "C-NET",
@@ -5525,7 +5544,8 @@
     "C-REP?",
     "C-INTEGRITY?",
     "C-HOSTAUTH?",
-    "C-NETSESSION"
+    "C-NETSESSION",
+    "C-STATECLASS"
    ],
    "expertise": [
     "rollback",
@@ -5721,7 +5741,8 @@
     "C-UI?",
     "C-VIEW?",
     "C-VFX?",
-    "C-CAMERA?"
+    "C-CAMERA?",
+    "C-REWIND?"
    ],
    "expertise": [
     "ability systems",
@@ -6011,7 +6032,8 @@
     "C-CFG",
     "C-SRVDATA?",
     "C-SIGN",
-    "C-LOC?"
+    "C-LOC?",
+    "C-STATECLASS"
    ],
    "expertise": [
     "save systems",
@@ -6457,7 +6479,7 @@
    "id": "visual-debugging-tools",
    "name": "Visual Debugging Tools",
    "tier": "expert",
-   "parent": "editor-architect",
+   "parent": "core-runtime-architect",
    "profiles": [
     "all"
    ],
@@ -8199,6 +8221,73 @@
     "C-INSTR",
     "C-BUDGET",
     "C-BENCH"
+   ],
+   "tool_consumes": [],
+   "provides": [],
+   "implements": []
+  },
+  {
+   "id": "foundation-conformance",
+   "name": "Foundation Conformance",
+   "tier": "expert",
+   "parent": "test-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "process",
+   "targets": [],
+   "workstream": "quality",
+   "purpose": "Independent authoring of conformance suites for foundation conformance contracts, distinct from their owners and implementers.",
+   "non_responsibilities": [
+    [
+     "Contract implementation",
+     "owning-skill"
+    ],
+    [
+     "Fuzz campaigns",
+     "robustness-fuzzing"
+    ]
+   ],
+   "expertise": [
+    "memory-model litmus tests",
+    "numeric reference vectors",
+    "container and allocator model tests"
+   ],
+   "consumes": [
+    "C-TEST"
+   ],
+   "tool_consumes": [],
+   "provides": [],
+   "implements": []
+  },
+  {
+   "id": "ui-text-conformance",
+   "name": "UI & Text Conformance",
+   "tier": "expert",
+   "parent": "test-architect",
+   "profiles": [
+    "all"
+   ],
+   "kind": "process",
+   "targets": [],
+   "workstream": "quality",
+   "purpose": "Independent authoring of conformance suites for ui & text conformance contracts, distinct from their owners and implementers.",
+   "non_responsibilities": [
+    [
+     "Contract implementation",
+     "owning-skill"
+    ],
+    [
+     "Fuzz campaigns",
+     "robustness-fuzzing"
+    ]
+   ],
+   "expertise": [
+    "text shaping and CLDR corpora",
+    "layout and focus-graph oracles"
+   ],
+   "consumes": [
+    "C-TEST"
    ],
    "tool_consumes": [],
    "provides": [],

@@ -309,6 +309,7 @@
     "C-REFL",
     "C-SER",
     "C-SPATIAL",
+    "C-STATECLASS",
     "C-TEXT",
     "C-TRUST",
     "C-VIEW"
@@ -432,6 +433,7 @@
     "C-REP",
     "C-REPLAY",
     "C-RES",
+    "C-REWIND",
     "C-RHI",
     "C-SAVE",
     "C-SCRIPT",
