@@ -22,7 +22,8 @@ Before spawning anything:
    owns (scope), reads, leaves out of scope and must not do, the contracts it provides and
    consumes, its done-when, and an isolation strategy
    (`worktree`, `patch`, `shared`, `read-only`) with one line of reason — decided per lane,
-   for this run. Files every lane would touch go under `hotspots`, owned by nobody.
+   for this run. Files every lane would touch go under `hotspots`, owned by nobody;
+   files nobody may ever write go under `protected`.
 3. Run `fanout.py plan` to validate the plan and measure coupling, and merge what it
    flags — or pin a `DEP` edge with a contract the provider can keep. N is an output of
    that analysis, not a number you pick.

@@ -138,8 +138,10 @@ BRIEF_TEMPLATE = """# Brief
 
 ## Must not
 
-<!-- Hard prohibitions that hold for every agent: APIs that must not change, files
-     nobody touches, commands nobody runs. Per-lane prohibitions go in slices.json. -->
+<!-- Hard prohibitions that hold for every agent: APIs that must not change, commands
+     nobody runs, dependencies nobody adds. Files nobody may ever write go under
+     "protected" in slices.json, where trespass enforces them. Per-lane prohibitions go
+     in slices.json too. -->
 
 -
 
@@ -194,6 +196,7 @@ Concrete failure example:
 # The allocation plan: who does what, in which isolation, against which contracts. It is
 # sealed with the brief, because every per-agent block is generated from it.
 SLICES_TEMPLATE = {
+    "protected": [],
     "hotspots": [],
     "slices": [
         {
@@ -343,6 +346,7 @@ def load_plan(d: Path, synthesis: bool = True) -> dict:
             s.setdefault(key, "")
     plan["slices"] = slices
     plan.setdefault("hotspots", [])
+    plan.setdefault("protected", [])
     return plan
 
 
@@ -360,6 +364,13 @@ def maybe_spec(d: Path, slice_id: str):
 
 def hotspot_paths(plan: dict) -> list:
     return [h["path"] if isinstance(h, dict) else h for h in plan["hotspots"]]
+
+
+def protected_paths(plan: dict) -> list:
+    return list(plan["protected"])
+
+
+PROTECTED = "PROTECTED"   # prefix of a trespass reason that no decision can accept
 
 
 def slice_spec(plan: dict, slice_id: str) -> dict:
@@ -404,6 +415,11 @@ def validate_plan(plan: dict, mode: str) -> tuple:
     hot = hotspot_paths(plan)
 
     # Shape first: every check below assumes text is text and lists are lists.
+    for key in ("protected", "hotspots"):
+        if not isinstance(plan[key], list):
+            errors.append(f"top level: {key} must be a list")
+    if not all(isinstance(p, str) for p in plan["protected"] if isinstance(plan["protected"], list)):
+        errors.append("top level: protected entries must be paths")
     for s in plan["slices"]:
         tag = s.get("id") or "(no id)"
         for key in ("summary", "task", "context", "strategy", "strategy_reason"):
@@ -444,6 +460,9 @@ def validate_plan(plan: dict, mode: str) -> tuple:
         if mode == "compete" and strategy == "shared":
             errors.append(f"{tag}: compete lanes write the same files; 'shared' would "
                           "have them overwrite each other")
+        if hit := overlaps(s["owns"], protected_paths(plan)):
+            errors.append(f"{tag}: owns protected path(s) {', '.join(sorted(hit))} — a "
+                          "protected file is never writable; unprotect it or drop it")
         if hit := overlaps(s["owns"], hot):
             errors.append(f"{tag}: owns hotspot(s) {', '.join(sorted(hit))} — hotspots "
                           "belong to no lane and are applied at integration")
@@ -465,6 +484,9 @@ def validate_plan(plan: dict, mode: str) -> tuple:
             if not (p.get("symbol") and (p.get("contract") or "").strip()):
                 errors.append(f"{tag}: every provides entry needs a symbol and a contract")
 
+    if hit := overlaps(hot, protected_paths(plan)):
+        errors.append(f"hotspot(s) {', '.join(sorted(hit))} are also protected — a hotspot "
+                      "is written at integration, a protected file never")
     if mode == "partition":
         for i, a in enumerate(slices):
             for b in slices[i + 1:]:
@@ -634,6 +656,10 @@ def classify(paths, spec: dict, plan: dict) -> list:
     """(path, why) for every write the lane was not allowed to make."""
     out = []
     for path in sorted(paths):
+        # Checked before ownership, so no plan mistake can turn it into an allowed write.
+        if under(path, protected_paths(plan)):
+            out.append((path, f"{PROTECTED} — never writable, not negotiable"))
+            continue
         if spec.get("strategy") != "read-only" and under(path, spec["owns"]):
             continue
         if under(path, hotspot_paths(plan)):
@@ -1289,6 +1315,8 @@ def cmd_plan(args) -> None:
               f"{s.get('strategy_reason') or '(no reason)'}")
     if hot := hotspot_paths(plan):
         print(f"  hotspots: {', '.join(hot)}   (no lane owns these; applied at integration)")
+    if prot := protected_paths(plan):
+        print(f"  protected: {', '.join(prot)}   (never written by anyone)")
     for w in warnings:
         print(f"  warn: {w}")
     for e in errors:
@@ -1589,6 +1617,8 @@ def lane_block(d: Path, plan: dict, spec: dict, mode: str) -> list:
         others = [f"{e} (owned by {o['id']})" for o in plan["slices"]
                   if o is not spec and not o.get("synthesis") for e in o["owns"]]
     listing("Out of scope — do not do, and do not write:", spec["out_of_scope"] + others)
+    listing("Protected — never write these, and do not ask to. Not negotiable; a write "
+            "sends your lane back:", protected_paths(plan))
     listing("Hotspots — no lane writes these; list what you need under "
             "'Hotspot entries' in your report:", hotspot_paths(plan))
     listing("Must not:", spec["must_not"])
@@ -1668,6 +1698,7 @@ def cmd_trespass(args) -> None:
     plan = load_plan(d)
     targets = [slice_spec(plan, args.slice)] if args.slice else plan["slices"]
     bad = 0
+    protected_hit = False
     tree_done = False
 
     for spec in targets:
@@ -1690,10 +1721,15 @@ def cmd_trespass(args) -> None:
             print(f"{sid}: clean")
             continue
         bad += len(found)
+        protected_hit = protected_hit or any(w.startswith(PROTECTED) for _, w in found)
+        found.sort(key=lambda x: not x[1].startswith(PROTECTED))
         print(f"{sid}: {len(found)} write(s) outside scope")
         for path, why in found:
             print(f"    {path}   {why}")
 
+    if protected_hit:
+        print("\nPROTECTED writes cannot be accepted or justified away: revert them. If the\n"
+              "file genuinely must change, the plan was wrong — a new run, or the user's call.")
     if bad:
         print("\nA trespassing lane goes back to its builder before any critic sees it:\n"
               "revert the listed writes, or justify each in the report and let the\n"
@@ -1766,10 +1802,21 @@ def cmd_integrate(args) -> None:
             stop += [(spec["id"], p, w) for p, w in (trespass_of(d, plan, spec) or [])]
     if any(s["strategy"] == "shared" for s in landing):
         stop += [("main tree", p, w) for p, w in tree_trespass(d, plan)]
-    if stop:
-        for sid, path, why in stop:
-            print(f"TRESPASS {sid}: {path}   {why}")
-        sys.exit("\nSend these back to their lanes (`fanout.py trespass` for detail).")
+    hard = [x for x in stop if x[2].startswith(PROTECTED)]
+    soft = [x for x in stop if not x[2].startswith(PROTECTED)]
+    for sid, path, why in hard + soft:
+        print(f"TRESPASS {sid}: {path}   {why}")
+    if hard:
+        # --force does not reach this: a protected file is the one boundary the plan
+        # declared to be beyond any decision taken mid-run.
+        sys.exit("\nA protected path was written. That lane goes back to its builder; "
+                 "--force does not apply.\nIf the file genuinely must change, the plan was "
+                 "wrong — that is a new run, or the user's decision.")
+    if soft and not args.force:
+        sys.exit("\nSend these back to their lanes (`fanout.py trespass` for detail), or "
+                 "accept them\ndeliberately with --force and record that in the fold report.")
+    if soft:
+        print("--force: landing with the trespass above accepted. The fold report must say so.\n")
 
     patches = {}
     for spec in landing:
@@ -1801,14 +1848,15 @@ def cmd_integrate(args) -> None:
         (idir / f"{sid}.patch").write_text(patches[sid])
         ok, err = apply_patch(patches[sid], Path("."))
         if not ok:
-            (idir / "applied.json").write_text(json.dumps(record, indent=2) + "\n")
             sys.exit(f"{sid} failed to apply after its check passed:\n{err}\n"
                      "The lanes before it are applied and recorded; "
                      "`fanout.py integrate --revert` undoes them.")
         paths = sorted(patch_paths(patches[sid]))
         record.append({"id": sid, "strategy": spec["strategy"], "paths": paths})
+        # Recorded the moment it lands, before anything else can fail — an interrupted
+        # integration must still be revertible.
+        (idir / "applied.json").write_text(json.dumps(record, indent=2) + "\n")
         print(f"  {sid:<20} {spec['strategy']:<9} applied ({len(paths)} path(s))")
-    (idir / "applied.json").write_text(json.dumps(record, indent=2) + "\n")
 
     requests = []
     for spec in landing:
@@ -1948,7 +1996,9 @@ def main() -> None:
     ig.add_argument("--winner", help="compete mode: the one lane to land")
     ig.add_argument("--check", action="store_true", help="verify every lane applies; change nothing")
     ig.add_argument("--revert", action="store_true", help="undo the last integration")
-    ig.add_argument("--force", action="store_true", help="land lanes whose gate has not passed")
+    ig.add_argument("--force", action="store_true",
+                    help="land lanes whose gate has not passed, or whose trespass you accept "
+                         "(never a protected path)")
     ig.set_defaults(func=cmd_integrate)
 
     s = sub.add_parser("snapshot", help="record the bytes under review")

@@ -182,6 +182,7 @@ that changes mid-run is the same fault as a brief that changes mid-run.
 
 ```json
 {
+  "protected": ["migrations/", "src/api/public.h", ".github/"],
   "hotspots": ["package.json", "src/routes.ts"],
   "slices": [
     {
@@ -218,6 +219,7 @@ that changes mid-run is the same fault as a brief that changes mid-run.
 | `consumes` | Symbols this lane builds against, naming the providing lane |
 | `done_when` | This lane's slice of the definition of done |
 | `hotspots` | Files every lane would need to touch — a lockfile, a registry, a route table, a changelog. No lane owns them |
+| `protected` | Files nobody may ever write in this run — not a lane, not integration, not by accepted trespass |
 
 What the fields are for:
 
@@ -241,6 +243,15 @@ What the fields are for:
   merge conflicts, and giving it to one lane forces the others to trespass. So nobody owns
   it: each builder lists the entries it needs under *Hotspot entries* in its report, and
   you apply them in Step 6.
+- **Protected is the one boundary that is not negotiable.** Everything outside a lane's
+  `owns` is already forbidden, but that ban bends: a builder may report a scope deviation,
+  you may accept a trespass, `integrate --force` may land it. A protected path never bends —
+  generated code, applied migrations, a published API header, CI configuration, vendored
+  code, secrets. `seal` refuses a plan in which a lane owns one or a hotspot is one, every
+  delta lists them, `trespass` marks a write as `PROTECTED`, and `integrate` refuses it
+  even under `--force`. If one genuinely must change, the plan was wrong: that is a new run,
+  or the user's decision — never yours mid-run. Rules that are not about files ("run no
+  migrations", "add no dependencies") stay in the brief's *Must not*.
 
 ### Isolation strategies
 
@@ -356,7 +367,8 @@ python scripts/fanout.py delta <slice-id>   # the block below the '---', per bui
 prepares the patch location, and lists what a fresh worktree will lack. `delta` renders a
 lane's per-agent block from the sealed plan, always in this order: its slice line, task,
 context, isolation instructions, scope (what it may write), what it reads, out of scope
-(its own entries, then every file another lane owns), the hotspots, its prohibitions, the
+(its own entries, then every file another lane owns), the protected paths, the hotspots,
+its prohibitions, the
 contracts it provides and consumes, and its done-when. Empty fields are left out. Paste its output verbatim; do
 not hand-write a delta, because a hand-written one drifts from the plan that trespass and
 integration will hold the lane to.
@@ -418,7 +430,9 @@ Worktree and patch lanes are measured exactly; the shared tree is measured again
 union of its lanes' `owns`. A lane that wrote outside its scope goes back to its builder
 with the list — revert those writes, or justify each in the report — and no critic is
 spawned for it until it is clean. A trespass that was genuinely necessary is a slicing
-error: accept it deliberately, record it for the fold, and cut differently next run. Never
+error: accept it deliberately, record it for the fold, and cut differently next run. A
+`PROTECTED` write is the exception to all of that — it is never accepted and never
+justified away; the lane reverts it. Never
 let it reach integration unexamined, where it surfaces as a conflict nobody can attribute.
 
 ## Step 4 — Critics
@@ -895,9 +909,12 @@ python scripts/fanout.py integrate                  # compete: add --winner <sli
 
 `integrate` works per strategy, in provider-before-consumer order: shared lanes are
 already in place, patch lanes are applied, worktree lanes have their diff against the base
-applied. It re-runs `trespass` first and refuses to land a lane that fails it, runs
+applied. It re-runs `trespass` first and refuses to land a lane that fails it — unless you
+pass `--force` to land a trespass you accepted, which the fold report must then name; no
+flag lands a `PROTECTED` write. It runs
 `git apply --check` for every lane before changing anything, and records what it applied in
-`integration/applied.json` so `integrate --revert` can undo it. Nothing is committed and no
+`integration/applied.json` the moment each lane lands, so `integrate --revert` can undo it
+even after an interrupted run. Nothing is committed and no
 branch is merged — the result sits uncommitted in the main tree, and committing it is the
 user's call.
 
