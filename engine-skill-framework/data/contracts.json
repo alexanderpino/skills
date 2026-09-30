@@ -12,7 +12,7 @@
    ],
    "conformance": true,
    "needs_implementer": true,
-   "oracle_author": "accessibility",
+   "oracle_author": "robustness-fuzzing",
    "boundary": true,
    "test_double": {
     "kind": "null/fake platform + event injection",
@@ -30,7 +30,7 @@
    ],
    "universal": "runtime",
    "conformance": true,
-   "oracle_author": "test-architect"
+   "oracle_author": "robustness-fuzzing"
   },
   {
    "id": "C-MOD",
@@ -44,7 +44,7 @@
    ],
    "conformance": true,
    "universal": "runtime",
-   "oracle_author": "hot-reload-iteration"
+   "oracle_author": "robustness-fuzzing"
   },
   {
    "id": "C-CFG",
@@ -57,7 +57,7 @@
    ],
    "conformance": true,
    "universal": "runtime",
-   "oracle_author": "gameplay-data"
+   "oracle_author": "robustness-fuzzing"
   },
   {
    "id": "C-MATH",
@@ -67,7 +67,7 @@
    "summary": "Vector/matrix types, precision classes, deterministic-math variants, fixed and scalable (vector-length-agnostic) SIMD kernels, convention enforcement.",
    "requires": [],
    "conformance": true,
-   "oracle_author": "animation-runtime"
+   "oracle_author": "robustness-fuzzing"
   },
   {
    "id": "C-MEM",
@@ -80,7 +80,7 @@
    ],
    "universal": "runtime",
    "conformance": true,
-   "oracle_author": "containers-core-types",
+   "oracle_author": "robustness-fuzzing",
    "boundary": true,
    "test_double": {
     "kind": "tracking/failing allocator",
@@ -97,7 +97,7 @@
     "C-MEM"
    ],
    "conformance": true,
-   "oracle_author": "core-runtime-architect"
+   "oracle_author": "robustness-fuzzing"
   },
   {
    "id": "C-SYNC",
@@ -109,7 +109,7 @@
     "C-BASE"
    ],
    "conformance": true,
-   "oracle_author": "entity-object-model"
+   "oracle_author": "robustness-fuzzing"
   },
   {
    "id": "C-TASK",
@@ -122,7 +122,7 @@
     "C-MEM"
    ],
    "conformance": true,
-   "oracle_author": "animation-architect"
+   "oracle_author": "robustness-fuzzing"
   },
   {
    "id": "C-INSTR",
@@ -135,7 +135,7 @@
    ],
    "universal": "runtime",
    "conformance": true,
-   "oracle_author": "cpu-performance"
+   "oracle_author": "robustness-fuzzing"
   },
   {
    "id": "C-CRASH",
@@ -149,7 +149,7 @@
    ],
    "universal": "runtime",
    "conformance": true,
-   "oracle_author": "test-architect"
+   "oracle_author": "robustness-fuzzing"
   },
   {
    "id": "C-DET",
@@ -161,7 +161,7 @@
     "C-MATH"
    ],
    "conformance": true,
-   "oracle_author": "character-movement"
+   "oracle_author": "simulation-validation"
   },
   {
    "id": "C-BUDGET",
@@ -182,7 +182,7 @@
     "C-MOD"
    ],
    "conformance": true,
-   "oracle_author": "editor-architect"
+   "oracle_author": "robustness-fuzzing"
   },
   {
    "id": "C-FRAME",
@@ -194,7 +194,7 @@
     "C-TASK"
    ],
    "conformance": true,
-   "oracle_author": "ai-behavior-perception"
+   "oracle_author": "robustness-fuzzing"
   },
   {
    "id": "C-ID",
@@ -206,7 +206,7 @@
     "C-TYPES"
    ],
    "conformance": true,
-   "oracle_author": "ecs-runtime"
+   "oracle_author": "robustness-fuzzing"
   },
   {
    "id": "C-ECS",
@@ -220,7 +220,7 @@
     "C-FRAME"
    ],
    "conformance": true,
-   "oracle_author": "audio-architect"
+   "oracle_author": "robustness-fuzzing"
   },
   {
    "id": "C-REFL",
@@ -232,7 +232,7 @@
     "C-TYPES"
    ],
    "conformance": true,
-   "oracle_author": "api-lifecycle-migration"
+   "oracle_author": "robustness-fuzzing"
   },
   {
    "id": "C-SER",
@@ -244,7 +244,7 @@
     "C-REFL"
    ],
    "conformance": true,
-   "oracle_author": "collaboration-version-control"
+   "oracle_author": "robustness-fuzzing"
   },
   {
    "id": "C-IO",
@@ -257,7 +257,7 @@
     "C-TASK"
    ],
    "conformance": true,
-   "oracle_author": "loading-streaming-performance",
+   "oracle_author": "functional-automation-soak",
    "boundary": true,
    "test_double": {
     "kind": "in-memory IO with fault points",
@@ -275,7 +275,7 @@
     "C-SER"
    ],
    "conformance": true,
-   "oracle_author": "localization-i18n"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-ASSET",
@@ -288,7 +288,7 @@
     "C-ID"
    ],
    "conformance": true,
-   "oracle_author": "ai-assisted-authoring"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-RES",
@@ -302,7 +302,7 @@
     "C-MEM"
    ],
    "conformance": true,
-   "oracle_author": "audio-dsp-mixing"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-RELOAD",
@@ -315,7 +315,7 @@
     "C-MOD"
    ],
    "conformance": true,
-   "oracle_author": "scripting-runtime"
+   "oracle_author": "robustness-fuzzing"
   },
   {
    "id": "C-SPATIAL",
@@ -328,7 +328,7 @@
     "C-ID"
    ],
    "conformance": true,
-   "oracle_author": "crowd-simulation"
+   "oracle_author": "simulation-validation"
   },
   {
    "id": "C-RHI",
@@ -350,7 +350,7 @@
     "web",
     "xr-standalone"
    ],
-   "oracle_author": "gpu-memory-resources",
+   "oracle_author": "render-validation",
    "boundary": true,
    "test_double": {
     "kind": "null/software device",
@@ -367,7 +367,7 @@
     "C-RHI"
    ],
    "conformance": true,
-   "oracle_author": "async-io-storage"
+   "oracle_author": "render-validation"
   },
   {
    "id": "C-ML",
@@ -381,7 +381,7 @@
    ],
    "conformance": true,
    "gated": true,
-   "oracle_author": "anti-cheat-integrity"
+   "oracle_author": "robustness-fuzzing"
   },
   {
    "id": "C-WORLD",
@@ -394,7 +394,7 @@
     "C-RES"
    ],
    "conformance": true,
-   "oracle_author": "dedicated-server"
+   "oracle_author": "simulation-validation"
   },
   {
    "id": "C-RG",
@@ -407,7 +407,7 @@
     "C-GPUMEM"
    ],
    "conformance": true,
-   "oracle_author": "atmosphere-weather"
+   "oracle_author": "render-validation"
   },
   {
    "id": "C-SHADER",
@@ -419,7 +419,7 @@
     "C-RHI"
    ],
    "conformance": true,
-   "oracle_author": "geometry-pipeline"
+   "oracle_author": "render-validation"
   },
   {
    "id": "C-MATIF",
@@ -431,7 +431,7 @@
     "C-SHADER"
    ],
    "conformance": true,
-   "oracle_author": "character-rendering"
+   "oracle_author": "render-validation"
   },
   {
    "id": "C-RSCENE",
@@ -445,7 +445,7 @@
     "C-MATIF"
    ],
    "conformance": true,
-   "oracle_author": "cinematics-sequencer"
+   "oracle_author": "render-validation"
   },
   {
    "id": "C-TEMPORAL",
@@ -457,7 +457,7 @@
     "C-RG"
    ],
    "conformance": true,
-   "oracle_author": "deformation-skinning"
+   "oracle_author": "render-validation"
   },
   {
    "id": "C-RT",
@@ -471,7 +471,7 @@
    ],
    "conformance": true,
    "gated": true,
-   "oracle_author": "direct-lighting-shadows"
+   "oracle_author": "render-validation"
   },
   {
    "id": "C-TEXT",
@@ -483,7 +483,7 @@
     "C-TYPES"
    ],
    "conformance": true,
-   "oracle_author": "editor-ui-framework"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-DRAW2D",
@@ -497,14 +497,14 @@
     "C-TEXT"
    ],
    "conformance": true,
-   "oracle_author": "ui-architect"
+   "oracle_author": "render-validation"
   },
   {
    "id": "C-PHYS",
    "layer": 3,
    "owner": "physics-architect",
    "name": "Physics world & scene queries",
-   "summary": "Bodies, shapes, queries (handle-addressed, batched), contact events with budgets, stepping phases, batch add/remove O(batch), snapshot/restore/resimulate participation, collider history for rewind; world instances and local simulation spaces; conformance: restore + resimulate N ticks reproduces the state hash at the declared determinism level.",
+   "summary": "Bodies, shapes, queries (handle-addressed, batched), contact events with budgets, stepping phases, batch add/remove O(batch), snapshot/restore/resimulate participation, collider history for rewind; world instances and local simulation spaces; conformance: restore + resimulate N ticks reproduces the state hash at the declared determinism level; backends (in-house 2D, in-house 3D, or middleware behind the integration layer PHY.ARCH.middleware-layer) implement it; every configuration that requires it contains one.",
    "requires": [
     "C-SPATIAL",
     "C-FRAME",
@@ -513,7 +513,8 @@
     "C-DET"
    ],
    "conformance": true,
-   "oracle_author": "gameplay-architect"
+   "oracle_author": "simulation-validation",
+   "needs_implementer": true
   },
   {
    "id": "C-ANIM",
@@ -526,7 +527,7 @@
     "C-ID"
    ],
    "conformance": true,
-   "oracle_author": "cloth-deformables"
+   "oracle_author": "simulation-validation"
   },
   {
    "id": "C-AUDIO",
@@ -539,7 +540,7 @@
     "C-ID"
    ],
    "conformance": true,
-   "oracle_author": "destruction-fracture"
+   "oracle_author": "simulation-validation"
   },
   {
    "id": "C-INPUT",
@@ -564,7 +565,7 @@
     "C-ID"
    ],
    "conformance": true,
-   "oracle_author": "online-performance"
+   "oracle_author": "simulation-validation"
   },
   {
    "id": "C-SVC",
@@ -577,7 +578,7 @@
     "C-TASK"
    ],
    "conformance": true,
-   "oracle_author": "certification-compliance",
+   "oracle_author": "functional-automation-soak",
    "boundary": true,
    "test_double": {
     "kind": "first-party service emulator",
@@ -594,7 +595,7 @@
     "C-ASSET"
    ],
    "conformance": true,
-   "oracle_author": "audio-content-runtime"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-UI",
@@ -610,7 +611,7 @@
     "C-LOC"
    ],
    "conformance": true,
-   "oracle_author": "reference-games"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-NAV",
@@ -622,7 +623,7 @@
     "C-SPATIAL"
    ],
    "conformance": true,
-   "oracle_author": "ai-behavior-perception"
+   "oracle_author": "simulation-validation"
   },
   {
    "id": "C-GAME",
@@ -635,7 +636,7 @@
     "C-FRAME"
    ],
    "conformance": true,
-   "oracle_author": "cinematics-sequencer"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-SCRIPT",
@@ -647,7 +648,7 @@
     "C-REFL"
    ],
    "conformance": true,
-   "oracle_author": "modding-ugc"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-SAVE",
@@ -660,7 +661,7 @@
     "C-ID"
    ],
    "conformance": true,
-   "oracle_author": "narrative-dialogue"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-COOK",
@@ -674,7 +675,7 @@
     "C-TASK"
    ],
    "conformance": true,
-   "oracle_author": "build-release-architect"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-EDCMD",
@@ -688,7 +689,7 @@
     "C-IPC"
    ],
    "conformance": true,
-   "oracle_author": "animation-graphs"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-GRAPH",
@@ -700,7 +701,7 @@
     "C-EDCMD"
    ],
    "conformance": true,
-   "oracle_author": "material-system"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-BUILD",
@@ -710,7 +711,7 @@
    "summary": "Targets, configurations, toolchains, codegen steps.",
    "requires": [],
    "conformance": true,
-   "oracle_author": "ci-cd-automation"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-PKG",
@@ -723,7 +724,7 @@
     "C-BUILD"
    ],
    "conformance": true,
-   "oracle_author": "build-release-architect"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-ARCH",
@@ -757,7 +758,7 @@
    "layer": "P",
    "owner": "program-orchestration",
    "name": "Agent coordination protocol",
-   "summary": "Ownership ledger with access classes; write sets by module convention (src/<skill-id>/, tools/<skill-id>/; tests owned by the test-owning skill); shared-file protocol; contributor semantics (review + change request, never direct writes); change requests; integration order and milestones; human-gate tasks; failure triage; per-change provenance; critic gates with calibration and independent adjudication; access classes per skill (public | nda:<holder>); NDA work routed only to cleared agents; test write sets: tests/unit/<skill-id>/ implementer-owned; tests/acceptance/<contract-id>/ owned by the contract's oracle_author, read-only (oracle-ro) for implementers.",
+   "summary": "Ownership ledger with access classes; write sets by module convention (src/<skill-id>/, tools/<skill-id>/; tests owned by the test-owning skill); shared-file protocol; contributor semantics (review + change request, never direct writes); change requests; integration order and milestones; human-gate tasks; failure triage; per-change provenance; critic gates with calibration and independent adjudication; access classes per skill (public | nda:<holder>); NDA work routed only to cleared agents; test write sets: tests/unit/<skill-id>/ implementer-owned; tests/acceptance/<contract-id>/ owned by the contract's oracle_author, read-only (oracle-ro) for implementers; lock leases and hand-off records (ARCH.ORG.agent-continuity); work-package format for delegated planning; model lineage recorded per change.",
    "requires": [],
    "universal": "all"
   },
@@ -813,7 +814,7 @@
    "summary": "Raw page allocator, raw log/assert/abort sink, monotonic clock, raw thread primitives and late-bound hook tables that higher layers install (allocator, log sink, assert handler, crash annotator). Depends on nothing.",
    "requires": [],
    "conformance": true,
-   "oracle_author": "concurrency-primitives"
+   "oracle_author": "robustness-fuzzing"
   },
   {
    "id": "C-LIFETIME",
@@ -826,7 +827,7 @@
    ],
    "conformance": true,
    "universal": "runtime",
-   "oracle_author": "resource-streaming-architect"
+   "oracle_author": "robustness-fuzzing"
   },
   {
    "id": "C-IPC",
@@ -839,7 +840,7 @@
     "C-TASK"
    ],
    "conformance": true,
-   "oracle_author": "visual-debugging-tools"
+   "oracle_author": "robustness-fuzzing"
   },
   {
    "id": "C-SCALE",
@@ -852,7 +853,7 @@
    ],
    "universal": "runtime",
    "conformance": true,
-   "oracle_author": "test-architect"
+   "oracle_author": "perf-benchmarking"
   },
   {
    "id": "C-FLOW",
@@ -864,7 +865,7 @@
     "C-FRAME"
    ],
    "conformance": true,
-   "oracle_author": "input-system"
+   "oracle_author": "robustness-fuzzing"
   },
   {
    "id": "C-PRESENT",
@@ -876,7 +877,7 @@
     "C-FRAME"
    ],
    "conformance": true,
-   "oracle_author": "reconstruction-upscaling"
+   "oracle_author": "robustness-fuzzing"
   },
   {
    "id": "C-SNAPSHOT",
@@ -889,7 +890,7 @@
     "C-SER"
    ],
    "conformance": true,
-   "oracle_author": "physics-architect"
+   "oracle_author": "simulation-validation"
   },
   {
    "id": "C-REPLAY",
@@ -902,7 +903,7 @@
     "C-SER"
    ],
    "conformance": true,
-   "oracle_author": "physics-tools"
+   "oracle_author": "simulation-validation"
   },
   {
    "id": "C-VIEW",
@@ -914,7 +915,7 @@
     "C-SPATIAL"
    ],
    "conformance": true,
-   "oracle_author": "gameplay-systems-toolkit"
+   "oracle_author": "simulation-validation"
   },
   {
    "id": "C-SIGNIF",
@@ -926,7 +927,7 @@
     "C-VIEW"
    ],
    "conformance": true,
-   "oracle_author": "character-physics"
+   "oracle_author": "simulation-validation"
   },
   {
    "id": "C-ENV",
@@ -938,7 +939,7 @@
     "C-SPATIAL"
    ],
    "conformance": true,
-   "oracle_author": "collision-detection"
+   "oracle_author": "simulation-validation"
   },
   {
    "id": "C-GPUTIER",
@@ -950,7 +951,7 @@
     "C-RHI"
    ],
    "conformance": true,
-   "oracle_author": "render-architect"
+   "oracle_author": "render-validation"
   },
   {
    "id": "C-INSTANCES",
@@ -963,7 +964,7 @@
     "C-GPUMEM"
    ],
    "conformance": true,
-   "oracle_author": "path-tracing"
+   "oracle_author": "render-validation"
   },
   {
    "id": "C-GEOLOD",
@@ -975,7 +976,7 @@
     "C-RG"
    ],
    "conformance": true,
-   "oracle_author": "ray-tracing-infrastructure"
+   "oracle_author": "render-validation"
   },
   {
    "id": "C-VT",
@@ -988,7 +989,7 @@
     "C-GPUMEM"
    ],
    "conformance": true,
-   "oracle_author": "render-2d-vector"
+   "oracle_author": "render-validation"
   },
   {
    "id": "C-LIGHT",
@@ -1000,7 +1001,7 @@
     "C-RSCENE"
    ],
    "conformance": true,
-   "oracle_author": "global-illumination"
+   "oracle_author": "render-validation"
   },
   {
    "id": "C-GI",
@@ -1012,7 +1013,7 @@
     "C-RSCENE"
    ],
    "conformance": true,
-   "oracle_author": "translucency-decals"
+   "oracle_author": "render-validation"
   },
   {
    "id": "C-ATMOS",
@@ -1024,7 +1025,7 @@
     "C-RSCENE"
    ],
    "conformance": true,
-   "oracle_author": "vfx-particles"
+   "oracle_author": "render-validation"
   },
   {
    "id": "C-VIDEO",
@@ -1036,7 +1037,7 @@
     "C-RG"
    ],
    "conformance": true,
-   "oracle_author": "ui-architect"
+   "oracle_author": "render-validation"
   },
   {
    "id": "C-DEVICE",
@@ -1048,7 +1049,7 @@
     "C-PAL"
    ],
    "conformance": true,
-   "oracle_author": "vehicle-physics",
+   "oracle_author": "functional-automation-soak",
    "boundary": true,
    "test_double": {
     "kind": "virtual devices / injection",
@@ -1066,7 +1067,7 @@
     "C-TASK"
    ],
    "conformance": true,
-   "oracle_author": "net-session",
+   "oracle_author": "simulation-validation",
    "boundary": true,
    "test_double": {
     "kind": "loopback + link conditioner",
@@ -1085,7 +1086,7 @@
     "C-ID"
    ],
    "conformance": true,
-   "oracle_author": "prediction-rollback"
+   "oracle_author": "simulation-validation"
   },
   {
    "id": "C-PREDICT",
@@ -1100,7 +1101,7 @@
     "C-INPUT"
    ],
    "conformance": true,
-   "oracle_author": "anti-cheat-integrity"
+   "oracle_author": "simulation-validation"
   },
   {
    "id": "C-MOVE",
@@ -1113,7 +1114,7 @@
     "C-GAME"
    ],
    "conformance": true,
-   "oracle_author": "motion-synthesis"
+   "oracle_author": "simulation-validation"
   },
   {
    "id": "C-GAMEDATA",
@@ -1126,7 +1127,7 @@
     "C-ASSET"
    ],
    "conformance": true,
-   "oracle_author": "gameplay-systems-toolkit"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-DIALOGUE",
@@ -1139,7 +1140,7 @@
     "C-ID"
    ],
    "conformance": true,
-   "oracle_author": "facial-animation"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-AIAGENT",
@@ -1152,7 +1153,7 @@
    ],
    "conformance": true,
    "gated": true,
-   "oracle_author": "crowd-simulation"
+   "oracle_author": "simulation-validation"
   },
   {
    "id": "C-A11YRT",
@@ -1164,7 +1165,7 @@
     "C-TEXT"
    ],
    "conformance": true,
-   "oracle_author": "ui-architect"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-DEVUI",
@@ -1176,7 +1177,7 @@
     "C-DRAW2D"
    ],
    "conformance": true,
-   "oracle_author": "editor-ui-framework"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-EDHOST",
@@ -1188,7 +1189,7 @@
     "C-EDCMD"
    ],
    "conformance": true,
-   "oracle_author": "fluid-simulation"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-LIVE",
@@ -1201,7 +1202,7 @@
     "C-TASK"
    ],
    "conformance": true,
-   "oracle_author": "dedicated-server",
+   "oracle_author": "functional-automation-soak",
    "boundary": true,
    "test_double": {
     "kind": "service emulator",
@@ -1218,7 +1219,7 @@
     "C-VIEW"
    ],
    "conformance": true,
-   "oracle_author": "render-architect"
+   "oracle_author": "render-validation"
   },
   {
    "id": "C-MLGPU",
@@ -1232,7 +1233,7 @@
    ],
    "conformance": true,
    "gated": true,
-   "oracle_author": "texture-streaming-vt"
+   "oracle_author": "robustness-fuzzing"
   },
   {
    "id": "C-CERT",
@@ -1289,7 +1290,7 @@
     "C-RES"
    ],
    "conformance": true,
-   "oracle_author": "visual-debugging-tools"
+   "oracle_author": "perf-benchmarking"
   },
   {
    "id": "C-SCENETEX",
@@ -1315,7 +1316,7 @@
     "C-PAL"
    ],
    "conformance": true,
-   "oracle_author": "media-playback"
+   "oracle_author": "render-validation"
   },
   {
    "id": "C-LIGHTENV",
@@ -1327,7 +1328,7 @@
     "C-RG"
    ],
    "conformance": true,
-   "oracle_author": "water-ocean"
+   "oracle_author": "render-validation"
   },
   {
    "id": "C-TRANSLUCENT",
@@ -1341,7 +1342,7 @@
     "C-SCENETEX"
    ],
    "conformance": true,
-   "oracle_author": "character-rendering"
+   "oracle_author": "render-validation"
   },
   {
    "id": "C-RTAS",
@@ -1355,7 +1356,7 @@
    ],
    "conformance": true,
    "gated": true,
-   "oracle_author": "spatial-audio-acoustics"
+   "oracle_author": "render-validation"
   },
   {
    "id": "C-PCG",
@@ -1368,7 +1369,7 @@
     "C-SPATIAL"
    ],
    "conformance": true,
-   "oracle_author": "terrain"
+   "oracle_author": "simulation-validation"
   },
   {
    "id": "C-VEHICLE",
@@ -1380,7 +1381,7 @@
     "C-PHYS"
    ],
    "conformance": true,
-   "oracle_author": "audio-content-runtime"
+   "oracle_author": "simulation-validation"
   },
   {
    "id": "C-TARGETPLAT",
@@ -1393,7 +1394,7 @@
    ],
    "needs_implementer": true,
    "conformance": true,
-   "oracle_author": "content-pipeline-architect"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-NETSESSION",
@@ -1406,7 +1407,7 @@
     "C-NET"
    ],
    "conformance": true,
-   "oracle_author": "gameplay-architect"
+   "oracle_author": "simulation-validation"
   },
   {
    "id": "C-SERVER",
@@ -1419,7 +1420,7 @@
     "C-FRAME"
    ],
    "conformance": true,
-   "oracle_author": "server-scaleout-persistence"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-SHARD",
@@ -1433,7 +1434,7 @@
     "C-NET"
    ],
    "conformance": true,
-   "oracle_author": "replication"
+   "oracle_author": "simulation-validation"
   },
   {
    "id": "C-SRVDATA",
@@ -1446,7 +1447,7 @@
     "C-NET"
    ],
    "conformance": true,
-   "oracle_author": "persistence-save"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-EDVIEW",
@@ -1458,7 +1459,7 @@
     "C-EDCMD"
    ],
    "conformance": true,
-   "oracle_author": "navigation-pathfinding"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-VCS",
@@ -1471,7 +1472,7 @@
     "C-SER"
    ],
    "conformance": true,
-   "oracle_author": "graph-editor-framework"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-EDIT",
@@ -1485,7 +1486,7 @@
     "C-FRAME"
    ],
    "conformance": true,
-   "oracle_author": "gameplay-systems-toolkit"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-AUTOMATION",
@@ -1498,7 +1499,7 @@
     "C-REFL"
    ],
    "conformance": true,
-   "oracle_author": "editor-architect"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-INTEGRITY",
@@ -1511,7 +1512,7 @@
     "C-FRAME"
    ],
    "conformance": true,
-   "oracle_author": "platform-services"
+   "oracle_author": "security-engineering"
   },
   {
    "id": "C-TESTHOST",
@@ -1524,7 +1525,7 @@
    ],
    "universal": "runtime",
    "conformance": true,
-   "oracle_author": "test-architect"
+   "oracle_author": "robustness-fuzzing"
   },
   {
    "id": "C-SIGN",
@@ -1536,7 +1537,7 @@
     "C-TYPES"
    ],
    "conformance": true,
-   "oracle_author": "modding-ugc"
+   "oracle_author": "security-engineering"
   },
   {
    "id": "C-ABILITY",
@@ -1549,7 +1550,7 @@
     "C-GAMEDATA"
    ],
    "conformance": true,
-   "oracle_author": "ai-behavior-perception"
+   "oracle_author": "functional-automation-soak"
   },
   {
    "id": "C-CROWD",
@@ -1562,7 +1563,7 @@
     "C-SIGNIF"
    ],
    "conformance": true,
-   "oracle_author": "gameplay-architect"
+   "oracle_author": "simulation-validation"
   },
   {
    "id": "C-SEQ",
@@ -1575,7 +1576,7 @@
     "C-VIEW"
    ],
    "conformance": true,
-   "oracle_author": "gameplay-architect"
+   "oracle_author": "simulation-validation"
   },
   {
    "id": "C-AI",
@@ -1588,7 +1589,7 @@
     "C-NAV"
    ],
    "conformance": true,
-   "oracle_author": "crowd-simulation"
+   "oracle_author": "simulation-validation"
   }
  ]
 }

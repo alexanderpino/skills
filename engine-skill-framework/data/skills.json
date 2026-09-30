@@ -4341,7 +4341,9 @@
     "tools"
    ],
    "tool_consumes": [],
-   "implements": [],
+   "implements": [
+    "C-PHYS"
+   ],
    "workstream": "simulation"
   },
   {
@@ -4569,7 +4571,9 @@
     "C-EDHOST",
     "C-EDVIEW"
    ],
-   "implements": [],
+   "implements": [
+    "C-PHYS"
+   ],
    "workstream": "simulation"
   },
   {
@@ -7739,7 +7743,7 @@
     "server",
     "tools"
    ],
-   "workstream": "quality",
+   "workstream": "foundation",
    "purpose": "Test infrastructure that ships as code on every target: unit/integration test framework, on-device test runner and result reporting, fixtures, and the fault-point registry that owners implement fault injection against.",
    "non_responsibilities": [
     [
@@ -7787,7 +7791,7 @@
     "server",
     "tools"
    ],
-   "workstream": "quality",
+   "workstream": "foundation",
    "purpose": "Security-critical runtime code shared by every verifier: vetted crypto primitives and CSPRNG, the signed-artifact envelope, trust-root store, key rotation/revocation, anti-rollback version floors and algorithm agility.",
    "non_responsibilities": [
     [

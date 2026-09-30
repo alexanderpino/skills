@@ -1023,6 +1023,35 @@
    "evidence": "OWASP LLM Top 10; Steam AI disclosure",
    "revisit": "Per-title policy approval",
    "fallback": "No live-generated content"
+  },
+  {
+   "tech": "Coordination of ~150 autonomous agents (program)",
+   "class": "M",
+   "owner": "program-orchestration",
+   "capabilities": [
+    "ARCH.ORG.ownership-ledger",
+    "ARCH.ORG.staffing",
+    "ARCH.ORG.change-requests",
+    "ARCH.ORG.write-sets",
+    "ARCH.ORG.skill-lifecycle",
+    "ARCH.ORG.agent-continuity",
+    "ARCH.ORG.delegated-planning"
+   ],
+   "evidence": "No published precedent at this agent count; multi-agent coding systems (2025)",
+   "revisit": "Two milestones completed without lock deadlock or lost work",
+   "fallback": "Human coordinator role per workstream and mandatory human review sampling per tier (ARCH.ORG.human-gates)"
+  },
+  {
+   "tech": "Independence & model lineage of agent verification",
+   "class": "M",
+   "owner": "architecture-governance",
+   "capabilities": [
+    "ARCH.ORG.independence",
+    "ARCH.ORG.model-requalification"
+   ],
+   "evidence": "LLM-as-judge self-preference and correlated errors (2023–2024)",
+   "revisit": "Measured escape rate of seeded defects stable across model changes",
+   "fallback": "Human coordinator role per workstream and mandatory human review sampling per tier (ARCH.ORG.human-gates)"
   }
  ]
 }

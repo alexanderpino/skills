@@ -8,8 +8,8 @@
 
 ```
 [O] engine-architect  (13) ·process
-    [O] architecture-governance  (9) ·process
-    [O] program-orchestration  (17) ·process
+    [O] architecture-governance  (10) ·process
+    [O] program-orchestration  (19) ·process
     [X] research-evidence  (5) ·process
     [X] performance-architect  (8) ·process
             perf-benchmarking  (8) ·process
@@ -171,9 +171,9 @@ Integration groups used for delegated arbitration and staffing (`ARCH.ORG.escala
 - **governance** (6): engine-architect, program-orchestration, research-evidence, api-lifecycle-migration, developer-experience-docs, engine-product-management
 - **assurance** (1): architecture-governance
 - **performance** (7): performance-architect, perf-benchmarking, cpu-performance, gpu-performance, loading-streaming-performance, memory-performance, online-performance
-- **quality** (11): test-architect, render-validation, functional-automation-soak, robustness-fuzzing, certification-compliance, security-engineering, reference-games, simulation-validation, test-runtime-harness, security-runtime, privacy-data-protection
+- **quality** (9): test-architect, render-validation, functional-automation-soak, robustness-fuzzing, certification-compliance, security-engineering, reference-games, simulation-validation, privacy-data-protection
 - **online** (8): anti-cheat-integrity, network-architect, network-transport, replication, prediction-rollback, dedicated-server, net-session, server-scaleout-persistence
-- **foundation** (18): observability-telemetry, crash-diagnostics, determinism-replay, hot-reload-iteration, plugin-system, ml-inference-runtime, core-runtime-architect, math-simd-numerics, memory-allocators, containers-core-types, concurrency-primitives, job-system-task-graph, frame-orchestration, entity-object-model, ecs-runtime, reflection-metadata, serialization-schema, runtime-scalability
+- **foundation** (20): observability-telemetry, crash-diagnostics, determinism-replay, hot-reload-iteration, plugin-system, ml-inference-runtime, core-runtime-architect, math-simd-numerics, memory-allocators, containers-core-types, concurrency-primitives, job-system-task-graph, frame-orchestration, entity-object-model, ecs-runtime, reflection-metadata, serialization-schema, runtime-scalability, test-runtime-harness, security-runtime
 - **ui** (4): accessibility, ui-architect, text-fonts, localization-i18n
 - **gameplay** (13): modding-ugc, gameplay-architect, gameplay-systems-toolkit, scripting-runtime, navigation-pathfinding, crowd-simulation, ai-behavior-perception, persistence-save, character-movement, gameplay-data, narrative-dialogue, systems-simulation, gameplay-camera
 - **platform** (11): platform-architect, platform-desktop, platform-console, platform-mobile, platform-services, input-system, input-devices-haptics, xr-runtime, platform-web, online-services-liveops, platform-server-host
@@ -383,7 +383,7 @@ Owns the engine's overall architecture: requirements and configuration profiles,
 
 Runs architecture as an evidence-backed, governed process: ADR lifecycle with revisit conditions, technology radar with maturity tiers and promotion criteria, automated fitness functions (layering, dependency direction, contract conformance), anti-legacy review, coding standard.
 
-- **Owns:** `ARCH.GOV.adr`; `ARCH.GOV.fitness`; `ARCH.GOV.anti-legacy`; `ARCH.GOV.radar`; `ARCH.GOV.process-tiers`; `ARCH.ORG.critic-calibration`; `ARCH.ORG.adjudication`; `ARCH.ORG.independence`; `ARCH.ORG.human-audit`
+- **Owns:** `ARCH.GOV.adr`; `ARCH.GOV.fitness`; `ARCH.GOV.anti-legacy`; `ARCH.GOV.radar`; `ARCH.GOV.process-tiers`; `ARCH.ORG.critic-calibration`; `ARCH.ORG.adjudication`; `ARCH.ORG.independence`; `ARCH.ORG.human-audit`; `ARCH.ORG.model-requalification`
 - **Contributes to:** `ARCH.STRUCT.build-buy`; `ARCH.STRUCT.platform-backends`; `ARCH.STRUCT.binding`; `ARCH.ORG.change-requests`; `ARCH.ORG.skill-lifecycle`; `CORE.LIFE.language`; `BLD.SYS.dev-surface-exclusion`; `QA.CERT.patents-codecs`
 - **Not responsible for:** Making the architecture decisions themselves → engine-architect; Grading sources and running spikes → research-evidence; Test definition of done → test-architect
 - **Provides:** C-ADR · **Consumes:** —
@@ -396,8 +396,8 @@ Runs architecture as an evidence-backed, governed process: ADR lifecycle with re
 
 Turns architecture into coordinated multi-agent work: decomposes milestones into tasks by skill territory, keeps the ownership ledger and territory locks, sequences integration through vertical slices, routes contract change requests, and schedules critic gates.
 
-- **Owns:** `ARCH.ORG.decomposition`; `ARCH.ORG.ownership-ledger`; `ARCH.ORG.integration`; `ARCH.ORG.change-requests`; `ARCH.ORG.critic-gates`; `ARCH.ORG.bootstrap`; `ARCH.ORG.milestones`; `ARCH.ORG.write-sets`; `ARCH.ORG.staffing`; `ARCH.ORG.escalation`; `ARCH.ORG.human-gates`; `ARCH.ORG.risk`; `ARCH.ORG.triage`; `ARCH.ORG.provenance`; `ARCH.ORG.skill-lifecycle`; `ARCH.ORG.cost-ledger`; `ARCH.ORG.sensitive-paths`
-- **Contributes to:** `ARCH.EVID.source-policy`; `ARCH.ORG.critic-calibration`; `ARCH.ORG.adjudication`; `ARCH.ORG.independence`; `ARCH.ORG.human-audit`; `PLAT.PAL.confidential-extensions`; `QA.STRAT.contract-fakes`; `QA.AGENT.oracle-independence`; `QA.AGENT.holdout`; `XC.SEC.agent-boundary`; `XC.SEC.agent-redteam`
+- **Owns:** `ARCH.ORG.decomposition`; `ARCH.ORG.ownership-ledger`; `ARCH.ORG.integration`; `ARCH.ORG.change-requests`; `ARCH.ORG.critic-gates`; `ARCH.ORG.bootstrap`; `ARCH.ORG.milestones`; `ARCH.ORG.write-sets`; `ARCH.ORG.staffing`; `ARCH.ORG.escalation`; `ARCH.ORG.human-gates`; `ARCH.ORG.risk`; `ARCH.ORG.triage`; `ARCH.ORG.provenance`; `ARCH.ORG.skill-lifecycle`; `ARCH.ORG.cost-ledger`; `ARCH.ORG.sensitive-paths`; `ARCH.ORG.agent-continuity`; `ARCH.ORG.delegated-planning`
+- **Contributes to:** `ARCH.EVID.source-policy`; `ARCH.ORG.critic-calibration`; `ARCH.ORG.adjudication`; `ARCH.ORG.independence`; `ARCH.ORG.human-audit`; `ARCH.ORG.model-requalification`; `PLAT.PAL.confidential-extensions`; `QA.STRAT.contract-fakes`; `QA.AGENT.oracle-independence`; `QA.AGENT.holdout`; `XC.SEC.agent-boundary`; `XC.SEC.agent-redteam`
 - **Not responsible for:** Deciding architecture → engine-architect; CI mechanics → ci-cd-automation; Release versioning → build-release-architect; Adjudicating findings & calibrating critics → architecture-governance
 - **Provides:** C-ORCH · **Consumes:** C-PROD
 - **Untrusted inputs:** external-reports
@@ -490,7 +490,7 @@ End-to-end load time, startup time and hitch elimination (PSO compilation, strea
 Test strategy and architecture: per-subsystem test pyramid, frameworks, the test definition of done every skill must meet, contract tests, test content, coverage and mutation policy, flakiness policy.
 
 - **Owns:** `QA.STRAT.pyramid`; `QA.STRAT.frameworks`; `QA.STRAT.dod`; `QA.STRAT.coverage`; `QA.STRAT.flaky`; `QA.STRAT.content`; `QA.STRAT.contracts`; `QA.STRAT.oracles`; `QA.STRAT.integration`; `QA.STRAT.release-criteria`; `QA.STRAT.contract-fakes`; `QA.AGENT.oracle-independence`; `QA.AGENT.baseline-governance`; `QA.AGENT.test-integrity`; `QA.AGENT.mutation-gate`; `QA.AGENT.oracle-change-control`; `QA.AGENT.gate-canaries`; `QA.AGENT.holdout`
-- **Contributes to:** `ARCH.ORG.critic-calibration`; `ARCH.ORG.independence`; `CNT.COOK.determinism-check`; `PHY.ARCH.validation`; `ANM.ARCH.validation`; `AUD.ARCH.validation`; `UI.A11Y.validation`; `BLD.CI.gating`; `QA.REF.ladder`; `PRF.BENCH.workloads`; `XC.DET.conformance`; `XC.DX.doc-tests`
+- **Contributes to:** `ARCH.ORG.critic-calibration`; `ARCH.ORG.independence`; `ARCH.ORG.model-requalification`; `CNT.COOK.determinism-check`; `PHY.ARCH.validation`; `ANM.ARCH.validation`; `AUD.ARCH.validation`; `UI.A11Y.validation`; `BLD.CI.gating`; `QA.REF.ladder`; `PRF.BENCH.workloads`; `XC.DET.conformance`; `XC.DX.doc-tests`
 - **Not responsible for:** Running pipelines → ci-cd-automation; Performance regression → perf-benchmarking; Rendering image validation → render-validation
 - **Provides:** C-TEST · **Consumes:** —
 - **Expertise:** test strategy, contract testing, mutation testing, test determinism
@@ -720,7 +720,7 @@ Runtime neural-network inference shared by neural rendering, animation, audio an
 Core runtime architecture: layering within core, module system and engine lifecycle (parallel boot, init graph, shutdown), configuration and cvars, error-handling and failure model, language and compiler feature policy.
 
 - **Owns:** `CORE.LIFE.boot`; `CORE.LIFE.modules`; `CORE.LIFE.shutdown`; `CORE.LIFE.services`; `CORE.LIFE.config`; `CORE.LIFE.errors`; `CORE.LIFE.asserts`; `CORE.LIFE.language`; `CORE.LIFE.bootstrap`; `CORE.LIFE.ownership-model`; `CORE.LIFE.ipc`; `CORE.LIFE.config-snapshots`; `CORE.LIFE.interop`; `CORE.LIFE.config-trust`
-- **Contributes to:** `ARCH.STRUCT.registration`; `PLAT.PAL.base`; `CORE.TYPES.ownership`; `CORE.CONC.retirement`; `XC.SEC.memory-safety`
+- **Contributes to:** `ARCH.STRUCT.registration`; `ARCH.ORG.delegated-planning`; `PLAT.PAL.base`; `CORE.TYPES.ownership`; `CORE.CONC.retirement`; `XC.SEC.memory-safety`
 - **Not responsible for:** Allocator design → memory-allocators; Scheduler → job-system-task-graph; Frame loop → frame-orchestration
 - **Provides:** C-MOD, C-CFG, C-ERR, C-IPC · **Consumes:** C-PAL, C-BASE, C-MEM, C-TYPES, C-SYNC, C-TASK, C-INSTR
 - **Untrusted inputs:** config-layers, launch-args
@@ -866,7 +866,7 @@ Binary and text formats, schema evolution and upgraders, in-place loadable layou
 Platform abstraction layer interfaces and policy (implemented per platform by the platform experts): OS services, CPU/GPU capability discovery, windowing, process lifecycle, device database, and evaluation of new targets (web, cloud streaming).
 
 - **Owns:** `ARCH.STRUCT.platform-backends`; `PLAT.PAL.os`; `PLAT.PAL.cpu-topology`; `PLAT.PAL.windowing`; `PLAT.PAL.lifecycle`; `PLAT.PAL.capability-tiers`; `PLAT.PAL.cloud-streaming`; `PLAT.PAL.base`; `PLAT.PAL.threads`; `PLAT.PAL.thread-affinity`; `PLAT.PAL.process`; `PLAT.PAL.clocks`; `PLAT.PAL.signals`; `PLAT.PAL.fs-watch`; `PLAT.PAL.power`; `PLAT.PAL.system-events`; `PLAT.PAL.safe-area`; `PLAT.PAL.permissions`; `PLAT.PAL.device-db`; `PLAT.PAL.performance-modes`; `PLAT.PAL.os-support-policy`; `PLAT.PAL.devlink`; `PLAT.PAL.confidential-extensions`; `PLAT.PAL.cloud-hybrid`; `PLAT.PAL.display`; `PLAT.PAL.event-injection`; `PLAT.PAL.pointer-shell`
-- **Contributes to:** `ARCH.REQ.platform-matrix`; `ARCH.ORG.bootstrap`; `PLAT.DESK.pal`; `PLAT.CON.pal`; `PLAT.MOB.pal`; `PLAT.WEB.pal`; `PLAT.SRV.pal`; `CORE.LIFE.bootstrap`; `CORE.JOBS.hetero`; `CORE.JOBS.thread-model`; `CORE.JOBS.pinned`; `CORE.SCALE.profiles`; `RES.MGMT.arbitration`; `RES.IO.fs`; `ML.RT.npu`; `UI.FW.safe-area`; `UI.TXT.ime`; `UI.A11Y.screen-reader`; `QA.HOST.runner`; `XC.EXT.mod-editor`
+- **Contributes to:** `ARCH.REQ.platform-matrix`; `ARCH.ORG.bootstrap`; `ARCH.ORG.delegated-planning`; `PLAT.DESK.pal`; `PLAT.CON.pal`; `PLAT.MOB.pal`; `PLAT.WEB.pal`; `PLAT.SRV.pal`; `CORE.LIFE.bootstrap`; `CORE.JOBS.hetero`; `CORE.JOBS.thread-model`; `CORE.JOBS.pinned`; `CORE.SCALE.profiles`; `RES.MGMT.arbitration`; `RES.IO.fs`; `ML.RT.npu`; `UI.FW.safe-area`; `UI.TXT.ime`; `UI.A11Y.screen-reader`; `QA.HOST.runner`; `XC.EXT.mod-editor`
 - **Not responsible for:** Graphics API backends → rhi-core; Store and online services → platform-services; Toolchains → build-system-toolchains
 - **Provides:** C-PAL, C-BASE, C-TARGETPLAT · **Consumes:** —
 - **Expertise:** OS internals (Windows, Linux, macOS), porting, CPU topology
@@ -974,7 +974,7 @@ XR integration: OpenXR, stereo/multiview rendering hooks, foveation, reprojectio
 Asset identity and the content pipeline: asset registry and dependency graph, deterministic incremental per-platform cooking, the cook-step contract, derived-data cache and content-addressed store, distributed cooking, content validation.
 
 - **Owns:** `CNT.ID.identity`; `CNT.ID.registry`; `CNT.ID.dependencies`; `CNT.ID.redirects`; `CNT.ID.rights`; `CNT.COOK.architecture`; `CNT.COOK.contract`; `CNT.COOK.ddc`; `CNT.COOK.distributed`; `CNT.COOK.variants`; `CNT.COOK.determinism-check`; `CNT.COOK.world-build`; `CNT.COOK.on-demand`; `CNT.COOK.shared-cache`; `CNT.COOK.gpu-steps`; `CNT.COOK.incremental-equivalence`; `CNT.VAL.framework`; `CNT.VAL.budgets`; `CNT.VAL.audit`; `CNT.VAL.submit-gate`
-- **Contributes to:** `CORE.ECS.baking`; `RES.MGMT.dependencies`; `RES.PKG.ordering`; `RND.GI.bake-pipeline`; `AUD.CONTENT.licensed-music`; `UI.LOC.assets`; `UI.LOC.overflow-validation`; `ED.UI.asset-browser`; `ED.UI.thumbnails`; `ED.AI.provenance`; `QA.REF.content-acquisition`; `PRF.METH.pipeline-budgets`; `PRF.BENCH.tools`; `PRF.MEM.attribution`
+- **Contributes to:** `ARCH.ORG.delegated-planning`; `CORE.ECS.baking`; `RES.MGMT.dependencies`; `RES.PKG.ordering`; `RND.GI.bake-pipeline`; `AUD.CONTENT.licensed-music`; `UI.LOC.assets`; `UI.LOC.overflow-validation`; `ED.UI.asset-browser`; `ED.UI.thumbnails`; `ED.AI.provenance`; `QA.REF.content-acquisition`; `PRF.METH.pipeline-budgets`; `PRF.BENCH.tools`; `PRF.MEM.attribution`
 - **Not responsible for:** Format-specific builders (shaders, animation, clusters…) → shader-system; Runtime loading → resource-streaming-architect; Import formats → asset-import-interchange
 - **Provides:** C-ASSET, C-COOK · **Consumes:** C-SER, C-TASK, C-REFL · **Tool-side:** C-ML?, C-TARGETPLAT
 - **Untrusted inputs:** shared-ddc
@@ -1015,7 +1015,7 @@ Generic processors: texture processing and GPU texture-compression encoding, mes
 Runtime resource model: handles and explicit lifetime, load requests with priority and deadline, dependency-aware loading, the streaming manager (budgets, eviction, prediction), fallbacks, no-stall loading.
 
 - **Owns:** `RES.MGMT.handles`; `RES.MGMT.requests`; `RES.MGMT.dependencies`; `RES.MGMT.streaming`; `RES.MGMT.fallbacks`; `RES.MGMT.no-stall`; `RES.MGMT.reload`; `RES.MGMT.arbitration`; `RES.MGMT.gpu-requests`; `RES.MGMT.pipeline`; `RES.MGMT.validation`
-- **Contributes to:** `CORE.LIFE.ownership-model`; `CORE.OBJ.references`; `CNT.COOK.on-demand`; `WLD.MODEL.unit-load`; `WLD.PART.sources`; `RND.GRAPH.external-work`; `RND.SHADER.precache`; `RND.LOD.streaming`; `ML.RT.residency`; `ANM.CINE.preload`; `AUD.DSP.streaming`; `UI.FW.loading-screens`; `PRF.MEM.peaks`; `OBS.LOG.trace-analysis`
+- **Contributes to:** `ARCH.ORG.delegated-planning`; `CORE.LIFE.ownership-model`; `CORE.OBJ.references`; `CNT.COOK.on-demand`; `WLD.MODEL.unit-load`; `WLD.PART.sources`; `RND.GRAPH.external-work`; `RND.SHADER.precache`; `RND.LOD.streaming`; `ML.RT.residency`; `ANM.CINE.preload`; `AUD.DSP.streaming`; `UI.FW.loading-screens`; `PRF.MEM.peaks`; `OBS.LOG.trace-analysis`
 - **Not responsible for:** IO backends → async-io-storage; Package format → package-formats-vfs; Texture-specific streaming → texture-streaming-vt
 - **Provides:** C-RES · **Consumes:** C-ASSET, C-VFS, C-IO, C-TASK, C-GPUMEM?, C-FRAME, C-LIFETIME
 - **Expertise:** streaming systems, cache eviction, async loading
@@ -1056,7 +1056,7 @@ Package/container format and chunking, codec selection, VFS mount layering (base
 World representation strategy (data-oriented, no universal scene graph), partitioning and streaming cells, streaming sources, HLOD strategy, simulation LOD and significance, large-world coordinate policy, level transitions, server-side world streaming.
 
 - **Owns:** `WLD.MODEL.strategy`; `WLD.MODEL.travel`; `WLD.MODEL.planetary`; `WLD.MODEL.unit-load`; `WLD.PART.grid`; `WLD.PART.sources`; `WLD.PART.hlod`; `WLD.PART.sim-lod`; `WLD.PART.server`; `WLD.PART.lwc-policy`; `WLD.PART.activation`; `WLD.PART.cook`; `WLD.PART.sim-tiers`; `WLD.ENV.queries`
-- **Contributes to:** `CORE.OBJ.world-instances`; `CORE.SCALE.actuators`; `CNT.COOK.world-build`; `RND.GEO.precomputed-visibility`; `PHY.ARCH.streaming`; `NET.REP.interest`; `NET.SRV.zoning`; `NET.SRV.cross-server`; `NET.SESS.travel`; `GAM.SYS.volumes`; `GAM.SCR.level-scripting`; `UI.FW.maps`; `ED.WORLD.partitioned`; `PRF.METH.model`; `PRF.LOAD.hitches`
+- **Contributes to:** `ARCH.ORG.delegated-planning`; `CORE.OBJ.world-instances`; `CORE.SCALE.actuators`; `CNT.COOK.world-build`; `RND.GEO.precomputed-visibility`; `PHY.ARCH.streaming`; `NET.REP.interest`; `NET.SRV.zoning`; `NET.SRV.cross-server`; `NET.SESS.travel`; `GAM.SYS.volumes`; `GAM.SCR.level-scripting`; `UI.FW.maps`; `ED.WORLD.partitioned`; `PRF.METH.model`; `PRF.LOAD.hitches`
 - **Not responsible for:** World document format → world-data-model; Transform math → spatial-transforms; HLOD mesh generation → virtualized-geometry-lod
 - **Provides:** C-WORLD, C-SIGNIF, C-ENV · **Consumes:** C-SPATIAL, C-RES, C-ECS?, C-VIEW, C-FRAME · **Tool-side:** C-COOK
 - **Expertise:** open-world streaming, spatial partitioning, significance systems
@@ -1160,7 +1160,7 @@ Deterministic graph-based PCG framework usable in editor and at stream-in, place
 Rendering architecture: pipeline organization, shading-path choice (forward+, deferred, visibility buffer), render-feature contract, render scene and world→render sync, scalability tiers from 2D mobile to path-traced, multi-view, debug modes.
 
 - **Owns:** `RND.ARCH.pipeline`; `RND.ARCH.shading-path`; `RND.ARCH.feature-contract`; `RND.ARCH.scene-sync`; `RND.ARCH.scalability`; `RND.ARCH.multiview`; `RND.ARCH.debug-modes`; `RND.ARCH.submission-strategy`; `RND.ARCH.editor-rendering`; `RND.ARCH.multiview-nview`; `RND.ARCH.scene-textures`; `RND.ARCH.lighting-env`; `RND.ARCH.invalidation`; `RND.ARCH.portals`; `RND.TOOL.scalability-preview`
-- **Contributes to:** `ARCH.STRUCT.registration`; `PLAT.XR.depth-occlusion`; `PLAT.XR.scene-export`; `CORE.FRAME.access-model`; `WLD.SPACE.views`; `RND.MAT.custom-lighting`; `RND.GEO.visbuffer`; `RND.GEO.cpu-occlusion`; `GAM.SYS.markers`; `UI.FW.world-ui`; `ED.UI.thumbnails`
+- **Contributes to:** `ARCH.STRUCT.registration`; `ARCH.ORG.delegated-planning`; `PLAT.XR.depth-occlusion`; `PLAT.XR.scene-export`; `CORE.FRAME.access-model`; `WLD.SPACE.views`; `RND.MAT.custom-lighting`; `RND.GEO.visbuffer`; `RND.GEO.cpu-occlusion`; `GAM.SYS.markers`; `UI.FW.world-ui`; `ED.UI.thumbnails`
 - **Not responsible for:** API backends → gpu-platform-architect; Pass scheduling → render-graph-scheduling; Individual features (GI, shadows…) → owning-skill; Render threading / command-recording model → gpu-platform-architect
 - **Provides:** C-RSCENE, C-SCENETEX, C-LIGHTENV · **Consumes:** C-RG, C-SPATIAL, C-MATIF, C-FRAME, C-FLOW, C-VIEW, C-GPUTIER, C-ECS?, C-XRVIEW?, C-A11Y · **Tool-side:** C-EDCMD, C-EDHOST
 - **Expertise:** real-time rendering architecture, GPU-driven pipelines, scalability
@@ -1410,7 +1410,7 @@ GPU particle simulation, VFX graph runtime, ribbons/beams/mesh particles, partic
 Physics architecture: build vs integrate decision, physics world representation and ECS integration, stepping and frame sync, determinism levels, physics LOD, materials, GPU offload evaluation; covers both 2D and 3D.
 
 - **Owns:** `PHY.ARCH.build-integrate`; `PHY.ARCH.world`; `PHY.ARCH.stepping`; `PHY.ARCH.determinism`; `PHY.ARCH.lod`; `PHY.ARCH.materials`; `PHY.ARCH.gpu`; `PHY.ARCH.rewind`; `PHY.ARCH.async`; `PHY.ARCH.streaming`; `PHY.ARCH.lwc`; `PHY.ARCH.middleware-layer`; `PHY.ARCH.events`; `PHY.ARCH.validation`; `PHY.ARCH.multi-world`; `PHY.ARCH.local-frames`; `PHY.ARCH.tier-transitions`; `PHY.ARCH.fields`
-- **Contributes to:** `CORE.FRAME.access-model`; `CORE.FRAME.sim-schedule`; `CORE.ECS.bridges`; `WLD.PART.activation`; `WLD.SPACE.change-sets`; `ANM.ARCH.sync`; `GAM.SYS.projectiles`; `PRF.LOAD.hitches`; `XC.DET.snapshot`
+- **Contributes to:** `ARCH.ORG.delegated-planning`; `CORE.FRAME.access-model`; `CORE.FRAME.sim-schedule`; `CORE.ECS.bridges`; `WLD.PART.activation`; `WLD.SPACE.change-sets`; `ANM.ARCH.sync`; `GAM.SYS.projectiles`; `PRF.LOAD.hitches`; `XC.DET.snapshot`
 - **Not responsible for:** Collision algorithms → collision-detection; Solvers → rigid-body-dynamics; Networked physics → prediction-rollback
 - **Provides:** C-PHYS · **Consumes:** C-SPATIAL, C-FRAME, C-DET, C-TASK, C-ECS?, C-WORLD?, C-RES, C-SIGNIF?, C-SNAPSHOT, C-ENV?, C-RG?, C-FLOW
 - **Expertise:** physics engines (Jolt, PhysX, Havok, Box2D), simulation architecture
@@ -1438,7 +1438,7 @@ Integration and constraint solvers, joints, islands and sleeping, parallel solvi
 - **Owns:** `PHY.DYN.solver`; `PHY.DYN.joints`; `PHY.DYN.islands`; `PHY.DYN.parallel`; `PHY.DYN.stability`; `PHY.DYN.kinematic`; `PHY.DYN.dof-lock`; `PHY.DYN.articulations`; `PHY.DYN.buoyancy`
 - **Contributes to:** `WLD.ENV.buoyancy`; `PHY.ARCH.rewind`; `PHY.TOOL.physics-asset`; `ANM.IK.physical`; `NET.PRED.physics`; `QA.SIM.stability-suite`
 - **Not responsible for:** Character controllers → character-physics; Ragdoll blending → ik-procedural-animation
-- **Provides:** — · **Consumes:** C-PHYS, C-TASK, C-DET, C-ANIM?, C-ENV?
+- **Provides:** — · **Consumes:** C-PHYS, C-TASK, C-DET, C-ANIM?, C-ENV? · **Implements:** C-PHYS
 - **Expertise:** TGS/XPBD, constraint solvers, numerical stability
 - **Critics (G2):** K-ARCH, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
@@ -1503,7 +1503,7 @@ Particle fluids, grid smoke and fire, shallow-water simulation, GPU fluid solver
 - **Owns:** `PHY.2D.dynamics`; `PHY.2D.controllers`; `PHY.2D.determinism`; `PHY.2D.shape-gen`; `PHY.TOOL.2d-shapes`
 - **Contributes to:** `PHY.FLUID.cellular`; `QA.SIM.stability-suite`
 - **Not responsible for:** 3D physics → rigid-body-dynamics
-- **Provides:** — · **Consumes:** C-PHYS, C-DET · **Tool-side:** C-EDCMD, C-EDHOST, C-EDVIEW
+- **Provides:** — · **Consumes:** C-PHYS, C-DET · **Tool-side:** C-EDCMD, C-EDHOST, C-EDVIEW · **Implements:** C-PHYS
 - **Expertise:** Box2D-class solvers, 2D collision
 - **Critics (G2):** K-ARCH, K-SIM, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
@@ -1514,7 +1514,7 @@ Particle fluids, grid smoke and fire, shallow-water simulation, GPU fluid solver
 Animation architecture: data model, parallel evaluation pipeline, animation/physics/gameplay sync and root-motion policy, animation LOD, budgets.
 
 - **Owns:** `ANM.ARCH.data-model`; `ANM.ARCH.pipeline`; `ANM.ARCH.sync`; `ANM.ARCH.lod`; `ANM.ARCH.budgets`; `ANM.ARCH.net`; `ANM.ARCH.validation`
-- **Contributes to:** `CORE.FRAME.sim-schedule`; `CORE.ECS.bridges`; `WLD.SPACE.attachments`; `PHY.DYN.kinematic`; `GAM.MOVE.root-motion`; `QA.SIM.animation`; `XC.DET.snapshot`
+- **Contributes to:** `ARCH.ORG.delegated-planning`; `CORE.FRAME.sim-schedule`; `CORE.ECS.bridges`; `WLD.SPACE.attachments`; `PHY.DYN.kinematic`; `GAM.MOVE.root-motion`; `QA.SIM.animation`; `XC.DET.snapshot`
 - **Not responsible for:** Sampling and blending → animation-runtime; Skinning → deformation-skinning
 - **Provides:** C-ANIM · **Consumes:** C-SPATIAL, C-FRAME, C-TASK, C-ECS?, C-PHYS?, C-NET?, C-REP?, C-SNAPSHOT, C-SIGNIF?, C-FLOW
 - **Expertise:** animation systems, pose pipelines
@@ -1616,7 +1616,7 @@ Timeline/sequencer, camera cuts and cinematic cameras, high-quality movie render
 Audio engine architecture and threading, device backends, voice management and virtualization, middleware decision, audio budgets.
 
 - **Owns:** `AUD.ARCH.engine`; `AUD.ARCH.devices`; `AUD.ARCH.voices`; `AUD.ARCH.middleware`; `AUD.ARCH.budgets`; `AUD.ARCH.listeners`; `AUD.ARCH.clock`; `AUD.ARCH.validation`; `AUD.ARCH.offline-render`; `AUD.TOOL.profiler`
-- **Contributes to:** `PLAT.PAL.clocks`; `PLAT.CON.confidential-slots`; `PLAT.WEB.gestures`; `CORE.JOBS.thread-model`; `CORE.ECS.bridges`; `RND.MEDIA.sync`; `INP.ACT.calibration`; `QA.SIM.audio`
+- **Contributes to:** `ARCH.ORG.delegated-planning`; `PLAT.PAL.clocks`; `PLAT.CON.confidential-slots`; `PLAT.WEB.gestures`; `CORE.JOBS.thread-model`; `CORE.ECS.bridges`; `RND.MEDIA.sync`; `INP.ACT.calibration`; `QA.SIM.audio`
 - **Not responsible for:** DSP algorithms → audio-dsp-mixing; Spatialization → spatial-audio-acoustics
 - **Provides:** C-AUDIO · **Consumes:** C-PAL, C-TASK, C-SPATIAL, C-VIEW, C-ECS?, C-SIGNIF?, C-FRAME, C-FLOW · **Tool-side:** C-EDCMD, C-EDHOST
 - **Expertise:** real-time audio, lock-free audio threads, Wwise/FMOD
@@ -1669,7 +1669,7 @@ Audio event system and parameters, interactive music, dialogue and VO, authoring
 Netcode model per game type (authoritative server, lockstep, rollback, P2P/relay), network tick and time, authority model, budgets and scale targets, protocol versioning, sharded worlds evaluation.
 
 - **Owns:** `NET.ARCH.model`; `NET.ARCH.tick`; `NET.ARCH.authority`; `NET.ARCH.budgets`; `NET.ARCH.versioning`; `NET.ARCH.distributed-authority`; `NET.ARCH.connectivity`; `NET.ARCH.validation`
-- **Contributes to:** `PLAT.SVC.matchmaking`; `PLAT.XR.anchors`; `CORE.FRAME.sim-schedule`; `WLD.PART.server`; `NET.ARCH.async`; `NET.ARCH.meshing`; `NET.SRV.lifecycle`; `NET.SESS.handshake`; `NET.SESS.host-mode`; `BLD.REL.compat`; `BLD.REL.end-of-service`; `QA.FUNC.version-skew`; `PRF.METH.model`; `PRF.NET.latency`
+- **Contributes to:** `ARCH.ORG.delegated-planning`; `PLAT.SVC.matchmaking`; `PLAT.XR.anchors`; `CORE.FRAME.sim-schedule`; `WLD.PART.server`; `NET.ARCH.async`; `NET.ARCH.meshing`; `NET.SRV.lifecycle`; `NET.SESS.handshake`; `NET.SESS.host-mode`; `BLD.REL.compat`; `BLD.REL.end-of-service`; `QA.FUNC.version-skew`; `PRF.METH.model`; `PRF.NET.latency`
 - **Not responsible for:** Transport → network-transport; Replication mechanics → replication; Matchmaking services → online-services-liveops
 - **Provides:** C-NET · **Consumes:** C-FRAME, C-SER, C-DET, C-ID, C-ECS?, C-RELEASE
 - **Expertise:** netcode architectures, distributed systems, latency hiding
@@ -1738,7 +1738,7 @@ Headless server builds and stripping, host lifecycle (C-SERVER) for rolling depl
 Gameplay framework: rules and session state, players and data-oriented control binding (control model per game by ADR B25), extension points and game-module structure, game flow and transitions, local players.
 
 - **Owns:** `GAM.FW.rules`; `GAM.FW.extension`; `GAM.FW.flow`; `GAM.FW.local-players`; `GAM.FW.control`; `GAM.FW.execution`; `GAM.FW.ui-binding`; `GAM.FW.engagement`; `GAM.FW.objectives`; `GAM.FW.streamer-mode`; `GAM.FW.customization-descriptor`
-- **Contributes to:** `PLAT.SVC.age-region`; `CORE.FRAME.sim-schedule`; `WLD.MODEL.travel`; `ANM.CINE.gameplay-takeover`; `AUD.ARCH.listeners`; `NET.ARCH.connectivity`; `NET.SESS.join`; `UI.A11Y.assists`; `QA.REF.game-code`
+- **Contributes to:** `ARCH.ORG.delegated-planning`; `PLAT.SVC.age-region`; `CORE.FRAME.sim-schedule`; `WLD.MODEL.travel`; `ANM.CINE.gameplay-takeover`; `AUD.ARCH.listeners`; `NET.ARCH.connectivity`; `NET.SESS.join`; `UI.A11Y.assists`; `QA.REF.game-code`
 - **Not responsible for:** Abilities/tags/volumes toolkit → gameplay-systems-toolkit; Scripting VM → scripting-runtime; Game-specific code → external:game-team
 - **Provides:** C-GAME · **Consumes:** C-ID, C-FRAME, C-TASK, C-ECS?, C-INPUT?, C-PHYS?, C-ANIM?, C-AUDIO?, C-NET?, C-REP?, C-WORLD?, C-SAVE?, C-UI?, C-VIEW?, C-A11Y, C-AIAGENT?, C-NETSESSION?, C-SRVDATA?, C-A11YRT?, C-SEQ?, C-CROWD?, C-AI?, C-SCRIPT?, C-DET?
 - **Expertise:** gameplay frameworks, game architecture
@@ -1832,7 +1832,7 @@ Save-game model and serialization, save versioning and migration, atomic writes,
 Game UI architecture (retained, change-notified view models with resolved bindings), layout, styling, focus and navigation, animation, in-world UI, designer tool logic, UI performance.
 
 - **Owns:** `UI.FW.architecture`; `UI.FW.layout`; `UI.FW.styling`; `UI.FW.focus`; `UI.FW.animation`; `UI.FW.world-ui`; `UI.FW.performance`; `UI.FW.text-scale`; `UI.FW.safe-area`; `UI.FW.rtl-mirroring`; `UI.FW.xr-interaction`; `UI.FW.platform-dialogs`; `UI.FW.a11y-tree`; `UI.FW.logic`; `UI.FW.loading-screens`; `UI.FW.subtitles`; `UI.FW.validation`; `UI.FW.maps`; `UI.TOOL.designer`; `UI.TOOL.preview`; `UI.TOOL.binding-debug`
-- **Contributes to:** `PLAT.PAL.safe-area`; `CORE.REFL.static-default`; `RND.2D.ui-backend`; `INP.ACT.ui-routing`; `INP.ACT.touch-controls`; `GAM.FW.ui-binding`; `GAM.SYS.markers`; `UI.A11Y.palettes`; `ED.UI.toolkit-basis`
+- **Contributes to:** `ARCH.ORG.delegated-planning`; `PLAT.PAL.safe-area`; `CORE.REFL.static-default`; `RND.2D.ui-backend`; `INP.ACT.ui-routing`; `INP.ACT.touch-controls`; `GAM.FW.ui-binding`; `GAM.SYS.markers`; `UI.A11Y.palettes`; `ED.UI.toolkit-basis`
 - **Not responsible for:** UI draw backend → render-2d-vector; Text shaping → text-fonts; Editor panels → editor-ui-framework; Developer/debug immediate-mode UI → visual-debugging-tools
 - **Provides:** C-UI · **Consumes:** C-REFL, C-INPUT, C-DRAW2D, C-TEXT, C-LOC, C-A11YRT, C-AUDIO?, C-VIDEO?, C-PAL, C-A11Y, C-FRAME, C-COLOR, C-TRANSLUCENT?, C-SCRIPT?, C-VIEW · **Tool-side:** C-EDCMD, C-EDHOST
 - **Expertise:** UI frameworks, layout algorithms, MVVM
@@ -1872,7 +1872,7 @@ String tables, ICU-class message formatting, CLDR locale formatting, localizatio
 Editor architecture: process model (in- vs out-of-process runtime), editor/runtime data separation, transactions and undo/redo, selection, extension API and tool scripting, play-in-editor isolation, remote live editing, headless editor, large-project performance.
 
 - **Owns:** `ED.ARCH.process`; `ED.ARCH.separation`; `ED.ARCH.transactions`; `ED.ARCH.selection`; `ED.ARCH.extension`; `ED.ARCH.pie`; `ED.ARCH.remote`; `ED.ARCH.headless`; `ED.ARCH.scale`; `ED.ARCH.recovery`; `ED.ARCH.pie-net`; `ED.ARCH.discipline-workflows`; `ED.ARCH.telemetry`; `ED.ARCH.llm-agent-frontend`; `ED.ARCH.transaction-invariants`; `ED.ARCH.automation-security`
-- **Contributes to:** `PLAT.PAL.devlink`; `CORE.LIFE.ipc`; `CORE.OBJ.world-instances`; `CNT.COOK.on-demand`; `PHY.TOOL.simulate-in-editor`; `ED.DEBUG.automation-protocol`; `PRF.METH.pipeline-budgets`; `PRF.BENCH.tools`; `PRF.LOAD.editor`; `XC.SEC.dev-trust`; `XC.SEC.genai`; `XC.EXT.player-creation`
+- **Contributes to:** `ARCH.ORG.delegated-planning`; `PLAT.PAL.devlink`; `CORE.LIFE.ipc`; `CORE.OBJ.world-instances`; `CNT.COOK.on-demand`; `PHY.TOOL.simulate-in-editor`; `ED.DEBUG.automation-protocol`; `PRF.METH.pipeline-budgets`; `PRF.BENCH.tools`; `PRF.LOAD.editor`; `XC.SEC.dev-trust`; `XC.SEC.genai`; `XC.EXT.player-creation`
 - **Not responsible for:** Panels and inspectors → editor-ui-framework; World viewport tools → world-editor-viewport; Source control → collaboration-version-control
 - **Provides:** C-EDCMD · **Consumes:** C-REFL, C-SER, C-ASSET, C-WORLD, C-PLUGIN, C-UI?, C-IPC, C-NET?, C-REP?, C-AUTOMATION, C-ML? · **Tool-side:** C-VCS
 - **Untrusted inputs:** automation-commands
@@ -1967,7 +1967,7 @@ Evaluates and integrates AI-assisted authoring: generative asset tools, editor c
 Branching and merge model, engine release trains and versioning, title release-branch/content-lock/hotfix streams, LTS backports, shipped-build archival and rebuildability; pipeline architecture (execution by ci-cd-automation).
 
 - **Owns:** `BLD.CI.branching`; `BLD.CI.versioning`; `BLD.CI.title-branching`; `BLD.CI.backports`; `BLD.REL.archival`
-- **Contributes to:** `XC.SEC.vuln-response`; `XC.SEC.incident`; `XC.EXT.lts`; `XC.EXT.fork-integration`
+- **Contributes to:** `ARCH.ORG.delegated-planning`; `XC.SEC.vuln-response`; `XC.SEC.incident`; `XC.EXT.lts`; `XC.EXT.fork-integration`
 - **Not responsible for:** Build system implementation → build-system-toolchains; CI pipelines → ci-cd-automation; Packaging → packaging-release-patching; Pipeline orchestration → ci-cd-automation
 - **Provides:** C-RELEASE · **Consumes:** C-BUILD, C-PKG, C-PROD · **Tool-side:** C-COOK
 - **Expertise:** release engineering, branching strategies
@@ -2047,6 +2047,7 @@ Chunked voxel/block worlds end to end: sparse storage and compression, meshing a
 GPU platform architecture shared by every renderer tier: layering of RHI, GPU memory, render graph, shader system, ray-query and inference infrastructure; the GPU feature-tier model (binding, pipeline-state, queue, mesh, RT, tensor tiers) and API baselines per hardware tier; task-based parallel command recording.
 
 - **Owns:** `RND.GPU.layering`; `RND.GPU.tiers`; `RND.GPU.recording`; `RND.GPU.hetero-offload`
+- **Contributes to:** `ARCH.ORG.delegated-planning`
 - **Not responsible for:** Rendering pipeline and features → render-architect; Individual API backends → rhi-d3d12, rhi-vulkan, rhi-metal, rhi-webgpu; Frames in flight / thread existence → frame-orchestration; Thread inventory (which threads exist) → job-system-task-graph
 - **Provides:** C-GPUTIER · **Consumes:** C-RHI, C-PAL
 - **Expertise:** explicit graphics APIs, GPU architecture across vendors, API evolution tracking
@@ -2340,7 +2341,7 @@ Multi-server worlds and authoritative persistence: zoning and instancing with pl
 
 ### test-runtime-harness
 
-**Test Runtime Harness** · expert · runtime · workstream: quality · parent: test-architect · profiles: all · targets: client, headless-client, server, tools
+**Test Runtime Harness** · expert · runtime · workstream: foundation · parent: test-architect · profiles: all · targets: client, headless-client, server, tools
 
 Test infrastructure that ships as code on every target: unit/integration test framework, on-device test runner and result reporting, fixtures, and the fault-point registry that owners implement fault injection against.
 
@@ -2353,7 +2354,7 @@ Test infrastructure that ships as code on every target: unit/integration test fr
 
 ### security-runtime
 
-**Security Runtime** · expert · runtime · workstream: quality · parent: security-engineering · profiles: all · targets: client, headless-client, server, tools
+**Security Runtime** · expert · runtime · workstream: foundation · parent: security-engineering · profiles: all · targets: client, headless-client, server, tools
 
 Security-critical runtime code shared by every verifier: vetted crypto primitives and CSPRNG, the signed-artifact envelope, trust-root store, key rotation/revocation, anti-rollback version floors and algorithm agility.
 

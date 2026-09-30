@@ -4,13 +4,13 @@
 
 Everything required to build **and ship** the engine, decomposed as domain → area → capability. Each capability has exactly one owning skill (**bold**); contributors coordinate through the owner's contract. Maturity: unmarked = established production; `emerging` = shipping in some titles, evaluate per ADR; `experimental` = research, never an architectural baseline; `speculative` = watch only.
 
-**1361 capabilities** in 21 domains — 1251 established, 89 emerging, 21 experimental, 0 speculative.
+**1364 capabilities** in 21 domains — 1245 established, 98 emerging, 21 experimental, 0 speculative.
 
 ## Domains
 
 | Domain | Areas | Capabilities |
 |---|---|---|
-| [ARCH · Engine architecture, governance & agent organization](#arch) | 6 | 52 |
+| [ARCH · Engine architecture, governance & agent organization](#arch) | 6 | 55 |
 | [PLAT · Platform & hardware abstraction](#plat) | 10 | 106 |
 | [CORE · Core runtime foundations](#core) | 12 | 115 |
 | [RES · Resources, IO, packaging & streaming](#res) | 3 | 26 |
@@ -62,7 +62,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `ARCH.GOV.fitness` Automated architectural fitness functions (layering, dependency, contract conformance) — **architecture-governance**
 - `ARCH.GOV.anti-legacy` Anti-legacy review against the flagged-pattern catalogue (data/legacy-patterns.json) — **architecture-governance**
 - `ARCH.GOV.radar` Technology radar (data/radar.json): maturity, owners, revisit triggers, non-goals — **architecture-governance** · with research-evidence
-- `ARCH.GOV.process-tiers` Governance weight per organization tier (which ADR/CR/critic stages are mandatory) — **architecture-governance**
+- `ARCH.GOV.process-tiers` Governance weight per organization tier (consumes tier names from ARCH.ORG.staffing) — **architecture-governance**
 
 **ARCH.EVID — Research & evidence**
 
@@ -74,27 +74,30 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 
 **ARCH.ORG — Agent organization**
 
-- `ARCH.ORG.decomposition` Milestone → task decomposition by skill territory — **program-orchestration**
-- `ARCH.ORG.ownership-ledger` Ownership ledger & territory locks — **program-orchestration**
+- `ARCH.ORG.decomposition` Milestone → work-package decomposition by workstream (intra-subtree decomposition in ARCH.ORG.delegated-planning) — **program-orchestration**
+- `ARCH.ORG.ownership-ledger` Ownership ledger & territory locks `emerging` — **program-orchestration**
 - `ARCH.ORG.integration` Integration sequencing & milestone vertical slices — **program-orchestration**
-- `ARCH.ORG.change-requests` Contract change-request protocol between agents — **program-orchestration** · with architecture-governance
+- `ARCH.ORG.change-requests` Contract change-request protocol between agents `emerging` — **program-orchestration** · with architecture-governance
 - `ARCH.ORG.critic-gates` Scheduling critic gates per stage — **program-orchestration**
 - `ARCH.ORG.bootstrap` Walking-skeleton definition & bring-up order — **program-orchestration** · with engine-architect, platform-architect, ci-cd-automation
 - `ARCH.ORG.milestones` Milestone ladder with per-milestone skill set, contract maturity & exit criteria (data/milestones.json) — **program-orchestration** · with reference-games
-- `ARCH.ORG.write-sets` Module/file write-set convention & shared-file protocol — **program-orchestration** · with build-system-toolchains
-- `ARCH.ORG.staffing` Agent staffing tiers: co-hosting of skills per organization scale (by workstream) — **program-orchestration**
-- `ARCH.ORG.escalation` Escalation tiers & decision SLAs; delegated arbitration inside a lead's subtree — **program-orchestration** · with engine-architect
+- `ARCH.ORG.write-sets` Module/file write-set convention & shared-file protocol `emerging` — **program-orchestration** · with build-system-toolchains
+- `ARCH.ORG.staffing` Agent staffing tiers (small 3 agents, mid 8, large 16; data/organizations.json) co-hosting skills by workstream; sole owner of tier names `emerging` — **program-orchestration**
+- `ARCH.ORG.escalation` Escalation tiers & decision SLAs; delegated arbitration inside a lead's subtree; disputes between leads of one workstream, and disputes in which the arbitrating lead is a party, go to engine-architect — **program-orchestration** · with engine-architect
 - `ARCH.ORG.human-gates` Register of decisions requiring human authorization (contracts, spend, NDA access, submissions, legal/source-policy sign-off, production signing, security exceptions & risk acceptance, CI permission/secret-scope changes, new third-party dependencies, vulnerability disclosure, telemetry scope, sampled audit of adjudications and S3/S4 verdicts) — **program-orchestration** · with engine-architect, certification-compliance, security-engineering
 - `ARCH.ORG.risk` Program risk register & risk-driven milestone ordering — **program-orchestration** · with research-evidence
 - `ARCH.ORG.triage` Failure attribution & routing policy, revert-first (bisection engine in BLD.CI.bisection) — **program-orchestration** · with ci-cd-automation, perf-benchmarking
 - `ARCH.ORG.critic-calibration` Critic calibration via seeded defects at every stage (G1, G2, S1–S4 canary defects in sampled changes); recall and precision tracked per critic; below-threshold critics stop counting as gates `emerging` — **architecture-governance** · with test-architect, program-orchestration
 - `ARCH.ORG.adjudication` Independent adjudication of rejected and partially accepted findings `emerging` — **architecture-governance** · with program-orchestration
 - `ARCH.ORG.provenance` Per-change agent/model/task attestation in the ledger `emerging` — **program-orchestration** · with security-engineering
-- `ARCH.ORG.independence` Independence matrix: never-same-agent pairs (decider vs governance reviewer, implementer vs oracle author, builder vs adjudicator, security reviewer vs reviewed code, milestone owner vs gate owner) enforced by staffing at every organization tier; co-hosting capped by capability count — **architecture-governance** · with program-orchestration, test-architect
-- `ARCH.ORG.skill-lifecycle` Skill-library lifecycle during the build: territory re-bounding by ADR, check.py re-gate, SKILL.md regeneration, agent re-brief, library versioning tied to C-RELEASE; review at every milestone exit — **program-orchestration** · with architecture-governance, engine-architect
+- `ARCH.ORG.independence` Independence matrix: never-same-agent pairs (decider vs governance reviewer, implementer vs oracle author, builder vs adjudicator, security reviewer vs reviewed code, milestone owner vs gate owner) enforced by staffing at every organization tier; co-hosting capped by capability count `emerging` — **architecture-governance** · with program-orchestration, test-architect
+- `ARCH.ORG.skill-lifecycle` Skill-library lifecycle during the build: territory re-bounding by ADR, check.py re-gate, SKILL.md regeneration, agent re-brief, library versioning tied to C-RELEASE; review at every milestone exit `emerging` — **program-orchestration** · with architecture-governance, engine-architect
 - `ARCH.ORG.cost-ledger` Program cost ledger: agent compute per skill/milestone, CI/device-farm/cloud-cook cost, load-test hosting, server cost per CCU — **program-orchestration** · with ci-cd-automation, performance-architect, dedicated-server
 - `ARCH.ORG.human-audit` Human sampling of adjudications and S3/S4 pass verdicts at a fixed rate — **architecture-governance** · with program-orchestration
 - `ARCH.ORG.sensitive-paths` Sensitive write sets (registry parsers, crypto, auth, sandboxes, build & CI) require a K-SEC gate plus a second agent's approval — **program-orchestration** · with security-engineering
+- `ARCH.ORG.agent-continuity` Agent continuity: lock leases with heartbeats and fencing tokens, stale-lock reclamation, mandatory task hand-off record and re-brief when an agent crashes, runs out of context or is replaced `emerging` — **program-orchestration**
+- `ARCH.ORG.delegated-planning` Delegated planning: program-orchestration issues per-lead work packages and cross-workstream integration tasks; leads decompose inside their subtree (work-package format in C-ORCH) `emerging` — **program-orchestration** · with core-runtime-architect, platform-architect, content-pipeline-architect, resource-streaming-architect, world-architect, render-architect, physics-architect, animation-architect, audio-architect, network-architect, gameplay-architect, ui-architect, editor-architect, build-release-architect, gpu-platform-architect
+- `ARCH.ORG.model-requalification` Model/prompt lineage and requalification: implementer, oracle author and S3/S4 critics use different model families or versions (otherwise the human-audit rate rises); any change of agent model or prompt re-runs seeded-defect calibration and holdouts before the agent counts as a gate; the model is recorded in provenance `emerging` — **architecture-governance** · with program-orchestration, test-architect
 
 **ARCH.PROD — Engine product management**
 
@@ -1703,7 +1706,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 
 **QA.AGENT — Validation of agent-produced work**
 
-- `QA.AGENT.oracle-independence` Acceptance suites authored by each contract's declared oracle_author; implementers propose additions by change request only `emerging` — **test-architect** · with program-orchestration
+- `QA.AGENT.oracle-independence` Acceptance suites authored by each contract's declared oracle_author (a validator in another workstream than owner and implementers); implementers propose additions by change request only `emerging` — **test-architect** · with program-orchestration
 - `QA.AGENT.baseline-governance` Governed changes to goldens, tolerances, perf thresholds, hashes & corpora `emerging` — **test-architect** · with render-validation, perf-benchmarking
 - `QA.AGENT.test-integrity` Detection of weakened tests (deleted/skipped cases, loosened tolerances, assert-free tests, input special-casing) as a merge gate `emerging` — **test-architect** · with ci-cd-automation
 - `QA.AGENT.mutation-gate` Mutation-score thresholds per skill tier as part of the definition of done `emerging` — **test-architect**

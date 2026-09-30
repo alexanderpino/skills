@@ -319,8 +319,18 @@ def run(m):
                 E(f"contract {cid} frozen twice ({frozen_at[cid]} and {ms['id']})")
             frozen_at[cid] = ms["id"]
         for g in ms.get("gates", []):
-            if g not in m.caps:
-                E(f"milestone {ms['id']} gate names unknown capability {g}")
+            cap_, val_ = (g.get("capability"), g.get("validator")) if isinstance(g, dict) else (g, None)
+            if cap_ not in m.caps:
+                E(f"milestone {ms['id']} gate names unknown capability {cap_}")
+                continue
+            if not val_ or val_ not in m.caps:
+                E(f"milestone {ms['id']} gate {cap_} has no valid validator capability")
+                continue
+            vo, go = m.cap(val_)["owner"], m.cap(cap_)["owner"]
+            if vo == go:
+                E(f"milestone {ms['id']} gate {cap_}: validator {val_} is owned by the gated owner {go}")
+            if m.skill(vo).get("workstream") == "governance":
+                E(f"milestone {ms['id']} gate {cap_}: validator {val_} sits in the milestone owner's workstream")
         earlier |= sk
     if m.milestone_doc["milestones"]:
         for sid in m.skill_order:
@@ -346,6 +356,12 @@ def run(m):
                     and cid in {d for d, _ in m.deps(x, include_universal=True, include_tool=True)}]
             if cons and min(cons) > f:
                 E(f"contract {cid} frozen at {frozen_at[cid]} before any consumer is built")
+            impl_ms = [ms_of[x] for x in m.skill_order if x in ms_of and cid in m.skill(x).get("implements", [])]
+            if m.contract(cid).get("needs_implementer") and impl_ms and max(impl_ms) > f:
+                E(f"contract {cid} frozen at {frozen_at[cid]} before its last implementer is built")
+            for tier, tms in (m.contract(cid).get("extension_tiers") or {}).items():
+                if tms not in idx_of or idx_of[tms] < f:
+                    E(f"contract {cid} extension tier '{tier}' names milestone {tms} that does not follow the core freeze")
             for r in m.contract(cid)["requires"]:
                 if r in frozen_at and idx_of[frozen_at[r]] > f:
                     E(f"contract {cid} frozen at {frozen_at[cid]} before its requirement {r} ({frozen_at[r]})")
@@ -535,6 +551,13 @@ def run(m):
             E(f"code contract {cid} has no valid oracle_author")
         elif oa == c["owner"] and not any(cid in m.skill(x).get("implements", []) for x in m.skill_order):
             E(f"code contract {cid}: its sole implementer {oa} is also its oracle author")
+        if oa in m.skills:
+            if m.skill(oa).get("workstream") not in ("quality", "performance", "assurance"):
+                E(f"code contract {cid}: oracle author {oa} is not in a quality/performance/assurance workstream")
+            ws_ = {m.skill(c["owner"]).get("workstream")} | {m.skill(x).get("workstream") for x in m.skill_order
+                                                              if cid in m.skill(x).get("implements", [])}
+            if m.skill(oa).get("workstream") in ws_:
+                E(f"code contract {cid}: oracle author {oa} shares a workstream with its owner or an implementer")
         if c.get("boundary"):
             td = c.get("test_double") or {}
             if not td.get("kind") or td.get("owner") not in m.skills:
@@ -581,6 +604,31 @@ def run(m):
         if a in m.skills and b in m.skills and m.skill(a).get("workstream") == m.skill(b).get("workstream"):
             E(f"independence pair ({a}, {b}) shares workstream '{m.skill(a).get('workstream')}': staffing must not "
               f"co-host them")
+
+    # -- organization tiers: workstreams partitioned into agents; independence holds per tier
+    all_ws = {m.skill(x).get("workstream") for x in m.skill_order}
+    for tname, tier in m.org_doc["tiers"].items():
+        host = {}
+        for agent, wss in tier["agents"].items():
+            for w in wss:
+                if w in host:
+                    E(f"organization tier {tname}: workstream {w} hosted by {host[w]} and {agent}")
+                host[w] = agent
+        for w in all_ws - set(host):
+            E(f"organization tier {tname}: workstream {w} is hosted by no agent")
+        hs = lambda sid: host.get(m.skill(sid).get("workstream"))
+        for a, b, why in m.cross_doc.get("independence", []):
+            if a in m.skills and b in m.skills and hs(a) == hs(b):
+                E(f"organization tier {tname}: independence pair ({a}, {b}) is hosted by one agent {hs(a)}")
+        for cid in m.contracts:
+            c_ = m.contract(cid)
+            oa = c_.get("oracle_author")
+            if c_["layer"] == "P" or oa not in m.skills:
+                continue
+            for x in [c_["owner"]] + [y for y in m.skill_order if cid in m.skill(y).get("implements", [])]:
+                if hs(x) == hs(oa):
+                    E(f"organization tier {tname}: oracle author {oa} of {cid} is hosted with {x}")
+                    break
 
     counts = {}
     for cid in m.caps:
@@ -644,6 +692,11 @@ def selftest():
         ("authoring path missing", lambda m: [c.__setitem__(2, "gameplay-camera") for d in m.cap_doc["domains"] for a in d["areas"] for c in a["caps"] if c[0] == "GAM.TOOL.camera"] and None or m.skill("gameplay-camera").__setitem__("workstream", "gameplay") or [c.__setitem__(2, "gameplay-architect") for d in m.cap_doc["domains"] for a in d["areas"] for c in a["caps"] if c[0] == "GAM.TOOL.camera"], "has no authoring path"),
         ("tool-side cap without tool contract", lambda m: m.skill("ecs-runtime").__setitem__("tool_consumes", []), "owns tool-side capability CORE.ECS.baking"),
         ("public owner of confidential territory", lambda m: [c.__setitem__(1, "Async IO backends (console APIs)") for d in m.cap_doc["domains"] for a in d["areas"] for c in a["caps"] if c[0] == "RES.IO.backends"], "names confidential console territory"),
+        ("oracle author shares owner workstream", lambda m: m.contract("C-RG").__setitem__("oracle_author", "shader-system"), "not in a quality/performance/assurance"),
+        ("oracle author in owner workstream", lambda m: m.contract("C-PAL").__setitem__("oracle_author", "perf-benchmarking") or m.skill("rhi-core").__setitem__("workstream", "performance") or m.contract("C-RHI").__setitem__("oracle_author", "perf-benchmarking"), "shares a workstream"),
+        ("gate validator owned by gated owner", lambda m: m.milestone_doc["milestones"][0]["gates"][0].__setitem__("validator", m.milestone_doc["milestones"][0]["gates"][0]["capability"]), "owned by the gated owner"),
+        ("organization hosts a pair together", lambda m: m.org_doc["tiers"]["small"]["agents"]["build"].extend(m.org_doc["tiers"]["small"]["agents"].pop("verify")), "hosted with"),
+        ("needs_implementer frozen before implementer", lambda m: [ms["contracts_frozen"].remove("C-PHYS") for ms in m.milestone_doc["milestones"] if "C-PHYS" in ms["contracts_frozen"]] and m.milestone_doc["milestones"][0]["contracts_frozen"].append("C-PHYS"), "before"),
         ("missing implementer", lambda m: [m.skill(s)["implements"].remove("C-RHI") for s in m.skill_order if "C-RHI" in m.skill(s)["implements"]], "no implementer"),
     ]
     ok = True

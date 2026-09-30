@@ -11,7 +11,7 @@ from model import DATA
 FILES = {"cap": "capabilities.json", "skill": "skills.json", "contract": "contracts.json",
          "critic": "critics.json", "cross": "crosscutting.json", "seed": "seed-map.json",
          "radar": "radar.json", "legacy": "legacy-patterns.json", "milestone": "milestones.json",
-         "untrusted": "untrusted-inputs.json"}
+         "untrusted": "untrusted-inputs.json", "org": "organizations.json"}
 
 
 class Editor:

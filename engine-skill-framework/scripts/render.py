@@ -262,7 +262,8 @@ def radar_legacy_milestones(m):
         out.append(f"### {ms['id']} · {ms['name']} ({len(ms['skills'])} new build skills)\n\n**Configurations proven:** {claims}\n\n")
         out.append(f"**Exit criteria:** {ms['exit']}\n\n")
         if ms.get("gates"):
-            out.append(f"**Gates (capabilities):** {', '.join(f'`{g}`' for g in ms['gates'])}\n\n")
+            out.append("**Gates (capability → independent validator):** " + ", ".join(
+                f"`{g['capability']}` → `{g['validator']}`" for g in ms["gates"]) + "\n\n")
         if ms.get("contracts_frozen"):
             out.append(f"**Contracts frozen:** {', '.join(ms['contracts_frozen'])}\n\n")
         if ms.get("contracts_draft"):

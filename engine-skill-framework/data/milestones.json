@@ -7,7 +7,10 @@
    "configurations": [],
    "skills": [
     "asset-cook-processors",
+    "asset-import-interchange",
     "async-io-storage",
+    "build-system-toolchains",
+    "ci-cd-automation",
     "concurrency-primitives",
     "containers-core-types",
     "content-pipeline-architect",
@@ -48,13 +51,26 @@
    ],
    "exit": "Boots on one PC platform, runs the task graph, opens a window, presents through the RHI, reads input, draws a sprite and text, loads one cooked and signed asset from a package, passes CI with sanitizer, fuzz (package/serialization parsers) and determinism smoke lanes. Perf: trace capture and the C-BENCH runner on the skeleton; C-BUDGET v0 for indie-2d tiers; CI perf lane (frame time, startup, memory).",
    "gates": [
-    "QA.HOST.runner",
-    "XC.DET.conformance",
-    "QA.ROBUST.fuzzing",
-    "OBS.LOG.bench-runtime"
+    {
+     "capability": "QA.HOST.runner",
+     "validator": "QA.STRAT.integration"
+    },
+    {
+     "capability": "XC.DET.conformance",
+     "validator": "QA.ROBUST.concurrency"
+    },
+    {
+     "capability": "QA.ROBUST.fuzzing",
+     "validator": "QA.AGENT.gate-canaries"
+    },
+    {
+     "capability": "OBS.LOG.bench-runtime",
+     "validator": "PRF.BENCH.regression"
+    }
    ],
    "contracts_draft": [
     "C-ASSET",
+    "C-BUILD",
     "C-COLOR",
     "C-COOK",
     "C-DET",
@@ -71,6 +87,7 @@
     "C-IPC",
     "C-LIGHTENV",
     "C-MATIF",
+    "C-PAL",
     "C-PRESENT",
     "C-REFL",
     "C-REPLAY",
@@ -105,7 +122,6 @@
     "C-MEM",
     "C-MOD",
     "C-ORCH",
-    "C-PAL",
     "C-SCALE",
     "C-SIGN",
     "C-SYNC",
@@ -150,6 +166,7 @@
     "network-architect",
     "network-transport",
     "online-services-liveops",
+    "packaging-release-patching",
     "persistence-save",
     "physics-2d",
     "physics-architect",
@@ -170,12 +187,30 @@
    ],
    "exit": "The indie-2d and minimal reference games are playable on PC with save, localization, accessibility baseline and hot reload. Network design authorities (network-architect, transport, replication, prediction, sessions) draft C-NET/C-REP/C-PREDICT/C-NETSESSION and review every freeze; a two-instance loopback session (lockstep or rollback) runs under QA.SIM.netsim. Security: threat model for the configuration, fuzz harnesses for every registered input reaching it, hardened shipping build, dev-surface audit. Perf: within budget on min-spec PC; hitch gate active.",
    "gates": [
-    "QA.REF.ladder",
-    "QA.SIM.netsim",
-    "XC.SEC.threats",
-    "XC.SEC.hardening",
-    "BLD.SYS.dev-surface-exclusion",
-    "PRF.LOAD.hitch-gate"
+    {
+     "capability": "QA.REF.ladder",
+     "validator": "QA.STRAT.release-criteria"
+    },
+    {
+     "capability": "QA.SIM.netsim",
+     "validator": "QA.AGENT.oracle-change-control"
+    },
+    {
+     "capability": "XC.SEC.threats",
+     "validator": "QA.ROBUST.fuzzing"
+    },
+    {
+     "capability": "XC.SEC.hardening",
+     "validator": "QA.CERT.prechecks"
+    },
+    {
+     "capability": "BLD.SYS.dev-surface-exclusion",
+     "validator": "XC.SEC.testing"
+    },
+    {
+     "capability": "PRF.LOAD.hitch-gate",
+     "validator": "PRF.BENCH.regression"
+    }
    ],
    "contracts_draft": [
     "C-A11YRT",
@@ -203,6 +238,7 @@
     "C-NETSESSION",
     "C-PCG",
     "C-PHYS",
+    "C-PKG",
     "C-PLUGIN",
     "C-PREDICT",
     "C-RELOAD",
@@ -219,43 +255,24 @@
    "contracts_frozen": [
     "C-API",
     "C-ASSET",
-    "C-COLOR",
+    "C-BUILD",
     "C-COOK",
     "C-DET",
-    "C-DEVICE",
-    "C-DRAW2D",
     "C-EVID",
     "C-FLOW",
     "C-FRAME",
-    "C-GOVERN",
-    "C-GPUMEM",
-    "C-GPUTIER",
     "C-ID",
     "C-INPUT",
-    "C-IO",
-    "C-IPC",
-    "C-LIGHTENV",
-    "C-MATIF",
     "C-PERF",
     "C-PRESENT",
     "C-REFL",
     "C-REPLAY",
-    "C-RES",
-    "C-RG",
-    "C-RHI",
-    "C-RSCENE",
-    "C-SCENETEX",
     "C-SER",
-    "C-SHADER",
     "C-SNAPSHOT",
     "C-SPATIAL",
-    "C-TARGETPLAT",
-    "C-TEMPORAL",
     "C-TEXT",
     "C-TRUST",
-    "C-VFS",
-    "C-VIEW",
-    "C-VT"
+    "C-VIEW"
    ]
   },
   {
@@ -271,15 +288,11 @@
     "sandbox-2d-client"
    ],
    "skills": [
-    "asset-import-interchange",
-    "build-system-toolchains",
-    "ci-cd-automation",
     "collaboration-version-control",
     "editor-architect",
     "editor-ui-framework",
     "fluid-simulation",
     "graph-editor-framework",
-    "packaging-release-patching",
     "physics-tools",
     "platform-console",
     "platform-mobile",
@@ -292,62 +305,59 @@
    ],
    "exit": "indie-2d ships on PC, console, mobile and web with a TRC/store-review dry run; the editor and tools configuration closes with source control; rollback (8 frames under 150 ms / 5% loss) and async play proven. Local multiplayer: 2-player split-screen with independent UI focus, listeners and input. Perf: mobile tier within budget.",
    "gates": [
-    "QA.CERT.prechecks",
-    "ED.COLLAB.vcs",
-    "NET.PRED.rollback",
-    "GAM.FW.local-players"
+    {
+     "capability": "QA.CERT.prechecks",
+     "validator": "QA.STRAT.release-criteria"
+    },
+    {
+     "capability": "ED.COLLAB.vcs",
+     "validator": "QA.FUNC.editor"
+    },
+    {
+     "capability": "NET.PRED.rollback",
+     "validator": "QA.SIM.netsim"
+    },
+    {
+     "capability": "GAM.FW.local-players",
+     "validator": "QA.FUNC.automation"
+    },
+    {
+     "capability": "PRF.MEM.footprint",
+     "validator": "QA.FUNC.soak"
+    },
+    {
+     "capability": "PRF.LOAD.pacing-latency",
+     "validator": "PRF.BENCH.stats"
+    }
    ],
    "contracts_draft": [
-    "C-BUILD",
     "C-EDCMD",
     "C-EDHOST",
     "C-EDVIEW",
     "C-GRAPH",
-    "C-PKG",
     "C-VCS"
    ],
    "contracts_frozen": [
     "C-A11YRT",
     "C-ABILITY",
-    "C-AI",
-    "C-AIAGENT",
     "C-ANIM",
     "C-AUDIO",
-    "C-AUTOMATION",
     "C-BENCH",
     "C-CERT",
-    "C-DEVUI",
     "C-DIALOGUE",
     "C-ECS",
-    "C-ENV",
     "C-GAME",
     "C-GAMEDATA",
     "C-INTEGRITY",
-    "C-LIVE",
     "C-LOC",
-    "C-ML",
-    "C-MLGPU",
-    "C-MOVE",
-    "C-NAV",
     "C-NET",
-    "C-NETLINK",
-    "C-NETSESSION",
-    "C-PCG",
-    "C-PHYS",
     "C-PLUGIN",
-    "C-PREDICT",
     "C-PROD",
     "C-RELEASE",
-    "C-RELOAD",
-    "C-REP",
     "C-SAVE",
     "C-SCRIPT",
     "C-SEQ",
-    "C-SIGNIF",
-    "C-SVC",
-    "C-UI",
-    "C-VIDEO",
-    "C-WORLD"
+    "C-SIGNIF"
    ]
   },
   {
@@ -387,10 +397,30 @@
    ],
    "exit": "The standard-3d reference game runs on PC and console with GPU-driven and CPU-submission paths, reference path-tracer validation (itself validated), the lite-3d mobile and portable-console configurations; C-RHI reviewed against the tensor tier by ml-inference-runtime before freeze. Tools: iteration-latency targets met on standard-3d-tools and on-device iteration to console and mobile. Perf: std3d and lite3d budgets per tier; PSO first-encounter hitch gate; governor closed-loop test.",
    "gates": [
-    "QA.RENDER.reference-validation",
-    "RND.SHADER.pso-lists",
-    "CORE.SCALE.governor",
-    "XC.ITER.metrics"
+    {
+     "capability": "QA.RENDER.reference-validation",
+     "validator": "QA.AGENT.oracle-change-control"
+    },
+    {
+     "capability": "RND.SHADER.pso-lists",
+     "validator": "PRF.LOAD.hitch-gate"
+    },
+    {
+     "capability": "CORE.SCALE.governor",
+     "validator": "PRF.METH.gates"
+    },
+    {
+     "capability": "XC.ITER.metrics",
+     "validator": "QA.FUNC.editor"
+    },
+    {
+     "capability": "PRF.GPU.baselines",
+     "validator": "PRF.METH.gates"
+    },
+    {
+     "capability": "PRF.METH.pipeline-budgets",
+     "validator": "PRF.BENCH.tools"
+    }
    ],
    "contracts_draft": [
     "C-ATMOS",
@@ -404,12 +434,12 @@
     "C-VEHICLE"
    ],
    "contracts_frozen": [
-    "C-BUILD",
-    "C-EDCMD",
-    "C-EDHOST",
-    "C-EDVIEW",
-    "C-GRAPH",
-    "C-PKG",
+    "C-AI",
+    "C-ENV",
+    "C-MOVE",
+    "C-NAV",
+    "C-PCG",
+    "C-PHYS",
     "C-VCS"
    ]
   },
@@ -438,11 +468,26 @@
    ],
    "exit": "Online reference games per netcode family: dedicated-server shooter with prediction and lag compensation, listen-server co-op, desync-free 2 h lockstep soak, web transports; bot load test; packet/handshake fuzzing, DoS test, server-authority review and external pen test (human gate); patch + DLC + staged rollout + rollback executed on the online reference game. Perf: bandwidth per player and server density within budget.",
    "gates": [
-    "QA.FUNC.load",
-    "NET.TRANS.dos",
-    "BLD.REL.staged-rollout",
-    "BLD.REL.rollback",
-    "PRF.NET.bandwidth"
+    {
+     "capability": "QA.FUNC.load",
+     "validator": "PRF.NET.load-analysis"
+    },
+    {
+     "capability": "NET.TRANS.dos",
+     "validator": "XC.SEC.testing"
+    },
+    {
+     "capability": "BLD.REL.staged-rollout",
+     "validator": "QA.FUNC.compat-corpus"
+    },
+    {
+     "capability": "BLD.REL.rollback",
+     "validator": "QA.STRAT.release-criteria"
+    },
+    {
+     "capability": "PRF.NET.bandwidth",
+     "validator": "QA.FUNC.load"
+    }
    ],
    "contracts_draft": [
     "C-CROWD",
@@ -453,14 +498,50 @@
    ],
    "contracts_frozen": [
     "C-ATMOS",
+    "C-AUTOMATION",
+    "C-COLOR",
+    "C-DEVICE",
+    "C-DEVUI",
+    "C-DRAW2D",
+    "C-EDCMD",
+    "C-EDHOST",
+    "C-EDVIEW",
     "C-GEOLOD",
     "C-GI",
+    "C-GOVERN",
+    "C-GPUMEM",
+    "C-GPUTIER",
+    "C-GRAPH",
     "C-INSTANCES",
+    "C-IO",
+    "C-IPC",
     "C-LIGHT",
-    "C-RT",
-    "C-RTAS",
+    "C-LIGHTENV",
+    "C-LIVE",
+    "C-MATIF",
+    "C-NETLINK",
+    "C-NETSESSION",
+    "C-PAL",
+    "C-PKG",
+    "C-PREDICT",
+    "C-RELOAD",
+    "C-REP",
+    "C-RES",
+    "C-RG",
+    "C-RHI",
+    "C-RSCENE",
+    "C-SCENETEX",
+    "C-SHADER",
+    "C-SVC",
+    "C-TARGETPLAT",
+    "C-TEMPORAL",
     "C-TRANSLUCENT",
-    "C-VEHICLE"
+    "C-UI",
+    "C-VEHICLE",
+    "C-VFS",
+    "C-VIDEO",
+    "C-VT",
+    "C-WORLD"
    ]
   },
   {
@@ -479,9 +560,18 @@
    ],
    "exit": "Open-world reference slice streams at target speed within the arbitration budget (arbiter without oscillation or starvation, A14); massim and sandbox configurations closed and benchmarked; XR on PC, standalone and console. Perf: scale-content stress worlds within declared asymptotics.",
    "gates": [
-    "RES.MGMT.arbitration",
-    "RES.MGMT.validation",
-    "PRF.BENCH.scale-content"
+    {
+     "capability": "RES.MGMT.arbitration",
+     "validator": "PRF.MEM.peaks"
+    },
+    {
+     "capability": "RES.MGMT.validation",
+     "validator": "PRF.LOAD.load-time"
+    },
+    {
+     "capability": "PRF.BENCH.scale-content",
+     "validator": "PRF.METH.asymptotics"
+    }
    ],
    "contracts_draft": [
     "C-XRVIEW"
@@ -508,12 +598,34 @@
    ],
    "exit": "AAA reference slice; zoned hand-off and persistence crash-consistency with ≥1k bot clients; mods with sandbox-escape and GPU-DoS tests; experimental features only behind the experimental profile. Tools: team-large pipeline (multi-user sessions, distributed cook, world builds) on aaa-open-world-online-tools.",
    "gates": [
-    "NET.SRV.cross-server",
-    "XC.SEC.sandbox",
-    "ED.COLLAB.multiuser"
+    {
+     "capability": "NET.SRV.cross-server",
+     "validator": "QA.FUNC.load"
+    },
+    {
+     "capability": "XC.SEC.sandbox",
+     "validator": "QA.ROBUST.fuzzing"
+    },
+    {
+     "capability": "ED.COLLAB.multiuser",
+     "validator": "QA.FUNC.editor"
+    },
+    {
+     "capability": "PRF.METH.asymptotics",
+     "validator": "PRF.BENCH.scale-content"
+    },
+    {
+     "capability": "PRF.NET.server-density",
+     "validator": "QA.FUNC.load"
+    }
    ],
    "contracts_draft": [],
    "contracts_frozen": [
+    "C-AIAGENT",
+    "C-ML",
+    "C-MLGPU",
+    "C-RT",
+    "C-RTAS",
     "C-XRVIEW"
    ]
   },
@@ -524,10 +636,22 @@
    "skills": [],
    "exit": "Customer-corpus upgrade from the previous release, release notes, backport stream open, console certification pass of at least one reference game, live-ops and end-of-service rehearsal. Every milestone exit also runs the skill-library review (ARCH.ORG.skill-lifecycle).",
    "gates": [
-    "ARCH.PROD.customer-corpus",
-    "XC.EXT.lts",
-    "BLD.REL.end-of-service",
-    "PLAT.LIVE.operations"
+    {
+     "capability": "ARCH.PROD.customer-corpus",
+     "validator": "QA.REF.upkeep"
+    },
+    {
+     "capability": "XC.EXT.lts",
+     "validator": "QA.FUNC.compat-corpus"
+    },
+    {
+     "capability": "BLD.REL.end-of-service",
+     "validator": "QA.FUNC.compat"
+    },
+    {
+     "capability": "PLAT.LIVE.operations",
+     "validator": "QA.FUNC.soak"
+    }
    ],
    "contracts_draft": [],
    "contracts_frozen": []

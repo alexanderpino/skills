@@ -162,7 +162,7 @@
       ],
       [
        "ARCH.GOV.process-tiers",
-       "Governance weight per organization tier (which ADR/CR/critic stages are mandatory)",
+       "Governance weight per organization tier (consumes tier names from ARCH.ORG.staffing)",
        "architecture-governance",
        "E"
       ]
@@ -217,7 +217,7 @@
      "caps": [
       [
        "ARCH.ORG.decomposition",
-       "Milestone → task decomposition by skill territory",
+       "Milestone → work-package decomposition by workstream (intra-subtree decomposition in ARCH.ORG.delegated-planning)",
        "program-orchestration",
        "E"
       ],
@@ -225,7 +225,7 @@
        "ARCH.ORG.ownership-ledger",
        "Ownership ledger & territory locks",
        "program-orchestration",
-       "E"
+       "M"
       ],
       [
        "ARCH.ORG.integration",
@@ -237,7 +237,7 @@
        "ARCH.ORG.change-requests",
        "Contract change-request protocol between agents",
        "program-orchestration",
-       "E",
+       "M",
        [
         "architecture-governance"
        ]
@@ -272,20 +272,20 @@
        "ARCH.ORG.write-sets",
        "Module/file write-set convention & shared-file protocol",
        "program-orchestration",
-       "E",
+       "M",
        [
         "build-system-toolchains"
        ]
       ],
       [
        "ARCH.ORG.staffing",
-       "Agent staffing tiers: co-hosting of skills per organization scale (by workstream)",
+       "Agent staffing tiers (small 3 agents, mid 8, large 16; data/organizations.json) co-hosting skills by workstream; sole owner of tier names",
        "program-orchestration",
-       "E"
+       "M"
       ],
       [
        "ARCH.ORG.escalation",
-       "Escalation tiers & decision SLAs; delegated arbitration inside a lead's subtree",
+       "Escalation tiers & decision SLAs; delegated arbitration inside a lead's subtree; disputes between leads of one workstream, and disputes in which the arbitrating lead is a party, go to engine-architect",
        "program-orchestration",
        "E",
        [
@@ -354,7 +354,7 @@
        "ARCH.ORG.independence",
        "Independence matrix: never-same-agent pairs (decider vs governance reviewer, implementer vs oracle author, builder vs adjudicator, security reviewer vs reviewed code, milestone owner vs gate owner) enforced by staffing at every organization tier; co-hosting capped by capability count",
        "architecture-governance",
-       "E",
+       "M",
        [
         "program-orchestration",
         "test-architect"
@@ -364,7 +364,7 @@
        "ARCH.ORG.skill-lifecycle",
        "Skill-library lifecycle during the build: territory re-bounding by ADR, check.py re-gate, SKILL.md regeneration, agent re-brief, library versioning tied to C-RELEASE; review at every milestone exit",
        "program-orchestration",
-       "E",
+       "M",
        [
         "architecture-governance",
         "engine-architect"
@@ -397,6 +397,45 @@
        "E",
        [
         "security-engineering"
+       ]
+      ],
+      [
+       "ARCH.ORG.agent-continuity",
+       "Agent continuity: lock leases with heartbeats and fencing tokens, stale-lock reclamation, mandatory task hand-off record and re-brief when an agent crashes, runs out of context or is replaced",
+       "program-orchestration",
+       "M"
+      ],
+      [
+       "ARCH.ORG.delegated-planning",
+       "Delegated planning: program-orchestration issues per-lead work packages and cross-workstream integration tasks; leads decompose inside their subtree (work-package format in C-ORCH)",
+       "program-orchestration",
+       "M",
+       [
+        "core-runtime-architect",
+        "platform-architect",
+        "content-pipeline-architect",
+        "resource-streaming-architect",
+        "world-architect",
+        "render-architect",
+        "physics-architect",
+        "animation-architect",
+        "audio-architect",
+        "network-architect",
+        "gameplay-architect",
+        "ui-architect",
+        "editor-architect",
+        "build-release-architect",
+        "gpu-platform-architect"
+       ]
+      ],
+      [
+       "ARCH.ORG.model-requalification",
+       "Model/prompt lineage and requalification: implementer, oracle author and S3/S4 critics use different model families or versions (otherwise the human-audit rate rises); any change of agent model or prompt re-runs seeded-defect calibration and holdouts before the agent counts as a gate; the model is recorded in provenance",
+       "architecture-governance",
+       "M",
+       [
+        "program-orchestration",
+        "test-architect"
        ]
       ]
      ]
@@ -10553,7 +10592,7 @@
      "caps": [
       [
        "QA.AGENT.oracle-independence",
-       "Acceptance suites authored by each contract's declared oracle_author; implementers propose additions by change request only",
+       "Acceptance suites authored by each contract's declared oracle_author (a validator in another workstream than owner and implementers); implementers propose additions by change request only",
        "test-architect",
        "M",
        [
