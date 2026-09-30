@@ -2,7 +2,7 @@
 
 # 03 · Skill Hierarchy
 
-**156 skills**: 4 orchestrator, 11 cross-cutting, 126 expert, 15 lead.
+**157 skills**: 4 orchestrator, 11 cross-cutting, 127 expert, 15 lead.
 
 ## Tree
 
@@ -11,8 +11,8 @@
     [O] architecture-governance  (11) ·process
     [O] program-orchestration  (22) ·process
     [X] research-evidence  (5) ·process
-    [X] performance-architect  (9) ·process
-            perf-benchmarking  (12) ·process
+    [X] performance-architect  (10) ·process
+            perf-benchmarking  (13) ·process
             cpu-performance  (6) ·process
             gpu-performance  (5) ·process
             loading-streaming-performance  (6) ·process
@@ -29,6 +29,7 @@
             test-runtime-harness  (3)
             foundation-conformance  (3) ·process
             ui-text-conformance  (3) ·process
+            tools-pipeline-conformance  (3) ·process
     [X] security-engineering  (18) ·process
             anti-cheat-integrity  (8)
             security-runtime  (3)
@@ -42,9 +43,9 @@
     [X] developer-experience-docs  (8) ·process
     [L] core-runtime-architect  (14)
             plugin-system  (3)
-            ml-inference-runtime  (13)
+            ml-inference-runtime  (14)
             math-simd-numerics  (12)
-            memory-allocators  (10)
+            memory-allocators  (11)
             containers-core-types  (8)
             concurrency-primitives  (7)
             job-system-task-graph  (16)
@@ -55,22 +56,22 @@
             serialization-schema  (8)
             visual-debugging-tools  (7)
             runtime-scalability  (5)
-    [L] platform-architect  (28)
-            platform-desktop  (7)
+    [L] platform-architect  (29)
+            platform-desktop  (9)
             platform-console  (17)
-            platform-mobile  (11)
+            platform-mobile  (13)
             platform-services  (20)
             input-system  (17)
             input-devices-haptics  (13)
             xr-runtime  (18)
-            platform-web  (9)
+            platform-web  (11)
             online-services-liveops  (17)
-            platform-server-host  (4)
+            platform-server-host  (5)
     [L] content-pipeline-architect  (21)
-            asset-import-interchange  (16) ·tool
-            asset-cook-processors  (5) ·tool
+            asset-import-interchange  (18) ·tool
+            asset-cook-processors  (6) ·tool
     [L] resource-streaming-architect  (11)
-            async-io-storage  (10)
+            async-io-storage  (11)
             package-formats-vfs  (6)
     [L] world-architect  (14)
             world-data-model  (6)
@@ -87,7 +88,7 @@
             virtualized-geometry-lod  (12)
             texture-streaming-vt  (9)
             direct-lighting-shadows  (11)
-            global-illumination  (14)
+            global-illumination  (15)
             path-tracing  (3)
             reconstruction-upscaling  (11)
             post-color-hdr  (11)
@@ -96,7 +97,7 @@
             render-2d-vector  (9)
             vfx-particles  (9)
             media-playback  (7)
-    [L] physics-architect  (23)
+    [L] physics-architect  (24)
             collision-detection  (11)
             rigid-body-dynamics  (9)
             character-physics  (4)
@@ -120,7 +121,7 @@
             audio-content-runtime  (13)
     [L] network-architect  (9)
             network-transport  (19)
-            replication  (17)
+            replication  (19)
             prediction-rollback  (15)
             dedicated-server  (8)
             net-session  (14)
@@ -133,7 +134,7 @@
             crowd-simulation  (4)
             ai-behavior-perception  (14)
             persistence-save  (12)
-            character-movement  (7)
+            character-movement  (8)
             gameplay-data  (10)
             narrative-dialogue  (9)
             systems-simulation  (6)
@@ -174,7 +175,7 @@ Integration groups used for delegated arbitration and staffing (`ARCH.ORG.escala
 - **governance** (6): engine-architect, program-orchestration, research-evidence, api-lifecycle-migration, developer-experience-docs, engine-product-management
 - **assurance** (1): architecture-governance
 - **performance** (8): performance-architect, perf-benchmarking, cpu-performance, gpu-performance, loading-streaming-performance, memory-performance, online-performance, pipeline-performance
-- **quality** (11): test-architect, render-validation, functional-automation-soak, robustness-fuzzing, certification-compliance, security-engineering, reference-games, simulation-validation, privacy-data-protection, foundation-conformance, ui-text-conformance
+- **quality** (12): test-architect, render-validation, functional-automation-soak, robustness-fuzzing, certification-compliance, security-engineering, reference-games, simulation-validation, privacy-data-protection, foundation-conformance, ui-text-conformance, tools-pipeline-conformance
 - **online** (8): anti-cheat-integrity, network-architect, network-transport, replication, prediction-rollback, dedicated-server, net-session, server-scaleout-persistence
 - **foundation** (20): observability-telemetry, crash-diagnostics, determinism-replay, hot-reload-iteration, plugin-system, ml-inference-runtime, core-runtime-architect, math-simd-numerics, memory-allocators, containers-core-types, concurrency-primitives, job-system-task-graph, frame-orchestration, entity-object-model, ecs-runtime, reflection-metadata, serialization-schema, runtime-scalability, test-runtime-harness, security-runtime
 - **ui** (4): accessibility, ui-architect, text-fonts, localization-i18n
@@ -194,185 +195,189 @@ A configuration is a point on three independent axes: scale/feature **profiles**
 
 | Configuration | Profiles | Target | Platforms | Build skills | Capabilities |
 |---|---|---|---|---|---|
-| minimal-client | minimal | client | pc, console, mobile, web | 74 | 740 |
-| indie-2d-client | min2d | client | pc, console, mobile, web | 81 | 812 |
-| indie-2d-tools | min2d | tools | pc | 92 | 923 |
-| indie-2d-online-moddable-client | min2d, online, ugc | client | pc, console, mobile | 85 | 885 |
-| indie-2d-online-moddable-server | min2d, online, ugc | server | server-host | 59 | 620 |
-| rts-2d-massim-client | min2d, massim, online-lockstep | client | pc | 83 | 840 |
-| lite-3d-mobile-client | lite3d | client | mobile | 95 | 908 |
-| lite-3d-mobile-online-client | lite3d, online | client | mobile | 100 | 982 |
-| standard-3d-client | std3d | client | pc, console | 98 | 941 |
-| standard-3d-tools | std3d | tools | pc | 110 | 1070 |
-| open-world-client | std3d, openworld | client | pc, console | 99 | 947 |
-| online-3d-client | std3d, online | client | pc, console | 103 | 1015 |
-| online-3d-server | std3d, online | server | server-host | 67 | 673 |
-| online-3d-bot-client | std3d, online | headless-client | server-host | 67 | 671 |
-| racing-3d-client | std3d, vehicles | client | pc, console | 99 | 948 |
-| rts-3d-massim-client | std3d, massim, online-lockstep | client | pc | 103 | 991 |
-| sandbox-online-server | std3d, sandbox, online, persistent-world | server | server-host | 71 | 693 |
-| xr-standalone-client | lite3d, xr, ml | client | xr-standalone | 97 | 937 |
-| xr-pc-client | std3d, xr, ml | client | pc | 98 | 950 |
-| aaa-open-world-online-client | std3d, openworld, online, aaa, ugc, vehicles, team-large, persistent-world, ml | client | pc, console | 108 | 1062 |
-| aaa-open-world-online-server | std3d, openworld, online, aaa, ugc, vehicles, team-large, persistent-world, ml | server | server-host | 73 | 718 |
-| aaa-open-world-online-tools | std3d, openworld, online, aaa, ugc, vehicles, team-large, persistent-world, ml | tools | pc | 123 | 1209 |
-| sandbox-2d-client | min2d, sandbox | client | pc | 79 | 786 |
-| xr-console-client | std3d, xr, ml | client | console | 96 | 954 |
-| lite-3d-portable-console-client | lite3d | client | console | 94 | 911 |
-| fighting-2d-rollback-client | min2d, online-rollback | client | pc, console | 82 | 845 |
-| mobile-async-client | minimal, online-async | client | mobile | 69 | 707 |
-| coop-3d-listen-client | std3d, online | client | pc, console | 103 | 1015 |
-| indie-2d-online-web-client | min2d, online | client | web | 79 | 839 |
-| online-3d-console-client | std3d, online | client | console | 99 | 999 |
-| minimal-tools | minimal | tools | pc | 82 | 828 |
-| lite-3d-mobile-tools | lite3d | tools | pc | 108 | 1036 |
-| online-3d-tools | std3d, online | tools | pc | 116 | 1146 |
-| aaa-experimental-client | std3d, openworld, online, aaa, experimental, ml | client | pc | 104 | 1046 |
-| standard-3d-team-tools | std3d, online, team-mid | tools | pc | 116 | 1150 |
-| fighting-2d-rollback-tools | min2d, online-rollback | tools | pc | 93 | 957 |
-| rts-massim-lockstep-tools | min2d, massim, online-lockstep | tools | pc | 94 | 952 |
-| mobile-async-validator | minimal, online-async | headless-client | server-host | 47 | 470 |
-| rt-required-3d-client | std3d, aaa, hwrt, ml | client | pc, console | 100 | 963 |
-| xr-standalone-tools | lite3d, xr | tools | pc | 109 | 1054 |
-| lite-3d-mobile-openworld-online-client | lite3d, openworld, online | client | mobile | 101 | 988 |
-| lite-3d-portable-openworld-client | lite3d, openworld | client | console | 95 | 917 |
-| lite-3d-web-client | lite3d | client | web | 94 | 902 |
+| minimal-client | minimal | client | pc, console, mobile, web | 74 | 747 |
+| indie-2d-client | min2d | client | pc, console, mobile, web | 81 | 821 |
+| indie-2d-tools | min2d | tools | pc | 92 | 935 |
+| indie-2d-online-moddable-client | min2d, online, ugc | client | pc, console, mobile | 85 | 894 |
+| indie-2d-online-moddable-server | min2d, online, ugc | server | server-host | 59 | 628 |
+| rts-2d-massim-client | min2d, massim, online-lockstep | client | pc | 83 | 845 |
+| lite-3d-mobile-client | lite3d | client | mobile | 94 | 912 |
+| lite-3d-mobile-online-client | lite3d, online | client | mobile | 99 | 988 |
+| standard-3d-client | std3d | client | pc, console | 98 | 947 |
+| standard-3d-tools | std3d | tools | pc | 110 | 1081 |
+| open-world-client | std3d, openworld | client | pc, console | 99 | 953 |
+| online-3d-client | std3d, online | client | pc, console | 103 | 1023 |
+| online-3d-server | std3d, online | server | server-host | 67 | 681 |
+| online-3d-bot-client | std3d, online | headless-client | server-host | 67 | 679 |
+| racing-3d-client | std3d, vehicles | client | pc, console | 99 | 954 |
+| rts-3d-massim-client | std3d, massim, online-lockstep | client | pc | 103 | 997 |
+| sandbox-online-server | std3d, sandbox, online, persistent-world | server | server-host | 71 | 701 |
+| xr-standalone-client | lite3d, xr, ml | client | xr-standalone | 96 | 942 |
+| xr-pc-client | std3d, xr, ml | client | pc | 98 | 957 |
+| aaa-open-world-online-client | std3d, openworld, online, aaa, ugc, vehicles, team-large, persistent-world, ml | client | pc, console | 108 | 1071 |
+| aaa-open-world-online-server | std3d, openworld, online, aaa, ugc, vehicles, team-large, persistent-world, ml | server | server-host | 73 | 727 |
+| aaa-open-world-online-tools | std3d, openworld, online, aaa, ugc, vehicles, team-large, persistent-world, ml | tools | pc | 123 | 1222 |
+| sandbox-2d-client | min2d, sandbox | client | pc | 79 | 791 |
+| xr-console-client | std3d, xr, ml | client | console | 96 | 959 |
+| lite-3d-portable-console-client | lite3d | client | console | 93 | 913 |
+| fighting-2d-rollback-client | min2d, online-rollback | client | pc, console | 82 | 850 |
+| mobile-async-client | minimal, online-async | client | mobile | 69 | 710 |
+| coop-3d-listen-client | std3d, online | client | pc, console | 103 | 1023 |
+| indie-2d-online-web-client | min2d, online | client | web | 79 | 846 |
+| online-3d-console-client | std3d, online | client | console | 99 | 1005 |
+| minimal-tools | minimal | tools | pc | 82 | 838 |
+| lite-3d-mobile-tools | lite3d | tools | pc | 107 | 1045 |
+| online-3d-tools | std3d, online | tools | pc | 116 | 1158 |
+| aaa-experimental-client | std3d, openworld, online, aaa, experimental, ml | client | pc | 104 | 1057 |
+| standard-3d-team-tools | std3d, online, team-mid | tools | pc | 116 | 1162 |
+| fighting-2d-rollback-tools | min2d, online-rollback | tools | pc | 93 | 965 |
+| rts-massim-lockstep-tools | min2d, massim, online-lockstep | tools | pc | 94 | 960 |
+| mobile-async-validator | minimal, online-async | headless-client | server-host | 47 | 474 |
+| rt-required-3d-client | std3d, aaa, hwrt, ml | client | pc, console | 100 | 970 |
+| xr-standalone-tools | lite3d, xr | tools | pc | 108 | 1063 |
+| lite-3d-mobile-openworld-online-client | lite3d, openworld, online | client | mobile | 100 | 994 |
+| lite-3d-portable-openworld-client | lite3d, openworld | client | console | 94 | 919 |
+| lite-3d-web-client | lite3d | client | web | 93 | 906 |
+| community-server-pc | min2d, online, ugc | server | pc, server-host | 60 | 637 |
+| sandbox-2d-tools | min2d, sandbox | tools | pc | 90 | 905 |
+| rt-required-3d-tools | std3d, hwrt | tools | pc | 109 | 1069 |
+| aaa-experimental-tools | std3d, openworld, online, aaa, experimental | tools | pc | 116 | 1178 |
 
 ### Membership matrix
 
-| Skill | minimal-client | indie-2d-client | indie-2d-tools | indie-2d-online-moddable-client | indie-2d-online-moddable-server | rts-2d-massim-client | lite-3d-mobile-client | lite-3d-mobile-online-client | standard-3d-client | standard-3d-tools | open-world-client | online-3d-client | online-3d-server | online-3d-bot-client | racing-3d-client | rts-3d-massim-client | sandbox-online-server | xr-standalone-client | xr-pc-client | aaa-open-world-online-client | aaa-open-world-online-server | aaa-open-world-online-tools | sandbox-2d-client | xr-console-client | lite-3d-portable-console-client | fighting-2d-rollback-client | mobile-async-client | coop-3d-listen-client | indie-2d-online-web-client | online-3d-console-client | minimal-tools | lite-3d-mobile-tools | online-3d-tools | aaa-experimental-client | standard-3d-team-tools | fighting-2d-rollback-tools | rts-massim-lockstep-tools | mobile-async-validator | rt-required-3d-client | xr-standalone-tools | lite-3d-mobile-openworld-online-client | lite-3d-portable-openworld-client | lite-3d-web-client |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| anti-cheat-integrity | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| observability-telemetry | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| crash-diagnostics | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| determinism-replay | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| hot-reload-iteration | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| accessibility | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| plugin-system | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| modding-ugc |  |  |  | ● | ● |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● | ● | ● |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
-| ml-inference-runtime |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● | ● | ● | ● | ● |  | ● |  |  |  |  |  |  |  |  |  | ● |  |  |  |  | ● |  |  |  |  |
-| core-runtime-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| math-simd-numerics | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| memory-allocators | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| containers-core-types | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| concurrency-primitives | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| job-system-task-graph | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| frame-orchestration | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| entity-object-model | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| ecs-runtime |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| reflection-metadata | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| serialization-schema | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| platform-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| platform-desktop | ● | ● | ● | ● |  | ● |  |  | ● | ● | ● | ● |  |  | ● | ● |  |  | ● | ● |  | ● | ● |  |  | ● |  | ● |  |  | ● | ● | ● | ● | ● | ● | ● |  | ● | ● |  |  |  |
-| platform-console | ● | ● | ● | ● |  |  |  |  | ● | ● | ● | ● |  |  | ● |  |  |  |  | ● |  | ● |  | ● | ● | ● |  | ● |  | ● |  |  | ● |  | ● | ● |  |  | ● |  |  | ● |  |
-| platform-mobile | ● | ● | ● | ● |  |  | ● | ● |  | ● |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  | ● |  |  |  | ● | ● |  |  |  |  |  |  |  | ● | ● |  |  |
-| platform-services | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| input-system | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| input-devices-haptics | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| xr-runtime |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● | ● |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |
-| content-pipeline-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| asset-import-interchange |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  | ● | ● | ● |  | ● | ● | ● |  |  | ● |  |  |  |
-| asset-cook-processors |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  | ● | ● | ● |  | ● | ● | ● |  |  | ● |  |  |  |
-| resource-streaming-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| async-io-storage | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| package-formats-vfs | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| world-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| world-data-model | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| spatial-transforms | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| terrain |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |
-| vegetation-foliage |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |
-| water-ocean |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |
-| atmosphere-weather |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |
-| procedural-generation |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| render-architect | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| rhi-core | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| gpu-memory-resources | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| render-graph-scheduling | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| shader-system | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| material-system | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| geometry-pipeline |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |
-| virtualized-geometry-lod |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |
-| texture-streaming-vt | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| direct-lighting-shadows |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |
-| global-illumination |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |
-| ray-tracing-infrastructure |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |
-| path-tracing |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |
-| reconstruction-upscaling | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| post-color-hdr | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| translucency-decals |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |
-| character-rendering |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |
-| render-2d-vector | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| vfx-particles | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| physics-architect |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| collision-detection |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |
-| rigid-body-dynamics |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |
-| character-physics |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |
-| cloth-deformables |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |
-| destruction-fracture |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |
-| fluid-simulation |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  | ● | ● |  |  | ● | ● | ● | ● |  |  |  |  |  |  |  |  |  |  | ● |  |  | ● |  | ● |  |  |  |  |
-| physics-2d |  | ● | ● | ● | ● | ● |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● |  |  | ● |  |  | ● |  |  |  |  |  |  | ● | ● |  |  |  |  |  |  |
-| animation-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| animation-runtime | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| deformation-skinning |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |
-| animation-graphs | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| motion-synthesis |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |
-| ik-procedural-animation |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| facial-animation |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |
-| cinematics-sequencer | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| audio-architect | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| audio-dsp-mixing | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| spatial-audio-acoustics |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |
-| audio-content-runtime | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| network-architect |  |  |  | ● | ● | ● |  | ● |  |  |  | ● | ● | ● |  | ● | ● |  |  | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |  |  | ● | ● | ● | ● | ● | ● |  |  | ● |  |  |
-| network-transport |  |  |  | ● | ● | ● |  | ● |  |  |  | ● | ● | ● |  | ● | ● |  |  | ● | ● | ● |  |  |  | ● |  | ● | ● | ● |  |  | ● | ● | ● | ● | ● |  |  |  | ● |  |  |
-| replication |  |  |  | ● | ● |  |  | ● |  |  |  | ● | ● | ● |  |  | ● |  |  | ● | ● | ● |  |  |  |  |  | ● | ● | ● |  |  | ● | ● | ● |  |  |  |  |  | ● |  |  |
-| prediction-rollback |  |  |  | ● | ● | ● |  | ● |  |  |  | ● | ● | ● |  | ● | ● |  |  | ● | ● | ● |  |  |  | ● |  | ● | ● | ● |  |  | ● | ● | ● | ● | ● |  |  |  | ● |  |  |
-| dedicated-server |  |  |  |  | ● |  |  |  |  |  |  |  | ● |  |  |  | ● |  |  |  | ● | ● |  |  |  |  |  |  |  |  |  |  | ● |  | ● |  |  |  |  |  |  |  |  |
-| gameplay-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| gameplay-systems-toolkit | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| scripting-runtime | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| navigation-pathfinding |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| crowd-simulation |  |  |  |  |  | ● |  |  |  |  | ● |  |  |  |  | ● |  |  |  | ● | ● | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  | ● |  |  |  | ● | ● |  |
-| ai-behavior-perception | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| persistence-save | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| ui-architect | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| text-fonts | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| localization-i18n | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| editor-architect |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  | ● | ● | ● |  | ● | ● | ● |  |  | ● |  |  |  |
-| editor-ui-framework |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  | ● | ● | ● |  | ● | ● | ● |  |  | ● |  |  |  |
-| world-editor-viewport |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  | ● | ● | ● |  | ● | ● | ● |  |  | ● |  |  |  |
-| graph-editor-framework |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  | ● | ● | ● |  | ● | ● | ● |  |  | ● |  |  |  |
-| collaboration-version-control |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  | ● | ● | ● |  | ● | ● | ● |  |  | ● |  |  |  |
-| visual-debugging-tools | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| ai-assisted-authoring |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
-| build-system-toolchains |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  | ● | ● | ● |  | ● | ● | ● |  |  | ● |  |  |  |
-| ci-cd-automation |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  | ● | ● | ● |  | ● | ● | ● |  |  | ● |  |  |  |
-| packaging-release-patching |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  | ● | ● | ● |  | ● | ● | ● |  |  | ● |  |  |  |
-| runtime-scalability | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| voxel-worlds |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
-| gpu-platform-architect | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| rhi-d3d12 | ● | ● | ● | ● |  | ● |  |  | ● | ● | ● | ● |  |  | ● | ● |  |  | ● | ● |  | ● | ● |  |  | ● |  | ● |  |  | ● | ● | ● | ● | ● | ● | ● |  | ● | ● |  |  |  |
-| rhi-vulkan | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● |  |  | ● | ● | ● |  |  | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● |  |  |
-| rhi-metal | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● |  |  | ● | ● | ● |  |  | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● |  |  |
-| rhi-webgpu | ● | ● | ● |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |
-| media-playback | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| vehicle-physics |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  | ● | ● | ● |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
-| physics-tools |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  | ● | ● |  | ● | ● | ● |  |  | ● |  |  |  |
-| character-movement |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |
-| gameplay-data | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| narrative-dialogue | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| reference-games | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| platform-web | ● | ● | ● |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |
-| online-services-liveops | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| systems-simulation |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  | ● | ● |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |
-| platform-server-host |  |  |  |  | ● |  |  |  |  |  |  |  | ● | ● |  |  | ● |  |  |  | ● | ● |  |  |  |  |  |  |  |  |  |  | ● |  | ● |  |  | ● |  |  |  |  |  |
-| rhi-console | ● | ● | ● | ● |  |  |  |  | ● | ● | ● | ● |  |  | ● |  |  |  |  | ● |  | ● |  | ● | ● | ● |  | ● |  | ● |  |  | ● |  | ● | ● |  |  | ● |  |  | ● |  |
-| net-session |  |  |  | ● | ● | ● |  | ● |  |  |  | ● | ● | ● |  | ● | ● |  |  | ● | ● | ● |  |  |  | ● |  | ● | ● | ● |  |  | ● | ● | ● | ● | ● |  |  |  | ● |  |  |
-| server-scaleout-persistence |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  | ● | ● |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
-| test-runtime-harness | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| security-runtime | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| gameplay-camera | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| **total** | 74 | 81 | 92 | 85 | 59 | 83 | 95 | 100 | 98 | 110 | 99 | 103 | 67 | 67 | 99 | 103 | 71 | 97 | 98 | 108 | 73 | 123 | 79 | 96 | 94 | 82 | 69 | 103 | 79 | 99 | 82 | 108 | 116 | 104 | 116 | 93 | 94 | 47 | 100 | 109 | 101 | 95 | 94 |
+| Skill | minimal-client | indie-2d-client | indie-2d-tools | indie-2d-online-moddable-client | indie-2d-online-moddable-server | rts-2d-massim-client | lite-3d-mobile-client | lite-3d-mobile-online-client | standard-3d-client | standard-3d-tools | open-world-client | online-3d-client | online-3d-server | online-3d-bot-client | racing-3d-client | rts-3d-massim-client | sandbox-online-server | xr-standalone-client | xr-pc-client | aaa-open-world-online-client | aaa-open-world-online-server | aaa-open-world-online-tools | sandbox-2d-client | xr-console-client | lite-3d-portable-console-client | fighting-2d-rollback-client | mobile-async-client | coop-3d-listen-client | indie-2d-online-web-client | online-3d-console-client | minimal-tools | lite-3d-mobile-tools | online-3d-tools | aaa-experimental-client | standard-3d-team-tools | fighting-2d-rollback-tools | rts-massim-lockstep-tools | mobile-async-validator | rt-required-3d-client | xr-standalone-tools | lite-3d-mobile-openworld-online-client | lite-3d-portable-openworld-client | lite-3d-web-client | community-server-pc | sandbox-2d-tools | rt-required-3d-tools | aaa-experimental-tools |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| anti-cheat-integrity | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| observability-telemetry | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| crash-diagnostics | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| determinism-replay | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| hot-reload-iteration | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| accessibility | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |  | ● | ● | ● |
+| plugin-system | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| modding-ugc |  |  |  | ● | ● |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● | ● | ● |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |
+| ml-inference-runtime |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● | ● | ● | ● | ● |  | ● |  |  |  |  |  |  |  |  |  | ● |  |  |  |  | ● |  |  |  |  |  |  |  |  |
+| core-runtime-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| math-simd-numerics | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| memory-allocators | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| containers-core-types | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| concurrency-primitives | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| job-system-task-graph | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| frame-orchestration | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| entity-object-model | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| ecs-runtime |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| reflection-metadata | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| serialization-schema | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| platform-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| platform-desktop | ● | ● | ● | ● |  | ● |  |  | ● | ● | ● | ● |  |  | ● | ● |  |  | ● | ● |  | ● | ● |  |  | ● |  | ● |  |  | ● | ● | ● | ● | ● | ● | ● |  | ● | ● |  |  |  | ● | ● | ● | ● |
+| platform-console | ● | ● | ● | ● |  |  |  |  | ● | ● | ● | ● |  |  | ● |  |  |  |  | ● |  | ● |  | ● | ● | ● |  | ● |  | ● |  |  | ● |  | ● | ● |  |  | ● |  |  | ● |  |  |  | ● |  |
+| platform-mobile | ● | ● | ● | ● |  |  | ● | ● |  | ● |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  | ● |  |  |  | ● | ● |  |  |  |  |  |  |  | ● | ● |  |  |  |  |  |  |
+| platform-services | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| input-system | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| input-devices-haptics | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |  | ● | ● | ● |
+| xr-runtime |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● | ● |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |
+| content-pipeline-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| asset-import-interchange |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  | ● | ● | ● |  | ● | ● | ● |  |  | ● |  |  |  |  | ● | ● | ● |
+| asset-cook-processors |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  | ● | ● | ● |  | ● | ● | ● |  |  | ● |  |  |  |  | ● | ● | ● |
+| resource-streaming-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| async-io-storage | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| package-formats-vfs | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| world-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| world-data-model | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| spatial-transforms | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| terrain |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |  |  | ● | ● |
+| vegetation-foliage |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |  |  | ● | ● |
+| water-ocean |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |  |  | ● | ● |
+| atmosphere-weather |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |  |  | ● | ● |
+| procedural-generation |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| render-architect | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |  | ● | ● | ● |
+| rhi-core | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |  | ● | ● | ● |
+| gpu-memory-resources | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |  | ● | ● | ● |
+| render-graph-scheduling | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |  | ● | ● | ● |
+| shader-system | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |  | ● | ● | ● |
+| material-system | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |  | ● | ● | ● |
+| geometry-pipeline |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |  |  | ● | ● |
+| virtualized-geometry-lod |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |  |  | ● | ● |
+| texture-streaming-vt | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |  | ● | ● | ● |
+| direct-lighting-shadows |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |  |  | ● | ● |
+| global-illumination |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |  |  | ● | ● |
+| ray-tracing-infrastructure |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |  |  | ● | ● |
+| path-tracing |  |  |  |  |  |  |  |  | ● | ● | ● | ● |  |  | ● | ● |  |  | ● | ● |  | ● |  | ● |  |  |  | ● |  | ● |  |  | ● | ● | ● |  |  |  | ● |  |  |  |  |  |  | ● | ● |
+| reconstruction-upscaling | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |  | ● | ● | ● |
+| post-color-hdr | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |  | ● | ● | ● |
+| translucency-decals |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |  |  | ● | ● |
+| character-rendering |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |  |  | ● | ● |
+| render-2d-vector | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |  | ● | ● | ● |
+| vfx-particles | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |  | ● | ● | ● |
+| physics-architect |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| collision-detection |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |  |  | ● | ● |
+| rigid-body-dynamics |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |  |  | ● | ● |
+| character-physics |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |  |  | ● | ● |
+| cloth-deformables |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |  |  | ● | ● |
+| destruction-fracture |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |  |  | ● | ● |
+| fluid-simulation |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  | ● | ● |  |  | ● | ● | ● | ● |  |  |  |  |  |  |  |  |  |  | ● |  |  | ● |  | ● |  |  |  |  |  | ● |  | ● |
+| physics-2d |  | ● | ● | ● | ● | ● |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● |  |  | ● |  |  | ● |  |  |  |  |  |  | ● | ● |  |  |  |  |  |  | ● | ● |  |  |
+| animation-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| animation-runtime | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| deformation-skinning |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |  |  | ● | ● |
+| animation-graphs | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| motion-synthesis |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |  |  | ● | ● |
+| ik-procedural-animation |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| facial-animation |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |  |  | ● | ● |
+| cinematics-sequencer | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| audio-architect | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |  | ● | ● | ● |
+| audio-dsp-mixing | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |  | ● | ● | ● |
+| spatial-audio-acoustics |  |  |  |  |  |  | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● |  | ● | ● |  |  | ● |  | ● |  | ● | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |  |  | ● | ● |
+| audio-content-runtime | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |  | ● | ● | ● |
+| network-architect |  |  |  | ● | ● | ● |  | ● |  |  |  | ● | ● | ● |  | ● | ● |  |  | ● | ● | ● |  |  |  | ● | ● | ● | ● | ● |  |  | ● | ● | ● | ● | ● | ● |  |  | ● |  |  | ● |  |  | ● |
+| network-transport |  |  |  | ● | ● | ● |  | ● |  |  |  | ● | ● | ● |  | ● | ● |  |  | ● | ● | ● |  |  |  | ● |  | ● | ● | ● |  |  | ● | ● | ● | ● | ● |  |  |  | ● |  |  | ● |  |  | ● |
+| replication |  |  |  | ● | ● |  |  | ● |  |  |  | ● | ● | ● |  |  | ● |  |  | ● | ● | ● |  |  |  |  |  | ● | ● | ● |  |  | ● | ● | ● |  |  |  |  |  | ● |  |  | ● |  |  | ● |
+| prediction-rollback |  |  |  | ● | ● | ● |  | ● |  |  |  | ● | ● | ● |  | ● | ● |  |  | ● | ● | ● |  |  |  | ● |  | ● | ● | ● |  |  | ● | ● | ● | ● | ● |  |  |  | ● |  |  | ● |  |  | ● |
+| dedicated-server |  |  |  |  | ● |  |  |  |  |  |  |  | ● |  |  |  | ● |  |  |  | ● | ● |  |  |  |  |  |  |  |  |  |  | ● |  | ● |  |  |  |  |  |  |  |  | ● |  |  | ● |
+| gameplay-architect | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| gameplay-systems-toolkit | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| scripting-runtime | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| navigation-pathfinding |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| crowd-simulation |  |  |  |  |  | ● |  |  |  |  | ● |  |  |  |  | ● |  |  |  | ● | ● | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  | ● |  |  |  | ● | ● |  |  |  |  | ● |
+| ai-behavior-perception | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| persistence-save | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| ui-architect | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |  | ● | ● | ● |
+| text-fonts | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |  | ● | ● | ● |
+| localization-i18n | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| editor-architect |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  | ● | ● | ● |  | ● | ● | ● |  |  | ● |  |  |  |  | ● | ● | ● |
+| editor-ui-framework |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  | ● | ● | ● |  | ● | ● | ● |  |  | ● |  |  |  |  | ● | ● | ● |
+| world-editor-viewport |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  | ● | ● | ● |  | ● | ● | ● |  |  | ● |  |  |  |  | ● | ● | ● |
+| graph-editor-framework |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  | ● | ● | ● |  | ● | ● | ● |  |  | ● |  |  |  |  | ● | ● | ● |
+| collaboration-version-control |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  | ● | ● | ● |  | ● | ● | ● |  |  | ● |  |  |  |  | ● | ● | ● |
+| visual-debugging-tools | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| ai-assisted-authoring |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● |
+| build-system-toolchains |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  | ● | ● | ● |  | ● | ● | ● |  |  | ● |  |  |  |  | ● | ● | ● |
+| ci-cd-automation |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  | ● | ● | ● |  | ● | ● | ● |  |  | ● |  |  |  |  | ● | ● | ● |
+| packaging-release-patching |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  | ● | ● | ● |  | ● | ● | ● |  |  | ● |  |  |  |  | ● | ● | ● |
+| runtime-scalability | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| voxel-worlds |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |
+| gpu-platform-architect | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |  | ● | ● | ● |
+| rhi-d3d12 | ● | ● | ● | ● |  | ● |  |  | ● | ● | ● | ● |  |  | ● | ● |  |  | ● | ● |  | ● | ● |  |  | ● |  | ● |  |  | ● | ● | ● | ● | ● | ● | ● |  | ● | ● |  |  |  |  | ● | ● | ● |
+| rhi-vulkan | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● |  |  | ● | ● | ● |  |  | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● |  |  |  | ● | ● | ● |
+| rhi-metal | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● |  |  | ● | ● | ● |  |  | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● |  |  |  | ● | ● | ● |
+| rhi-webgpu | ● | ● | ● |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |
+| media-playback | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  |  | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● |  | ● | ● | ● |
+| vehicle-physics |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  | ● | ● | ● |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| physics-tools |  |  | ● |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  | ● | ● |  | ● | ● | ● |  |  | ● |  |  |  |  | ● | ● | ● |
+| character-movement |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| gameplay-data | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| narrative-dialogue | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| reference-games | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| platform-web | ● | ● | ● |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● |  | ● |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |
+| online-services-liveops | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| systems-simulation |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  | ● | ● |  |  |  |  |  | ● |  |  |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  |  |  |  |  | ● |  |  |
+| platform-server-host |  |  |  |  | ● |  |  |  |  |  |  |  | ● | ● |  |  | ● |  |  |  | ● | ● |  |  |  |  |  |  |  |  |  |  | ● |  | ● |  |  | ● |  |  |  |  |  | ● |  |  |  |
+| rhi-console | ● | ● | ● | ● |  |  |  |  | ● | ● | ● | ● |  |  | ● |  |  |  |  | ● |  | ● |  | ● | ● | ● |  | ● |  | ● |  |  | ● |  | ● | ● |  |  | ● |  |  | ● |  |  |  | ● |  |
+| net-session |  |  |  | ● | ● | ● |  | ● |  |  |  | ● | ● | ● |  | ● | ● |  |  | ● | ● | ● |  |  |  | ● |  | ● | ● | ● |  |  | ● | ● | ● | ● | ● |  |  |  | ● |  |  | ● |  |  | ● |
+| server-scaleout-persistence |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ● |  |  |  | ● | ● |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| test-runtime-harness | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| security-runtime | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| gameplay-camera | ● | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● |  | ● | ● | ● |  | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |  | ● | ● | ● |
+| **total** | 74 | 81 | 92 | 85 | 59 | 83 | 94 | 99 | 98 | 110 | 99 | 103 | 67 | 67 | 99 | 103 | 71 | 96 | 98 | 108 | 73 | 123 | 79 | 96 | 93 | 82 | 69 | 103 | 79 | 99 | 82 | 107 | 116 | 104 | 116 | 93 | 94 | 47 | 100 | 108 | 100 | 94 | 93 | 60 | 90 | 109 | 116 |
 
 ## Skill cards
 
@@ -436,7 +441,7 @@ Research discipline for every major decision: finds and grades authoritative evi
 
 Owns performance as a discipline: the hypothesis → instrumentation → measurement → optimization → regression-test loop, budgets per subsystem and hardware tier, the scalability / device-profile framework, and performance gates.
 
-- **Owns:** `PRF.METH.loop`; `PRF.METH.budgets`; `PRF.METH.scalability`; `PRF.METH.gates`; `PRF.METH.model`; `PRF.METH.asymptotics`; `PRF.METH.pipeline-budgets`; `PRF.METH.field`; `PRF.METH.energy`
+- **Owns:** `PRF.METH.loop`; `PRF.METH.budgets`; `PRF.METH.scalability`; `PRF.METH.gates`; `PRF.METH.model`; `PRF.METH.asymptotics`; `PRF.METH.pipeline-budgets`; `PRF.METH.field`; `PRF.METH.energy`; `PRF.METH.tier-emulation`
 - **Contributes to:** `ARCH.REQ.hardware-tiers`; `ARCH.ORG.cost-ledger`; `ARCH.PROD.field-feedback`; `PLAT.PAL.device-db`; `PLAT.MOB.thermal`; `CORE.MEM.budget-enforcement`; `CORE.FRAME.critical-path`; `CORE.SCALE.profiles`; `CORE.SCALE.governor`; `RES.MGMT.arbitration`; `CNT.COOK.variants`; `CNT.VAL.budgets`; `RND.ARCH.scalability`; `RND.MEM.budget`; `RND.SHADER.permutation-budget`; `RND.VFX.budgets`; `RND.GPU.tiers`; `PRF.NET.load-analysis`
 - **Not responsible for:** Optimizing subsystem code (via C-PERF findings) → owning-skill; Instrumentation API → observability-telemetry; Benchmark harness → perf-benchmarking; Runtime scalability machinery → runtime-scalability
 - **Provides:** C-BUDGET, C-PERF · **Consumes:** C-PROD
@@ -449,7 +454,7 @@ Owns performance as a discipline: the hypothesis → instrumentation → measure
 
 Benchmark harnesses (micro and representative-workload scenes), automated capture, statistical analysis (variance, significance), regression detection and bisection, dashboards.
 
-- **Owns:** `PRF.BENCH.micro`; `PRF.BENCH.workloads`; `PRF.BENCH.stats`; `PRF.BENCH.regression`; `PRF.BENCH.dashboards`; `PRF.BENCH.scale-content`; `PRF.BENCH.replay`; `PRF.BENCH.tools`; `PRF.BENCH.lab`; `PRF.BENCH.sim-worst-case`; `PRF.BENCH.proxy-metrics`; `PRF.BENCH.lab-scheduling`
+- **Owns:** `PRF.BENCH.micro`; `PRF.BENCH.workloads`; `PRF.BENCH.stats`; `PRF.BENCH.regression`; `PRF.BENCH.dashboards`; `PRF.BENCH.scale-content`; `PRF.BENCH.replay`; `PRF.BENCH.tools`; `PRF.BENCH.lab`; `PRF.BENCH.sim-worst-case`; `PRF.BENCH.proxy-metrics`; `PRF.BENCH.lab-scheduling`; `PRF.BENCH.shipping-delta`
 - **Contributes to:** `ARCH.EVID.claims`; `ARCH.ORG.triage`; `BLD.SYS.configs`; `BLD.CI.bisection`; `QA.REF.content`; `QA.AGENT.baseline-governance`; `PRF.METH.model`; `PRF.METH.field`; `OBS.LOG.bench-runtime`
 - **Not responsible for:** Setting budgets → performance-architect; CI infrastructure → ci-cd-automation
 - **Provides:** C-BENCH · **Consumes:** C-INSTR, C-BUDGET, C-AUTOMATION
@@ -502,7 +507,7 @@ End-to-end load time, startup time and hitch elimination (PSO compilation, strea
 Test strategy and architecture: per-subsystem test pyramid, frameworks, the test definition of done every skill must meet, contract tests, test content, coverage and mutation policy, flakiness policy.
 
 - **Owns:** `QA.STRAT.pyramid`; `QA.STRAT.frameworks`; `QA.STRAT.dod`; `QA.STRAT.coverage`; `QA.STRAT.flaky`; `QA.STRAT.content`; `QA.STRAT.contracts`; `QA.STRAT.oracles`; `QA.STRAT.integration`; `QA.STRAT.release-criteria`; `QA.STRAT.contract-fakes`; `QA.STRAT.selection-policy`; `QA.AGENT.oracle-independence`; `QA.AGENT.baseline-governance`; `QA.AGENT.test-integrity`; `QA.AGENT.mutation-gate`; `QA.AGENT.oracle-change-control`; `QA.AGENT.gate-canaries`; `QA.AGENT.holdout`; `QA.AGENT.holdout-hygiene`
-- **Contributes to:** `ARCH.ORG.critic-calibration`; `ARCH.ORG.independence`; `ARCH.ORG.model-requalification`; `CNT.COOK.determinism-check`; `PHY.ARCH.validation`; `ANM.ARCH.validation`; `AUD.ARCH.validation`; `UI.A11Y.validation`; `BLD.CI.gating`; `BLD.CI.sealed-suites`; `BLD.CI.merge-queue`; `BLD.CI.test-selection`; `QA.REF.ladder`; `QA.CONF.foundation`; `QA.CONF.ui-text`; `QA.CONF.memory-model`; `QA.CONF.numerics`; `QA.CONF.text-shaping`; `QA.CONF.layout-focus`; `PRF.BENCH.workloads`; `XC.DET.conformance`; `XC.DX.doc-tests`
+- **Contributes to:** `ARCH.ORG.critic-calibration`; `ARCH.ORG.independence`; `ARCH.ORG.model-requalification`; `CNT.COOK.determinism-check`; `PHY.ARCH.validation`; `ANM.ARCH.validation`; `AUD.ARCH.validation`; `UI.A11Y.validation`; `BLD.CI.gating`; `BLD.CI.sealed-suites`; `BLD.CI.merge-queue`; `BLD.CI.test-selection`; `QA.REF.ladder`; `QA.CONF.foundation`; `QA.CONF.ui-text`; `QA.CONF.memory-model`; `QA.CONF.numerics`; `QA.CONF.text-shaping`; `QA.CONF.layout-focus`; `QA.CONF.tools-pipeline`; `QA.CONF.import-roundtrip`; `QA.CONF.command-properties`; `PRF.BENCH.workloads`; `XC.DET.conformance`; `XC.DX.doc-tests`
 - **Not responsible for:** Running pipelines → ci-cd-automation; Performance regression → perf-benchmarking; Rendering image validation → render-validation
 - **Provides:** C-TEST · **Consumes:** —
 - **Expertise:** test strategy, contract testing, mutation testing, test determinism
@@ -567,7 +572,7 @@ Tracks and pre-validates external requirements: platform certification (TRC/XR/L
 Threat modeling and trust boundaries for every untrusted input, secure-coding and memory-safety policy, supply-chain security, secrets, anti-tamper boundary, mod/UGC sandbox policy.
 
 - **Owns:** `XC.SEC.threats`; `XC.SEC.coding`; `XC.SEC.trust`; `XC.SEC.supply-chain`; `XC.SEC.secrets`; `XC.SEC.tamper`; `XC.SEC.sandbox`; `XC.SEC.memory-safety`; `XC.SEC.hardening`; `XC.SEC.crypto-policy`; `XC.SEC.vuln-response`; `XC.SEC.incident`; `XC.SEC.dev-trust`; `XC.SEC.agent-boundary`; `XC.SEC.key-custody`; `XC.SEC.genai`; `XC.SEC.testing`; `XC.SEC.agent-redteam`
-- **Contributes to:** `ARCH.EVID.source-policy`; `ARCH.ORG.human-gates`; `ARCH.ORG.provenance`; `ARCH.ORG.sensitive-paths`; `PLAT.PAL.process`; `PLAT.PAL.confidential-extensions`; `PLAT.SVC.voice-moderation`; `PLAT.LIVE.support-tools`; `PLAT.COMM.receipts`; `CORE.LIFE.language`; `CORE.LIFE.ipc`; `CORE.LIFE.interop`; `CORE.LIFE.config-trust`; `CORE.MEM.field-detection`; `CORE.TYPES.crypto`; `CORE.TYPES.hash-dos`; `CORE.SER.untrusted`; `RES.PKG.crypto`; `RND.TEX.runtime-decode`; `NET.TRANS.crypto`; `NET.TRANS.dos`; `NET.SRV.admin`; `NET.SRV.secrets-delivery`; `GAM.SCR.sandbox`; `GAM.AI.local-guardrails`; `GAM.SAVE.integrity`; `UI.FW.web-view`; `ED.ARCH.automation-security`; `ED.COLLAB.codev`; `ED.COLLAB.session-server`; `BLD.SYS.third-party`; `BLD.SYS.dev-surface-exclusion`; `BLD.SYS.provenance`; `BLD.CI.build-distribution`; `BLD.CI.backports`; `BLD.CI.leak-protection`; `BLD.CI.hardening`; `BLD.REL.preload-embargo`; `QA.CERT.privacy`; `QA.CERT.licenses`; `QA.CERT.export-crypto`; `OBS.LOG.consent`; `OBS.LOG.analytics`; `OBS.CRASH.privacy`; `XC.SEC.privacy`; `XC.SEC.data-rights`; `XC.SEC.signed-artifacts`; `XC.EXT.mod-editor`; `XC.EXT.ugc-integrity`; `XC.EXT.generated-assets`
+- **Contributes to:** `ARCH.EVID.source-policy`; `ARCH.ORG.human-gates`; `ARCH.ORG.provenance`; `ARCH.ORG.sensitive-paths`; `PLAT.PAL.process`; `PLAT.PAL.confidential-extensions`; `PLAT.SVC.voice-moderation`; `PLAT.LIVE.support-tools`; `PLAT.COMM.receipts`; `CORE.LIFE.language`; `CORE.LIFE.ipc`; `CORE.LIFE.interop`; `CORE.LIFE.config-trust`; `CORE.MEM.field-detection`; `CORE.MEM.exec-pages`; `CORE.TYPES.crypto`; `CORE.TYPES.hash-dos`; `CORE.SER.untrusted`; `RES.PKG.crypto`; `RND.TEX.runtime-decode`; `NET.TRANS.crypto`; `NET.TRANS.dos`; `NET.SRV.admin`; `NET.SRV.secrets-delivery`; `GAM.SCR.sandbox`; `GAM.AI.local-guardrails`; `GAM.SAVE.integrity`; `UI.FW.web-view`; `ED.ARCH.automation-security`; `ED.COLLAB.codev`; `ED.COLLAB.session-server`; `BLD.SYS.third-party`; `BLD.SYS.dev-surface-exclusion`; `BLD.SYS.provenance`; `BLD.CI.build-distribution`; `BLD.CI.backports`; `BLD.CI.leak-protection`; `BLD.CI.hardening`; `BLD.REL.preload-embargo`; `QA.CERT.privacy`; `QA.CERT.licenses`; `QA.CERT.export-crypto`; `PRF.BENCH.shipping-delta`; `OBS.LOG.consent`; `OBS.LOG.analytics`; `OBS.CRASH.privacy`; `XC.SEC.privacy`; `XC.SEC.data-rights`; `XC.SEC.signed-artifacts`; `XC.EXT.mod-editor`; `XC.EXT.ugc-integrity`; `XC.EXT.generated-assets`
 - **Not responsible for:** Cheat detection → anti-cheat-integrity; Fuzzing campaigns → robustness-fuzzing; Transport encryption implementation → network-transport; Privacy engineering → privacy-data-protection; Crypto and signed-artifact code → security-runtime
 - **Provides:** C-TRUST · **Consumes:** —
 - **Untrusted inputs:** tool-outputs, vuln-reports
@@ -581,7 +586,7 @@ Threat modeling and trust boundaries for every untrusted input, secure-coding an
 Cheat resistance for online games: server-authoritative validation patterns (movement, hits, economy), rate limiting, anomaly signals, integration boundary for client anti-cheat middleware.
 
 - **Owns:** `XC.SEC.server-validation`; `XC.SEC.anticheat`; `XC.SEC.abuse`; `XC.SEC.score-integrity`; `XC.SEC.behavioral-detection`; `XC.SEC.attestation`; `XC.SEC.usermode-anticheat`; `XC.SEC.info-hiding`
-- **Contributes to:** `ARCH.ORG.human-gates`; `PLAT.DESK.os-security`; `PLAT.SVC.leaderboards`; `PLAT.COMM.receipts`; `PLAT.COMM.revocation`; `NET.ARCH.async-validation`; `NET.REP.interest`; `NET.PRED.input-commands`; `NET.SRV.transactions`; `NET.SRV.admin`; `NET.SESS.disconnect`; `NET.SESS.budgets`; `GAM.SYS.projectiles`; `GAM.SYS.aim-assist`; `GAM.AI.team-visibility`; `XC.SEC.tamper`; `XC.SEC.incident`
+- **Contributes to:** `ARCH.ORG.human-gates`; `PLAT.DESK.os-security`; `PLAT.SVC.leaderboards`; `PLAT.COMM.receipts`; `PLAT.COMM.revocation`; `NET.ARCH.distributed-authority`; `NET.ARCH.async-validation`; `NET.REP.interest`; `NET.PRED.lagcomp`; `NET.PRED.input-commands`; `NET.SRV.transactions`; `NET.SRV.admin`; `NET.SESS.disconnect`; `NET.SESS.budgets`; `GAM.SYS.projectiles`; `GAM.SYS.aim-assist`; `GAM.AI.team-visibility`; `XC.SEC.tamper`; `XC.SEC.incident`
 - **Not responsible for:** Replication design → replication; Transport encryption → network-transport
 - **Provides:** C-INTEGRITY · **Consumes:** C-NET?, C-PREDICT?, C-PHYS?, C-SVC?, C-LIVE?, C-SRVDATA?, C-ML?, C-HOSTAUTH?
 - **Untrusted inputs:** client-integrity-reports
@@ -637,7 +642,7 @@ Defines determinism levels (none, same-binary, cross-platform) per subsystem and
 Owns the reload protocol (change detection, dependency invalidation, state preservation) that assets, shaders, scripts, config and C++ live coding plug into; measures edit → see latency.
 
 - **Owns:** `XC.ITER.protocol`; `XC.ITER.live-coding`; `XC.ITER.coordination`; `XC.ITER.metrics`
-- **Contributes to:** `PLAT.PAL.fs-watch`; `RES.MGMT.reload`; `CNT.COOK.on-demand`; `RND.SHADER.reload`; `GAM.SCR.reload`; `ED.ARCH.discipline-workflows`
+- **Contributes to:** `PLAT.PAL.fs-watch`; `CORE.MEM.exec-pages`; `RES.MGMT.reload`; `CNT.COOK.on-demand`; `RND.SHADER.reload`; `GAM.SCR.reload`; `ED.ARCH.pie`; `ED.ARCH.discipline-workflows`
 - **Not responsible for:** Each system's own reload implementation (via C-RELOAD) → owning-skill; Build system → build-system-toolchains
 - **Provides:** C-RELOAD · **Consumes:** C-RES, C-MOD, C-REFL · **Tool-side:** C-BUILD
 - **Untrusted inputs:** dev-endpoints
@@ -648,10 +653,10 @@ Owns the reload protocol (change detection, dependency invalidation, state prese
 
 **Accessibility** · cross-cutting · runtime · workstream: ui · parent: engine-architect · profiles: all · targets: client, tools
 
-Maps XAG/GAG and legal requirements to engine features and owns subtitles and captions, screen-reader/TTS/STT hooks, colorblind and contrast modes, text scaling, motion and photosensitivity options, assist hooks, and their validation.
+Maps XAG/GAG and legal requirements to engine features; defines the requirement mapping, services (C-A11YRT), settings and validation; presentation is owned by ui-architect (subtitles, text scaling), post-color-hdr (colorblind and contrast passes) and input-system.
 
 - **Owns:** `UI.A11Y.requirements`; `UI.A11Y.screen-reader`; `UI.A11Y.subtitles`; `UI.A11Y.motion`; `UI.A11Y.assists`; `UI.A11Y.validation`; `UI.A11Y.comms`; `UI.A11Y.sound-visualization`; `UI.A11Y.audio-description`; `UI.A11Y.palettes`; `UI.TOOL.a11y-preview`
-- **Contributes to:** `PLAT.PAL.system-events`; `PLAT.CON.confidential-slots`; `PLAT.SVC.voice-text`; `RND.POST.colorblind`; `INP.DEV.eye-tracking`; `INP.ACT.accessibility`; `GAM.SAVE.settings`; `GAM.DATA.tuning`; `GAM.NARR.validation`; `GAM.CAM.comfort`; `UI.FW.text-scale`; `UI.FW.a11y-tree`; `UI.FW.subtitles`; `UI.TXT.editing`; `ED.UI.accessibility`; `QA.CERT.a11y-law`; `XC.SEC.score-integrity`
+- **Contributes to:** `PLAT.PAL.system-events`; `PLAT.DESK.backend-slots`; `PLAT.CON.confidential-slots`; `PLAT.MOB.backend-slots`; `PLAT.SVC.voice-text`; `PLAT.WEB.backend-slots`; `RND.POST.colorblind`; `INP.DEV.eye-tracking`; `INP.ACT.accessibility`; `GAM.SAVE.settings`; `GAM.DATA.tuning`; `GAM.NARR.validation`; `GAM.CAM.comfort`; `UI.FW.text-scale`; `UI.FW.a11y-tree`; `UI.FW.subtitles`; `UI.TXT.editing`; `ED.UI.accessibility`; `QA.CERT.a11y-law`; `XC.SEC.score-integrity`
 - **Not responsible for:** Input remapping implementation → input-system; UI layout engine & subtitle presentation → ui-architect; Colorblind passes → post-color-hdr; Legal compliance sign-off → certification-compliance
 - **Provides:** C-A11Y, C-A11YRT · **Consumes:** C-TEXT, C-PAL, C-DIALOGUE?, C-AUDIO? · **Tool-side:** C-EDCMD, C-EDHOST
 - **Expertise:** game accessibility guidelines, assistive tech APIs, inclusive design
@@ -693,7 +698,7 @@ Mod and UGC support: mod SDK, content overrides via VFS layering, sandboxed mod 
 - **Owns:** `XC.EXT.mod-sdk`; `XC.EXT.mod-loading`; `XC.EXT.ugc`; `XC.EXT.mod-compat`; `XC.EXT.player-creation`; `XC.EXT.ugc-discovery`; `XC.EXT.mod-editor`; `XC.EXT.ugc-integrity`; `XC.EXT.generated-assets`; `XC.EXT.runtime-graphs`
 - **Contributes to:** `PLAT.SVC.moderation`; `CORE.SER.commands`; `RND.SHADER.untrusted`; `PHY.COL.runtime-build`; `NET.SRV.community-hosting`; `NET.SESS.content-set`; `GAM.SAVE.unknown-content`; `ED.ARCH.transactions`; `QA.FUNC.compat-corpus`; `XC.SEC.sandbox`
 - **Not responsible for:** Sandbox policy → security-engineering; Script VM → scripting-runtime
-- **Provides:** C-EDIT · **Consumes:** C-VFS, C-SCRIPT, C-PLUGIN, C-SVC, C-SIGN, C-SHADER?, C-CMD, C-NETSESSION? · **Tool-side:** C-EDCMD, C-EDHOST, C-COOK
+- **Provides:** C-EDIT · **Consumes:** C-VFS, C-SCRIPT, C-PLUGIN, C-SVC, C-SIGN, C-SHADER?, C-CMD, C-NETSESSION?, C-GRAPHRT · **Tool-side:** C-EDCMD, C-EDHOST, C-COOK
 - **Untrusted inputs:** community-server-config, mods, physics-assets, player-model-prompts, server-pushed-content, ugc-graphs
 - **Expertise:** mod ecosystems, sandboxing, content overrides
 - **Critics (G2):** K-ARCH, K-NET, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
@@ -717,13 +722,13 @@ Documentation and developer experience: API reference, architecture docs, the sa
 
 Runtime neural-network inference shared by neural rendering, animation, audio and AI: GPU (matrix/tensor intrinsics tier) and CPU backends, model packaging and quantization, scheduling within frame budgets, determinism characteristics.
 
-- **Owns:** `ML.RT.inference`; `ML.RT.packaging`; `ML.RT.scheduling`; `ML.RT.training-boundary`; `ML.RT.determinism`; `ML.RT.npu`; `ML.RT.validation`; `ML.RT.os-models`; `ML.RT.residency`; `ML.RT.local-remote`; `ML.RT.constrained-decoding`; `ML.RT.sequence-exec`; `ML.RT.web-backends`
+- **Owns:** `ML.RT.inference`; `ML.RT.packaging`; `ML.RT.scheduling`; `ML.RT.training-boundary`; `ML.RT.determinism`; `ML.RT.npu`; `ML.RT.validation`; `ML.RT.os-models`; `ML.RT.residency`; `ML.RT.local-remote`; `ML.RT.constrained-decoding`; `ML.RT.sequence-exec`; `ML.RT.web-backends`; `ML.TOOL.model-assets`
 - **Contributes to:** `CNT.COOK.gpu-steps`; `RND.SHADER.neural`; `RND.MAT.neural`; `RND.TEX.ntc`; `RND.GI.neural-cache`; `RND.RECON.ml-denoise`; `PHY.ARCH.learned-surrogates`; `ANM.DEF.ml`; `ANM.SYN.learned`; `ANM.IK.learned-physics`; `ANM.FACE.lipsync-ml`; `AUD.CONTENT.speech`; `GAM.AI.local-guardrails`; `QA.CERT.ml-provenance`; `XC.SEC.behavioral-detection`
 - **Not responsible for:** Vendor upscalers → reconstruction-upscaling; In-shader (fused) networks → shader-system; Neural feature design → owning-skill; Model training → external:ml-training; GPU queue/budget arbitration of C-MLGPU work → render-graph-scheduling
-- **Provides:** C-ML, C-MLGPU · **Consumes:** C-TASK, C-RHI?@C-MLGPU, C-RG?@C-MLGPU, C-PAL, C-FRAME, C-RES
+- **Provides:** C-ML, C-MLGPU · **Consumes:** C-TASK, C-RHI?@C-MLGPU, C-RG?@C-MLGPU, C-PAL, C-FRAME, C-RES · **Tool-side:** C-EDCMD, C-EDHOST
 - **Untrusted inputs:** ml-models
 - **Expertise:** inference engines, quantization, matrix/tensor intrinsics, ONNX
-- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
+- **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### core-runtime-architect
 
@@ -758,8 +763,8 @@ Math and numerics: SIMD linear algebra, geometry and intersection primitives, co
 
 Memory management: virtual memory, allocator families, thread-local and NUMA-aware allocation, tagging and attribution, budget enforcement mechanisms, fragmentation control, memory debugging, OOM policy, UMA accounting.
 
-- **Owns:** `CORE.MEM.virtual`; `CORE.MEM.allocators`; `CORE.MEM.thread-caches`; `CORE.MEM.tracking`; `CORE.MEM.budget-enforcement`; `CORE.MEM.fragmentation`; `CORE.MEM.debugging`; `CORE.MEM.oom`; `CORE.MEM.uma`; `CORE.MEM.field-detection`
-- **Contributes to:** `PLAT.PAL.system-events`; `RES.MGMT.arbitration`; `RND.MEM.cpu-visible`; `QA.HOST.fault-points`; `PRF.MEM.footprint`; `OBS.LOG.trace-analysis`; `OBS.CRASH.oom`; `OBS.CRASH.safe-path`; `XC.SEC.hardening`
+- **Owns:** `CORE.MEM.virtual`; `CORE.MEM.allocators`; `CORE.MEM.thread-caches`; `CORE.MEM.tracking`; `CORE.MEM.budget-enforcement`; `CORE.MEM.fragmentation`; `CORE.MEM.debugging`; `CORE.MEM.oom`; `CORE.MEM.uma`; `CORE.MEM.field-detection`; `CORE.MEM.exec-pages`
+- **Contributes to:** `PLAT.PAL.system-events`; `RES.MGMT.arbitration`; `RND.MEM.cpu-visible`; `QA.HOST.fault-points`; `PRF.METH.tier-emulation`; `PRF.MEM.footprint`; `OBS.LOG.trace-analysis`; `OBS.CRASH.oom`; `OBS.CRASH.safe-path`; `XC.SEC.hardening`
 - **Not responsible for:** GPU heaps → gpu-memory-resources; Budget numbers → performance-architect
 - **Provides:** C-MEM · **Consumes:** C-PAL, C-BASE, C-SYNC, C-LIFETIME
 - **Expertise:** allocator design, virtual memory, TLSF, memory profiling
@@ -838,7 +843,7 @@ Object-model strategy and identity: generational entity IDs, stable GUIDs, hard/
 ECS: storage (archetype chunks or sparse sets, chosen by ADR), queries, change detection, structural changes and command buffers, lowering systems to frame access declarations, ECS-specific ambiguity diagnostics, relationships, singletons, authoring → runtime baking, debugging.
 
 - **Owns:** `CORE.ECS.storage`; `CORE.ECS.queries`; `CORE.ECS.change`; `CORE.ECS.structural`; `CORE.ECS.scheduling`; `CORE.ECS.relationships`; `CORE.ECS.singletons`; `CORE.ECS.baking`; `CORE.ECS.debug`; `CORE.ECS.bridges`; `CORE.ECS.snapshot`; `CORE.ECS.safety`
-- **Contributes to:** `CORE.FRAME.phases`; `CORE.FRAME.access-model`; `CORE.OBJ.world-instances`; `CORE.REFL.state-classes`; `WLD.PART.activation`; `WLD.PART.cook`; `WLD.SPACE.change-sets`; `GAM.FW.execution`; `GAM.AI.mass`; `XC.DET.snapshot`
+- **Contributes to:** `CORE.FRAME.phases`; `CORE.FRAME.access-model`; `CORE.OBJ.world-instances`; `CORE.REFL.state-classes`; `WLD.PART.activation`; `WLD.PART.cook`; `WLD.SPACE.change-sets`; `GAM.FW.execution`; `GAM.AI.mass`; `ED.ARCH.pie`; `XC.DET.snapshot`
 - **Not responsible for:** World partition → world-architect; Transform propagation → spatial-transforms; Object-model policy → entity-object-model
 - **Provides:** C-ECS · **Consumes:** C-ID, C-TASK, C-FRAME, C-REFL?, C-SNAPSHOT, C-RELOAD?, C-STATECLASS · **Tool-side:** C-COOK
 - **Expertise:** ECS architectures, data-oriented design, parallel scheduling
@@ -877,8 +882,8 @@ Binary and text formats, schema evolution and upgraders, in-place loadable layou
 
 Platform abstraction layer interfaces and policy (implemented per platform by the platform experts): OS services, CPU/GPU capability discovery, windowing, process lifecycle, device database, and evaluation of new targets (web, cloud streaming).
 
-- **Owns:** `ARCH.STRUCT.platform-backends`; `PLAT.PAL.os`; `PLAT.PAL.cpu-topology`; `PLAT.PAL.windowing`; `PLAT.PAL.lifecycle`; `PLAT.PAL.capability-tiers`; `PLAT.PAL.cloud-streaming`; `PLAT.PAL.base`; `PLAT.PAL.threads`; `PLAT.PAL.thread-affinity`; `PLAT.PAL.process`; `PLAT.PAL.clocks`; `PLAT.PAL.signals`; `PLAT.PAL.fs-watch`; `PLAT.PAL.power`; `PLAT.PAL.system-events`; `PLAT.PAL.safe-area`; `PLAT.PAL.permissions`; `PLAT.PAL.device-db`; `PLAT.PAL.performance-modes`; `PLAT.PAL.os-support-policy`; `PLAT.PAL.devlink`; `PLAT.PAL.confidential-extensions`; `PLAT.PAL.display`; `PLAT.PAL.event-injection`; `PLAT.PAL.pointer-shell`; `PLAT.PAL.target-tools`; `PLAT.PAL.cloud-render-host`
-- **Contributes to:** `ARCH.REQ.platform-matrix`; `ARCH.ORG.bootstrap`; `ARCH.ORG.delegated-planning`; `PLAT.PAL.cloud-hybrid`; `PLAT.DESK.pal`; `PLAT.CON.pal`; `PLAT.CON.public-slot-reference`; `PLAT.MOB.pal`; `PLAT.WEB.pal`; `PLAT.SRV.pal`; `CORE.LIFE.bootstrap`; `CORE.CONC.layout`; `CORE.JOBS.hetero`; `CORE.JOBS.thread-model`; `CORE.JOBS.pinned`; `CORE.SCALE.profiles`; `RES.MGMT.arbitration`; `RES.IO.fs`; `RES.IO.write`; `ML.RT.npu`; `AUD.ARCH.routing`; `UI.FW.safe-area`; `UI.TXT.ime`; `UI.TXT.editing`; `UI.A11Y.screen-reader`; `QA.HOST.runner`; `OBS.CRASH.safe-path`; `XC.EXT.mod-editor`
+- **Owns:** `ARCH.STRUCT.platform-backends`; `PLAT.PAL.os`; `PLAT.PAL.cpu-topology`; `PLAT.PAL.windowing`; `PLAT.PAL.lifecycle`; `PLAT.PAL.capability-tiers`; `PLAT.PAL.cloud-streaming`; `PLAT.PAL.base`; `PLAT.PAL.threads`; `PLAT.PAL.thread-affinity`; `PLAT.PAL.process`; `PLAT.PAL.clocks`; `PLAT.PAL.signals`; `PLAT.PAL.fs-watch`; `PLAT.PAL.power`; `PLAT.PAL.system-events`; `PLAT.PAL.safe-area`; `PLAT.PAL.permissions`; `PLAT.PAL.device-db`; `PLAT.PAL.performance-modes`; `PLAT.PAL.os-support-policy`; `PLAT.PAL.devlink`; `PLAT.PAL.confidential-extensions`; `PLAT.PAL.display`; `PLAT.PAL.event-injection`; `PLAT.PAL.pointer-shell`; `PLAT.PAL.target-tools`; `PLAT.PAL.cloud-render-host`; `PLAT.PAL.storage-class`
+- **Contributes to:** `ARCH.REQ.platform-matrix`; `ARCH.ORG.bootstrap`; `ARCH.ORG.delegated-planning`; `PLAT.PAL.cloud-hybrid`; `PLAT.DESK.pal`; `PLAT.CON.pal`; `PLAT.CON.public-slot-reference`; `PLAT.MOB.pal`; `PLAT.WEB.pal`; `PLAT.SRV.pal`; `PLAT.SRV.gpu-host`; `CORE.LIFE.bootstrap`; `CORE.CONC.layout`; `CORE.JOBS.hetero`; `CORE.JOBS.thread-model`; `CORE.JOBS.pinned`; `CORE.SCALE.profiles`; `RES.MGMT.arbitration`; `RES.IO.fs`; `RES.IO.write`; `RES.IO.media-policy`; `ML.RT.npu`; `AUD.ARCH.routing`; `UI.FW.safe-area`; `UI.TXT.ime`; `UI.TXT.editing`; `UI.A11Y.screen-reader`; `QA.HOST.runner`; `OBS.CRASH.safe-path`; `XC.EXT.mod-editor`
 - **Not responsible for:** Graphics API backends → rhi-core; Store and online services → platform-services; Toolchains → build-system-toolchains
 - **Provides:** C-PAL, C-BASE, C-TARGETPLAT · **Consumes:** — · **Tool-side:** C-COOK
 - **Untrusted inputs:** clipboard-dragdrop, device-db-updates
@@ -891,7 +896,7 @@ Platform abstraction layer interfaces and policy (implemented per platform by th
 
 Windows, Linux, SteamOS and macOS integration: display modes, HDR and VRR capability, DPI, OS-specific IO and scheduling behavior, handheld-PC specifics.
 
-- **Owns:** `PLAT.DESK.os-integration`; `PLAT.DESK.handheld`; `PLAT.DESK.os-security`; `PLAT.DESK.arm64`; `PLAT.DESK.pal`; `PLAT.DESK.cloud-streaming`; `PLAT.DESK.target-tools`
+- **Owns:** `PLAT.DESK.os-integration`; `PLAT.DESK.handheld`; `PLAT.DESK.os-security`; `PLAT.DESK.arm64`; `PLAT.DESK.pal`; `PLAT.DESK.cloud-streaming`; `PLAT.DESK.target-tools`; `PLAT.DESK.backend-slots`; `PLAT.DESK.compat-layers`
 - **Contributes to:** `PLAT.PAL.performance-modes`; `PLAT.PAL.display`; `PLAT.PAL.pointer-shell`; `PLAT.SVC.user-model`; `PLAT.SVC.pc-storefronts`; `CORE.FRAME.latency`; `CORE.FRAME.present-timeline`; `INP.ACT.platform-remap`; `BLD.SYS.platform-sdks`; `QA.CERT.programs`; `XC.SEC.attestation`
 - **Not responsible for:** HDR signal encoding → post-color-hdr; Swapchain → rhi-core
 - **Provides:** — · **Consumes:** C-BASE · **Tool-side:** C-COOK · **Implements:** C-PAL, C-TARGETPLAT
@@ -919,8 +924,8 @@ Console-class integration from platform-holder documentation: OS and memory mode
 
 iOS and Android (incl. Android-based standalone XR and visionOS app lifecycle) integration: app lifecycle, thermal/power signal backends for the runtime governor, tile-based GPU implications, frame pacing, storage, notifications, deep links.
 
-- **Owns:** `PLAT.MOB.os`; `PLAT.MOB.tbdr`; `PLAT.MOB.thermal`; `PLAT.MOB.storage`; `PLAT.MOB.frame-pacing`; `PLAT.MOB.notifications`; `PLAT.MOB.links`; `PLAT.MOB.pal`; `PLAT.MOB.windowing`; `PLAT.MOB.location`; `PLAT.MOB.target-tools`
-- **Contributes to:** `PLAT.PAL.lifecycle`; `PLAT.PAL.thread-affinity`; `PLAT.PAL.display`; `PLAT.SVC.user-model`; `PLAT.XR.runtime-backends`; `CORE.FRAME.host-loop`; `CORE.SCALE.governor`; `CORE.SCALE.actuators`; `CNT.COOK.on-demand`; `RND.ARCH.submission-strategy`; `RND.GRAPH.tbdr`; `RND.SHADER.precision`; `RND.GEO.cpu-submission`; `NET.ARCH.connectivity`; `NET.TRANS.platform-requirements`; `BLD.SYS.platform-sdks`; `BLD.CI.device-lanes`; `BLD.REL.on-demand`; `QA.CERT.programs`; `PRF.METH.energy`; `PRF.GPU.power`; `XC.SEC.attestation`
+- **Owns:** `PLAT.MOB.os`; `PLAT.MOB.tbdr`; `PLAT.MOB.thermal`; `PLAT.MOB.storage`; `PLAT.MOB.frame-pacing`; `PLAT.MOB.notifications`; `PLAT.MOB.links`; `PLAT.MOB.pal`; `PLAT.MOB.windowing`; `PLAT.MOB.location`; `PLAT.MOB.target-tools`; `PLAT.MOB.backend-slots`; `PLAT.MOB.svc-stores`
+- **Contributes to:** `PLAT.PAL.lifecycle`; `PLAT.PAL.thread-affinity`; `PLAT.PAL.display`; `PLAT.SVC.user-model`; `PLAT.XR.mobile-ar`; `PLAT.XR.runtime-backends`; `CORE.FRAME.host-loop`; `CORE.SCALE.governor`; `CORE.SCALE.actuators`; `CNT.COOK.on-demand`; `RND.ARCH.submission-strategy`; `RND.GRAPH.tbdr`; `RND.SHADER.precision`; `RND.GEO.cpu-submission`; `NET.ARCH.connectivity`; `NET.TRANS.platform-requirements`; `BLD.SYS.platform-sdks`; `BLD.CI.device-lanes`; `BLD.REL.on-demand`; `QA.CERT.programs`; `PRF.METH.energy`; `PRF.GPU.power`; `XC.SEC.attestation`
 - **Not responsible for:** Render-graph TBDR optimizations → render-graph-scheduling; Touch input → input-devices-haptics
 - **Provides:** — · **Consumes:** C-BASE · **Tool-side:** C-COOK · **Implements:** C-PAL, C-TARGETPLAT
 - **Untrusted inputs:** invites-deep-links, launch-args, push-payloads
@@ -934,9 +939,9 @@ iOS and Android (incl. Android-based standalone XR and visionOS app lifecycle) i
 First-party platform and store services: identity and sign-in, achievements and presence, entitlements and commerce through first-party stores, privileges and parental controls, social graph and invites, block/mute and text filtering, crossplay policy, leaderboards, cloud-save APIs, media capture, age and region policy enforcement.
 
 - **Owns:** `PLAT.SVC.identity`; `PLAT.SVC.achievements`; `PLAT.SVC.entitlements`; `PLAT.SVC.cloud-save`; `PLAT.SVC.capture`; `PLAT.SVC.social`; `PLAT.SVC.privileges`; `PLAT.SVC.social-safety`; `PLAT.SVC.crossplay-policy`; `PLAT.SVC.leaderboards`; `PLAT.SVC.age-region`; `PLAT.SVC.user-model`; `PLAT.SVC.first-party-emulation`; `PLAT.SVC.trials`; `PLAT.SVC.credential-storage`; `PLAT.SVC.pc-storefronts`; `PLAT.COMM.iap`; `PLAT.COMM.receipts`; `PLAT.COMM.disclosure`; `PLAT.COMM.revocation`
-- **Contributes to:** `PLAT.CON.svc-trophies-privileges`; `PLAT.CON.svc-entitlements-presence`; `PLAT.SVC.xplat-social`; `RES.IO.remote`; `NET.TRANS.nat`; `NET.SESS.content-set`; `NET.SESS.local-players`; `GAM.FW.engagement`; `GAM.SAVE.cloud`; `GAM.SAVE.slots`; `UI.FW.web-view`; `BLD.REL.cdn`; `BLD.REL.store-variants`; `QA.CERT.store-policy`; `QA.CERT.monetization-law`; `QA.CERT.regional`; `QA.CERT.legal-surfaces`; `XC.SEC.abuse`; `XC.SEC.attestation`; `XC.SEC.childrens-data`; `XC.EXT.ugc`; `XC.EXT.ugc-integrity`
+- **Contributes to:** `PLAT.CON.svc-trophies-privileges`; `PLAT.CON.svc-entitlements-presence`; `PLAT.MOB.svc-stores`; `PLAT.SVC.xplat-social`; `PLAT.WEB.svc-portals`; `RES.IO.remote`; `NET.TRANS.nat`; `NET.SESS.content-set`; `NET.SESS.local-players`; `GAM.FW.engagement`; `GAM.SAVE.cloud`; `GAM.SAVE.slots`; `UI.FW.web-view`; `BLD.REL.cdn`; `BLD.REL.store-variants`; `QA.CERT.store-policy`; `QA.CERT.monetization-law`; `QA.CERT.regional`; `QA.CERT.legal-surfaces`; `XC.SEC.abuse`; `XC.SEC.attestation`; `XC.SEC.childrens-data`; `XC.EXT.ugc`; `XC.EXT.ugc-integrity`
 - **Not responsible for:** Third-party/own backend & live-ops boundaries → online-services-liveops; Game-server hosting → dedicated-server; Save-game content → persistence-save; Backend implementation → external:backend
-- **Provides:** C-SVC · **Consumes:** C-PAL, C-TASK, C-CFG, C-INTEGRITY? · **Implements:** C-NETLINK
+- **Provides:** C-SVC · **Consumes:** C-PAL, C-TASK, C-CFG, C-INTEGRITY? · **Implements:** C-NETLINK, C-SVC
 - **Untrusted inputs:** invites-deep-links, service-responses, store-notifications, web-content
 - **Expertise:** platform SDKs, online service APIs, auth tokens
 - **Critics (G2):** K-ARCH, K-NET, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
@@ -948,7 +953,7 @@ First-party platform and store services: identity and sign-in, achievements and 
 Action-level input: mapping and context stacks, rebinding, buffering and latency accounting, local-multiplayer assignment, accessibility input options, UI navigation routing, per-device glyphs, recording and replay.
 
 - **Owns:** `INP.ACT.mapping`; `INP.ACT.remapping`; `INP.ACT.latency`; `INP.ACT.accessibility`; `INP.ACT.local-mp`; `INP.ACT.recording`; `INP.ACT.ui-routing`; `INP.ACT.glyphs`; `INP.ACT.confirm-swap`; `INP.ACT.calibration`; `INP.ACT.platform-remap`; `INP.ACT.sequences`; `INP.ACT.touch-controls`; `INP.ACT.injection`; `INP.ACT.stick-processing`; `INP.ACT.validation`; `INP.TOOL.actions`
-- **Contributes to:** `PLAT.PAL.cloud-streaming`; `PLAT.PAL.cloud-render-host`; `PLAT.DESK.cloud-streaming`; `PLAT.XR.gaze-input`; `CNT.VAL.submit-gate`; `AUD.ARCH.clock`; `NET.PRED.input-commands`; `NET.SESS.local-players`; `GAM.FW.local-players`; `GAM.FW.control`; `GAM.FW.engagement`; `GAM.SYS.aim-assist`; `GAM.SYS.interaction`; `GAM.SAVE.settings`; `UI.FW.focus`; `PRF.LOAD.pacing-latency`; `XC.DET.replay-format`
+- **Contributes to:** `PLAT.PAL.cloud-streaming`; `PLAT.PAL.cloud-render-host`; `PLAT.DESK.cloud-streaming`; `PLAT.XR.gaze-input`; `CNT.VAL.submit-gate`; `AUD.ARCH.clock`; `NET.PRED.input-commands`; `NET.SESS.local-players`; `GAM.FW.local-players`; `GAM.FW.control`; `GAM.FW.engagement`; `GAM.SYS.aim-assist`; `GAM.SYS.interaction`; `GAM.SAVE.settings`; `UI.FW.focus`; `ED.ARCH.pie`; `PRF.LOAD.pacing-latency`; `XC.DET.replay-format`
 - **Not responsible for:** Device drivers and haptics → input-devices-haptics; UI focus logic → ui-architect
 - **Provides:** C-INPUT · **Consumes:** C-DEVICE?, C-FRAME, C-SER, C-A11Y, C-FLOW, C-A11YRT?, C-LOC?, C-RELOAD? · **Tool-side:** C-EDCMD, C-EDHOST
 - **Expertise:** input systems, latency measurement, remapping UX
@@ -961,7 +966,7 @@ Action-level input: mapping and context stacks, rebinding, buffering and latency
 Device layer: keyboard/mouse raw input, gamepads, touch and gestures, motion sensors, pen, hotplug and user pairing, haptics (rumble, HD haptics, adaptive triggers).
 
 - **Owns:** `INP.DEV.abstraction`; `INP.DEV.kbm`; `INP.DEV.gamepads`; `INP.DEV.touch`; `INP.DEV.motion`; `INP.DEV.pen`; `INP.DEV.haptics`; `INP.DEV.hotplug`; `INP.DEV.force-feedback`; `INP.DEV.specialty`; `INP.DEV.eye-tracking`; `INP.DEV.companion`; `INP.DEV.head-tracking`
-- **Contributes to:** `PLAT.PAL.pointer-shell`; `PLAT.CON.confidential-slots`; `PLAT.SVC.user-model`; `PLAT.XR.input`; `AUD.ARCH.routing`; `AUD.CONTENT.haptics`; `AUD.CONTENT.haptic-assets`; `AUD.TOOL.haptics`; `INP.ACT.injection`; `NET.PRED.presentation`; `GAM.SYS.cues`
+- **Contributes to:** `PLAT.PAL.pointer-shell`; `PLAT.DESK.backend-slots`; `PLAT.CON.confidential-slots`; `PLAT.MOB.backend-slots`; `PLAT.SVC.user-model`; `PLAT.XR.input`; `PLAT.WEB.backend-slots`; `AUD.ARCH.routing`; `AUD.CONTENT.haptics`; `AUD.CONTENT.haptic-assets`; `AUD.TOOL.haptics`; `INP.ACT.injection`; `NET.PRED.presentation`; `GAM.SYS.cues`
 - **Not responsible for:** Action mapping → input-system; XR controllers → xr-runtime
 - **Provides:** C-DEVICE · **Consumes:** C-PAL · **Tool-side:** C-EDCMD, C-EDHOST
 - **Untrusted inputs:** hid-reports
@@ -975,7 +980,7 @@ Device layer: keyboard/mouse raw input, gamepads, touch and gestures, motion sen
 XR integration: OpenXR, stereo/multiview rendering hooks, foveation, reprojection and latency, XR input and hand tracking, comfort and safety requirements.
 
 - **Owns:** `PLAT.XR.openxr`; `PLAT.XR.reprojection`; `PLAT.XR.input`; `PLAT.XR.comfort`; `PLAT.XR.fixed-foveation`; `PLAT.XR.passthrough`; `PLAT.XR.scene`; `PLAT.XR.anchors`; `PLAT.XR.depth-occlusion`; `PLAT.XR.layers`; `PLAT.XR.gaze-input`; `PLAT.XR.light-estimation`; `PLAT.XR.mobile-ar`; `PLAT.XR.runtime-backends`; `PLAT.XR.scene-export`; `PLAT.XR.body-face`; `PLAT.XR.editor-preview`; `PLAT.XR.geospatial`
-- **Contributes to:** `PLAT.CON.confidential-slots`; `CORE.FRAME.present-timeline`; `CORE.FRAME.host-loop`; `WLD.SPACE.views`; `RND.ARCH.multiview`; `RND.ARCH.multiview-nview`; `RND.ARCH.depth-convention`; `RND.RECON.foveation`; `RND.POST.display-state`; `ANM.IK.avatar-embodiment`; `GAM.CAM.comfort`; `UI.FW.xr-interaction`; `QA.CERT.programs`
+- **Contributes to:** `PLAT.CON.confidential-slots`; `CORE.FRAME.present-timeline`; `CORE.FRAME.host-loop`; `WLD.SPACE.views`; `RND.ARCH.multiview`; `RND.ARCH.multiview-nview`; `RND.ARCH.depth-convention`; `RND.RECON.foveation`; `RND.POST.display-state`; `ANM.IK.avatar-embodiment`; `GAM.CAM.comfort`; `UI.FW.xr-interaction`; `QA.CERT.programs`; `PRF.LOAD.pacing-latency`
 - **Not responsible for:** Render pipeline → render-architect; Generic input actions → input-system
 - **Provides:** C-XRVIEW · **Consumes:** C-PAL, C-INPUT, C-FRAME, C-PRESENT, C-VIEW, C-DEVICE, C-TEMPORAL?, C-A11Y, C-COLOR? · **Tool-side:** C-EDCMD, C-EDVIEW
 - **Expertise:** OpenXR, stereo rendering, motion-to-photon latency
@@ -1001,8 +1006,8 @@ Asset identity and the content pipeline: asset registry and dependency graph, de
 
 Importers and interchange: glTF, FBX, OpenUSD, texture and audio source formats, MaterialX/OpenPBR, DCC live link, reimport and source tracking, scan data.
 
-- **Owns:** `CNT.IMP.gltf`; `CNT.IMP.fbx`; `CNT.IMP.usd`; `CNT.IMP.textures`; `CNT.IMP.audio`; `CNT.IMP.materialx`; `CNT.IMP.livelink`; `CNT.IMP.reimport`; `CNT.IMP.scans`; `CNT.IMP.caches`; `CNT.IMP.procedural`; `CNT.IMP.rules`; `CNT.IMP.dcc-plugins`; `CNT.IMP.splats`; `CNT.IMP.geospatial`; `CNT.IMP.vector`
-- **Contributes to:** `PLAT.XR.geospatial`; `RND.GEO.splats`; `ANM.DEF.geometry-cache`; `ANM.FACE.capture`; `ANM.TOOL.take-recorder`; `XC.SEC.dev-trust`
+- **Owns:** `CNT.IMP.gltf`; `CNT.IMP.fbx`; `CNT.IMP.usd`; `CNT.IMP.textures`; `CNT.IMP.audio`; `CNT.IMP.materialx`; `CNT.IMP.livelink`; `CNT.IMP.reimport`; `CNT.IMP.scans`; `CNT.IMP.caches`; `CNT.IMP.procedural`; `CNT.IMP.rules`; `CNT.IMP.dcc-plugins`; `CNT.IMP.splats`; `CNT.IMP.geospatial`; `CNT.IMP.vector`; `CNT.IMP.sprites-2d`; `CNT.IMP.tilemaps`
+- **Contributes to:** `PLAT.XR.geospatial`; `RND.GEO.splats`; `ML.TOOL.model-assets`; `ANM.RT.2d-import`; `ANM.DEF.geometry-cache`; `ANM.FACE.capture`; `ANM.TOOL.take-recorder`; `XC.SEC.dev-trust`
 - **Not responsible for:** Cooking → content-pipeline-architect; Material model → material-system
 - **Provides:** C-IMPORT · **Consumes:** C-ASSET, C-COOK
 - **Untrusted inputs:** dcc-live-link, imported-dcc-files, procedural-asset-eval
@@ -1015,7 +1020,7 @@ Importers and interchange: glTF, FBX, OpenUSD, texture and audio source formats,
 
 Generic processors: texture processing and GPU texture-compression encoding, mesh optimization, hosting of collision and other domain builders under the cook contract.
 
-- **Owns:** `CNT.COOK.textures`; `CNT.COOK.meshes`; `CNT.COOK.images`; `CNT.COOK.geometry-ops`; `CNT.COOK.ml-assisted`
+- **Owns:** `CNT.COOK.textures`; `CNT.COOK.meshes`; `CNT.COOK.images`; `CNT.COOK.geometry-ops`; `CNT.COOK.ml-assisted`; `CNT.COOK.fonts`
 - **Contributes to:** `CNT.COOK.video`; `RND.LOD.cluster-build`; `RND.TEX.mip-layout`; `RND.TEX.transcode`; `RND.GI.lightmap-uv`; `RND.2D.atlas-cook`; `PHY.COL.cook`; `AUD.TOOL.cook`; `UI.FW.maps`; `UI.TXT.font-subsetting`; `ED.WORLD.blockout`; `PRF.PIPE.cook`; `XC.EXT.generated-assets`
 - **Not responsible for:** Cluster DAG building → virtualized-geometry-lod; Animation compression → animation-runtime; Shader compilation → shader-system
 - **Provides:** — · **Consumes:** C-COOK, C-MATH, C-ML?
@@ -1029,7 +1034,7 @@ Generic processors: texture processing and GPU texture-compression encoding, mes
 Runtime resource model: handles and explicit lifetime, load requests with priority and deadline, dependency-aware loading, the streaming manager (budgets, eviction, prediction), fallbacks, no-stall loading.
 
 - **Owns:** `RES.MGMT.handles`; `RES.MGMT.requests`; `RES.MGMT.dependencies`; `RES.MGMT.streaming`; `RES.MGMT.fallbacks`; `RES.MGMT.no-stall`; `RES.MGMT.reload`; `RES.MGMT.arbitration`; `RES.MGMT.gpu-requests`; `RES.MGMT.pipeline`; `RES.MGMT.validation`
-- **Contributes to:** `ARCH.ORG.delegated-planning`; `CORE.LIFE.ownership-model`; `CORE.JOBS.cancellation`; `CORE.OBJ.references`; `CNT.COOK.on-demand`; `WLD.MODEL.unit-load`; `WLD.PART.sources`; `RND.GRAPH.external-work`; `RND.SHADER.precache`; `RND.LOD.streaming`; `ML.RT.residency`; `ANM.CINE.preload`; `AUD.DSP.streaming`; `UI.FW.loading-screens`; `QA.SIM.streaming`; `PRF.MEM.peaks`; `OBS.LOG.trace-analysis`
+- **Contributes to:** `ARCH.ORG.delegated-planning`; `CORE.LIFE.ownership-model`; `CORE.JOBS.cancellation`; `CORE.OBJ.references`; `CNT.COOK.on-demand`; `WLD.MODEL.unit-load`; `WLD.PART.sources`; `RND.GRAPH.external-work`; `RND.SHADER.precache`; `RND.LOD.streaming`; `RND.GI.baked-streaming`; `ML.RT.residency`; `ANM.CINE.preload`; `AUD.DSP.streaming`; `UI.FW.loading-screens`; `QA.SIM.streaming`; `PRF.MEM.peaks`; `OBS.LOG.trace-analysis`
 - **Not responsible for:** IO backends → async-io-storage; Package format → package-formats-vfs; Texture-specific streaming → texture-streaming-vt
 - **Provides:** C-RES · **Consumes:** C-ASSET, C-VFS, C-IO, C-TASK, C-GPUMEM?, C-FRAME, C-LIFETIME
 - **Expertise:** streaming systems, cache eviction, async loading
@@ -1041,8 +1046,8 @@ Runtime resource model: handles and explicit lifetime, load requests with priori
 
 Async IO: io_uring, IOCP, DirectStorage and console backends, IO scheduling and queue depth, GPU decompression, memory-mapped IO, file-system abstraction, error handling.
 
-- **Owns:** `RES.IO.backends`; `RES.IO.scheduling`; `RES.IO.gpu-decompress`; `RES.IO.mmap`; `RES.IO.fs`; `RES.IO.errors`; `RES.IO.cpu-decompress`; `RES.IO.hw-decompress`; `RES.IO.remote`; `RES.IO.write`
-- **Contributes to:** `PLAT.PAL.lifecycle`; `PLAT.DESK.os-security`; `PLAT.CON.confidential-slots`; `CORE.JOBS.completions`; `CORE.JOBS.cancellation`; `RES.MGMT.pipeline`; `RND.GRAPH.external-work`; `QA.HOST.fault-points`; `PRF.LOAD.io`
+- **Owns:** `RES.IO.backends`; `RES.IO.scheduling`; `RES.IO.gpu-decompress`; `RES.IO.mmap`; `RES.IO.fs`; `RES.IO.errors`; `RES.IO.cpu-decompress`; `RES.IO.hw-decompress`; `RES.IO.remote`; `RES.IO.write`; `RES.IO.media-policy`
+- **Contributes to:** `PLAT.PAL.lifecycle`; `PLAT.DESK.os-security`; `PLAT.CON.confidential-slots`; `CORE.JOBS.completions`; `CORE.JOBS.cancellation`; `RES.MGMT.pipeline`; `RND.GRAPH.external-work`; `RND.GI.baked-streaming`; `QA.HOST.fault-points`; `PRF.METH.tier-emulation`; `PRF.LOAD.io`
 - **Not responsible for:** Streaming decisions → resource-streaming-architect; Codec choice → package-formats-vfs
 - **Provides:** C-IO · **Consumes:** C-PAL, C-TASK, C-GPUMEM?
 - **Untrusted inputs:** service-responses
@@ -1056,7 +1061,7 @@ Async IO: io_uring, IOCP, DirectStorage and console backends, IO scheduling and 
 Package/container format and chunking, codec selection, VFS mount layering (base, patch, DLC, mods), encryption and signing, install-chunk layout.
 
 - **Owns:** `RES.PKG.format`; `RES.PKG.compression`; `RES.PKG.vfs`; `RES.PKG.crypto`; `RES.PKG.install-layout`; `RES.PKG.ordering`
-- **Contributes to:** `PLAT.LIVE.events`; `CORE.TYPES.codecs`; `CORE.SER.relocatable`; `RES.IO.hw-decompress`; `CNT.VAL.audit`; `BLD.REL.patching`; `BLD.REL.preload-embargo`; `XC.SEC.key-custody`; `XC.EXT.mod-loading`
+- **Contributes to:** `PLAT.LIVE.events`; `CORE.TYPES.codecs`; `CORE.SER.relocatable`; `RES.IO.hw-decompress`; `RES.IO.media-policy`; `CNT.VAL.audit`; `BLD.REL.patching`; `BLD.REL.preload-embargo`; `XC.SEC.key-custody`; `XC.EXT.mod-loading`
 - **Not responsible for:** Patch generation → packaging-release-patching; Relocatable data layout → serialization-schema
 - **Provides:** C-VFS · **Consumes:** C-IO, C-SER, C-SIGN
 - **Untrusted inputs:** assets, decompressors, patch-payloads, physics-assets
@@ -1070,7 +1075,7 @@ Package/container format and chunking, codec selection, VFS mount layering (base
 World representation strategy (data-oriented, no universal scene graph), partitioning and streaming cells, streaming sources, HLOD strategy, simulation LOD and significance, large-world coordinate policy, level transitions, server-side world streaming.
 
 - **Owns:** `WLD.MODEL.strategy`; `WLD.MODEL.travel`; `WLD.MODEL.planetary`; `WLD.MODEL.unit-load`; `WLD.PART.grid`; `WLD.PART.sources`; `WLD.PART.hlod`; `WLD.PART.sim-lod`; `WLD.PART.server`; `WLD.PART.lwc-policy`; `WLD.PART.activation`; `WLD.PART.cook`; `WLD.PART.sim-tiers`; `WLD.ENV.queries`
-- **Contributes to:** `ARCH.ORG.delegated-planning`; `CORE.OBJ.world-instances`; `CORE.SCALE.actuators`; `CNT.COOK.world-build`; `RND.GEO.precomputed-visibility`; `PHY.ARCH.streaming`; `PHY.ARCH.persistence`; `AUD.CONTENT.emitters`; `NET.REP.interest`; `NET.SRV.zoning`; `NET.SRV.cross-server`; `NET.SESS.travel`; `GAM.SYS.volumes`; `GAM.SCR.level-scripting`; `UI.FW.maps`; `ED.WORLD.partitioned`; `PRF.METH.model`; `PRF.LOAD.hitches`
+- **Contributes to:** `ARCH.ORG.delegated-planning`; `CORE.OBJ.world-instances`; `CORE.SCALE.actuators`; `CNT.COOK.world-build`; `RND.GEO.precomputed-visibility`; `RND.GI.baked-streaming`; `PHY.ARCH.streaming`; `PHY.ARCH.persistence`; `AUD.CONTENT.emitters`; `NET.REP.interest`; `NET.SRV.zoning`; `NET.SRV.cross-server`; `NET.SESS.travel`; `GAM.SYS.volumes`; `GAM.SCR.level-scripting`; `UI.FW.maps`; `ED.WORLD.partitioned`; `PRF.METH.model`; `PRF.LOAD.hitches`
 - **Not responsible for:** World document format → world-data-model; Transform math → spatial-transforms; HLOD mesh generation → virtualized-geometry-lod
 - **Provides:** C-WORLD, C-SIGNIF, C-ENV · **Consumes:** C-SPATIAL, C-RES, C-ECS?, C-VIEW, C-FRAME · **Tool-side:** C-COOK
 - **Expertise:** open-world streaming, spatial partitioning, significance systems
@@ -1111,7 +1116,7 @@ Terrain end-to-end: representation, rendering, material layering, sculpt/paint t
 - **Owns:** `WLD.ENV.terrain-rep`; `WLD.ENV.terrain-render`; `WLD.ENV.terrain-materials`; `WLD.ENV.terrain-deform`; `WLD.ENV.terrain-planetary`; `WLD.ENV.terrain-rt`; `WLD.TOOL.terrain`
 - **Contributes to:** `WLD.MODEL.planetary`; `WLD.ENV.queries`; `WLD.PCG.roads`; `RND.ARCH.invalidation`; `RND.RT.instances`; `RND.RT.lod`; `PHY.COL.runtime-build`; `PHY.2D.runtime-build`; `GAM.DATA.surface-types`; `ED.WORLD.modes`
 - **Not responsible for:** Virtual texturing core → texture-streaming-vt; Viewport hosting → world-editor-viewport; Collision algorithms → collision-detection
-- **Provides:** — · **Consumes:** C-WORLD?, C-RSCENE?, C-PHYS?, C-RES, C-MATIF?, C-ENV, C-INSTANCES?, C-VT?, C-RG?, C-GEOLOD?, C-TEMPORAL?, C-PCG?, C-LIGHT?, C-RT?, C-GI?, C-SCENETEX? · **Tool-side:** C-EDCMD, C-EDHOST, C-EDVIEW, C-EDPREVIEW · **Implements:** C-ENV
+- **Provides:** — · **Consumes:** C-WORLD?, C-RSCENE?, C-PHYS?, C-RES, C-MATIF?, C-ENV, C-INSTANCES?, C-VT?, C-RG?, C-GEOLOD?, C-TEMPORAL?, C-PCG?, C-LIGHT?, C-RT?, C-GI?, C-SCENETEX?, C-GAMEDATA? · **Tool-side:** C-EDCMD, C-EDHOST, C-EDVIEW, C-EDPREVIEW · **Implements:** C-ENV
 - **Expertise:** terrain LOD, heightfield processing, virtual texturing
 - **Critics (G2):** K-ARCH, K-RENDER, K-SYSTEMS, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
@@ -1243,7 +1248,7 @@ Material model (OpenPBR-class, layered), material graph → shader code generati
 - **Owns:** `RND.MAT.model`; `RND.MAT.graph`; `RND.MAT.instances`; `RND.MAT.tiers`; `RND.MAT.neural`; `RND.MAT.validation`; `RND.MAT.openpbr`; `RND.MAT.custom-lighting`; `RND.MAT.pso-miss-policy`; `RND.RECON.specular-aa`; `RND.TOOL.material-editor`
 - **Contributes to:** `CNT.IMP.materialx`; `RND.SHADER.precache`; `RND.SHADER.precision`; `RND.GEO.material-resolve`; `ANM.DEF.modular-assembly`; `GAM.DATA.surface-types`
 - **Not responsible for:** BRDF research reference → research-evidence; Graph editor UI → graph-editor-framework; Shader compiler → shader-system
-- **Provides:** C-MATIF · **Consumes:** C-SHADER, C-ASSET, C-MLGPU?, C-GPUTIER, C-LIGHTENV?, C-RELOAD?, C-VT? · **Tool-side:** C-EDCMD, C-EDHOST, C-GRAPH, C-EDPREVIEW, C-IMPORT
+- **Provides:** C-MATIF · **Consumes:** C-SHADER, C-ASSET, C-MLGPU?, C-GPUTIER, C-LIGHTENV?, C-RELOAD?, C-VT?, C-GAMEDATA? · **Tool-side:** C-EDCMD, C-EDHOST, C-GRAPH, C-EDPREVIEW, C-IMPORT
 - **Expertise:** PBR, OpenPBR/MaterialX, shader codegen
 - **Critics (G2):** K-ARCH, K-RENDER, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
@@ -1306,7 +1311,7 @@ Light types and physical units, clustered light culling, stochastic many-light s
 
 Indirect lighting across tiers: baked lightmaps, probe volumes, screen-space GI and AO, surface/radiance-cache hybrid GI, ReSTIR GI, reflections, sky lighting, specular occlusion, SDF/software ray queries consumed via C-RTAS.
 
-- **Owns:** `RND.GI.baked`; `RND.GI.probes`; `RND.GI.screen-space`; `RND.GI.hybrid`; `RND.GI.restir`; `RND.GI.reflections`; `RND.GI.sky`; `RND.GI.specular-occlusion`; `RND.GI.bake-pipeline`; `RND.GI.lightmap-uv`; `RND.GI.neural-cache`; `RND.GI.planar`; `RND.GI.rt-required`; `RND.TOOL.lighting`
+- **Owns:** `RND.GI.baked`; `RND.GI.probes`; `RND.GI.screen-space`; `RND.GI.hybrid`; `RND.GI.restir`; `RND.GI.reflections`; `RND.GI.sky`; `RND.GI.specular-occlusion`; `RND.GI.bake-pipeline`; `RND.GI.lightmap-uv`; `RND.GI.neural-cache`; `RND.GI.planar`; `RND.GI.rt-required`; `RND.GI.baked-streaming`; `RND.TOOL.lighting`
 - **Contributes to:** `PLAT.XR.light-estimation`; `CNT.COOK.world-build`; `RND.ARCH.invalidation`; `RND.RT.sdf-scene`; `RND.RECON.denoise`; `RND.RECON.ml-denoise`; `RND.TOOL.direct-lights`
 - **Not responsible for:** RT infrastructure → ray-tracing-infrastructure; Atmosphere model → atmosphere-weather
 - **Provides:** C-GI · **Consumes:** C-RSCENE, C-RG, C-RT?, C-TEMPORAL, C-LIGHT, C-ATMOS?, C-MLGPU?, C-SCENETEX, C-COLOR, C-LIGHTENV · **Tool-side:** C-COOK, C-EDCMD, C-EDHOST, C-EDVIEW
@@ -1328,7 +1333,7 @@ Acceleration structure management at scale, inline vs pipeline RT, opacity micro
 
 ### path-tracing
 
-**Path Tracing** · expert · runtime · workstream: rendering · parent: render-architect · profiles: lite3d, std3d · targets: client, tools
+**Path Tracing** · expert · runtime · workstream: rendering · parent: render-architect · profiles: std3d · targets: client, tools
 
 Reference path tracer as ground-truth oracle for validation, real-time path tracing, offline cinematic render mode.
 
@@ -1398,7 +1403,7 @@ Skin subsurface scattering, eyes, strand-based hair and fur rendering, digital-h
 2D draw backend shared by 2D games, UI and debug overlays: sprites, tilemaps, 2D lighting, vector paths, UI batching/clipping/SDF, HDR compositing, pixel-perfect modes.
 
 - **Owns:** `RND.2D.sprites`; `RND.2D.tilemaps`; `RND.2D.lighting`; `RND.2D.vector`; `RND.2D.ui-backend`; `RND.2D.pixel`; `RND.2D.atlas-cook`; `RND.2D.world-sprites`; `RND.TOOL.tilemap-sprite`
-- **Contributes to:** `CNT.IMP.vector`; `RND.POST.display-state`; `PHY.2D.tilemap-collision`; `ANM.RT.2d`; `ANM.TOOL.2d-rigging`; `GAM.AI.team-visibility`; `ED.WORLD.2d-mode`; `QA.RENDER.final-frame`
+- **Contributes to:** `CNT.IMP.vector`; `CNT.IMP.sprites-2d`; `CNT.IMP.tilemaps`; `RND.POST.display-state`; `PHY.2D.tilemap-collision`; `ANM.RT.2d`; `ANM.TOOL.2d-rigging`; `GAM.AI.team-visibility`; `ED.WORLD.2d-mode`; `QA.RENDER.final-frame`
 - **Not responsible for:** Widget model → ui-architect; Glyph shaping → text-fonts
 - **Provides:** C-DRAW2D · **Consumes:** C-RG, C-SHADER, C-TEXT, C-TEMPORAL?, C-A11Y, C-COLOR, C-RSCENE?, C-MATIF?, C-LIGHT?, C-VT? · **Tool-side:** C-EDCMD, C-EDHOST, C-EDVIEW
 - **Expertise:** 2D batching, vector rasterization, SDF rendering
@@ -1413,7 +1418,7 @@ GPU particle simulation, VFX graph runtime, ribbons/beams/mesh particles, partic
 - **Owns:** `RND.VFX.gpu-sim`; `RND.VFX.graph`; `RND.VFX.primitives`; `RND.VFX.collision`; `RND.VFX.budgets`; `RND.VFX.volumes`; `RND.VFX.volume-playback`; `RND.VFX.cpu-sim`; `RND.TOOL.vfx-editor`
 - **Contributes to:** `CORE.FRAME.local-time-scale`; `WLD.ENV.wind-field`; `WLD.ENV.media-integrator`; `NET.PRED.presentation`; `GAM.SYS.impacts`; `GAM.DATA.surface-types`; `ED.UI.curves-timeline`
 - **Not responsible for:** Physically based fluids → fluid-simulation; Translucency sorting → translucency-decals
-- **Provides:** C-VFX · **Consumes:** C-RG, C-PHYS?, C-LIGHT?, C-GI?, C-ATMOS?, C-TEMPORAL?, C-ENV?, C-A11Y, C-COLOR, C-LIGHTENV?, C-TRANSLUCENT?, C-RELOAD?, C-ANIM?, C-VT?, C-PREDICT?, C-RSCENE?, C-MATIF?, C-SCENETEX? · **Tool-side:** C-GRAPH, C-EDCMD, C-EDHOST, C-EDPREVIEW
+- **Provides:** C-VFX · **Consumes:** C-RG, C-PHYS?, C-LIGHT?, C-GI?, C-ATMOS?, C-TEMPORAL?, C-ENV?, C-A11Y, C-COLOR, C-LIGHTENV?, C-TRANSLUCENT?, C-RELOAD?, C-ANIM?, C-VT?, C-PREDICT?, C-RSCENE?, C-MATIF?, C-SCENETEX?, C-GAMEDATA? · **Tool-side:** C-GRAPH, C-EDCMD, C-EDHOST, C-EDPREVIEW
 - **Expertise:** GPU particles, VFX authoring, Niagara/VFX Graph-class systems
 - **Critics (G2):** K-ARCH, K-RENDER, K-SIM, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
@@ -1423,10 +1428,10 @@ GPU particle simulation, VFX graph runtime, ribbons/beams/mesh particles, partic
 
 Physics architecture: build vs integrate decision, physics world representation and ECS integration, stepping and frame sync, determinism levels, physics LOD, materials, GPU offload evaluation; covers both 2D and 3D.
 
-- **Owns:** `PHY.ARCH.build-integrate`; `PHY.ARCH.world`; `PHY.ARCH.stepping`; `PHY.ARCH.determinism`; `PHY.ARCH.lod`; `PHY.ARCH.materials`; `PHY.ARCH.gpu`; `PHY.ARCH.rewind`; `PHY.ARCH.async`; `PHY.ARCH.streaming`; `PHY.ARCH.lwc`; `PHY.ARCH.middleware-layer`; `PHY.ARCH.events`; `PHY.ARCH.validation`; `PHY.ARCH.multi-world`; `PHY.ARCH.local-frames`; `PHY.ARCH.tier-transitions`; `PHY.ARCH.fields`; `PHY.ARCH.debug-capture`; `PHY.ARCH.persistence`; `PHY.ARCH.fixed-point-backend`; `PHY.ARCH.learned-surrogates`; `PHY.ARCH.budget-degradation`
-- **Contributes to:** `ARCH.ORG.delegated-planning`; `CORE.FRAME.access-model`; `CORE.FRAME.sim-schedule`; `CORE.FRAME.local-time-scale`; `CORE.ECS.bridges`; `WLD.PART.activation`; `WLD.SPACE.change-sets`; `RND.GRAPH.external-work`; `ANM.ARCH.sync`; `NET.REP.physics-bodies`; `NET.PRED.physics-rollback`; `GAM.SYS.projectiles`; `GAM.DATA.surface-types`; `PRF.BENCH.sim-worst-case`; `PRF.LOAD.hitches`; `XC.DET.snapshot`
+- **Owns:** `PHY.ARCH.build-integrate`; `PHY.ARCH.world`; `PHY.ARCH.stepping`; `PHY.ARCH.determinism`; `PHY.ARCH.lod`; `PHY.ARCH.materials`; `PHY.ARCH.gpu`; `PHY.ARCH.rewind`; `PHY.ARCH.async`; `PHY.ARCH.streaming`; `PHY.ARCH.lwc`; `PHY.ARCH.middleware-layer`; `PHY.ARCH.events`; `PHY.ARCH.validation`; `PHY.ARCH.multi-world`; `PHY.ARCH.local-frames`; `PHY.ARCH.tier-transitions`; `PHY.ARCH.fields`; `PHY.ARCH.debug-capture`; `PHY.ARCH.persistence`; `PHY.ARCH.fixed-point-backend`; `PHY.ARCH.learned-surrogates`; `PHY.ARCH.budget-degradation`; `PHY.ARCH.migration`
+- **Contributes to:** `ARCH.ORG.delegated-planning`; `CORE.FRAME.access-model`; `CORE.FRAME.sim-schedule`; `CORE.FRAME.local-time-scale`; `CORE.ECS.bridges`; `WLD.PART.activation`; `WLD.SPACE.change-sets`; `RND.GRAPH.external-work`; `ANM.ARCH.sync`; `NET.REP.physics-bodies`; `NET.PRED.lagcomp`; `NET.PRED.physics-rollback`; `GAM.SYS.projectiles`; `GAM.DATA.surface-types`; `PRF.BENCH.sim-worst-case`; `PRF.LOAD.hitches`; `XC.DET.snapshot`
 - **Not responsible for:** Collision algorithms → collision-detection; Solvers → rigid-body-dynamics; Networked physics → prediction-rollback
-- **Provides:** C-PHYS, C-CHARCTRL · **Consumes:** C-SPATIAL, C-FRAME, C-DET, C-TASK, C-ECS?, C-RES, C-SIGNIF?, C-SNAPSHOT, C-ENV?, C-RG?, C-FLOW, C-SAVE?, C-WORLD?, C-ML?
+- **Provides:** C-PHYS, C-CHARCTRL · **Consumes:** C-SPATIAL, C-FRAME, C-DET, C-TASK, C-ECS?, C-RES, C-SIGNIF?, C-SNAPSHOT, C-ENV?, C-RG?, C-FLOW, C-SAVE?, C-WORLD?, C-ML?, C-GAMEDATA?, C-SHARD?
 - **Expertise:** physics engines (Jolt, PhysX, Havok, Box2D), simulation architecture
 - **Critics (G2):** K-ARCH, K-SIM, K-NET, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
@@ -1439,7 +1444,7 @@ Shapes, broadphase, narrowphase and contact manifolds, CCD, scene queries, filte
 - **Owns:** `PHY.COL.shapes`; `PHY.COL.broadphase`; `PHY.COL.narrowphase`; `PHY.COL.ccd`; `PHY.COL.queries`; `PHY.COL.filtering`; `PHY.COL.cook`; `PHY.COL.mesh-heightfield`; `PHY.COL.sdf`; `PHY.COL.decomposition`; `PHY.COL.runtime-build`
 - **Contributes to:** `PLAT.XR.scene`; `RND.ARCH.portals`; `PHY.ARCH.streaming`; `PHY.CTRL.sensing`; `PHY.TOOL.collision-authoring`; `AUD.SPAT.occlusion`; `GAM.SYS.volumes`; `GAM.SYS.hit-detection`; `GAM.SYS.projectiles`; `QA.SIM.collision`
 - **Not responsible for:** Generic spatial queries → spatial-transforms; Dynamics → rigid-body-dynamics; Projectile & ballistics logic → gameplay-systems-toolkit
-- **Provides:** — · **Consumes:** C-PHYS, C-MATH, C-DET, C-ENV? · **Tool-side:** C-COOK, C-IMPORT
+- **Provides:** — · **Consumes:** C-PHYS, C-MATH, C-DET, C-ENV? · **Tool-side:** C-COOK, C-IMPORT · **Implements:** C-PHYS
 - **Untrusted inputs:** physics-assets
 - **Expertise:** GJK/EPA, BVH broadphase, robust geometry
 - **Critics (G2):** K-ARCH, K-SIM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
@@ -1464,9 +1469,9 @@ Integration and constraint solvers, joints, islands and sleeping, parallel solvi
 Character controllers (kinematic and dynamic), moving platforms and physical interaction.
 
 - **Owns:** `PHY.CTRL.character`; `PHY.CTRL.platforms`; `PHY.CTRL.sensing`; `PHY.TOOL.controller-tuning`
-- **Contributes to:** `PHY.ARCH.local-frames`; `PHY.ARCH.tier-transitions`; `PHY.ARCH.fields`; `QA.SIM.controllers`
+- **Contributes to:** `PHY.ARCH.local-frames`; `PHY.ARCH.tier-transitions`; `PHY.ARCH.fields`; `GAM.MOVE.ragdoll-transition`; `QA.SIM.controllers`
 - **Not responsible for:** Movement modes & networked movement → character-movement; Vehicles → vehicle-physics
-- **Provides:** — · **Consumes:** C-PHYS, C-DET, C-ENV?, C-SIGNIF? · **Tool-side:** C-EDCMD, C-EDHOST · **Implements:** C-CHARCTRL
+- **Provides:** — · **Consumes:** C-PHYS, C-DET, C-ENV?, C-SIGNIF?, C-SHARD? · **Tool-side:** C-EDCMD, C-EDHOST · **Implements:** C-CHARCTRL
 - **Expertise:** character controllers
 - **Critics (G2):** K-ARCH, K-SIM, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
@@ -1479,7 +1484,7 @@ Cloth, soft bodies, ropes and cables, hair strand simulation; evaluates ML cloth
 - **Owns:** `PHY.SOFT.cloth`; `PHY.SOFT.softbody`; `PHY.SOFT.ropes`; `PHY.SOFT.hair-sim`; `PHY.SOFT.ml`; `PHY.TOOL.cloth`
 - **Contributes to:** `WLD.ENV.wind-field`; `RND.GRAPH.external-work`; `QA.SIM.deformables`
 - **Not responsible for:** Hair rendering → character-rendering; Skinning → deformation-skinning
-- **Provides:** — · **Consumes:** C-PHYS, C-ANIM, C-RG?, C-ENV?, C-DET?, C-ML? · **Tool-side:** C-EDCMD, C-EDHOST
+- **Provides:** — · **Consumes:** C-PHYS, C-ANIM, C-RG?, C-ENV?, C-DET?, C-ML?, C-SNAPSHOT?, C-STATECLASS · **Tool-side:** C-EDCMD, C-EDHOST
 - **Expertise:** XPBD, cloth simulation, strand dynamics
 - **Critics (G2):** K-ARCH, K-SIM, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
@@ -1516,7 +1521,7 @@ Particle fluids, grid smoke and fire, GPU fluid solvers.
 2D rigid bodies and collision, 2D character controllers, 2D determinism.
 
 - **Owns:** `PHY.2D.dynamics`; `PHY.2D.controllers`; `PHY.2D.determinism`; `PHY.2D.shape-gen`; `PHY.2D.queries-filtering`; `PHY.2D.joints-ropes`; `PHY.2D.ccd-sensors`; `PHY.2D.tilemap-collision`; `PHY.2D.runtime-build`; `PHY.TOOL.2d-shapes`
-- **Contributes to:** `PHY.ARCH.fixed-point-backend`; `GAM.SIM.cellular`; `QA.SIM.stability-suite`
+- **Contributes to:** `CNT.IMP.tilemaps`; `PHY.ARCH.fixed-point-backend`; `GAM.SIM.cellular`; `QA.SIM.stability-suite`
 - **Not responsible for:** 3D physics → rigid-body-dynamics; Discrete cellular material simulation → systems-simulation
 - **Provides:** — · **Consumes:** C-PHYS, C-DET · **Tool-side:** C-EDCMD, C-EDHOST, C-EDVIEW · **Implements:** C-CHARCTRL, C-PHYS
 - **Expertise:** Box2D-class solvers, 2D collision
@@ -1594,7 +1599,7 @@ Motion matching, learned motion matching and neural controllers, pose databases,
 IK solvers, foot placement, procedural animation, physical animation and active ragdoll.
 
 - **Owns:** `ANM.IK.solvers`; `ANM.IK.feet`; `ANM.IK.procedural`; `ANM.IK.physical`; `ANM.IK.2d`; `ANM.IK.avatar-embodiment`; `ANM.IK.learned-physics`; `ANM.TOOL.rigging`
-- **Contributes to:** `PHY.TOOL.physics-asset`; `ANM.SYN.multi-actor`
+- **Contributes to:** `PHY.TOOL.physics-asset`; `ANM.SYN.multi-actor`; `GAM.MOVE.ragdoll-transition`
 - **Not responsible for:** Rigid-body solver → rigid-body-dynamics; Motion matching → motion-synthesis
 - **Provides:** — · **Consumes:** C-ANIM, C-PHYS, C-ML? · **Tool-side:** C-EDCMD, C-EDHOST
 - **Expertise:** IK, procedural animation, physics-based character control
@@ -1633,7 +1638,7 @@ Timeline/sequencer, camera cuts and cinematic cameras, high-quality movie render
 Audio engine architecture and threading, device backends, voice management and virtualization, middleware decision, audio budgets.
 
 - **Owns:** `AUD.ARCH.engine`; `AUD.ARCH.devices`; `AUD.ARCH.voices`; `AUD.ARCH.middleware`; `AUD.ARCH.budgets`; `AUD.ARCH.listeners`; `AUD.ARCH.clock`; `AUD.ARCH.validation`; `AUD.ARCH.offline-render`; `AUD.ARCH.routing`; `AUD.TOOL.profiler`
-- **Contributes to:** `ARCH.ORG.delegated-planning`; `PLAT.PAL.clocks`; `PLAT.PAL.system-events`; `PLAT.CON.confidential-slots`; `PLAT.WEB.gestures`; `CORE.JOBS.thread-model`; `CORE.ECS.bridges`; `RND.MEDIA.sync`; `INP.ACT.calibration`; `QA.SIM.audio`
+- **Contributes to:** `ARCH.ORG.delegated-planning`; `PLAT.PAL.clocks`; `PLAT.PAL.system-events`; `PLAT.DESK.backend-slots`; `PLAT.CON.confidential-slots`; `PLAT.MOB.backend-slots`; `PLAT.WEB.gestures`; `PLAT.WEB.backend-slots`; `CORE.JOBS.thread-model`; `CORE.ECS.bridges`; `RND.MEDIA.sync`; `INP.ACT.calibration`; `ED.ARCH.pie`; `QA.SIM.audio`
 - **Not responsible for:** DSP algorithms → audio-dsp-mixing; Spatialization → spatial-audio-acoustics
 - **Provides:** C-AUDIO · **Consumes:** C-PAL, C-TASK, C-SPATIAL, C-VIEW, C-ECS?, C-SIGNIF?, C-FRAME, C-FLOW · **Tool-side:** C-EDCMD, C-EDHOST
 - **Expertise:** real-time audio, lock-free audio threads, Wwise/FMOD
@@ -1675,7 +1680,7 @@ Audio event system and parameters, interactive music, dialogue and VO, authoring
 - **Owns:** `AUD.CONTENT.events`; `AUD.CONTENT.music`; `AUD.CONTENT.dialogue`; `AUD.CONTENT.authoring`; `AUD.CONTENT.haptics`; `AUD.CONTENT.licensed-music`; `AUD.CONTENT.speech`; `AUD.CONTENT.music-clock`; `AUD.CONTENT.emitters`; `AUD.CONTENT.haptic-assets`; `AUD.TOOL.designer`; `AUD.TOOL.cook`; `AUD.TOOL.haptics`
 - **Contributes to:** `CORE.FRAME.local-time-scale`; `CNT.IMP.audio`; `ML.RT.sequence-exec`; `ANM.FACE.lipsync`; `NET.PRED.presentation`; `GAM.FW.streamer-mode`; `GAM.SYS.impacts`; `GAM.DATA.surface-types`; `GAM.NARR.lines`; `GAM.NARR.vo-script`; `GAM.NARR.validation`; `UI.A11Y.subtitles`; `UI.A11Y.sound-visualization`
 - **Not responsible for:** Localization pipeline → localization-i18n; Haptics devices → input-devices-haptics
-- **Provides:** — · **Consumes:** C-AUDIO, C-ASSET, C-LOC, C-DIALOGUE?, C-DEVICE?, C-ML?, C-A11Y, C-VEHICLE?, C-A11YRT, C-RELOAD?, C-PREDICT? · **Tool-side:** C-GRAPH, C-COOK, C-EDCMD, C-EDHOST, C-EDPREVIEW, C-IMPORT
+- **Provides:** — · **Consumes:** C-AUDIO, C-ASSET, C-LOC, C-DIALOGUE?, C-DEVICE?, C-ML?, C-A11Y, C-VEHICLE?, C-A11YRT, C-RELOAD?, C-PREDICT?, C-GAMEDATA? · **Tool-side:** C-GRAPH, C-COOK, C-EDCMD, C-EDHOST, C-EDPREVIEW, C-IMPORT
 - **Untrusted inputs:** player-model-prompts
 - **Expertise:** sound design systems, adaptive music, VO pipelines
 - **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
@@ -1700,10 +1705,10 @@ Netcode model per game type (authoritative server, lockstep, rollback, P2P/relay
 UDP sockets and platform network APIs, reliability and ordering, fragmentation, congestion control, encryption and authentication, NAT traversal and relays, connection lifecycle, link simulation, QUIC/WebTransport evaluation.
 
 - **Owns:** `NET.TRANS.sockets`; `NET.TRANS.reliability`; `NET.TRANS.mtu`; `NET.TRANS.congestion`; `NET.TRANS.crypto`; `NET.TRANS.nat`; `NET.TRANS.lifecycle`; `NET.TRANS.simulation`; `NET.TRANS.quic`; `NET.TRANS.web`; `NET.TRANS.voice`; `NET.TRANS.dos`; `NET.TRANS.platform-requirements`; `NET.TRANS.web-server`; `NET.TRANS.l4s`; `NET.TRANS.local-network`; `NET.TRANS.qos-probe`; `NET.DBG.inspect`; `NET.DBG.profiler`
-- **Contributes to:** `PLAT.PAL.lifecycle`; `PLAT.PAL.cloud-render-host`; `PLAT.CON.confidential-slots`; `PLAT.SVC.matchmaking`; `AUD.DSP.voip`; `AUD.DSP.voice-jitter`; `INP.DEV.companion`; `NET.SESS.auth`; `NET.SESS.server-browser`; `ED.ARCH.pie-net`; `ED.COLLAB.session-server`; `QA.FUNC.network`; `QA.SIM.netsim`
+- **Contributes to:** `PLAT.PAL.lifecycle`; `PLAT.PAL.cloud-render-host`; `PLAT.CON.confidential-slots`; `PLAT.SVC.matchmaking`; `AUD.DSP.voip`; `AUD.DSP.voice-jitter`; `INP.DEV.companion`; `NET.SESS.auth`; `NET.SESS.server-browser`; `NET.TOOL.replication-authoring`; `NET.TOOL.net-debug`; `ED.ARCH.pie-net`; `ED.COLLAB.session-server`; `QA.FUNC.network`; `QA.SIM.netsim`
 - **Not responsible for:** What is replicated → replication; Relay service operation → external:backend
 - **Provides:** C-NETLINK · **Consumes:** C-PAL, C-TASK, C-SIGN
-- **Untrusted inputs:** lan-discovery, packets, server-list-entries
+- **Untrusted inputs:** lan-discovery, packets, qos-probe-replies, server-list-entries
 - **Expertise:** UDP protocols, congestion control, DTLS/QUIC
 - **Critics (G2):** K-ARCH, K-SYSTEMS, K-NET, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
@@ -1713,13 +1718,13 @@ UDP sockets and platform network APIs, reliability and ordering, fragmentation, 
 
 Entity and property replication, delta compression and quantization, interest management, prioritization, RPCs, snapshot interpolation, replay recording, network ID mapping.
 
-- **Owns:** `NET.REP.state`; `NET.REP.compression`; `NET.REP.interest`; `NET.REP.priority`; `NET.REP.rpc`; `NET.REP.interpolation`; `NET.REP.replays`; `NET.REP.ids`; `NET.REP.spectator`; `NET.REP.killcam`; `NET.REP.change-tracking`; `NET.REP.parallel`; `NET.REP.moq-spectator`; `NET.REP.compat`; `NET.REP.physics-bodies`; `NET.DBG.visualize`; `NET.DBG.session-replay`
-- **Contributes to:** `CORE.REFL.state-classes`; `WLD.VOX.edits`; `PHY.CTRL.vehicle-damage`; `PHY.DEST.replication`; `ANM.ARCH.net`; `ANM.IK.avatar-embodiment`; `ANM.CINE.net-sync`; `AUD.SPAT.proximity-voice`; `NET.ARCH.distributed-authority`; `NET.SRV.zoning`; `NET.SRV.cross-server`; `NET.DBG.profiler`; `NET.SESS.baseline`; `NET.SESS.budgets`; `NET.SESS.overload`; `NET.SESS.local-players`; `NET.SESS.host-migration`; `GAM.FW.customization-descriptor`; `GAM.SYS.cues`; `GAM.AI.team-visibility`; `QA.SIM.netsim`; `PRF.NET.bandwidth`; `XC.DET.replay-format`; `XC.SEC.info-hiding`
+- **Owns:** `NET.REP.state`; `NET.REP.compression`; `NET.REP.interest`; `NET.REP.priority`; `NET.REP.rpc`; `NET.REP.interpolation`; `NET.REP.replays`; `NET.REP.ids`; `NET.REP.spectator`; `NET.REP.killcam`; `NET.REP.change-tracking`; `NET.REP.parallel`; `NET.REP.moq-spectator`; `NET.REP.compat`; `NET.REP.physics-bodies`; `NET.DBG.visualize`; `NET.DBG.session-replay`; `NET.TOOL.replication-authoring`; `NET.TOOL.net-debug`
+- **Contributes to:** `CORE.REFL.state-classes`; `WLD.VOX.edits`; `PHY.ARCH.migration`; `PHY.CTRL.vehicle-damage`; `PHY.DEST.replication`; `ANM.ARCH.net`; `ANM.IK.avatar-embodiment`; `ANM.CINE.net-sync`; `AUD.SPAT.proximity-voice`; `NET.ARCH.distributed-authority`; `NET.SRV.zoning`; `NET.SRV.cross-server`; `NET.DBG.profiler`; `NET.SESS.baseline`; `NET.SESS.budgets`; `NET.SESS.overload`; `NET.SESS.local-players`; `NET.SESS.host-migration`; `GAM.FW.customization-descriptor`; `GAM.SYS.cues`; `GAM.AI.team-visibility`; `QA.SIM.netsim`; `PRF.NET.bandwidth`; `XC.DET.replay-format`; `XC.SEC.info-hiding`
 - **Not responsible for:** Prediction → prediction-rollback; Transport → network-transport
-- **Provides:** C-REP · **Consumes:** C-NET, C-NETLINK, C-ECS?, C-SER, C-ID, C-SPATIAL, C-WORLD?, C-SIGNIF?, C-REPLAY?, C-FLOW, C-SHARD?, C-FRAME, C-TASK, C-HOSTAUTH?, C-INTEGRITY?, C-STATECLASS, C-PHYS?, C-NETSESSION
+- **Provides:** C-REP · **Consumes:** C-NET, C-NETLINK, C-ECS?, C-SER, C-ID, C-SPATIAL, C-WORLD?, C-SIGNIF?, C-REPLAY?, C-FLOW, C-SHARD?, C-FRAME, C-TASK, C-HOSTAUTH?, C-INTEGRITY?, C-STATECLASS, C-PHYS?, C-NETSESSION · **Tool-side:** C-EDCMD, C-EDHOST
 - **Untrusted inputs:** client-rpcs, replicated-state
 - **Expertise:** state synchronization, bit packing, interest management
-- **Critics (G2):** K-ARCH, K-NET, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
+- **Critics (G2):** K-ARCH, K-NET, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
 ### prediction-rollback
 
@@ -1769,9 +1774,9 @@ Gameplay framework: rules and session state, players and data-oriented control b
 Reusable gameplay systems: abilities, effects and attributes, hit detection and projectiles, building, aim assist, volumes, impacts, timers, cues and interaction, batched deferred spawning (pooling only where measured), gameplay message routing.
 
 - **Owns:** `GAM.SYS.abilities`; `GAM.SYS.spawning`; `GAM.SYS.messages`; `GAM.SYS.predicted-abilities`; `GAM.SYS.impacts`; `GAM.SYS.volumes`; `GAM.SYS.building`; `GAM.SYS.hit-detection`; `GAM.SYS.projectiles`; `GAM.SYS.markers`; `GAM.SYS.aim-assist`; `GAM.SYS.timers`; `GAM.SYS.cues`; `GAM.SYS.interaction`; `GAM.TOOL.tags-abilities`
-- **Contributes to:** `PHY.DEST.structural`; `ANM.GRAPH.actions`; `NET.PRED.rewound-world-query`; `GAM.SCR.level-scripting`; `GAM.DATA.tags`; `UI.FW.maps`
+- **Contributes to:** `PHY.DEST.structural`; `ANM.GRAPH.actions`; `NET.PRED.lagcomp`; `NET.PRED.rewound-world-query`; `GAM.SCR.level-scripting`; `GAM.DATA.tags`; `UI.FW.maps`
 - **Not responsible for:** Generic events → entity-object-model; Cinematic cameras → cinematics-sequencer; Gameplay cameras & photo mode → gameplay-camera
-- **Provides:** C-ABILITY · **Consumes:** C-GAME, C-PHYS?, C-ANIM?, C-AUDIO?, C-DEVICE?, C-PREDICT?, C-REP?, C-INPUT?, C-GAMEDATA, C-A11Y, C-EDIT?, C-INTEGRITY?, C-A11YRT?, C-AI?, C-SCRIPT?, C-LOC?, C-DET?, C-UI?, C-VIEW?, C-VFX?, C-CAMERA?, C-REWIND? · **Tool-side:** C-EDCMD, C-EDHOST
+- **Provides:** C-ABILITY · **Consumes:** C-GAME, C-PHYS?, C-ANIM?, C-AUDIO?, C-DEVICE?, C-PREDICT?, C-REP?, C-INPUT?, C-GAMEDATA, C-A11Y, C-EDIT?, C-INTEGRITY?, C-A11YRT?, C-AI?, C-SCRIPT?, C-LOC?, C-DET?, C-UI?, C-VIEW?, C-VFX?, C-CAMERA?, C-REWIND?, C-SHARD? · **Tool-side:** C-EDCMD, C-EDHOST
 - **Expertise:** ability systems, camera design, gameplay tags
 - **Critics (G2):** K-ARCH, K-SIM, K-NET, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
@@ -1782,9 +1787,9 @@ Reusable gameplay systems: abilities, effects and attributes, hit detection and 
 Scripting language selection, VM embedding and bindings, sandboxing, debugging and profiling, hot reload, visual scripting, AOT/JIT constraints, GC policy, VM concurrency model.
 
 - **Owns:** `GAM.SCR.selection`; `GAM.SCR.vm`; `GAM.SCR.sandbox`; `GAM.SCR.debug`; `GAM.SCR.reload`; `GAM.SCR.visual`; `GAM.SCR.aot`; `GAM.SCR.gc`; `GAM.SCR.concurrency`; `GAM.SCR.level-scripting`; `GAM.SCR.hotfix`; `GAM.TOOL.script-debugger`
-- **Contributes to:** `CORE.LIFE.ownership-model`; `CORE.REFL.bindings`; `GAM.SYS.volumes`; `UI.FW.logic`; `BLD.SYS.ide-integration`; `XC.EXT.runtime-graphs`
+- **Contributes to:** `CORE.LIFE.ownership-model`; `CORE.MEM.exec-pages`; `CORE.REFL.bindings`; `GAM.SYS.volumes`; `UI.FW.logic`; `BLD.SYS.ide-integration`; `XC.EXT.runtime-graphs`
 - **Not responsible for:** Reflection substrate → reflection-metadata; Graph editor UI → graph-editor-framework
-- **Provides:** C-SCRIPT · **Consumes:** C-REFL, C-RELOAD?, C-TASK, C-LIFETIME, C-FRAME, C-ID, C-ECS?, C-DET? · **Tool-side:** C-GRAPH, C-EDCMD, C-EDHOST
+- **Provides:** C-SCRIPT, C-GRAPHRT · **Consumes:** C-REFL, C-RELOAD?, C-TASK, C-LIFETIME, C-FRAME, C-ID, C-ECS?, C-DET? · **Tool-side:** C-GRAPH, C-EDCMD, C-EDHOST
 - **Untrusted inputs:** scripts
 - **Expertise:** VM embedding (Luau, .NET, Wasm), DAP, sandboxing
 - **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
@@ -1824,7 +1829,7 @@ Decision making (behavior trees, utility, HTN/GOAP, state trees), perception, en
 - **Owns:** `GAM.AI.decisions`; `GAM.AI.perception`; `GAM.AI.queries`; `GAM.AI.smart-objects`; `GAM.AI.lod`; `GAM.AI.learned`; `GAM.AI.tactical`; `GAM.AI.llm-dialogue`; `GAM.AI.llm-decision`; `GAM.AI.local-guardrails`; `GAM.AI.team-visibility`; `GAM.AI.search`; `GAM.TOOL.ai-editors`; `GAM.TOOL.ai-debug`
 - **Contributes to:** `ML.RT.sequence-exec`; `GAM.FW.turns`; `GAM.NARR.barks`; `UI.LOC.generated`; `QA.CERT.genai`; `XC.SEC.genai`
 - **Not responsible for:** Navigation → navigation-pathfinding; ML runtime → ml-inference-runtime
-- **Provides:** C-AIAGENT, C-AI · **Consumes:** C-GAME, C-NAV?, C-SPATIAL, C-PHYS?, C-ML?, C-LIVE?, C-DIALOGUE?, C-SIGNIF?, C-SAVE?, C-FRAME, C-FLOW, C-VEHICLE?, C-ABILITY?, C-MOVE?, C-SCRIPT?, C-DET?, C-REP? · **Tool-side:** C-GRAPH, C-EDCMD, C-EDHOST
+- **Provides:** C-AIAGENT, C-AI · **Consumes:** C-GAME, C-NAV?, C-SPATIAL, C-PHYS?, C-ML?, C-LIVE?, C-DIALOGUE?, C-SIGNIF?, C-SAVE?, C-FRAME, C-FLOW, C-VEHICLE?, C-ABILITY?, C-MOVE?, C-SCRIPT?, C-DET?, C-REP?, C-SHARD? · **Tool-side:** C-GRAPH, C-EDCMD, C-EDHOST
 - **Untrusted inputs:** generated-content, player-model-prompts
 - **Expertise:** game AI, utility theory, HTN planning, ML policy & LLM integration (latency, cost, moderation, fallback)
 - **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
@@ -1836,7 +1841,7 @@ Decision making (behavior trees, utility, HTN/GOAP, state trees), perception, en
 Save-game model and serialization, save versioning and migration, atomic writes, platform save APIs and quotas, cloud-save sync, persistent world-state deltas, checkpoints.
 
 - **Owns:** `GAM.SAVE.model`; `GAM.SAVE.migration`; `GAM.SAVE.atomic`; `GAM.SAVE.platform`; `GAM.SAVE.cloud`; `GAM.SAVE.world-state`; `GAM.SAVE.checkpoints`; `GAM.SAVE.settings`; `GAM.SAVE.integrity`; `GAM.SAVE.unknown-content`; `GAM.SAVE.slots`; `GAM.TOOL.save-inspector`
-- **Contributes to:** `PLAT.DESK.os-security`; `PLAT.CON.confidential-slots`; `PLAT.SVC.cloud-save`; `PLAT.SVC.user-model`; `PLAT.XR.anchors`; `PLAT.WEB.storage`; `PLAT.LIVE.support-tools`; `CORE.REFL.state-classes`; `CORE.SCALE.autodetect`; `CORE.SCALE.safe-boot`; `RES.IO.write`; `WLD.VOX.edits`; `PHY.ARCH.persistence`; `NET.SRV.persistence`; `GAM.FW.objectives`; `GAM.FW.customization-descriptor`; `GAM.FW.turns`; `GAM.SYS.timers`; `GAM.AI.llm-dialogue`; `GAM.NARR.facts`; `GAM.SIM.scale-save`; `QA.FUNC.compat-corpus`; `XC.SEC.key-custody`
+- **Contributes to:** `PLAT.DESK.os-security`; `PLAT.DESK.backend-slots`; `PLAT.CON.confidential-slots`; `PLAT.MOB.backend-slots`; `PLAT.SVC.cloud-save`; `PLAT.SVC.user-model`; `PLAT.XR.anchors`; `PLAT.WEB.storage`; `PLAT.WEB.backend-slots`; `PLAT.LIVE.support-tools`; `CORE.REFL.state-classes`; `CORE.SCALE.autodetect`; `CORE.SCALE.safe-boot`; `RES.IO.write`; `WLD.VOX.edits`; `PHY.ARCH.persistence`; `NET.SRV.persistence`; `GAM.FW.objectives`; `GAM.FW.customization-descriptor`; `GAM.FW.turns`; `GAM.SYS.timers`; `GAM.AI.llm-dialogue`; `GAM.NARR.facts`; `GAM.SIM.scale-save`; `ED.ARCH.pie`; `QA.FUNC.compat-corpus`; `XC.SEC.key-custody`
 - **Not responsible for:** Schema evolution mechanism → serialization-schema; Cloud service API → platform-services
 - **Provides:** C-SAVE · **Consumes:** C-SER, C-ID, C-SVC?, C-WORLD?, C-CFG, C-SRVDATA?, C-SIGN, C-LOC?, C-STATECLASS · **Tool-side:** C-EDCMD, C-EDHOST
 - **Untrusted inputs:** cloud-saves, saves
@@ -1864,7 +1869,7 @@ Game UI architecture (retained, change-notified view models with resolved bindin
 Font loading and fallback, glyph rasterization, shaping, bidi and line breaking, rich text and emoji, text input and IME.
 
 - **Owns:** `UI.TXT.fonts`; `UI.TXT.raster`; `UI.TXT.shaping`; `UI.TXT.bidi`; `UI.TXT.rich`; `UI.TXT.ime`; `UI.TXT.font-subsetting`; `UI.TXT.locale-shaping`; `UI.TXT.cjk-layout`; `UI.TXT.editing`; `UI.TXT.segmentation`
-- **Contributes to:** `PLAT.CON.confidential-slots`; `UI.TOOL.preview`; `QA.RENDER.final-frame`
+- **Contributes to:** `PLAT.DESK.backend-slots`; `PLAT.CON.confidential-slots`; `PLAT.MOB.backend-slots`; `PLAT.WEB.backend-slots`; `CNT.COOK.fonts`; `UI.TOOL.preview`; `QA.RENDER.final-frame`
 - **Not responsible for:** String content → localization-i18n; 2D draw submission → render-2d-vector
 - **Provides:** C-TEXT · **Consumes:** C-TYPES, C-ASSET, C-A11Y, C-PAL, C-RELOAD?
 - **Untrusted inputs:** chat-text, fonts
@@ -1906,7 +1911,7 @@ Editor architecture: process model (in- vs out-of-process runtime), editor/runti
 Tool UI toolkit (docking, panels), reflection-driven inspectors, asset browser, hosting of C-DEVUI panels in the editor, editor UX standards.
 
 - **Owns:** `ED.UI.toolkit`; `ED.UI.inspectors`; `ED.UI.asset-browser`; `ED.UI.ux`; `ED.UI.asset-editor-host`; `ED.UI.thumbnails`; `ED.UI.curves-timeline`; `ED.UI.tabular`; `ED.UI.toolkit-basis`; `ED.UI.localization`; `ED.UI.outliner`; `ED.UI.accessibility`; `ED.UI.settings-editor`; `ED.UI.workspace`
-- **Contributes to:** `CORE.REFL.properties`; `RND.ARCH.editor-rendering`; `RND.TOOL.material-editor`; `ANM.TOOL.sequencer-editor`; `GAM.TOOL.data`; `UI.TOOL.designer`; `ED.DEBUG.imgui`; `QA.FUNC.editor`; `XC.DX.creator-docs`
+- **Contributes to:** `CORE.REFL.properties`; `RND.ARCH.editor-rendering`; `RND.TOOL.material-editor`; `ML.TOOL.model-assets`; `ANM.TOOL.sequencer-editor`; `NET.TOOL.replication-authoring`; `NET.TOOL.net-debug`; `GAM.TOOL.data`; `UI.TOOL.designer`; `ED.DEBUG.imgui`; `QA.FUNC.editor`; `XC.DX.creator-docs`
 - **Not responsible for:** Game UI → ui-architect; Graph editors → graph-editor-framework; Developer/debug immediate-mode UI → visual-debugging-tools
 - **Provides:** C-EDHOST · **Consumes:** C-EDCMD, C-REFL, C-DRAW2D, C-TEXT, C-DEVUI? · **Tool-side:** C-VCS
 - **Untrusted inputs:** clipboard-dragdrop
@@ -1935,7 +1940,7 @@ Shared node-graph editor for material, animation, VFX, audio, PCG and visual-scr
 - **Owns:** `ED.GRAPH.framework`; `ED.GRAPH.compile`; `ED.GRAPH.debug`; `ED.GRAPH.diff`
 - **Contributes to:** `RND.MAT.graph`; `RND.VFX.graph`; `RND.TOOL.material-editor`; `RND.TOOL.vfx-editor`; `ANM.TOOL.graph-editor`; `AUD.TOOL.designer`; `GAM.SCR.visual`; `GAM.TOOL.ai-editors`; `GAM.TOOL.dialogue`; `XC.EXT.runtime-graphs`
 - **Not responsible for:** Each domain's graph semantics → material-system, animation-graphs, vfx-particles, audio-content-runtime, procedural-generation, scripting-runtime, ai-behavior-perception, narrative-dialogue
-- **Provides:** C-GRAPH · **Consumes:** C-EDCMD, C-SER · **Tool-side:** C-VCS
+- **Provides:** C-GRAPH · **Consumes:** C-EDCMD, C-SER · **Tool-side:** C-VCS, C-GRAPHRT
 - **Expertise:** node editors, graph compilers, visual diff
 - **Critics (G2):** K-ARCH, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
@@ -2001,7 +2006,7 @@ Branching and merge model, engine release trains and versioning, title release-b
 Build graph, compiler and toolchain matrix, C++ modules/unity/PCH, compile caching and distribution, codegen integration, third-party dependencies, static analysis, build configurations.
 
 - **Owns:** `BLD.SYS.graph`; `BLD.SYS.toolchains`; `BLD.SYS.compile-speed`; `BLD.SYS.caching`; `BLD.SYS.codegen`; `BLD.SYS.third-party`; `BLD.SYS.static-analysis`; `BLD.SYS.configs`; `BLD.SYS.platform-sdks`; `BLD.SYS.dev-surface-exclusion`; `BLD.SYS.provenance`; `BLD.SYS.ide-integration`
-- **Contributes to:** `ARCH.REQ.platform-matrix`; `ARCH.ORG.write-sets`; `PLAT.PAL.confidential-extensions`; `PLAT.CON.devkit`; `CORE.LIFE.interop`; `BLD.CI.build-distribution`; `BLD.REL.archival`; `PRF.METH.pipeline-budgets`; `PRF.MEM.size`; `PRF.PIPE.build`; `XC.SEC.supply-chain`; `XC.SEC.hardening`
+- **Contributes to:** `ARCH.REQ.platform-matrix`; `ARCH.ORG.write-sets`; `PLAT.PAL.confidential-extensions`; `PLAT.CON.devkit`; `CORE.LIFE.interop`; `BLD.CI.build-distribution`; `BLD.REL.archival`; `PRF.METH.pipeline-budgets`; `PRF.BENCH.shipping-delta`; `PRF.MEM.size`; `PRF.PIPE.build`; `XC.SEC.supply-chain`; `XC.SEC.hardening`
 - **Not responsible for:** CI orchestration → ci-cd-automation; Supply-chain policy → security-engineering
 - **Provides:** C-BUILD · **Consumes:** —
 - **Untrusted inputs:** remote-build-results, third-party-source
@@ -2015,7 +2020,7 @@ Build graph, compiler and toolchain matrix, C++ modules/unity/PCH, compile cachi
 CI pipelines, build farm and artifact storage, pre-submit and merge gating, symbol servers, device-farm orchestration, developer CLI and automation.
 
 - **Owns:** `BLD.CI.pipelines`; `BLD.CI.farm`; `BLD.CI.gating`; `BLD.CI.symbols`; `BLD.CI.devices`; `BLD.CI.cli`; `BLD.CI.orchestration`; `BLD.CI.binary-distribution`; `BLD.CI.build-distribution`; `BLD.CI.local-first`; `BLD.CI.device-lanes`; `BLD.CI.artifacts`; `BLD.CI.bisection`; `BLD.CI.leak-protection`; `BLD.CI.sealed-suites`; `BLD.CI.merge-queue`; `BLD.CI.test-selection`; `BLD.CI.hardening`
-- **Contributes to:** `ARCH.REQ.platform-matrix`; `ARCH.ORG.bootstrap`; `ARCH.ORG.triage`; `ARCH.ORG.cost-ledger`; `ARCH.ORG.external-dependencies`; `PLAT.CON.packaging`; `PLAT.CON.submission`; `PLAT.CON.patch-format`; `PLAT.CON.ci-lane`; `CNT.COOK.world-build`; `CNT.COOK.shared-cache`; `CNT.COOK.gpu-steps`; `CNT.VAL.submit-gate`; `RND.SHADER.cache`; `ED.ARCH.headless`; `ED.COLLAB.binaries`; `ED.COLLAB.codev`; `QA.STRAT.flaky`; `QA.STRAT.integration`; `QA.STRAT.selection-policy`; `QA.CERT.code-provenance`; `QA.AGENT.test-integrity`; `QA.AGENT.gate-canaries`; `QA.AGENT.holdout-hygiene`; `PRF.METH.gates`; `PRF.BENCH.regression`; `PRF.BENCH.lab`; `PRF.BENCH.proxy-metrics`; `PRF.BENCH.lab-scheduling`; `PRF.LOAD.hitch-gate`; `PRF.PIPE.ci`; `OBS.CRASH.symbolication`; `XC.DET.conformance`; `XC.SEC.secrets`; `XC.SEC.incident`; `XC.SEC.agent-boundary`; `XC.SEC.key-custody`; `XC.SEC.testing`; `XC.SEC.agent-redteam`
+- **Contributes to:** `ARCH.REQ.platform-matrix`; `ARCH.ORG.bootstrap`; `ARCH.ORG.triage`; `ARCH.ORG.cost-ledger`; `ARCH.ORG.external-dependencies`; `PLAT.DESK.compat-layers`; `PLAT.CON.packaging`; `PLAT.CON.submission`; `PLAT.CON.patch-format`; `PLAT.CON.ci-lane`; `CNT.COOK.world-build`; `CNT.COOK.shared-cache`; `CNT.COOK.gpu-steps`; `CNT.VAL.submit-gate`; `RND.SHADER.cache`; `ED.ARCH.headless`; `ED.COLLAB.binaries`; `ED.COLLAB.codev`; `QA.STRAT.flaky`; `QA.STRAT.integration`; `QA.STRAT.selection-policy`; `QA.CERT.code-provenance`; `QA.AGENT.test-integrity`; `QA.AGENT.gate-canaries`; `QA.AGENT.holdout-hygiene`; `PRF.METH.gates`; `PRF.METH.tier-emulation`; `PRF.BENCH.regression`; `PRF.BENCH.lab`; `PRF.BENCH.proxy-metrics`; `PRF.BENCH.lab-scheduling`; `PRF.LOAD.hitch-gate`; `PRF.PIPE.ci`; `OBS.CRASH.symbolication`; `XC.DET.conformance`; `XC.SEC.secrets`; `XC.SEC.incident`; `XC.SEC.agent-boundary`; `XC.SEC.key-custody`; `XC.SEC.testing`; `XC.SEC.agent-redteam`
 - **Not responsible for:** What tests exist → test-architect; Perf thresholds → performance-architect
 - **Provides:** — · **Consumes:** C-BUILD, C-COOK, C-AUTOMATION · **Tool-side:** C-VCS
 - **Untrusted inputs:** remote-build-results, triage-artifacts
@@ -2069,7 +2074,7 @@ Chunked voxel/block worlds end to end: sparse storage and compression, meshing a
 GPU platform architecture shared by every renderer tier: layering of RHI, GPU memory, render graph, shader system, ray-query and inference infrastructure; the GPU feature-tier model (binding, pipeline-state, queue, mesh, RT, tensor tiers) and API baselines per hardware tier; task-based parallel command recording.
 
 - **Owns:** `RND.GPU.layering`; `RND.GPU.tiers`; `RND.GPU.recording`; `RND.GPU.hetero-offload`
-- **Contributes to:** `ARCH.ORG.delegated-planning`; `PLAT.PAL.cloud-render-host`; `ML.RT.npu`
+- **Contributes to:** `ARCH.ORG.delegated-planning`; `PLAT.PAL.cloud-render-host`; `PLAT.SRV.gpu-host`; `ML.RT.npu`
 - **Not responsible for:** Rendering pipeline and features → render-architect; Individual API backends → rhi-d3d12, rhi-vulkan, rhi-metal, rhi-webgpu; Frames in flight / thread existence → frame-orchestration; Thread inventory (which threads exist) → job-system-task-graph
 - **Provides:** C-GPUTIER · **Consumes:** C-RHI, C-PAL
 - **Expertise:** explicit graphics APIs, GPU architecture across vendors, API evolution tracking
@@ -2149,7 +2154,7 @@ Vehicle dynamics: wheeled vehicles (tires, suspension, drivetrain), aerodynamic 
 - **Owns:** `PHY.CTRL.vehicles`; `PHY.CTRL.vehicle-net`; `PHY.CTRL.aero`; `PHY.CTRL.orbital`; `PHY.CTRL.watercraft`; `PHY.CTRL.vehicle-damage`; `PHY.TOOL.vehicle-tuning`
 - **Contributes to:** `WLD.ENV.buoyancy`; `PHY.ARCH.local-frames`; `PHY.ARCH.tier-transitions`; `PHY.ARCH.fields`; `INP.DEV.force-feedback`; `GAM.AI.traffic`; `QA.SIM.vehicles`
 - **Not responsible for:** Character controllers → character-physics; Generic buoyancy → rigid-body-dynamics; Netcode model → prediction-rollback
-- **Provides:** C-VEHICLE · **Consumes:** C-PHYS, C-DET, C-ENV?, C-DEVICE?, C-PREDICT?, C-SIGNIF? · **Tool-side:** C-EDCMD, C-EDHOST
+- **Provides:** C-VEHICLE · **Consumes:** C-PHYS, C-DET, C-ENV?, C-DEVICE?, C-PREDICT?, C-SIGNIF?, C-SHARD? · **Tool-side:** C-EDCMD, C-EDHOST
 - **Expertise:** tire models (Pacejka, brush), flight dynamics, orbital mechanics
 - **Critics (G2):** K-ARCH, K-SIM, K-NET, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
@@ -2171,10 +2176,10 @@ Cross-cutting physics tooling: collision authoring, physics-asset/ragdoll and co
 
 Character movement as one system at the junction of input, physics, animation and netcode: movement modes, step/slope rules, root-motion consumption and authority, networked predicted/reconciled movement with a resimulatable move API, mount/vehicle transitions, 2D platformer movement.
 
-- **Owns:** `GAM.MOVE.modes`; `GAM.MOVE.networked`; `GAM.MOVE.root-motion`; `GAM.MOVE.transitions`; `GAM.MOVE.platformer`; `GAM.MOVE.grid`; `GAM.TOOL.movement`
+- **Owns:** `GAM.MOVE.modes`; `GAM.MOVE.networked`; `GAM.MOVE.root-motion`; `GAM.MOVE.transitions`; `GAM.MOVE.platformer`; `GAM.MOVE.grid`; `GAM.MOVE.ragdoll-transition`; `GAM.TOOL.movement`
 - **Contributes to:** `CORE.FRAME.sim-schedule`; `PHY.TOOL.controller-tuning`; `ANM.GRAPH.actions`; `ANM.SYN.motion-warping`; `ANM.SYN.multi-actor`; `QA.SIM.controllers`
 - **Not responsible for:** Collide-and-slide controller primitive → character-physics; Generic prediction machinery → prediction-rollback; Animation selection → animation-graphs, motion-synthesis
-- **Provides:** C-MOVE · **Consumes:** C-GAME, C-PHYS, C-INPUT, C-ANIM?, C-PREDICT?, C-DET, C-VEHICLE?, C-INTEGRITY?, C-CAMERA?, C-GAMEDATA, C-CHARCTRL · **Tool-side:** C-EDCMD, C-EDHOST, C-EDVIEW
+- **Provides:** C-MOVE · **Consumes:** C-GAME, C-PHYS, C-INPUT, C-ANIM?, C-PREDICT?, C-DET, C-VEHICLE?, C-INTEGRITY?, C-CAMERA?, C-GAMEDATA, C-CHARCTRL, C-SHARD? · **Tool-side:** C-EDCMD, C-EDHOST, C-EDVIEW
 - **Expertise:** character movement, movement netcode, game feel
 - **Critics (G2):** K-ARCH, K-SIM, K-NET, K-TOOLS, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-GAMEPLAY, K-TEST, K-SEC
 
@@ -2225,7 +2230,7 @@ The reference-game ladder (one representative game per configuration) used as mi
 
 Web target (WASM + WebGPU): threads and cross-origin isolation, memory limits, OPFS/IndexedDB storage, HTTP streaming delivery, user-gesture rules for audio/pointer/fullscreen, browser transport constraints.
 
-- **Owns:** `PLAT.WEB.runtime`; `PLAT.WEB.storage`; `PLAT.WEB.delivery`; `PLAT.WEB.gestures`; `PLAT.WEB.webgpu-target`; `PLAT.WEB.pal`; `PLAT.WEB.std3d`; `PLAT.WEB.audience-share`; `PLAT.WEB.target-tools`
+- **Owns:** `PLAT.WEB.runtime`; `PLAT.WEB.storage`; `PLAT.WEB.delivery`; `PLAT.WEB.gestures`; `PLAT.WEB.webgpu-target`; `PLAT.WEB.pal`; `PLAT.WEB.std3d`; `PLAT.WEB.audience-share`; `PLAT.WEB.target-tools`; `PLAT.WEB.backend-slots`; `PLAT.WEB.svc-portals`
 - **Contributes to:** `PLAT.PAL.lifecycle`; `CORE.JOBS.degenerate`; `CORE.FRAME.host-loop`; `RND.TEX.transcode`; `RND.TOOL.scalability-preview`; `ML.RT.web-backends`; `INP.DEV.companion`; `NET.TRANS.web`; `PRF.MEM.size`
 - **Not responsible for:** WebGPU backend → rhi-webgpu; Browser transports → network-transport
 - **Provides:** — · **Consumes:** C-BASE · **Tool-side:** C-COOK · **Implements:** C-PAL, C-TARGETPLAT
@@ -2240,10 +2245,10 @@ Web target (WASM + WebGPU): threads and cross-origin isolation, memory limits, O
 Integration boundary to third-party and own online backends and live operations: matchmaking/lobby/session boundary, remote config and feature flags, live events and experiments, service-hosted voice/text chat sessions, moderation (UGC, chat, generated content), wallet and ads boundaries, trusted time, remote generative-AI/inference boundary, service emulators and outage injection for tests.
 
 - **Owns:** `PLAT.SVC.matchmaking`; `PLAT.SVC.remote-config`; `PLAT.SVC.moderation`; `PLAT.SVC.voice-text`; `PLAT.SVC.trusted-time`; `PLAT.SVC.genai-boundary`; `PLAT.SVC.emulation`; `PLAT.SVC.admission`; `PLAT.SVC.xplat-social`; `PLAT.SVC.voice-moderation`; `PLAT.LIVE.events`; `PLAT.LIVE.experiments`; `PLAT.LIVE.operations`; `PLAT.LIVE.support-tools`; `PLAT.COMM.currency`; `PLAT.COMM.ads`; `NET.ARCH.async`
-- **Contributes to:** `ARCH.ORG.human-gates`; `PLAT.PAL.device-db`; `PLAT.PAL.cloud-hybrid`; `CORE.LIFE.config`; `ML.RT.local-remote`; `AUD.SPAT.proximity-voice`; `NET.ARCH.async-validation`; `NET.TRANS.qos-probe`; `NET.SRV.orchestration`; `NET.SRV.lifecycle`; `NET.SESS.server-browser`; `GAM.FW.turns`; `UI.A11Y.comms`; `BLD.REL.rollback`; `BLD.REL.staged-rollout`; `BLD.REL.end-of-service`; `BLD.REL.preload-embargo`; `QA.ROBUST.distributed-faults`; `OBS.LOG.analytics`; `XC.SEC.incident`; `XC.SEC.genai`; `XC.EXT.ugc-discovery`; `XC.EXT.ugc-integrity`; `XC.EXT.generated-assets`
+- **Contributes to:** `ARCH.ORG.human-gates`; `PLAT.PAL.device-db`; `PLAT.PAL.cloud-hybrid`; `CORE.LIFE.config`; `ML.RT.local-remote`; `AUD.SPAT.proximity-voice`; `NET.ARCH.async-validation`; `NET.TRANS.qos-probe`; `NET.SRV.orchestration`; `NET.SRV.lifecycle`; `NET.SESS.server-browser`; `GAM.FW.turns`; `UI.A11Y.comms`; `ED.ARCH.pie`; `BLD.REL.rollback`; `BLD.REL.staged-rollout`; `BLD.REL.end-of-service`; `BLD.REL.preload-embargo`; `QA.ROBUST.distributed-faults`; `OBS.LOG.analytics`; `XC.SEC.incident`; `XC.SEC.genai`; `XC.EXT.ugc-discovery`; `XC.EXT.ugc-integrity`; `XC.EXT.generated-assets`
 - **Not responsible for:** First-party platform services → platform-services; Backend implementation → external:backend; Game-server hosting → dedicated-server
 - **Provides:** C-LIVE · **Consumes:** C-PAL, C-TASK, C-CFG, C-SVC?, C-SIGN, C-A11YRT? · **Implements:** C-NETLINK
-- **Untrusted inputs:** chat-text, generated-content, player-model-prompts, remote-config, service-responses
+- **Untrusted inputs:** chat-text, generated-content, player-model-prompts, qos-probe-replies, remote-config, service-responses
 - **Expertise:** online service APIs, live operations, experimentation
 - **Critics (G2):** K-ARCH, K-NET, K-PLATFORM, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
 
@@ -2318,7 +2323,7 @@ Simulation substrates of colony, city, factory and sandbox games: grid/field sim
 
 Server-host PAL implementation: containerized Linux and ARM64 hosts, cgroup-aware CPU and memory discovery, NUMA on large instances, signal/termination handling, no display or GPU, orchestrator health integration at the OS level.
 
-- **Owns:** `PLAT.SRV.pal`; `PLAT.SRV.host-os`; `PLAT.SRV.container-topology`; `PLAT.SRV.target-tools`
+- **Owns:** `PLAT.SRV.pal`; `PLAT.SRV.host-os`; `PLAT.SRV.container-topology`; `PLAT.SRV.target-tools`; `PLAT.SRV.gpu-host`
 - **Not responsible for:** Server gameplay & lifecycle → dedicated-server; Fleet operation → external:backend
 - **Provides:** — · **Consumes:** C-BASE · **Tool-side:** C-COOK · **Implements:** C-PAL, C-TARGETPLAT
 - **Expertise:** Linux containers & cgroups, server CPU topology, ARM64 server ISAs
@@ -2346,7 +2351,7 @@ The network session lifecycle in every hosting mode (dedicated, listen, P2P host
 - **Owns:** `NET.SESS.handshake`; `NET.SESS.join`; `NET.SESS.baseline`; `NET.SESS.reconnect`; `NET.SESS.travel`; `NET.SESS.disconnect`; `NET.SESS.host-mode`; `NET.SESS.auth`; `NET.SESS.budgets`; `NET.SESS.overload`; `NET.SESS.content-set`; `NET.SESS.server-browser`; `NET.SESS.local-players`; `NET.SESS.host-migration`
 - **Contributes to:** `PLAT.SVC.matchmaking`; `PLAT.SVC.admission`; `WLD.MODEL.travel`; `NET.TRANS.local-network`; `NET.SRV.community-hosting`; `ED.ARCH.pie-net`
 - **Not responsible for:** Transport links → network-transport; State replication → replication; Headless server builds & density → dedicated-server
-- **Provides:** C-NETSESSION, C-HOSTAUTH · **Consumes:** C-NETLINK, C-NET, C-FRAME, C-SVC?, C-LIVE?, C-WORLD?, C-INTEGRITY?
+- **Provides:** C-NETSESSION, C-HOSTAUTH · **Consumes:** C-NETLINK, C-NET, C-FRAME, C-SVC?, C-LIVE?, C-WORLD?, C-INTEGRITY? · **Tool-side:** C-EDCMD, C-EDHOST
 - **Untrusted inputs:** auth-tickets, lan-discovery, packets, server-list-entries, server-pushed-content
 - **Expertise:** connection state machines, session security, host migration
 - **Critics (G2):** K-ARCH, K-NET, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
@@ -2358,7 +2363,7 @@ The network session lifecycle in every hosting mode (dedicated, listen, P2P host
 Multi-server worlds and authoritative persistence: zoning and instancing with player hand-off, cross-server messaging and entity migration, seamless meshing (experimental), write-behind persistence with leases and live schema migration, idempotent economy transactions.
 
 - **Owns:** `NET.ARCH.meshing`; `NET.SRV.persistence`; `NET.SRV.transactions`; `NET.SRV.zoning`; `NET.SRV.cross-server`
-- **Contributes to:** `PLAT.COMM.receipts`; `PLAT.COMM.revocation`; `QA.ROBUST.distributed-faults`; `QA.SIM.server-dst`
+- **Contributes to:** `PLAT.COMM.receipts`; `PLAT.COMM.revocation`; `PHY.ARCH.migration`; `QA.ROBUST.distributed-faults`; `QA.SIM.server-dst`
 - **Not responsible for:** Headless builds, density & host lifecycle → dedicated-server; Backend database operation → external:backend; Local save format → persistence-save
 - **Provides:** C-SHARD, C-SRVDATA · **Consumes:** C-NET, C-REP, C-WORLD, C-SER, C-SERVER, C-SAVE?
 - **Untrusted inputs:** store-notifications, transaction-requests
@@ -2372,7 +2377,7 @@ Multi-server worlds and authoritative persistence: zoning and instancing with pl
 Test infrastructure that ships as code on every target: unit/integration test framework, on-device test runner and result reporting, fixtures, and the fault-point registry that owners implement fault injection against.
 
 - **Owns:** `QA.HOST.framework`; `QA.HOST.runner`; `QA.HOST.fault-points`
-- **Contributes to:** `PLAT.PAL.event-injection`
+- **Contributes to:** `PLAT.PAL.event-injection`; `PRF.METH.tier-emulation`
 - **Not responsible for:** Test strategy & definition of done → test-architect; Fuzz/fault campaign policy → robustness-fuzzing; CI pipelines → ci-cd-automation
 - **Provides:** C-TESTHOST · **Consumes:** C-BASE, C-PAL, C-SYNC, C-MEM
 - **Expertise:** test frameworks, on-device test execution, fault injection seams
@@ -2451,4 +2456,16 @@ Independent authoring of conformance suites for ui & text conformance contracts,
 - **Not responsible for:** Contract implementation → owning-skill; Fuzz campaigns → robustness-fuzzing
 - **Provides:** — · **Consumes:** C-TEST
 - **Expertise:** text shaping and CLDR corpora, layout and focus-graph oracles
+- **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC
+
+### tools-pipeline-conformance
+
+**Tools & Pipeline Conformance** · expert · process · workstream: quality · parent: test-architect · profiles: all
+
+Independent authoring of conformance suites for tool, cook, build and editor-command contracts, distinct from their owners and implementers.
+
+- **Owns:** `QA.CONF.tools-pipeline`; `QA.CONF.import-roundtrip`; `QA.CONF.command-properties`
+- **Not responsible for:** Contract implementation → owning-skill
+- **Provides:** — · **Consumes:** C-TEST
+- **Expertise:** import/cook/package round-trip corpora, command apply/invert property tests
 - **Critics (G2):** K-ARCH, K-PERF, K-PROD, K-FUTURE, K-COMPLETE, K-LEGACY, K-TEST, K-SEC

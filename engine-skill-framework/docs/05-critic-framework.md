@@ -164,7 +164,7 @@ Threat model, trust boundaries, memory safety, supply chain, privacy, incident r
 | plugin-system | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | ◆ |
 | modding-ugc | · |  |  |  | ◆ |  |  | · | · | · | · | · | ◆ | · | ◆ |
 | developer-experience-docs | ◆ |  |  |  |  | ◆ |  | · | ◆ | · | · | · |  | · | · |
-| ml-inference-runtime | · | ◆ | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
+| ml-inference-runtime | · | ◆ | ◆ |  |  | ◆ |  | · | · | · | · | · |  | · | · |
 | core-runtime-architect | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
 | math-simd-numerics | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
 | memory-allocators | · |  | ◆ |  |  |  |  | · | · | · | · | · |  | · | · |
@@ -239,7 +239,7 @@ Threat model, trust boundaries, memory safety, supply chain, privacy, incident r
 | audio-content-runtime | · |  |  |  |  | ◆ |  | · | · | · | · | · | ◆ | · | · |
 | network-architect | · |  |  |  | ◆ |  |  | · | · | · | · | · |  | · | · |
 | network-transport | · |  | ◆ |  | ◆ |  |  | · | · | · | · | · |  | · | ◆ |
-| replication | · |  |  |  | ◆ |  |  | · | · | · | · | · |  | · | · |
+| replication | · |  |  |  | ◆ | ◆ |  | · | · | · | · | · |  | · | · |
 | prediction-rollback | · |  |  | ◆ | ◆ |  |  | · | · | · | · | · |  | · | · |
 | dedicated-server | · |  |  |  | ◆ |  |  | · | · | · | · | · |  | · | ◆ |
 | gameplay-architect | · |  |  |  |  |  |  | · | · | · | · | · | ◆ | · | · |
@@ -295,5 +295,6 @@ Threat model, trust boundaries, memory safety, supply chain, privacy, incident r
 | pipeline-performance | · |  |  |  |  |  |  | ◆ | · | · | · | · |  | ◆ | · |
 | foundation-conformance | · |  |  |  |  |  |  | · | · | · | · | · |  | ◆ | · |
 | ui-text-conformance | · |  |  |  |  |  |  | · | · | · | · | · |  | ◆ | · |
+| tools-pipeline-conformance | · |  |  |  |  |  |  | · | · | · | · | · |  | ◆ | · |
 
 ◆ domain critic (specifically scoped) · · universal critic

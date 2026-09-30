@@ -4,31 +4,31 @@
 
 Everything required to build **and ship** the engine, decomposed as domain → area → capability. Each capability has exactly one owning skill (**bold**); contributors coordinate through the owner's contract. Maturity: unmarked = established production; `emerging` = shipping in some titles, evaluate per ADR; `experimental` = research, never an architectural baseline; `speculative` = watch only.
 
-**1538 capabilities** in 21 domains — 1406 established, 105 emerging, 27 experimental, 0 speculative.
+**1562 capabilities** in 21 domains — 1425 established, 108 emerging, 29 experimental, 0 speculative.
 
 ## Domains
 
 | Domain | Areas | Capabilities |
 |---|---|---|
 | [ARCH · Engine architecture, governance & agent organization](#arch) | 6 | 60 |
-| [PLAT · Platform & hardware abstraction](#plat) | 10 | 130 |
-| [CORE · Core runtime foundations](#core) | 12 | 124 |
-| [RES · Resources, IO, packaging & streaming](#res) | 3 | 27 |
-| [CNT · Asset identity & content pipeline](#cnt) | 4 | 43 |
+| [PLAT · Platform & hardware abstraction](#plat) | 10 | 138 |
+| [CORE · Core runtime foundations](#core) | 12 | 125 |
+| [RES · Resources, IO, packaging & streaming](#res) | 3 | 28 |
+| [CNT · Asset identity & content pipeline](#cnt) | 4 | 46 |
 | [WLD · World representation, streaming & environment](#wld) | 7 | 65 |
-| [RND · Rendering](#rnd) | 22 | 234 |
-| [ML · Machine-learning runtime](#ml) | 1 | 13 |
-| [PHY · Physics & simulation](#phy) | 9 | 84 |
+| [RND · Rendering](#rnd) | 22 | 235 |
+| [ML · Machine-learning runtime](#ml) | 2 | 14 |
+| [PHY · Physics & simulation](#phy) | 9 | 85 |
 | [ANM · Animation](#anm) | 9 | 64 |
 | [AUD · Audio](#aud) | 5 | 41 |
 | [INP · Input](#inp) | 3 | 30 |
-| [NET · Networking & multiplayer](#net) | 7 | 88 |
-| [GAM · Gameplay, scripting, AI & persistence](#gam) | 11 | 116 |
+| [NET · Networking & multiplayer](#net) | 8 | 90 |
+| [GAM · Gameplay, scripting, AI & persistence](#gam) | 11 | 117 |
 | [UI · UI, text, localization & accessibility](#ui) | 5 | 58 |
 | [ED · Editor & content tools](#ed) | 7 | 69 |
 | [BLD · Build, CI/CD & release](#bld) | 3 | 50 |
-| [QA · Testing & validation](#qa) | 10 | 93 |
-| [PRF · Performance engineering](#prf) | 8 | 54 |
+| [QA · Testing & validation](#qa) | 10 | 96 |
+| [PRF · Performance engineering](#prf) | 8 | 56 |
 | [OBS · Observability & diagnostics](#obs) | 2 | 22 |
 | [XC · Cross-cutting runtime disciplines](#xc) | 5 | 73 |
 
@@ -129,7 +129,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `PLAT.PAL.base` Bootstrap base (C-BASE): raw allocator, raw sinks, hook tables — **platform-architect** · with core-runtime-architect
 - `PLAT.PAL.threads` Thread creation, affinity & QoS per OS — **platform-architect** · with job-system-task-graph
 - `PLAT.PAL.thread-affinity` Thread-affinity registry & isolation of OS-thread-bound APIs behind queues; engine loop never assumes the OS main thread — **platform-architect** · with job-system-task-graph, platform-mobile, platform-console
-- `PLAT.PAL.process` Processes, pipes, shared memory, local/dev sockets, HTTP(S)/TLS client (platform stacks) — **platform-architect** · with security-engineering
+- `PLAT.PAL.process` Processes, pipes, shared memory, local/dev sockets, HTTP(S)/TLS client (platform stacks) (crash-time use goes through the C-BASE signal-safe subset) — **platform-architect** · with security-engineering
 - `PLAT.PAL.clocks` Clocks, timer precision & clock-domain correlation (CPU↔GPU↔audio↔display↔input) — **platform-architect** · with rhi-core, audio-architect, frame-orchestration
 - `PLAT.PAL.signals` Signal/SEH handler registry & chaining order — **platform-architect** · with crash-diagnostics
 - `PLAT.PAL.fs-watch` File-system change notification — **platform-architect** · with hot-reload-iteration
@@ -141,13 +141,14 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `PLAT.PAL.performance-modes` Performance-mode switching (docked/handheld, Pro/enhanced, TDP profiles) — **platform-architect** · with platform-console, platform-desktop, runtime-scalability
 - `PLAT.PAL.os-support-policy` Supported OS versions, deprecation & beta-OS validation — **platform-architect**
 - `PLAT.PAL.devlink` Development host↔target connection service — **platform-architect** · with editor-architect, observability-telemetry
-- `PLAT.PAL.confidential-extensions` NDA platform extensions: segregated modules/repos, public stubs, sanitized CI results, access classes — **platform-architect** · with build-system-toolchains, security-engineering, program-orchestration, platform-console
+- `PLAT.PAL.confidential-extensions` NDA platform extensions: segregated modules/repos, public stubs, sanitized CI results, access classes; data-class rules: per-holder sealed partitions for tier/budget numbers, DDC, symbols and captures with a public envelope and sanitized summaries — **platform-architect** · with build-system-toolchains, security-engineering, program-orchestration, platform-console
 - `PLAT.PAL.cloud-hybrid` Split client/cloud compute boundary `experimental` — **network-architect** · with platform-architect, frame-orchestration, online-services-liveops
 - `PLAT.PAL.display` Display enumeration, modes, DPI, HDR & VRR capability, dynamic HDR/EDR headroom events — **platform-architect** · with platform-desktop, platform-console, platform-mobile, post-color-hdr
 - `PLAT.PAL.event-injection` Lifecycle & system-event injection (suspend/resume, constrained mode, sign-out, controller disconnect, memory pressure, thermal) — **platform-architect** · with test-runtime-harness, certification-compliance
 - `PLAT.PAL.pointer-shell` Cursor management (hardware/software cursors, confinement, relative mode), clipboard, file dialogs, drag-and-drop — **platform-architect** · with input-devices-haptics, platform-desktop
 - `PLAT.PAL.target-tools` Target-platform tooling contract content: cook format variants, shader-target hook, packager hook, deploy/run/debug — **platform-architect**
-- `PLAT.PAL.cloud-render-host` Engine as cloud render host: headless GPU rendering, frame capture, low-latency hardware encode, video/input back-channel, multi-tenant GPU packing `emerging` — **platform-architect** · with frame-orchestration, gpu-platform-architect, network-transport, input-system
+- `PLAT.PAL.cloud-render-host` Cloud render host policy (implementation in PLAT.SRV.gpu-host) `emerging` — **platform-architect** · with frame-orchestration, gpu-platform-architect, network-transport, input-system
+- `PLAT.PAL.storage-class` Storage class discovery (rotational/SATA-SSD/NVMe/removable/network) with a throughput and latency probe — **platform-architect**
 
 **PLAT.DESK — Desktop & handheld PC**
 
@@ -158,6 +159,8 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `PLAT.DESK.pal` PAL implementation for Windows/Linux/SteamOS/macOS (C-PAL backend: OS services, windowing, threads, clocks, IO, display, power, events) — **platform-desktop** · with platform-architect
 - `PLAT.DESK.cloud-streaming` PC-build cloud streaming (touch-overlay controls, UI-scale tier) — **platform-desktop** · with input-system
 - `PLAT.DESK.target-tools` Target-platform cook variants, shader-target and packager hooks, deploy/run/debug — **platform-desktop**
+- `PLAT.DESK.backend-slots` OS-specific implementations of registered backend slots (audio endpoint, input, sockets, save storage, IME/accessibility bridge); the domain skill owns the slot interface — **platform-desktop** · with input-devices-haptics, audio-architect, text-fonts, accessibility, persistence-save
+- `PLAT.DESK.compat-layers` Proton/Wine ADR (native Linux vs Windows build under a compatibility layer) and a CI lane — **platform-desktop** · with ci-cd-automation
 
 **PLAT.CON — Console-class platforms**
 
@@ -192,6 +195,8 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `PLAT.MOB.windowing` Resizable/multi-window mobile apps (iPadOS windowing, foldable posture, ChromeOS/desktop modes) — **platform-mobile**
 - `PLAT.MOB.location` Device geolocation: fused location, geofences, background/approximate permissions, battery policy, location privacy class — **platform-mobile** · with privacy-data-protection
 - `PLAT.MOB.target-tools` Target-platform cook variants, shader-target and packager hooks, deploy/run/debug — **platform-mobile**
+- `PLAT.MOB.backend-slots` OS-specific implementations of registered backend slots (audio endpoint, input, sockets, save storage, IME/accessibility bridge); the domain skill owns the slot interface — **platform-mobile** · with input-devices-haptics, audio-architect, text-fonts, accessibility, persistence-save
+- `PLAT.MOB.svc-stores` Mobile store/service adapters (StoreKit, Play Billing, Game Center, Play Games, Sign in with Apple) — **platform-mobile** · with platform-services
 
 **PLAT.SVC — Platform & online services integration**
 
@@ -236,7 +241,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `PLAT.XR.layers` Compositor layers (quad/cylinder) — **xr-runtime**
 - `PLAT.XR.gaze-input` Gaze + pinch interaction `emerging` — **xr-runtime** · with input-system, privacy-data-protection
 - `PLAT.XR.light-estimation` Real-world light estimation `emerging` — **xr-runtime** · with global-illumination
-- `PLAT.XR.mobile-ar` Phone/tablet AR sessions (ARKit/ARCore class) — **xr-runtime**
+- `PLAT.XR.mobile-ar` Phone/tablet AR sessions (ARKit/ARCore class) — **xr-runtime** · with platform-mobile
 - `PLAT.XR.runtime-backends` XR runtime backends: OpenXR, visionOS Compositor Services (console XR SDK slot in PLAT.CON.confidential-slots) — **xr-runtime** · with platform-mobile, rhi-metal
 - `PLAT.XR.scene-export` OS-composited shared-space scenes (engine exports a scene description via C-RSCENE change streams) `emerging` — **xr-runtime** · with render-architect
 - `PLAT.XR.body-face` Body, face & eye-expression tracking inputs (OpenXR extensions) with biometric privacy class `emerging` — **xr-runtime** · with privacy-data-protection
@@ -254,6 +259,8 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `PLAT.WEB.std3d` std3d-class web tier gated by C-GPUTIER (bindless, memory64) `experimental` — **platform-web**
 - `PLAT.WEB.audience-share` Browser-capability share measurement (WebGPU, threads, memory) from web analytics and portal SDKs — **platform-web** · with observability-telemetry
 - `PLAT.WEB.target-tools` Target-platform cook variants, shader-target and packager hooks, deploy/run/debug — **platform-web**
+- `PLAT.WEB.backend-slots` OS-specific implementations of registered backend slots (audio endpoint, input, sockets, save storage, IME/accessibility bridge); the domain skill owns the slot interface — **platform-web** · with input-devices-haptics, audio-architect, text-fonts, accessibility, persistence-save
+- `PLAT.WEB.svc-portals` Web-portal SDK adapters — **platform-web** · with platform-services
 
 **PLAT.LIVE — Live operations**
 
@@ -277,6 +284,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `PLAT.SRV.host-os` Server host OS & container specifics (Linux, ARM64 hosts, huge pages) — **platform-server-host** · with dedicated-server
 - `PLAT.SRV.container-topology` cgroup-aware CPU/memory discovery feeding PLAT.PAL.cpu-topology — **platform-server-host** · with job-system-task-graph
 - `PLAT.SRV.target-tools` Target-platform cook variants, shader-target and packager hooks, deploy/run/debug — **platform-server-host**
+- `PLAT.SRV.gpu-host` Headless GPU host: offscreen surfaces, container GPU passthrough, driver pinning, hardware encode — **platform-server-host** · with gpu-platform-architect, platform-architect
 
 ## CORE
 
@@ -326,6 +334,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `CORE.MEM.oom` Out-of-memory policy & graceful degradation — **memory-allocators**
 - `CORE.MEM.uma` Unified-memory CPU/GPU accounting, reported into RES.MGMT.arbitration (no independent arbitration) — **memory-allocators** · with gpu-memory-resources
 - `CORE.MEM.field-detection` Field detection of heap corruption in shipping builds: sampled guard allocator (E) and hardware memory-tagging mode (M), overhead budgets in C-BUDGET — **memory-allocators** · with crash-diagnostics, security-engineering
+- `CORE.MEM.exec-pages` Executable-memory policy: W^X, JIT entitlement, code-page allocation, icache flush, per-platform executable-mapping queries from PAL — **memory-allocators** · with scripting-runtime, hot-reload-iteration, security-engineering
 
 **CORE.TYPES — Core types & containers**
 
@@ -370,7 +379,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 
 **CORE.FRAME — Frame & time orchestration**
 
-- `CORE.FRAME.pipelining` Frame pipelining & frames in flight (incl. whether any dedicated render/RHI thread exists, by ADR) — **frame-orchestration**
+- `CORE.FRAME.pipelining` Frame pipelining & frames in flight (the ADR fixes pipeline depth and lane roles; CORE.JOBS.thread-model registers the resulting threads) — **frame-orchestration**
 - `CORE.FRAME.phases` Tick phases & the minimal set of named global sync points (each justified by ADR); ordering otherwise derived from C-FRAME access declarations — **frame-orchestration** · with ecs-runtime
 - `CORE.FRAME.fixed-step` Fixed-step simulation with interpolation; bounded catch-up (max substeps, dilation vs drop) with cadence fixed for lockstep — **frame-orchestration**
 - `CORE.FRAME.time` Time domains (real, game, dilation, pause) & clocks — **frame-orchestration**
@@ -393,7 +402,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 
 - `CORE.OBJ.identity` Entity identity (generational IDs, stable GUIDs) — **entity-object-model**
 - `CORE.OBJ.hybrid` Hybrid object-model policy (ECS vs services vs asset objects vs UI objects) — **entity-object-model**
-- `CORE.OBJ.references` Reference kinds & explicit lifetime (owner + generational handles; no tracing GC over engine objects; script references are weak handles) — **entity-object-model** · with resource-streaming-architect
+- `CORE.OBJ.references` Reference kinds & explicit lifetime in the object model (policy from CORE.LIFE.ownership-model; handles generational, script references weak) — **entity-object-model** · with resource-streaming-architect
 - `CORE.OBJ.events` Events & messaging: deferred, batched delivery at declared consumption points by default — **entity-object-model**
 - `CORE.OBJ.world-instances` Multiple isolated world instances per process; world-scoped state reachable only through a world handle; no current-world global — **entity-object-model** · with ecs-runtime, world-architect, editor-architect
 
@@ -472,6 +481,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `RES.IO.hw-decompress` Fixed-function hardware decompression units — **async-io-storage** · with platform-console, package-formats-vfs
 - `RES.IO.remote` HTTP/CDN IO backend with persistent content cache, prefetch & offline policy `emerging` — **async-io-storage** · with platform-services
 - `RES.IO.write` Durable write primitives: write queues and coalescing, durability classes (fsync/F_FULLFSYNC, directory sync), atomic replace, quota and disk-full errors, read-deadline protection — **async-io-storage** · with platform-architect, persistence-save
+- `RES.IO.media-policy` Media-aware IO policy: seek-aware ordering, low queue depth, duplication or clustering per storage class; storage-class axis in tier records — **async-io-storage** · with package-formats-vfs, platform-architect
 
 **RES.PKG — Packages & virtual file system**
 
@@ -512,6 +522,8 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `CNT.IMP.splats` Splat/radiance-field import & compression `experimental` — **asset-import-interchange**
 - `CNT.IMP.geospatial` Geospatial data ingestion (DEM, 3D Tiles, OSM) `emerging` — **asset-import-interchange**
 - `CNT.IMP.vector` SVG & Lottie/Rive-class vector/motion-graphics import — **asset-import-interchange** · with render-2d-vector
+- `CNT.IMP.sprites-2d` Layered sprite/animation sources (Aseprite, layered PSD to atlas plus animation tags) and sprite sheets — **asset-import-interchange** · with render-2d-vector
+- `CNT.IMP.tilemaps` Tile editors (Tiled TMX, LDtk, Ogmo) to tilemaps and collision — **asset-import-interchange** · with render-2d-vector, physics-2d
 
 **CNT.COOK — Cooking & derived data**
 
@@ -533,6 +545,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `CNT.COOK.incremental-equivalence` Incremental cook equals clean cook (bit/tolerance per determinism class) — **content-pipeline-architect**
 - `CNT.COOK.cache-fleet` Multi-site derived-data cache fleet (replication, eviction, cost) — **content-pipeline-architect**
 - `CNT.COOK.video` Video transcode cook (codec/bitrate ladder, muxed tracks, HDR metadata) — **media-playback** · with asset-cook-processors
+- `CNT.COOK.fonts` Font and MSDF import-cook — **asset-cook-processors** · with text-fonts
 
 **CNT.VAL — Content validation**
 
@@ -561,7 +574,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 
 - `WLD.PART.grid` World partition & streaming cells — **world-architect**
 - `WLD.PART.sources` Streaming sources & activation policy — **world-architect** · with resource-streaming-architect
-- `WLD.PART.hlod` HLOD strategy & generation orchestration (builder implemented as a C-COOK world-scope processor; invalidation and distribution belong to CNT.COOK.world-build) — **world-architect** · with virtualized-geometry-lod
+- `WLD.PART.hlod` HLOD strategy, partitioning and invalidation (formats and builders belong to RND.LOD.hlod; orchestration to CNT.COOK.world-build) — **world-architect** · with virtualized-geometry-lod
 - `WLD.PART.sim-lod` Significance & simulation-LOD signal (C-SIGNIF) — **world-architect**
 - `WLD.PART.server` Server-side world streaming — **world-architect** · with dedicated-server, network-architect
 - `WLD.PART.lwc-policy` Large-world coordinate policy — **world-architect**
@@ -646,7 +659,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `RND.ARCH.debug-modes` Buffer visualization & render debug modes — **render-architect** · with visual-debugging-tools
 - `RND.ARCH.submission-strategy` Submission strategy per hardware tier (GPU-driven vs CPU-culled batched), by ADR; TBDR suitability — **render-architect** · with geometry-pipeline, platform-mobile
 - `RND.ARCH.editor-rendering` Editor render features: GPU picking, selection outline, editor primitives — **render-architect** · with world-editor-viewport, editor-ui-framework
-- `RND.ARCH.multiview-nview` N-view outputs (autostereo / light-field displays) `emerging` — **render-architect** · with xr-runtime
+- `RND.ARCH.multiview-nview` N-view outputs (autostereo / light-field displays) `experimental` — **render-architect** · with xr-runtime
 - `RND.ARCH.scene-textures` Per-view scene-texture layout & producer phases per shading path (C-SCENETEX) — **render-architect** · with geometry-pipeline, reconstruction-upscaling
 - `RND.ARCH.lighting-env` Lighting-environment block & its early-phase publication (C-LIGHTENV; static default without atmosphere) — **render-architect** · with atmosphere-weather, direct-lighting-shadows
 - `RND.ARCH.invalidation` Render-cache invalidation channel: GPU-deforming instance flags, dirty-region/page invalidation (shadow pages, surface caches), BLAS update requests — **render-architect** · with vegetation-foliage, terrain, deformation-skinning, water-ocean, direct-lighting-shadows, global-illumination, ray-tracing-infrastructure
@@ -682,8 +695,8 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `RND.RHI.metal-validation` Metal backend: validation layers & conformance runs — **rhi-metal** · with render-validation
 - `RND.RHI.metal-quirks` Metal backend: vendor/driver quirk handling — **rhi-metal** · with rhi-core
 - `RND.RHI.webgpu` WebGPU backend: implementation of C-RHI `emerging` — **rhi-webgpu**
-- `RND.RHI.webgpu-validation` WebGPU backend: validation layers & conformance runs — **rhi-webgpu** · with render-validation
-- `RND.RHI.webgpu-quirks` WebGPU backend: vendor/driver quirk handling — **rhi-webgpu** · with rhi-core
+- `RND.RHI.webgpu-validation` WebGPU backend: validation layers & conformance runs `emerging` — **rhi-webgpu** · with render-validation
+- `RND.RHI.webgpu-quirks` WebGPU backend: vendor/driver quirk handling `emerging` — **rhi-webgpu** · with rhi-core
 - `RND.RHI.work-graph-programs` Work-graph programs & mesh nodes (fallback: indirect dispatch) `experimental` — **rhi-core** · with render-graph-scheduling
 - `RND.RHI.console` Console graphics API backends (confidential, per platform holder) — **rhi-console** · with rhi-core, rhi-d3d12
 - `RND.RHI.console-validation` Console backends: platform validation layers & conformance runs — **rhi-console** · with render-validation
@@ -718,7 +731,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 **RND.SHADER — Shader system**
 
 - `RND.SHADER.language` Shading language & dialect policy (HLSL-class baseline) — **shader-system**
-- `RND.SHADER.toolchain` Compilation toolchain (DXC, Slang, SPIR-V, Metal shader converter) — **shader-system**
+- `RND.SHADER.toolchain` Compilation toolchain (DXC, SPIR-V, Metal shader converter; Slang via RND.SHADER.slang) — **shader-system**
 - `RND.SHADER.permutations` Permutation management & specialization — **shader-system**
 - `RND.SHADER.reflection` Shader reflection & binding-layout generation — **shader-system**
 - `RND.SHADER.interop` Shared host/shader interop headers — **shader-system**
@@ -730,7 +743,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `RND.SHADER.precache` Load-time PSO precaching from loaded asset/material/pass combinations — **shader-system** · with material-system, rhi-core, resource-streaming-architect
 - `RND.SHADER.permutation-budget` Permutation & PSO-count budgets with cook-time enforcement — **shader-system** · with performance-architect
 - `RND.SHADER.neural` In-shader small-network evaluation (matrix-vector/tensor intrinsics tier; API-neutral; standalone-dispatch fallback via C-MLGPU) `experimental` — **shader-system** · with ml-inference-runtime
-- `RND.SHADER.autodiff` Differentiable shader compilation (Slang-class autodiff) `emerging` — **shader-system**
+- `RND.SHADER.autodiff` Differentiable shader compilation (Slang-class autodiff) `experimental` — **shader-system**
 - `RND.SHADER.binding-abstraction` Shader-side binding abstraction generated per binding tier — **shader-system** · with rhi-core
 - `RND.SHADER.gpu-debug-draw` Shader-side debug draw for GPU-driven passes — **shader-system** · with visual-debugging-tools
 - `RND.SHADER.untrusted` GPU-DoS limits for UGC-authored graphs/shaders — **shader-system** · with modding-ugc
@@ -773,18 +786,18 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `RND.LOD.swraster` Software rasterization of micro-polygons — **virtualized-geometry-lod**
 - `RND.LOD.streaming` Cluster / page streaming — **virtualized-geometry-lod** · with resource-streaming-architect
 - `RND.LOD.discrete` Discrete LOD generation & selection — **virtualized-geometry-lod**
-- `RND.LOD.hlod` HLOD proxy meshes & impostors — **virtualized-geometry-lod**
+- `RND.LOD.hlod` HLOD proxy/impostor formats, builders and runtime selection — **virtualized-geometry-lod**
 - `RND.LOD.deforming` LOD for skinned / deforming geometry `emerging` — **virtualized-geometry-lod** · with deformation-skinning
 - `RND.LOD.displacement` Displacement / tessellation on virtualized geometry `emerging` — **virtualized-geometry-lod**
 - `RND.LOD.dgf` Hardware-decodable dense geometry formats (DGF class) `experimental` — **virtualized-geometry-lod** · with ray-tracing-infrastructure
-- `RND.LOD.instanced-clusters` Instance sharing inside a cluster hierarchy (assemblies, per-instance bounds expansion for WPO) — **virtualized-geometry-lod** · with vegetation-foliage, geometry-pipeline
-- `RND.LOD.foliage` Dense masked and thin-geometry LOD in the virtualized tier (voxel/impostor transition) — **virtualized-geometry-lod** · with vegetation-foliage, geometry-pipeline
+- `RND.LOD.instanced-clusters` Instance sharing inside a cluster hierarchy (assemblies, per-instance bounds expansion for WPO) `emerging` — **virtualized-geometry-lod** · with vegetation-foliage, geometry-pipeline
+- `RND.LOD.foliage` Dense masked and thin-geometry LOD in the virtualized tier (voxel/impostor transition) `emerging` — **virtualized-geometry-lod** · with vegetation-foliage, geometry-pipeline
 
 **RND.TEX — Textures & virtual texturing**
 
 - `RND.TEX.formats` Runtime texture formats — **texture-streaming-vt**
 - `RND.TEX.mip-streaming` Mip streaming & priority — **texture-streaming-vt**
-- `RND.TEX.feedback` Sampler-feedback streaming `emerging` — **texture-streaming-vt**
+- `RND.TEX.feedback` Sampler-feedback streaming; backend abstraction: hardware sampler feedback where present, shader-written feedback elsewhere `emerging` — **texture-streaming-vt**
 - `RND.TEX.vt` Virtual texturing (streaming & runtime-composited) — **texture-streaming-vt**
 - `RND.TEX.ntc` Neural texture compression `experimental` — **texture-streaming-vt** · with ml-inference-runtime
 - `RND.TEX.mip-layout` Streaming-friendly mip & tile layout in cook — **texture-streaming-vt** · with asset-cook-processors
@@ -814,11 +827,12 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `RND.GI.reflections` Reflections (screen-space, ray-traced, probes) — **global-illumination**
 - `RND.GI.sky` Sky lighting & environment capture — **global-illumination** · with atmosphere-weather
 - `RND.GI.specular-occlusion` Specular occlusion — **global-illumination**
-- `RND.GI.bake-pipeline` Incremental/distributed lighting bake orchestration (implemented as C-COOK world-scope processors; orchestration belongs to CNT.COOK.world-build) — **global-illumination** · with content-pipeline-architect
+- `RND.GI.bake-pipeline` Incremental/distributed lighting bake orchestration (implemented as C-COOK world-scope processors; orchestration belongs to CNT.COOK.world-build); GI-owned bake processors hosted by CNT.COOK.world-build — **global-illumination** · with content-pipeline-architect
 - `RND.GI.lightmap-uv` Lightmap UV generation & atlas packing — **global-illumination** · with asset-cook-processors
 - `RND.GI.neural-cache` Neural radiance caching with online training `experimental` — **global-illumination** · with ml-inference-runtime, path-tracing
 - `RND.GI.planar` Planar reflections (clip-plane re-render, tier-scaled) — **global-illumination**
 - `RND.GI.rt-required` Hardware-RT-only lighting path (no raster fallback) for the hwrt profile — **global-illumination** · with ray-tracing-infrastructure, path-tracing
+- `RND.GI.baked-streaming` Cell-streamed baked lighting: lightmaps, probe volumes, reflection captures and lighting-scenario/time-of-day blending, with a pool registered in RES.MGMT.arbitration and C-GI — **global-illumination** · with world-architect, resource-streaming-architect, async-io-storage
 
 **RND.RT — Ray tracing infrastructure**
 
@@ -955,6 +969,10 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `ML.RT.sequence-exec` Autoregressive execution: KV-cache budgets, token streaming, cancellation `emerging` — **ml-inference-runtime** · with audio-content-runtime, ai-behavior-perception
 - `ML.RT.web-backends` Browser ML backends (WebNN, WebGPU-compute inference) `emerging` — **ml-inference-runtime** · with platform-web
 
+**ML.TOOL — Tool**
+
+- `ML.TOOL.model-assets` Model asset tools: import (ONNX-class), inspect, quantize, per-backend preview, tolerance reports — **ml-inference-runtime** · with editor-ui-framework, asset-import-interchange
+
 ## PHY
 
 ### Physics & simulation
@@ -984,6 +1002,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `PHY.ARCH.fixed-point-backend` Fixed-point physics backend option — **physics-architect** · with physics-2d, rigid-body-dynamics
 - `PHY.ARCH.learned-surrogates` Learned policies/surrogates inside the physics step (substep hook with recorded or deterministic outputs) `experimental` — **physics-architect** · with ml-inference-runtime
 - `PHY.ARCH.budget-degradation` Simulation actuators (substeps, solver iterations, active-body cap, CCD and query budgets, cloth/fluid particle counts) registered in CORE.SCALE.actuators — **physics-architect** · with runtime-scalability, crowd-simulation, systems-simulation
+- `PHY.ARCH.migration` Live body, joint-graph and controller hand-off across authority boundaries; ghost-body policy; declared unsupported cases — **physics-architect** · with server-scaleout-persistence, replication
 
 **PHY.COL — Collision**
 
@@ -1042,7 +1061,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 **PHY.FLUID — Fluids**
 
 - `PHY.FLUID.particles` Particle fluids (SPH, PBF, FLIP) `emerging` — **fluid-simulation**
-- `PHY.FLUID.grid` Real-time interactive grid smoke & fire `emerging` — **fluid-simulation**
+- `PHY.FLUID.grid` Real-time interactive grid smoke & fire; decision table: gameplay-authoritative liquid or fire is cellular (GAM.SIM.cellular/GAM.SIM.fields); PHY.FLUID.* is presentation-grade with one-way coupling into C-PHYS bodies; the C-ENV water volume is authoritative for buoyancy `emerging` — **fluid-simulation**
 - `PHY.FLUID.gpu` GPU fluid solvers `emerging` — **fluid-simulation**
 
 **PHY.2D — 2D physics**
@@ -1093,7 +1112,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `ANM.RT.events` Curves, events & notifies — **animation-runtime**
 - `ANM.RT.2d` 2D skeletal & flipbook animation — **animation-runtime** · with render-2d-vector
 - `ANM.RT.pose-history` Pose history buffer for rewind/lag compensation — **animation-runtime** · with prediction-rollback
-- `ANM.RT.2d-import` 2D skeletal import (Spine class) incl. IK & mesh constraints — **animation-runtime**
+- `ANM.RT.2d-import` 2D skeletal import (Spine class) incl. IK & mesh constraints — **animation-runtime** · with asset-import-interchange
 
 **ANM.DEF — Skinning & deformation**
 
@@ -1277,10 +1296,10 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `NET.ARCH.model` Netcode model selection (authoritative server, lockstep, rollback, P2P/relay) — **network-architect**
 - `NET.ARCH.tick` Network tick & time model — **network-architect** · with frame-orchestration
 - `NET.ARCH.authority` Authority model — **network-architect**
-- `NET.ARCH.budgets` Network budgets & scale targets (players, entities, bandwidth) — **network-architect**
+- `NET.ARCH.budgets` Network budgets & scale targets (players, entities, bandwidth) per configuration and link class (down, up, host uplink share, radio wake cost) keyed to NET.TRANS.simulation trace classes; maximum rewind window — **network-architect**
 - `NET.ARCH.versioning` Compatibility-window policy & handshake (live-ops version skew, crossplay patch skew, rolling server deploys) — **network-architect** · with api-lifecycle-migration, packaging-release-patching
-- `NET.ARCH.async` Asynchronous / turn-based backend-mediated play — **online-services-liveops** · with network-architect
-- `NET.ARCH.distributed-authority` Per-object ownership transfer & shared authority — **network-architect** · with replication
+- `NET.ARCH.async` Asynchronous / turn-based backend-mediated play (channel is HTTPS via C-PAL, or WebSocket in browsers) — **online-services-liveops** · with network-architect
+- `NET.ARCH.distributed-authority` Per-object ownership transfer & shared authority (eligibility rule: ADR with declared trust tier and C-INTEGRITY validators on deltas) `emerging` — **network-architect** · with replication, anti-cheat-integrity
 - `NET.ARCH.connectivity` Connectivity loss, sign-out & suspend/resume session policy — **network-architect** · with platform-console, platform-mobile, gameplay-architect
 - `NET.ARCH.validation` Netcode oracle scenarios & acceptance thresholds incl. host-drop (co-signed by simulation validation) — **network-architect** · with functional-automation-soak, simulation-validation
 - `NET.ARCH.meshing` Seamless dynamic server meshing / cross-server entity authority `experimental` — **server-scaleout-persistence** · with network-architect
@@ -1297,7 +1316,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `NET.TRANS.lifecycle` Connection lifecycle & timeouts — **network-transport**
 - `NET.TRANS.simulation` Network link conditioner seam (latency, loss, jitter); replays a governed corpus of captured WAN, Wi-Fi and cellular traces — **network-transport**
 - `NET.TRANS.quic` QUIC/WebTransport as native transport `emerging` — **network-transport**
-- `NET.TRANS.web` Browser transports: WebTransport datagrams and WebRTC unreliable channels preferred; WebSocket fallback for async/turn-based play or by ADR — **network-transport** · with platform-web
+- `NET.TRANS.web` Browser transports: WebTransport datagrams and WebRTC unreliable channels preferred; WebSocket fallback by ADR — **network-transport** · with platform-web
 - `NET.TRANS.voice` Game-transport voice path (P2P/server-relayed) — **network-transport** · with audio-dsp-mixing
 - `NET.TRANS.dos` Anti-amplification handshake, stateless challenges, rate limiting, relay-shielded addressing — **network-transport** · with security-engineering, dedicated-server
 - `NET.TRANS.platform-requirements` Platform networking requirements (IPv6-only/NAT64, network change & migration, connectivity state) — **network-transport** · with platform-console, platform-mobile
@@ -1322,15 +1341,15 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `NET.REP.parallel` Parallel per-connection packet building with shared per-object serialization — **replication**
 - `NET.REP.moq-spectator` Media-over-QUIC spectator/broadcast streams `experimental` — **replication**
 - `NET.REP.compat` Wire-level replicated-schema compatibility: layout hashes, per-connection layout negotiation, tolerant decode — **replication** · with serialization-schema, network-architect
-- `NET.REP.physics-bodies` Physics-body replication: active-set/change-set from C-PHYS, sleep flags, quantized pose/velocity, significance priority, prop extrapolation, prop and vehicle ownership hand-off — **replication** · with physics-architect, prediction-rollback
+- `NET.REP.physics-bodies` Physics-body replication: wire content, priority and ownership hand-off (client-side presentation belongs to NET.PRED.physics) — **replication** · with physics-architect, prediction-rollback
 
 **NET.PRED — Prediction & latency hiding**
 
 - `NET.PRED.prediction` Client prediction & reconciliation — **prediction-rollback**
 - `NET.PRED.rollback` Rollback netcode — **prediction-rollback**
-- `NET.PRED.lagcomp` Lag compensation / server rewind — **prediction-rollback**
+- `NET.PRED.lagcomp` Lag compensation / server rewind — **prediction-rollback** · with anti-cheat-integrity, gameplay-systems-toolkit, physics-architect
 - `NET.PRED.lockstep` Deterministic lockstep — **prediction-rollback** · with determinism-replay
-- `NET.PRED.physics` Networked physics: server-authoritative replicated dynamic bodies with interpolation, extrapolation and smoothing — **prediction-rollback** · with rigid-body-dynamics
+- `NET.PRED.physics` Networked physics: server-authoritative replicated dynamic bodies with interpolation, extrapolation and smoothing; owns all client-side presentation of replicated bodies (extrapolation, smoothing, snap thresholds) — **prediction-rollback** · with rigid-body-dynamics
 - `NET.PRED.clock` Clock synchronization — **prediction-rollback**
 - `NET.PRED.input-commands` Network delivery of C-INPUT command frames: redundancy, jitter buffering, server-side validation hooks (format owned by input-system) — **prediction-rollback** · with input-system, anti-cheat-integrity
 - `NET.PRED.lockstep-replay` Shipping input-stream replays for lockstep games — **prediction-rollback** · with determinism-replay
@@ -1366,13 +1385,13 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 
 **NET.SESS — Network sessions**
 
-- `NET.SESS.handshake` Connect handshake: compatibility/version check, auth token, capability negotiation — **net-session** · with network-architect
+- `NET.SESS.handshake` Connect state machine: pre-auth sequence (stateless challenge, crypto, auth ticket, version window, layout negotiation) owned here, the other rows are its steps; no per-connection state before the challenge passes (C-NETSESSION conformance case) — **net-session** · with network-architect
 - `NET.SESS.join` Load-gated join readiness & spawn hand-off — **net-session** · with gameplay-architect
 - `NET.SESS.baseline` Join-in-progress baseline: replicated snapshot or C-SNAPSHOT + command catch-up — **net-session** · with replication, prediction-rollback, determinism-replay
 - `NET.SESS.reconnect` Reconnect/rejoin with ownership & state restore in a grace window — **net-session** · with prediction-rollback, determinism-replay
 - `NET.SESS.travel` Server-driven travel with connected clients — **net-session** · with world-architect
 - `NET.SESS.disconnect` Disconnect/kick reasons & ban hook — **net-session** · with anti-cheat-integrity
-- `NET.SESS.host-mode` Hosting modes (dedicated, listen, P2P host, relay-hosted, self-hosted/community servers) & host migration — **net-session** · with network-architect, dedicated-server
+- `NET.SESS.host-mode` Hosting modes (dedicated, listen, P2P host, relay-hosted, self-hosted/community servers); migration in NET.SESS.host-migration — **net-session** · with network-architect, dedicated-server
 - `NET.SESS.auth` Auth-ticket & service-identity validation in every host mode — **net-session** · with network-transport, dedicated-server
 - `NET.SESS.budgets` Per-connection memory/CPU/RPC quotas & limits on client-triggered work — **net-session** · with replication, anti-cheat-integrity, dedicated-server
 - `NET.SESS.overload` Server overload actuators (time dilation, adaptive tick, relevancy throttling) registered with CORE.SCALE.actuators — **net-session** · with replication, frame-orchestration, dedicated-server, runtime-scalability
@@ -1380,6 +1399,11 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `NET.SESS.server-browser` Server registration, listing and query via backend, master server or LAN; auth without a first-party backend — **net-session** · with online-services-liveops, network-transport
 - `NET.SESS.local-players` Several local players per connection: sub-player IDs, per-player auth/guest privileges, per-player ownership & prediction, drop-in/drop-out — **net-session** · with gameplay-architect, platform-services, input-system, replication, prediction-rollback
 - `NET.SESS.host-migration` Host migration: replicated state or snapshot, prediction state and authority transfer; host-drop scenario — **net-session** · with replication, prediction-rollback, determinism-replay
+
+**NET.TOOL — Tool**
+
+- `NET.TOOL.replication-authoring` Replication authoring: per-class conditions, priority, relevancy, RPC and authority annotations, ownership, rollback window and input-delay tuning — **replication** · with editor-ui-framework, network-transport
+- `NET.TOOL.net-debug` Network debugging tools (bandwidth attribution, prediction error, session replay views) — **replication** · with editor-ui-framework, network-transport
 
 ## GAM
 
@@ -1479,6 +1503,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `GAM.MOVE.transitions` Mount & vehicle transitions — **character-movement**
 - `GAM.MOVE.platformer` 2D platformer movement (coyote time, input buffering) — **character-movement**
 - `GAM.MOVE.grid` Grid movement — **character-movement**
+- `GAM.MOVE.ragdoll-transition` Capsule to ragdoll to get-up transition: state machine, capsule/body-set handover, authority class (cosmetic by default), ragdoll body budget — **character-movement** · with ik-procedural-animation, character-physics
 
 **GAM.DATA — Gameplay data**
 
@@ -1617,12 +1642,12 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 
 **ED.ARCH — Editor architecture**
 
-- `ED.ARCH.process` Editor process model: asynchronous cancellable editor jobs with progress; the UI thread never blocks (in-process vs out-of-process by ADR) — **editor-architect**
+- `ED.ARCH.process` Editor process model: in-process vs out-of-process runtime by ADR, crash isolation (job semantics belong to ED.ARCH.async-jobs) — **editor-architect**
 - `ED.ARCH.separation` Editor ↔ runtime data separation — **editor-architect**
 - `ED.ARCH.transactions` Command / transaction / undo-redo system; serializable diff-based commands — **editor-architect** · with modding-ugc, collaboration-version-control, serialization-schema
 - `ED.ARCH.selection` Selection model — **editor-architect**
 - `ED.ARCH.extension` Editor extension API & tool scripting (Python class) — **editor-architect** · with plugin-system
-- `ED.ARCH.pie` Play-in-editor & simulation isolation — **editor-architect** · with world-editor-viewport
+- `ED.ARCH.pie` Play-in-editor & simulation isolation (no process-global state, sandboxed save profile, emulated services, input focus/capture and audio isolation) — **editor-architect** · with world-editor-viewport, input-system, audio-architect, persistence-save, online-services-liveops, ecs-runtime, hot-reload-iteration
 - `ED.ARCH.remote` Remote / on-device live editing — **editor-architect**
 - `ED.ARCH.headless` Headless editor & commandlets — **editor-architect** · with ci-cd-automation
 - `ED.ARCH.scale` Editor performance for large projects — **editor-architect**
@@ -1894,6 +1919,9 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `QA.CONF.numerics` Numeric reference vectors and precision oracles — **foundation-conformance** · with test-architect
 - `QA.CONF.text-shaping` Text shaping, bidi and CLDR corpora — **ui-text-conformance** · with test-architect
 - `QA.CONF.layout-focus` Layout, safe-area and focus-graph oracles — **ui-text-conformance** · with test-architect
+- `QA.CONF.tools-pipeline` Tools and pipeline conformance suites (cook, build, package, editor commands, graphs) — **tools-pipeline-conformance** · with test-architect
+- `QA.CONF.import-roundtrip` Import/cook round-trip corpora — **tools-pipeline-conformance** · with test-architect
+- `QA.CONF.command-properties` Command apply/invert/merge property tests — **tools-pipeline-conformance** · with test-architect
 
 ## PRF
 
@@ -1910,6 +1938,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `PRF.METH.pipeline-budgets` Production-pipeline budgets: editor startup, PIE start, registry queries, cook throughput, DDC hit rate, shader compile, build times — **performance-architect** · with editor-architect, content-pipeline-architect, build-system-toolchains, shader-system
 - `PRF.METH.field` Field performance telemetry analysis & device-profile retuning — **performance-architect** · with observability-telemetry, perf-benchmarking, runtime-scalability
 - `PRF.METH.energy` Whole-device energy & sustained-performance methodology — **performance-architect** · with gpu-performance, cpu-performance, platform-mobile
+- `PRF.METH.tier-emulation` Lower-tier emulation on stronger machines: core-count and P/E affinity masks, hard memory ceiling at the tier budget, IO throttle, GPU clock caps; run per configuration in a CI lane — **performance-architect** · with test-runtime-harness, ci-cd-automation, memory-allocators, async-io-storage
 
 **PRF.BENCH — Benchmarking**
 
@@ -1925,6 +1954,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `PRF.BENCH.sim-worst-case` Simulation worst-case cost: contact storms, pile-ups, explosion-to-debris bursts, query storms, mass-agent surges — **perf-benchmarking** · with physics-architect, crowd-simulation, destruction-fracture
 - `PRF.BENCH.proxy-metrics` Deterministic pre-merge proxy metrics (instruction and cache-miss counts, allocations per frame, draw/dispatch/barrier counts, bytes per entity, replay memory traffic) calibrated against lab wall-clock — **perf-benchmarking** · with ci-cd-automation
 - `PRF.BENCH.lab-scheduling` Perf-lab scheduling, queueing and overload policy — **perf-benchmarking** · with ci-cd-automation
+- `PRF.BENCH.shipping-delta` Shipping-build smoke benchmark per tier with an overhead line for C-INSTR, hardening and DRM in C-BUDGET — **perf-benchmarking** · with build-system-toolchains, security-engineering
 
 **PRF.CPU — CPU performance**
 
@@ -1950,7 +1980,7 @@ Everything required to build **and ship** the engine, decomposed as domain → a
 - `PRF.LOAD.io` IO throughput analysis — **loading-streaming-performance** · with async-io-storage
 - `PRF.LOAD.startup` Startup time — **loading-streaming-performance**
 - `PRF.LOAD.hitch-gate` Load & hitch trace analyzers and the hitch gate — **loading-streaming-performance** · with ci-cd-automation
-- `PRF.LOAD.pacing-latency` Frame pacing & end-to-end latency analysis (percentile frame times, present jitter, input-to-photon by hardware/marker measurement) with a pacing gate — **loading-streaming-performance** · with frame-orchestration, input-system, reconstruction-upscaling
+- `PRF.LOAD.pacing-latency` Frame pacing & end-to-end latency analysis (percentile frame times, present jitter, input-to-photon by hardware/marker measurement) with a pacing gate — **loading-streaming-performance** · with frame-orchestration, input-system, reconstruction-upscaling, xr-runtime
 
 **PRF.MEM — Memory performance**
 

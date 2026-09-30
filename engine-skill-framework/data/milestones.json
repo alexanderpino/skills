@@ -99,6 +99,10 @@
     {
      "capability": "XC.SEC.key-custody",
      "validator": "QA.CERT.prechecks"
+    },
+    {
+     "capability": "PRF.BENCH.proxy-metrics",
+     "validator": "BLD.CI.bisection"
     }
    ],
    "contracts_draft": [
@@ -285,6 +289,14 @@
     {
      "capability": "PRF.METH.asymptotics",
      "validator": "PRF.BENCH.scale-content"
+    },
+    {
+     "capability": "PRF.BENCH.shipping-delta",
+     "validator": "BLD.SYS.dev-surface-exclusion"
+    },
+    {
+     "capability": "PRF.BENCH.lab",
+     "validator": "BLD.CI.device-lanes"
     }
    ],
    "contracts_draft": [
@@ -387,7 +399,8 @@
     "fighting-2d-rollback-client",
     "sandbox-2d-client",
     "fighting-2d-rollback-tools",
-    "mobile-async-validator"
+    "mobile-async-validator",
+    "sandbox-2d-tools"
    ],
    "skills": [
     "collaboration-version-control",
@@ -459,6 +472,10 @@
     {
      "capability": "XC.SEC.dev-trust",
      "validator": "QA.FUNC.editor"
+    },
+    {
+     "capability": "PRF.GPU.power",
+     "validator": "PRF.BENCH.stats"
     }
    ],
    "contracts_draft": [
@@ -570,6 +587,14 @@
     {
      "capability": "PRF.METH.energy",
      "validator": "PRF.GPU.power"
+    },
+    {
+     "capability": "PRF.CPU.parallel-scaling",
+     "validator": "PRF.BENCH.stats"
+    },
+    {
+     "capability": "PRF.MEM.bandwidth",
+     "validator": "PRF.GPU.analysis"
     }
    ],
    "contracts_draft": [
@@ -619,14 +644,15 @@
     "indie-2d-online-moddable-client",
     "indie-2d-online-moddable-server",
     "rts-2d-massim-client",
-    "rts-massim-lockstep-tools"
+    "rts-massim-lockstep-tools",
+    "community-server-pc"
    ],
    "skills": [
     "crowd-simulation",
     "dedicated-server",
     "modding-ugc"
    ],
-   "exit": "Online reference games per netcode family: dedicated-server shooter with prediction and lag compensation, listen-server co-op, desync-free 2 h lockstep soak, web transports; bot load test; packet/handshake fuzzing, DoS test, server-authority review and external pen test (human gate; gates XC.SEC.server-validation, XC.SEC.info-hiding, XC.SEC.incident, NET.SRV.admin, NET.SRV.transactions, PLAT.COMM.receipts; XC.SEC.testing validates); patch + DLC + staged rollout + rollback executed on the online reference game. Perf: bandwidth per player within budget and latency gated; server density is gated at M6 (PRF.NET.server-density).",
+   "exit": "Online reference games per netcode family: dedicated-server shooter with prediction and lag compensation, listen-server co-op, desync-free 2 h lockstep soak, web transports; bot load test; packet/handshake fuzzing, DoS test, server-authority review and external pen test (human gate; gates XC.SEC.server-validation, XC.SEC.info-hiding, XC.SEC.incident, NET.SRV.admin, NET.SRV.transactions, PLAT.COMM.receipts; XC.SEC.testing validates); patch + DLC + staged rollout + rollback executed on the online reference game. Perf: bandwidth per player within budget and latency gated; server density is gated at M6 (PRF.NET.server-density). A console configuration passes a holder pre-submission or partner review (scheduled from ARCH.ORG.external-dependencies start-by dates); M7 stays the final pass.",
    "gates": [
     {
      "capability": "QA.FUNC.load",
@@ -729,6 +755,14 @@
     {
      "capability": "PRF.BENCH.scale-content",
      "validator": "QA.SIM.mass-agents"
+    },
+    {
+     "capability": "PLAT.XR.reprojection",
+     "validator": "PRF.LOAD.pacing-latency"
+    },
+    {
+     "capability": "PRF.BENCH.sim-worst-case",
+     "validator": "QA.SIM.mass-agents"
     }
    ],
    "contracts_draft": [
@@ -752,7 +786,9 @@
     "aaa-open-world-online-server",
     "aaa-open-world-online-tools",
     "aaa-experimental-client",
-    "rt-required-3d-client"
+    "rt-required-3d-client",
+    "rt-required-3d-tools",
+    "aaa-experimental-tools"
    ],
    "skills": [
     "ai-assisted-authoring"
@@ -774,6 +810,14 @@
     {
      "capability": "PRF.NET.server-density",
      "validator": "QA.FUNC.load"
+    },
+    {
+     "capability": "PRF.PIPE.cook",
+     "validator": "PRF.BENCH.stats"
+    },
+    {
+     "capability": "PRF.METH.model",
+     "validator": "PRF.NET.load-analysis"
     }
    ],
    "contracts_draft": [],

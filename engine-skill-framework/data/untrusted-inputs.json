@@ -675,6 +675,16 @@
    "trust": "agent-input",
    "mode": "redteam",
    "limits": "quarantined as data; no instruction authority"
+  },
+  {
+   "id": "qos-probe-replies",
+   "validating_owner": "network-transport",
+   "parser_owners": [
+    "online-services-liveops"
+   ],
+   "trust": "hostile-remote",
+   "mode": "harness",
+   "limits": "size/rate/signature limits; spoofable UDP"
   }
  ]
 }

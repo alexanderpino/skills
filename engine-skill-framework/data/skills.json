@@ -546,6 +546,61 @@
    "platforms": [
     "web"
    ]
+  },
+  "community-server-pc": {
+   "profiles": [
+    "min2d",
+    "online",
+    "ugc"
+   ],
+   "target": "server",
+   "platforms": [
+    "pc",
+    "server-host"
+   ]
+  },
+  "sandbox-2d-tools": {
+   "profiles": [
+    "min2d",
+    "sandbox"
+   ],
+   "target": "tools",
+   "platforms": [
+    "pc"
+   ],
+   "target_platforms": [
+    "pc"
+   ]
+  },
+  "rt-required-3d-tools": {
+   "profiles": [
+    "std3d",
+    "hwrt"
+   ],
+   "target": "tools",
+   "platforms": [
+    "pc"
+   ],
+   "target_platforms": [
+    "pc",
+    "console"
+   ]
+  },
+  "aaa-experimental-tools": {
+   "profiles": [
+    "std3d",
+    "openworld",
+    "online",
+    "aaa",
+    "experimental"
+   ],
+   "target": "tools",
+   "platforms": [
+    "pc"
+   ],
+   "target_platforms": [
+    "pc"
+   ]
   }
  },
  "skills": [
@@ -1123,6 +1178,7 @@
     "procedural-asset-eval",
     "project-tool-code",
     "push-payloads",
+    "qos-probe-replies",
     "remote-build-results",
     "remote-config",
     "replays",
@@ -1784,7 +1840,10 @@
     "server",
     "tools"
    ],
-   "tool_consumes": [],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
    "implements": [],
    "workstream": "foundation",
    "untrusted_inputs": [
@@ -2574,7 +2633,8 @@
    ],
    "tool_consumes": [],
    "implements": [
-    "C-NETLINK"
+    "C-NETLINK",
+    "C-SVC"
    ],
    "workstream": "platform",
    "untrusted_inputs": [
@@ -5562,6 +5622,7 @@
    "untrusted_inputs": [
     "lan-discovery",
     "packets",
+    "qos-probe-replies",
     "server-list-entries"
    ]
   },
@@ -5619,7 +5680,10 @@
     "server",
     "tools"
    ],
-   "tool_consumes": [],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
    "implements": [],
    "workstream": "online",
    "untrusted_inputs": [
@@ -5864,7 +5928,8 @@
     "C-VIEW?",
     "C-VFX?",
     "C-CAMERA?",
-    "C-REWIND?"
+    "C-REWIND?",
+    "C-SHARD?"
    ],
    "expertise": [
     "ability systems",
@@ -6098,7 +6163,8 @@
     "C-MOVE?",
     "C-SCRIPT?",
     "C-DET?",
-    "C-REP?"
+    "C-REP?",
+    "C-SHARD?"
    ],
    "expertise": [
     "game AI",
@@ -7438,7 +7504,8 @@
     "C-INTEGRITY?",
     "C-CAMERA?",
     "C-GAMEDATA",
-    "C-CHARCTRL"
+    "C-CHARCTRL",
+    "C-SHARD?"
    ],
    "expertise": [
     "character movement",
@@ -7724,6 +7791,7 @@
     "chat-text",
     "generated-content",
     "player-model-prompts",
+    "qos-probe-replies",
     "remote-config",
     "service-responses"
    ],
@@ -8101,7 +8169,10 @@
     "server-list-entries",
     "server-pushed-content"
    ],
-   "tool_consumes": [],
+   "tool_consumes": [
+    "C-EDCMD",
+    "C-EDHOST"
+   ],
    "provides": [
     "C-NETSESSION",
     "C-HOSTAUTH"

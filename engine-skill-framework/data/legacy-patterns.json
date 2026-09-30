@@ -475,6 +475,7 @@
    "justification_owner": "network-architect",
    "stance_capabilities": [
     "NET.ARCH.authority",
+    "NET.ARCH.distributed-authority",
     "XC.SEC.server-validation"
    ]
   },

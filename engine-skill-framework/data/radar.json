@@ -1295,6 +1295,29 @@
    "revisit": "A shipped title runs synchronised cluster output",
    "fallback": "external virtual-production tooling",
    "reviewed": "2026-09-30"
+  },
+  {
+   "tech": "Distributed and client-owned authority",
+   "class": "M",
+   "owner": "network-architect",
+   "capabilities": [
+    "NET.ARCH.distributed-authority"
+   ],
+   "evidence": "Shared-authority modes in Unity NGO and Fusion; few competitive titles",
+   "revisit": "Two shipped competitive titles with validated client-owned objects",
+   "fallback": "server-authoritative ownership (NET.ARCH.authority)",
+   "reviewed": "2026-09-30"
+  },
+  {
+   "tech": "Windows server hosts",
+   "class": "S",
+   "owner": "platform-server-host",
+   "capabilities": [],
+   "evidence": "Community servers on Windows PCs use the pc target",
+   "revisit": "A shipped title needs Windows as a fleet host",
+   "fallback": "pc target for community-hosted servers (community-server-pc)",
+   "non_goal": true,
+   "reviewed": "2026-09-30"
   }
  ],
  "as_of": "2026-09-30",
