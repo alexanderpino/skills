@@ -7,9 +7,10 @@ description: >-
   because it would be faster. Those are not invocations. If the user has not typed
   /fan-out or named the fan-out method by name, this skill does not apply — answer the
   request directly instead. When it IS invoked: fans one task out to parallel sub-agents
-  against a single sealed brief, has independent critics judge each candidate against a
-  rubric written before the work started, verifies fixes against the delta only so approved
-  work is never re-reviewed, and folds one result with an evidence trail.
+  against a single sealed brief and allocation plan, each in a lane of its own, has
+  independent critics judge each candidate against a rubric written before the work
+  started, verifies fixes against the delta only so approved work is never re-reviewed,
+  integrates the lanes and judges their seams, and folds one result with an evidence trail.
 # The enforced half of "user-invoked only": Claude Code blocks an automatic load and will
 # not preload this skill into a sub-agent. The description above is the prompt-level half;
 # metadata is free-form data for other tooling, which Claude Code does not act on.
@@ -46,8 +47,8 @@ Two consequences that follow from being user-invoked:
   `disable-model-invocation: true` in the frontmatter is what makes the restriction real
   rather than a request, and Claude Code blocks an automatic load. `commands/fan-out.md`
   is an optional wrapper: copy it to `.claude/commands/` if you want its pre-flight
-  checklist (partition vs compete, plan, seal) in front of every run. Both spellings
-  produce `/fan-out`, so install one, not both.
+  checklist (partition vs compete, allocation and strategies, plan, seal, lanes) in front
+  of every run. Both spellings produce `/fan-out`, so install one, not both.
 
 ## Orientation
 
@@ -57,20 +58,26 @@ rule is what makes prompt caching work and what makes the critics' comparisons v
 agents disagree about the ground truth, their outputs are not comparable and the critique
 is noise.
 
-**You (the model reading this) are the Orchestrator.** You slice, spawn, gate, and fold.
-You do not build the candidates yourself. The moment you write one, you can no longer judge
-the set impartially.
+**You (the model reading this) are the Orchestrator.** You slice, allocate, spawn, gate,
+integrate and fold. You do not build the candidates yourself — not a slice, not a
+synthesis, not a seam fix. The moment you write one, you can no longer judge the set
+impartially. The only thing you write into the result is mechanical: hotspot entries at
+integration.
 
 ## Conventions
 
 Everything lives under `.fan-out/<run-id>/`. Each slice gets one **slice id** — lowercase,
-hyphenated, fixed for the whole run — and it must be identical in all three places, or the
-tooling silently fails to correlate them:
+hyphenated, fixed for the whole run — and it must be identical in every place it appears,
+or the tooling silently fails to correlate them:
 
 ```
-candidates/<slice-id>.md     verdicts/<slice-id>.json     revisions/<slice-id>/v<N>/
-renders/<slice-id>/r<N>/
+slices.json (its "id")       candidates/<slice-id>.md     verdicts/<slice-id>.json
+revisions/<slice-id>/v<N>/   renders/<slice-id>/r<N>/     lanes/<slice-id>[.patch]
 ```
+
+A slice is the unit of work; its **lane** is where that work physically happens — a
+worktree, a patch file, or the main tree. `integration` is reserved: it names the seam
+verdict (`verdicts/integration.json`) and the merged render (`renders/integration/`).
 
 `renders/` holds whatever a critic has to *look at* rather than read — screenshots,
 plots, frames, exported pages. **`r<N>` pairs with the snapshot `v<N>`**: the builder's
@@ -87,22 +94,25 @@ baseline.
 TASK
    │
    ├─► SLICE ──────► partition (different parts) or compete (same part, N approaches)
+   ├─► ALLOCATE ───► slices.json: who owns what, which isolation, which contracts
    │
    ├─► BRIEF ──────► one immutable file: shared context, identical for everyone
-   ├─► RUBRIC ─────► written BEFORE any builder runs, sealed with the brief
+   ├─► RUBRIC ─────► written BEFORE any builder runs, sealed with the brief and plan
    │
+   ├─► LANES ──────► one per slice, set up for its strategy
    ├─► PATHFINDER ─► builder #1 alone; its run writes the shared cache prefix
-   │
    ├─► FAN-OUT ────► builders #2..N in parallel; they read the prefix from cache
+   ├─► TRESPASS ───► mechanical: did any lane write outside what it owns?
    │
    ├─► CRITICS ────► one per candidate, blind to each other, same brief prefix
-   │
    ├─► VERIFY ─────► delta and open findings only; never re-review approved scope
+   │
+   ├─► INTEGRATE ──► land the lanes, run the whole-system oracles, judge the seams
    │
    └─► FOLD ───────► one result + a short evidence trail
 ```
 
-## Step 1 — Slice
+## Step 1 — Slice and allocate
 
 Pick the mode first, because it changes everything downstream:
 
@@ -114,6 +124,12 @@ Pick the mode first, because it changes everything downstream:
 If the request is ambiguous, ask once. Guessing wrong is expensive: `partition` work judged
 as `compete` produces critics arguing that incomparable things are unequal.
 
+```bash
+python scripts/fanout.py init "<task>" --mode partition --n 4
+```
+
+Creates `.fan-out/<run-id>/` with skeletons for `brief.md`, `rubric.md` and `slices.json`.
+
 ### Cohesion first: N is an output, not an input
 
 Work that sits close together — same files, same symbols, same mental model — belongs in
@@ -122,43 +138,169 @@ two agents rebuild the same model, fight over the same files, each drag a critic
 them, and — worst — makes every verification round cascade, because revising one re-opens
 the other's approved regions. `references/incremental-review.md` has that mechanism.
 
-Don't guess at the coupling, measure it:
+Don't guess at the coupling, measure it. Fill `slices.json` with the proposed slices and
+what each would own (next section), then:
 
 ```bash
 python scripts/fanout.py plan
 ```
 
-Fill `slices.json` with the proposed slices and the files each would touch. `plan` reports
-three tiers: shared write targets and cross-slice dependencies are merges, shared
-vocabulary is advisory.
+`plan` validates the allocation and reports coupling in four tiers: shared write targets
+(`WRITE`) and cross-slice dependencies (`DEP`) are merges; a dependency pinned by a stated
+contract (`CONTRACT`) may stay split; shared vocabulary (`VOCAB`) is advisory.
 
 - **Floor** — don't spawn an agent for work smaller than the brief it must read. Three
-  one-line fixes in one file are one slice. If `plan` warns that the total touched lines across all slices is very low (< 100), **abort the fan-out loop** and handle the task directly. This holds inside the loop too: give a builder
+  one-line fixes in one file are one slice. When `plan` reports `FLOOR` — under a hundred
+  existing lines across every slice — stop and do the task directly, unless most of the
+  work is new files that count cannot see. This holds inside the loop too: give a builder
   all of a slice's open findings in one pass, not one pass per finding.
 - **Ceiling** — stop merging when a slice no longer fits one coherent working set, or stops
   being verifiable in one pass. Between floor and ceiling, N is determined by the work.
 - **`compete` is exempt** — there the redundancy is the point, and merging destroys the
   diversity that made the mode worth choosing. It's bounded instead by how many genuinely
-  different constraints you can state, which is rarely more than four.
+  different constraints you can state, which is rarely more than four. `plan` does not
+  measure coupling in this mode; it validates the plan and stops.
 
-**`partition` rules.** No two slices write the same file — if `plan` shows an overlap,
-merge rather than coordinate. Each slice must be verifiable on its own: if B can only be
-judged once A lands, it isn't a slice, it's a phase, and phases are sequential.
+**`partition` rules.** No two slices own the same file — `seal` refuses the plan if they
+do; merge rather than coordinate. Each slice must be verifiable on its own: if B can only
+be judged once A lands, it isn't a slice, it's a **phase**. Phases are sequential runs: run
+1 goes all the way through integration, and run 2 is a new run whose brief describes what
+run 1 delivered. Worktree and patch lanes start from the base commit, so run 1's result
+must be committed (the user's call) before run 2's lanes can see it.
 
 **`compete` rules.** Each builder gets a genuinely different constraint, not different
 wording. "Optimise for allocation count" vs "optimise for readability" is a real choice;
 "do it well" vs "do it nicely" is N copies of one answer and N critics with nothing to say.
-State it in one line — that line is the only per-agent text.
+State it in one line — the slice's `summary` — because that line is the only per-agent
+text that differs in substance.
+
+### The allocation plan
+
+`slices.json` is where the orchestrator says how the work is divided, and it is the
+single source of every per-agent block. It is sealed with the brief: a builder's scope
+that changes mid-run is the same fault as a brief that changes mid-run.
+
+```json
+{
+  "protected": ["migrations/", "src/api/public.h", ".github/"],
+  "hotspots": ["package.json", "src/routes.ts"],
+  "slices": [
+    {
+      "id": "ecs-query",
+      "summary": "Rewrite Query iteration over archetype chunks",
+      "task": "Iterate chunk by chunk instead of entity by entity.\nKeep Query's public signature; only its internals change.",
+      "context": "Query is hot in the render loop; store.h's chunk layout is stable.",
+      "strategy": "worktree",
+      "strategy_reason": "runs the ECS test suite",
+      "owns": ["src/ecs/query.cpp", "src/ecs/query.h"],
+      "reads": ["src/ecs/store.h"],
+      "out_of_scope": ["caching query results between frames"],
+      "must_not": ["change the public Store API"],
+      "provides": [{"symbol": "each",
+                    "contract": "`Query::each(Fn)` calls Fn once per live entity, chunk order"}],
+      "consumes": [],
+      "done_when": ["`ctest -R ecs` passes", "no allocation inside `each`"]
+    }
+  ]
+}
+```
+
+| Field | What it fixes |
+|---|---|
+| `summary` | One line: the slice's job, or in `compete` its constraint. It follows `YOUR SLICE:` |
+| `task` | The lane's task description: what to do, the approach where it matters, the cases to cover. Text, newlines allowed |
+| `context` | What this lane needs to know that the others do not: who calls its code, what is fragile, why it is shaped this way. Text |
+| `strategy`, `strategy_reason` | The lane's isolation (next section), and why — decided per lane, so it is recorded |
+| `owns` | The lane's scope: the only paths it may write. A trailing `/` owns a directory |
+| `reads` | Files the lane should read for context and must not write |
+| `out_of_scope` | What this lane must not take on — work, not files ("no caching"). Other lanes' files are added to it automatically |
+| `must_not` | Prohibitions for this lane alone. Run-wide ones go in the brief |
+| `provides` | Symbols other lanes build against, each with a contract stated as an observation |
+| `consumes` | Symbols this lane builds against, naming the providing lane |
+| `done_when` | This lane's slice of the definition of done |
+| `hotspots` | Files every lane would need to touch — a lockfile, a registry, a route table, a changelog. No lane owns them |
+| `protected` | Files nobody may ever write in this run — not a lane, not integration, not by accepted trespass |
+
+What the fields are for:
+
+- **Everything that differs between agents lives here, never in the brief.** Task,
+  context, scope, what is out of scope, prohibitions for one lane: all of it is per-agent
+  text, and `fanout.py delta` renders it below the `---` where it cannot touch the cached
+  prefix. The brief and the plan split the same things by reach: the brief's *Goal*,
+  *Context*, *Out of scope* and *Must not* hold for every agent, the plan's `task`,
+  `context`, `owns`, `out_of_scope` and `must_not` for one lane.
+- **`task` is where a partition builder learns its job.** `summary` is one line and it is
+  enough for a `compete` constraint; a partition lane with nothing more gets a slogan, and
+  `plan` warns about it. Write the task as you would brief a colleague on that one part:
+  what, the approach where it matters, the cases that must be covered.
+- **A contract is what lets a coupled pair stay split.** When `plan` finds `DEP` between
+  two slices, merging is the default. The alternative is to pin the edge: the provider
+  lists the symbol under `provides` with its contract, the consumer lists it under
+  `consumes`, and the provider promises not to move it. `plan` then reports `CONTRACT`
+  instead of `DEP`. Write the contract the way a critic writes a `check` — what is
+  observably true — because at integration it becomes exactly that.
+- **Hotspots belong to integration.** A file every lane appends to is the classic source of
+  merge conflicts, and giving it to one lane forces the others to trespass. So nobody owns
+  it: each builder lists the entries it needs under *Hotspot entries* in its report, and
+  you apply them in Step 6.
+- **Protected is the one boundary that is not negotiable.** Everything outside a lane's
+  `owns` is already forbidden, but that ban bends: a builder may report a scope deviation,
+  you may accept a trespass, `integrate --force` may land it. A protected path never bends —
+  generated code, applied migrations, a published API header, CI configuration, vendored
+  code, secrets. `seal` refuses a plan in which a lane owns one or a hotspot is one, every
+  delta lists them, `trespass` marks a write as `PROTECTED`, and `integrate` refuses it
+  even under `--force`. If one genuinely must change, the plan was wrong: that is a new run,
+  or the user's decision — never yours mid-run. Rules that are not about files ("run no
+  migrations", "add no dependencies") stay in the brief's *Must not*.
+
+### Isolation strategies
+
+Each lane gets one of four strategies, chosen per lane and per run. A strategy fixes four
+things at once: where the builder writes, where its critic looks, how the lane is landed,
+and how trespass is measured.
+
+| Strategy | Builder writes | Critic looks at | Landed by | Trespass measured on |
+|---|---|---|---|---|
+| `read-only` | Only its candidate | The candidate | Nothing to land; the fold reads it | Any change to the repository |
+| `shared` | The main tree, only its `owns` | The main tree | Already in place | Main-tree changes vs the union of shared lanes' `owns` |
+| `patch` | A diff at `lanes/<slice-id>.patch`; the repo stays untouched | The patch, applied in a disposable worktree | `git apply` in the main tree | The paths in the patch |
+| `worktree` | Its own git worktree and branch | That worktree | Its diff applied in the main tree | The worktree's diff against the base |
+
+Decide each lane with three questions. Any "yes" means `worktree`:
+
+1. Would it write files another lane also writes? In `partition` that is a slicing error;
+   in `compete` it is the mode, and `shared` is therefore never allowed there.
+2. Does it run a build, tests, an install, a formatter or a server — anything that writes
+   shared state (output directories, caches, lockfiles, ports)?
+3. Must it be rejectable on its own, without touching what the others did?
+
+Three times "no": `shared` for writers, `read-only` for lanes that only report. `patch` is
+the cheap middle — isolated without a tree of its own to set up — for small changes whose
+builder does not need to run anything. When question 2 is a maybe, choose `worktree`: a
+wasted worktree costs setup time, a collision costs a round.
+
+What each costs, so the choice is honest:
+
+- **`worktree`** — a fresh checkout lacks everything ignored: dependencies, `.env`, build
+  caches, generated files. `fanout.py lane` lists what is missing; install or copy what the
+  build and render recipe need before the builder is spawned. It also starts from the base
+  commit, so uncommitted work in the main tree is invisible to it.
+- **`patch`** — the builder cannot run its own change against a real tree. Critics and
+  deciders run on `lane <slice-id> --materialize`, re-made after every new patch.
+- **`shared`** — attribution is ownership only. The main tree has several writers, so a
+  write inside another shared lane's `owns` cannot be traced to who made it, and a failed
+  shared lane cannot be un-landed except by hand.
+- **`read-only`** — none; it simply produces nothing to merge.
+
+Mixing is normal: code lanes in `worktree`, a docs lane in `shared`, an audit in
+`read-only`. Lanes are created by `fanout.py lane` rather than by a sub-agent harness's own
+worktree isolation, because a lane must outlive its builder — the critic, the verifier and
+integration all need it at a known path.
 
 ## Step 2 — Brief and rubric
 
-```bash
-python scripts/fanout.py init "<task>" --mode compete --n 4
-```
-
-Creates `.fan-out/<run-id>/` with `brief.md` and `rubric.md` skeletons.
-
 **Fill `brief.md` with everything every agent needs and nothing else:** goal, constraints,
+what the run as a whole leaves out of scope, the prohibitions that hold for every agent,
 relevant paths, acceptance criteria, definition of done, and any excerpt the agents would
 otherwise go discover for themselves. Pre-loading this isn't only a caching trick — it
 stops N agents from each exploring separately and arriving at N different models of the
@@ -166,7 +308,8 @@ problem.
 
 **`brief.md` must not contain** timestamps, run IDs, agent numbers, per-slice file lists,
 "you are agent 3 of 7", or anything else that differs between agents.
-`references/prompt-caching.md` explains why each of those is fatal.
+`references/prompt-caching.md` explains why each of those is fatal. Per-slice scope is not
+lost by keeping it out — it lives in `slices.json` and reaches each agent through its delta.
 
 **If the work has a visual surface, the brief carries the recipe for reaching it.** One
 command that renders the candidate, plus the exact state to render it in — viewport, seed,
@@ -175,12 +318,14 @@ because it must not vary: two candidates screenshotted at different widths are t
 about different things, and the critics' scores stop being comparable. The recipe is
 identical for everyone; only the slice id in the output path comes from the delta.
 
-**Run that recipe once yourself before you seal.** A recipe that needs a browser this
-environment doesn't have, or a dev server nobody started, fails identically in all N
-builders — and because the brief is sealed you cannot repair it without starting a new
-run. One dry run before `seal` is the cheapest check in the whole loop. If the render
-genuinely can't be produced here, say so in the brief and drop the visual axis from the
-rubric rather than shipping a recipe you know will fail.
+**Run that recipe once yourself before you seal — in a fresh worktree, if any lane is
+one** (`git worktree add --detach <tmp> HEAD`), because that bare checkout is what those
+builders will get. A recipe that needs a browser this environment doesn't have, a dev server nobody started,
+or a dependency a fresh worktree lacks, fails identically in all N builders — and because
+the brief is sealed you cannot repair it without starting a new run. One dry run before
+`seal` is the cheapest check in the whole loop. If the render genuinely can't be produced
+here, say so in the brief and drop the visual axis from the rubric rather than shipping a
+recipe you know will fail.
 
 **Fill `rubric.md` before any builder runs.** A rubric written after seeing the candidates
 is a rationalisation of the one you already liked. Three to six axes, each with a concrete
@@ -193,8 +338,10 @@ is the failure Step 4 exists to prevent.
 python scripts/fanout.py seal
 ```
 
-From here on, an edit to the brief is a detected error rather than a silent one —
-`fanout.py check` will fail.
+`seal` validates the allocation plan and refuses one that does not hold, hashes the brief,
+rubric and plan, and records the **base commit** every lane starts from. From here on, an
+edit to any of the three is a detected error rather than a silent one — `fanout.py check`
+will fail.
 
 ## Step 3 — Pathfinder, then fan out
 
@@ -209,33 +356,84 @@ wall-clock more than the tokens. Keep the whole wave on one model either way; ca
 cross models, so critics on a cheaper model than the builders share nothing with them. Read
 `references/prompt-caching.md` before deviating further.
 
+**Set up the lanes first**, once the seal is in place:
+
+```bash
+python scripts/fanout.py lane            # every lane, per its strategy
+python scripts/fanout.py delta <slice-id>   # the block below the '---', per builder
+```
+
+`lane` creates each worktree (branch `fanout/<run-id>/<slice-id>`, from the base commit),
+prepares the patch location, and lists what a fresh worktree will lack. `delta` renders a
+lane's per-agent block from the sealed plan, always in this order: its slice line, task,
+context, isolation instructions, scope (what it may write), what it reads, out of scope
+(its own entries, then every file another lane owns), the protected paths, the hotspots,
+its prohibitions, the
+contracts it provides and consumes, and its done-when. Empty fields are left out. Paste its output verbatim; do
+not hand-write a delta, because a hand-written one drifts from the plan that trespass and
+integration will hold the lane to.
+
 **Builder prompt — this exact shape, shared block first:**
 
 ```
 Read <run-dir>/brief.md in full before doing anything else. It is the complete and
 authoritative context for this task. Do not go looking for additional context; if the
-brief is insufficient, say so in your notes rather than improvising.
+brief is insufficient, say so in your report rather than improvising.
 
-Write your candidate to <run-dir>/candidates/<slice-id>.md (plus any code files it
-describes). 
+Your slice, its isolation and its scope are below the line. Treat that scope as a
+boundary, not a suggestion: write only what it lets you write, and where the work
+seems to need more, stop and say so in your report. Build against the contracts you
+are given, not the code you find — other lanes are changing it right now.
 
-**CRUCIAL (The Rubber Duck):** Before submitting your final artifact, you MUST use a `<scratchpad>` block to compile, run, or lint your own code. Self-correct any trivial syntax errors or test failures before finalizing. 
-
-End it with a "Notes" section: what you assumed, what you were unsure
-about, and what you would check next.
+Write your candidate to <run-dir>/candidates/<your slice id>.md: what you did and why,
+plus any code, placed as your isolation instructions say. Before you finish, run what
+the brief gives you to run — build, tests, lint — against your own change wherever your
+isolation allows it, and fix what fails. A candidate that does not compile spends a
+critic on a compiler's job.
 
 If the brief names a visual surface, produce it before you finish: run the render
-recipe exactly as written, write the output to <run-dir>/renders/<slice-id>/r1/, and
-link it from your candidate. Your critic will judge the render rather than your
+recipe exactly as written, write the output to <run-dir>/renders/<your slice id>/r1/,
+and link it from your candidate. Your critic will judge the render rather than your
 description of it, so an unrendered candidate is judged on a missing artifact. If the
-recipe fails, say so in your notes with the error — do not substitute a description.
+recipe fails, say so in your report with the error — do not substitute a description.
+
+End the candidate with this report, every heading present, "none" where empty:
+
+## Report
+### Files touched
+### Hotspot entries
+Exactly what you need added to each hotspot file, per file.
+### Assumptions
+### Scope deviations
+Anything you needed outside your scope, and whether you did it or stopped.
+### Open questions
 
 ---
-YOUR SLICE: <the one line that differs>
+<output of `fanout.py delta <slice-id>`>
 ```
 
-Everything above the `---` is byte-identical across every builder. Everything below is the
-delta. Keep it that way even when it feels redundant.
+Everything above the `---` is byte-identical across every builder — the slice id is
+referred to, never written, up there. Everything below is the delta. Keep it that way even
+when it feels redundant.
+
+The report headings are fixed because tooling reads them: `integrate` collects *Hotspot
+entries*, and `followups` drains *Assumptions*, *Scope deviations* and *Open questions*
+into `follow-ups.md`.
+
+**Then check scope, before any critic runs:**
+
+```bash
+python scripts/fanout.py trespass
+```
+
+Worktree and patch lanes are measured exactly; the shared tree is measured against the
+union of its lanes' `owns`. A lane that wrote outside its scope goes back to its builder
+with the list — revert those writes, or justify each in the report — and no critic is
+spawned for it until it is clean. A trespass that was genuinely necessary is a slicing
+error: accept it deliberately, record it for the fold, and cut differently next run. A
+`PROTECTED` write is the exception to all of that — it is never accepted and never
+justified away; the lane reverts it. Never
+let it reach integration unexamined, where it surfaces as a conflict nobody can attribute.
 
 ## Step 4 — Critics
 
@@ -259,6 +457,10 @@ Then read <run-dir>/rubric.md.
 
 ---
 Judge exactly one artifact: <run-dir>/candidates/<slice-id>.md
+Its files are in <lane root: the worktree, the materialized patch, or the main tree>;
+read and run them there, and anchor findings with paths relative to that root. Judge
+the lane against its own task, scope and contracts:
+<output of `fanout.py delta <slice-id>`, without its leading "---">
 If the brief names a visual surface, open <run-dir>/renders/<slice-id>/r1/ and judge
 what you see there. Do not read any other candidate.
 Write your verdict to <run-dir>/verdicts/<slice-id>.json in this schema:
@@ -517,8 +719,10 @@ no `observed` beside it, so the builder must re-measure what the critic just mea
 rather than after. The others cost you a misjudged severity or a weak approval; those two
 cost the round itself, and then the next one.
 
-**It enforces harsh critic mode if `--strict` is passed.** If critical miscalibration is detected, it exits non-zero and fails the loop, blocking the gate entirely until the critic verdict is manually repaired. Run it after the critic wave and again before the fold; a flagged
-verdict gets read in full, and any calibration you overruled belongs in the fold report.
+Run it after the critic wave and again before the fold. `--strict` makes any flag exit 1,
+so the run stops until each flagged verdict has been read in full and repaired or overruled;
+the gate itself never consults calibration, because a heuristic about tone must not hold
+real findings. Any calibration you overruled belongs in the fold report.
 
 ### Why there is no strictness dial
 
@@ -554,21 +758,29 @@ in `references/incremental-review.md`.
 python scripts/fanout.py snapshot <slice-id> <path>...
 ```
 
-Without this there is no delta and the round degenerates into a full re-review.
+Without this there is no delta and the round degenerates into a full re-review. Paths are
+relative to the lane root, and `snapshot` resolves them there: a worktree lane's files are
+read from its worktree, never from the same path in the main tree, which still holds the
+base. A patch lane is snapshotted after `fanout.py lane <slice-id> --materialize` — its
+files exist only once applied — and re-materialized after every new patch.
 
-**2. Send the builder only the open findings**, below the `---` as always, each with its
-`check`, plus:
+**2. Send the builder only the open findings**, below the `---` as always:
 
-> Fix only these findings. If a fix requires changing something outside them, say so in
-> your notes instead of doing it silently — an unexplained out-of-scope edit re-opens
-> everything it touches. A finding's own `sites` are part of that finding — fix all of
-> them, and that is not an out-of-scope edit. Where a finding carries a `remedy`, it is one
-> route and not the target: satisfy the `check` your own way if you have a better one, and
-> say in your notes why, so the next round judges the artifact rather than your compliance.
+```bash
+python scripts/fanout.py delta <slice-id> --findings
+```
+
+It prints the lane's usual block followed by its open blocking findings — each with its
+anchor, `observed`, `check`, `sites` and any `remedy` — and the fix-only instruction:
+fix only these; say so in the report rather than silently changing anything outside
+them; a finding's own `sites` are inside it; a `remedy` is one route, not the target. The
+lane block rides along because the scope still binds in a fix round, and `trespass` runs
+again before the verifier.
 
 **3. Compute the scope mechanically before spawning any critic.**
 
 ```bash
+python scripts/fanout.py trespass <slice-id>
 python scripts/fanout.py snapshot <slice-id> <path>...   # the new revision
 python scripts/fanout.py scope <slice-id>
 ```
@@ -589,9 +801,11 @@ python scripts/fanout.py deciders <slice-id> --run
 ```
 
 Prints the `check_cmd` each critic attached to its own findings, and lists the ones that
-carry none. By passing `--run`, the script automatically executes the agent-authored commands locally in your environment. Exit 0 automatically closes that finding:
-setting it to `verified` with a `reason` naming the command and its output. Non-zero means the
-finding still stands, so it goes to the builder unchanged. This is the largest single
+carry none. Without `--run` it only prints; read the commands before you pass `--run`,
+because they were written by an agent and `--run` executes them — in the lane's own tree,
+where the candidate is. Exit 0 closes that finding: it is set to `verified` with a `reason`
+naming the command and its output. Non-zero means the finding still stands, so it goes to
+the builder unchanged. This is the largest single
 saving in the loop, ahead of the scope narrowing — a slice whose findings are mostly
 mechanised can pass a verification round with no agent spawned at all.
 
@@ -610,9 +824,11 @@ VERIFICATION ROUND <N> for <slice-id>.
 
 Open findings to verify: <run-dir>/verdicts/<slice-id>.json (status == "open")
 
-**Semantic Diff (The AST Ratchet):** 
-<paste a semantic diff or filtered diff here. Do NOT paste a raw, noisy git diff. Only show structural changes.>
-Re-opened files: <paste the `scope` output>
+Lane root: <the worktree, the materialized patch, or the main tree>
+In scope: <paste the IN SCOPE section of `scope` — the changed hunks, with the
+enclosing symbol of each>
+Re-opened files: <paste the RE-OPENED section of `scope`>
+Out of scope: <paste the OUT OF SCOPE section of `scope`>
 
 Renders: <paste both paths — the new render dir and the previous one> — for any
 finding on a visual axis, decide it by comparing the two renders, not by reading the
@@ -659,33 +875,109 @@ That is an orchestrator decision, it is recorded, and it appears in the fold rep
 path where a blocker leaves the loop by decision rather than by fix, and an unexplained one
 is indistinguishable from a mistake.
 
-For `partition` runs, the integration critic on the merged result reviews **the seams
-only** — the interfaces between slices. Slice internals were already approved by their own
-critic and are not its business.
+## Step 6 — Integrate
 
-Where the seams are visual, that critic needs a render of the **merged** result, not the
-per-slice renders. A clashing heading scale, a doubled margin, two different empty states:
-none of those exist in any single slice's picture, which is exactly why the per-slice
-critics all passed. Render the merge before spawning it, or it is judging the seam from
-two photographs taken in different rooms.
+Every lane has passed its gate on its own. Integration is where they become one result,
+and it is a step of its own because it can fail on its own: two lanes that are each
+correct can still disagree at the seam, and per-slice critics are blind to that by
+construction.
 
-## Step 6 — Adjudicate and fold
+**Choose what lands.**
+
+- `partition` → every lane whose gate passed. Read-only lanes have nothing to land; their
+  candidates go straight to the fold.
+- `compete` → one lane. Read the **verdicts**, not the candidates: rank by rubric score,
+  break ties on unresolved findings weighted by severity, then read the top two candidates
+  yourself before choosing. With a visual surface, look at the renders side by side before
+  you rank — the verdicts tell you what each critic saw one at a time, and a comparison
+  across candidates is the one judgement no critic was allowed to make.
+
+**Synthesis is a lane, not an edit.** Taking the winner's structure and the runner-up's
+specific better idea is often right — but writing it yourself makes you a builder, and
+you can no longer judge it. Add the synthesis to `synthesis.json` (same schema as
+`slices.json`, plus `"from": "<winner>"`, strategy `worktree`); it is decided after the
+candidates exist, so it is legitimately outside the sealed plan. `fanout.py lane <id>`
+starts its worktree from the winner's change, a builder applies the one named idea, and a
+critic judges only what differs from the winner. Then it is the lane that lands.
+
+**Land it.**
+
+```bash
+python scripts/fanout.py integrate --check          # partition: every gated lane
+python scripts/fanout.py integrate                  # compete: add --winner <slice-id>
+```
+
+`integrate` works per strategy, in provider-before-consumer order: shared lanes are
+already in place, patch lanes are applied, worktree lanes have their diff against the base
+applied. It re-runs `trespass` first and refuses to land a lane that fails it — unless you
+pass `--force` to land a trespass you accepted, which the fold report must then name; no
+flag lands a `PROTECTED` write. It runs
+`git apply --check` for every lane before changing anything, and records what it applied in
+`integration/applied.json` the moment each lane lands, so `integrate --revert` can undo it
+even after an interrupted run. Nothing is committed and no
+branch is merged — the result sits uncommitted in the main tree, and committing it is the
+user's call.
+
+**A conflict is never resolved by hand.** Lanes own disjoint files, so a patch that will
+not apply means a lane wrote outside its scope or the main tree moved underneath it.
+Either way it goes back to the lane. Hand-merging here would ship the one change in the
+run that no critic has seen.
+
+**Apply the hotspot entries.** `integrate` prints what each lane asked for under *Hotspot
+entries*. Apply them yourself — this is the one place you write, and only because it is
+mechanical: entries in a registry or lockfile, never logic. Regenerate what has a
+generator (a lockfile, a route index) rather than editing it. An entry that needs judgement
+is a slicing error: note it for the fold.
+
+**Run the whole-system oracles.** Full build, the whole test suite, and — where there is a
+visual surface — a render of the merged result into `renders/integration/r1/`. Per-lane
+tests prove nothing about the seams. A clashing heading scale, a doubled margin, two
+different empty states: none of those exist in any single lane's picture, which is exactly
+why the per-lane critics all passed.
+
+**Spawn the integration critic** — `partition` runs, and `compete` runs whose synthesis
+joined two candidates. Same shared prefix:
+
+```
+Read <run-dir>/brief.md in full. It is the authoritative context.
+Then read <run-dir>/rubric.md.
+
+---
+INTEGRATION REVIEW. The lanes are merged in the main tree.
+
+Judge the seams only — where one lane's work meets another's. Lane internals were
+approved by their own critics and are not your business.
+Seams to verify, each contract a check: <paste the seams `integrate` printed>
+Whole-system oracles: <paste build and test results>
+Merged render: <run-dir>/renders/integration/r1/ (if the brief names a visual surface)
+
+Write your verdict to <run-dir>/verdicts/integration.json in the usual schema. Every
+finding also carries "owner": the slice id of the lane that must change to fix it —
+for a broken contract, the provider. A seam no single lane can fix is a contract
+that was wrong: say so in the claim, at its honest severity.
+```
+
+**Route seam findings to their lane.** `integrate --revert`, then the owner lane gets a
+fix round like any other: `fanout.py delta <owner> --findings` includes the seam findings
+it owns. Re-integrate, re-run the oracles, and have a verifier decide the open seam
+findings.
+
+```bash
+python scripts/fanout.py gate integration
+```
+
+The seam gate allows **one** fix round, not two. A seam still open after one fix means the
+contract itself was wrong, and no builder can repair a plan: escalate with the contract
+and what each side built. Never fix a seam on the integrated tree directly — that fix is
+in no lane, has no critic, and is gone on the next `--revert`.
+
+## Step 7 — Fold
 
 Read the **verdicts**, not the candidates. That keeps your context small enough to hold the
 whole picture, which is the only place cross-cutting judgement can happen. Pull up a full
 candidate only when a verdict is contested, unclear, or flagged by
 `fanout.py calibration` — reading verdicts instead of candidates only works while the
-verdicts are worth reading.
-
-- `partition` → merge slices that passed the gate. Never edit the brief to fix a slice.
-- `compete` → rank by rubric score, break ties on unresolved findings weighted by severity,
-  then read the top two candidates yourself before committing. Synthesis is allowed and
-  often correct: take the winner's structure and the runner-up's specific better idea, and
-  say which is which.
-
-For a `compete` run with a visual surface, look at the renders side by side yourself before
-you rank — the verdicts tell you what each critic saw one at a time, and a comparison
-across candidates is the one judgement no critic was allowed to make.
+verdicts are worth reading. Never edit the brief to fix a slice.
 
 Before writing the report, drain the findings that are leaving unfixed:
 
@@ -694,17 +986,23 @@ python scripts/fanout.py followups
 ```
 
 That writes `follow-ups.md` — everything waived with its reason, everything raised late,
-every deferred `minor` and `nit`, across all slices. Every other finding in this loop has
-an outlet: it gets fixed, or it holds the gate. These have neither, and with nowhere to
-land they stay in verdict JSON that nobody opens again — which is how a run reports clean
-while carrying a dozen things a critic actually flagged.
+every deferred `minor` and `nit`, across all slices and the seam verdict, plus each
+builder's reported *Assumptions*, *Scope deviations* and *Open questions*. Every other
+finding in this loop has an outlet: it gets fixed, or it holds the gate. These have
+neither, and with nowhere to land they stay in files that nobody opens again — which is how
+a run reports clean while carrying a dozen things a critic actually flagged.
 
-Finish with a short fold report: what shipped, what was rejected and why, any visual axis
-left unscored because the render could not be produced, a pointer to `follow-ups.md`, and
-any assumption a builder recorded that nobody verified. That last one is the only part the
-tooling cannot drain for you, and together with the follow-ups it is where fan-out runs
-actually go wrong — not in what the critics caught, but in what everyone agreed to stop
-looking at.
+Finish with a short fold report: what shipped and where it sits (uncommitted in the main
+tree), what was rejected and why, any lane landed with `--force` or any trespass you
+accepted, any visual axis left unscored because the render could not be produced, a
+pointer to `follow-ups.md`, and which of the builders' assumptions a critic actually
+checked. That last one is the only judgement the tooling cannot make for you — it can
+collect the assumptions, not verify them — and together with the follow-ups it is where
+fan-out runs actually go wrong: not in what the critics caught, but in what everyone agreed
+to stop looking at.
+
+Then clean up: `fanout.py lane --remove` deletes the worktrees and their branches. Do it
+after the fold, never before — `integrate --revert` and any fix round need them.
 
 ## When an agent fails
 
@@ -723,9 +1021,15 @@ The same goes for a verdict that won't parse or arrives with an empty `evidence`
 that is not a verdict. Re-spawn once, then judge that slice yourself and say so in the fold
 report.
 
-A partial fan-out is still useful. If three of five slices land, fold those three and
-report the other two as unattempted rather than discarding a good round for being
-incomplete.
+A lane that trespasses is neither failed nor rejected: it goes back to its builder with
+the `trespass` list before any critic sees it, and a second trespass is a slicing error to
+escalate. A lane whose worktree cannot build because a fresh checkout lacks something is a
+setup defect — yours, not the builder's; fix the lane and re-spawn with the identical
+prompt.
+
+A partial fan-out is still useful. If three of five slices land, integrate and fold those
+three and report the other two as unattempted rather than discarding a good round for
+being incomplete — as long as none of the three consumes a contract from the missing two.
 
 ## Resuming
 
@@ -733,8 +1037,9 @@ incomplete.
 python scripts/fanout.py status
 ```
 
-Reports the newest run: which candidates exist, which have verdicts, how many snapshots
-each slice has. Pick up from there rather than restarting — the brief is sealed, so the
+Reports the newest run: each lane with its strategy and whether its worktree or patch
+exists, which lanes are integrated, which candidates exist, which have verdicts, how many
+snapshots each slice has. Pick up from there rather than restarting — the brief is sealed, so the
 ground truth is intact, and `check` will say so if it isn't.
 
 ## Cost discipline
@@ -758,8 +1063,10 @@ step.
   is necessary, mechanical deciders, when a check earns a remedy, cross-slice cascades, the
   ratchet guard, anchor drift. Read before running a verification round or changing the
   verdict schema.
-- `scripts/fanout.py` — run dir, seal/check, plan, snapshot/scope/deciders/gate,
-  calibration, followups, status. Deterministic; no model calls, and `deciders` prints the
-  critics' commands rather than running them. `plan` and `scope` apply the same coupling
-  rule, before and after the fact respectively. `gate` decides the work; `calibration` lints
-  the critique and decides nothing; `followups` drains what the run is choosing not to fix.
+- `scripts/fanout.py` — run dir, plan/seal/check, lane/delta/trespass,
+  snapshot/scope/deciders/gate, integrate, calibration, followups, status. Deterministic
+  and model-free; the only agent-authored strings it ever executes are the critics'
+  `check_cmd`s, and only under `deciders --run`. `plan` and `scope` apply the same coupling
+  rule, before and after the fact respectively; `trespass` and `integrate` hold every lane
+  to the `owns` it was sealed with. `gate` decides the work; `calibration` lints the
+  critique and decides nothing; `followups` drains what the run is choosing not to fix.
