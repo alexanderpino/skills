@@ -38,6 +38,10 @@ system. Carry these stances into every step:
   reconstruct why it is that way, and to record it before it's lost.
 - **Protect conceptual integrity.** Prefer choices consistent with the system's
   existing style over locally-optimal novelties. Flag drift.
+- **Separate proven from current.** For every established design you touch, ask both "does
+  it work?" (evidence) and "would we build it this way today?" (current sources), record the
+  gap, and decide keep / work around / replace (SKILL.md §1). Long use answers only the
+  first question.
 - **Be economical.** The best documentation is the *least* that preserves the
   decisions and structure worth preserving. Volume is a cost, not a virtue.
 - **Be honest about uncertainty.** Derived a fact? Show the evidence. Couldn't?
@@ -262,7 +266,10 @@ need a pros/cons comparison (`references/standards.md`).
 - **Smells → anti-patterns** (record in "Known issues / debt", tag the quality they
   threaten): god object / mega-service (maintainability, performance), cyclic
   dependency (maintainability), dense undecomposed structure (modifiability),
-  deficient/near-duplicate names (communication). Detect via the dependency graph and
+  deficient/near-duplicate names (communication), **global serialisation point** — one
+  lock, one coordinator or one write path every request must pass (performance efficiency,
+  scalability; the big-kernel-lock pattern, `systems-architecture.md` §2.5; size its cost
+  with Amdahl/USL, `quantitative-methods.md` §4). Detect via the dependency graph and
   simple metrics (file/dir size, fan-in/out, cycle detection). Recording a smell is a
   legitimate outcome — a deliberate "we accept this for now" beats silent debt.
 
@@ -307,10 +314,14 @@ Use a lightweight **ATAM** (SEI; Bass, Clements & Kazman). The steps that matter
    - **Sensitivity point** — a measure that hinges critically on one element.
    - **Trade-off point** — one decision that helps quality A and hurts quality B (the
      highest-value findings; this is where ADRs concentrate).
-4. **Cluster risks into themes** — themes drive the roadmap, not individual risks.
-5. **Recommend** — each significant risk becomes a proposed **ADR** or a debt entry; the set
+4. **Compare with a clean sheet.** For each major approach found in step 2, state how it
+   would be designed today and cite the source; record the gap and its keep / work around /
+   replace call (SKILL.md §1). A proven approach can be a non-risk *and* carry a clean-sheet
+   gap — record both.
+5. **Cluster risks into themes** — themes drive the roadmap, not individual risks.
+6. **Recommend** — each significant risk becomes a proposed **ADR** or a debt entry; the set
    feeds a `transition-architecture.md` if the system is headed for change.
-6. **Make it continuous.** Turn the top scenarios into **fitness functions** (evolutionary
+7. **Make it continuous.** Turn the top scenarios into **fitness functions** (evolutionary
    architecture — Ford, Parsons & Kua): automated checks (a cycle test for maintainability, a
    latency-budget test for performance, an `arch_lint`/ArchUnit rule) so the qualities are
    verified every build, not assessed once. A fitness function is the executable form of a

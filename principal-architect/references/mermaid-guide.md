@@ -94,6 +94,8 @@ classDiagram
 | Entities & relationships in a data store | `erDiagram` | SD |
 | An entity's lifecycle states & transitions | `stateDiagram-v2` | SD |
 | A business process across roles/systems | BPMN-style `flowchart` (lanes) | EA / SAD |
+| Where containers run: nodes, OS/runtime, isolation boundary | `C4Deployment` | HLD §6 |
+| Network zones, trust boundaries, allowed flows | zone `flowchart` (subgraph per zone) | HLD/SAD §8, network SAD |
 
 Pick the **highest level that answers the question** and stop. Don't draw a
 component diagram when a container diagram suffices.
@@ -333,6 +335,44 @@ integrations as labelled edges (contract + sync/async), and external SaaS in the
 Keep the ArchiMate intent even without the notation: distinguish *active structure*
 (who/what acts), *behavior* (what happens), and *passive structure* (data acted on),
 and use realization edges (`-.realized by.->`) to link a higher layer to the one below.
+
+## Network & trust-zone view
+
+The C4 diagram set (c4model.com: context, container, component, code, plus landscape, dynamic and deployment) has no dedicated network view. When a system spans more than one zone, uses hybrid connectivity, or
+has a non-trivial ingress or egress path, draw one: zones as subgraphs, containers placed in
+the zone they run in, and every edge labelled with **protocol/port · authentication ·
+encryption**. Every edge that crosses a subgraph boundary is a trust-boundary crossing and
+needs a STRIDE row and a line in the flow matrix (`network-architecture.md` §2.5).
+
+```mermaid
+flowchart LR
+  user([Internet users])
+  subgraph edge[Edge zone]
+    cdn[CDN + WAF]
+  end
+  subgraph dmz[Ingress zone]
+    lb[L7 load balancer]
+  end
+  subgraph app[Application zone]
+    api[API service]
+  end
+  subgraph data[Data zone]
+    db[(Database)]
+  end
+  subgraph egress[Egress zone]
+    proxy[Egress proxy<br/>FQDN allow-list]
+  end
+  user -->|HTTPS 443 · OIDC · TLS 1.3| cdn
+  cdn -->|HTTPS 443 · origin auth · TLS| lb
+  lb -->|HTTP/2 8443 · mTLS| api
+  api -->|5432 · IAM auth · TLS| db
+  api -->|HTTPS 443 · allow-listed| proxy
+  proxy -->|HTTPS 443| ext[Payment provider]
+```
+
+For the **deployment view**, nest `Deployment_Node`s to show the isolation boundary, for
+example region → AZ → node pool (`"Linux 6.12, gVisor"`) → container. That makes the
+substrate choices from `systems-architecture.md` §2.1 visible without a separate diagram.
 
 ## Migration & transition views
 

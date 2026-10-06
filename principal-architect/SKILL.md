@@ -1,6 +1,6 @@
 ---
 name: principal-architect
-description: "Master architecture & business-analysis skill. Use BEFORE planning or changing structure, boundaries, interfaces, data, or quality attributes. Use when user mentions architecture, PRD/HLD/SD/SAD/RFC/ADR, C4/ArchiMate diagrams, capabilities, roadmap, migration, threat modeling, SLOs, ERDs, cloud cost, user stories, or acceptance criteria. Acts as master architect: derives content from evidence, writes stories in house format, and triages artifacts. Captures software with C4, logs decisions via RFC→ADR, and requires threat models/FinOps in HLDs. Conforms to ISO 42010, ISO 25010; uses TOGAF, ArchiMate, C4, arc42. Output must be human-readable, pragmatic prose; no robotic AI-isms. Use IDs (e.g., F.02) for references."
+description: "Master architecture & business-analysis skill. Use BEFORE planning or changing structure, boundaries, interfaces, data, or quality attributes. Use when user mentions architecture, PRD/HLD/SD/SAD/RFC/ADR, C4/ArchiMate diagrams, capabilities, roadmap, migration, threat modeling, SLOs, ERDs, cloud cost, user stories, or acceptance criteria — and for the substrate: kernel/OS design, isolation (containers, microVMs, VMs), embedded/RTOS/safety-critical, network topology/segmentation, cloud landing zones, multi-region/DR, or platform end-of-support. Acts as master architect: separates proven-by-use from how it would be designed today, derives content from evidence, writes stories in house format, and triages artifacts. Captures software with C4, logs decisions via RFC→ADR, and requires threat models/FinOps in HLDs. Conforms to ISO 42010, ISO 25010; uses TOGAF, ArchiMate, C4, arc42. Output must be human-readable, pragmatic prose; no robotic AI-isms. Use IDs (e.g., F.02) for references."
 ---
 
 # Architecture Docs
@@ -36,6 +36,48 @@ it is measured or derived, and treat an unvalidated assumption as a gap** (`meth
 a confidently wrong number does more damage than an honest adjective, because it survives review.
 See **`references/quantitative-methods.md`** for the formulas, the assumptions each one needs,
 and where they break.
+
+## 1. The founding question — proven is not the same as current
+
+Years of successful use prove that a design **works**. They do not prove it is how you would
+build it **today** if you could start again. Software that is used must keep changing or it
+becomes progressively less satisfactory, and its complexity grows unless work is done to
+reduce it (Lehman, *Programs, Life Cycles, and Laws of Software Evolution*, Proc. IEEE
+1980). People also systematically prefer whatever is already in place (status quo bias —
+Samuelson & Zeckhauser, *J. Risk & Uncertainty* 1988) and keep investing in what they
+already paid for (sunk cost — Arkes & Blumer, *OBHDP* 1985). So for **every existing
+design you evaluate, extend, migrate or build on** — a kernel, a protocol, a data model, an
+integration style, a platform, this skill's own defaults — answer two questions separately
+and never let one answer the other:
+
+1. **Is it proven?** Evidence of fitness so far: operating history, incidents, measured
+   `Q.xx`. Before judging, recover why it was built this way (Chesterton's fence,
+   `anti_over_engineering.md` §7A).
+2. **Would we design it this way today?** Drucker's test: *"If we did not do this already,
+   would we, knowing what we now know, go into it?"* (*Management Challenges for the 21st
+   Century*, 1999). Answer from **current sources** — standards, peer-reviewed research,
+   vendor guidance — never from taste or novelty (`anti_over_engineering.md` §7D).
+
+Then:
+
+3. **Record the gap**, per mechanism with its source, as architectural technical debt or an
+   evolution option (Kruchten, Nord & Ozkaya, *Managing Technical Debt*, SEI 2019) — in the
+   HLD/SD "Known issues / debt", or the `architecture-evaluation.md` clean-sheet section. A
+   gap you can name but do not record is the status quo bias winning silently.
+4. **Decide per mechanism: keep, work around, or replace**, and say which in the ADR.
+   *Keep* is legitimate when the proven design plus its ecosystem still meets the drivers.
+   *Work around* uses the current mechanism inside the proven system. *Replace* needs a
+   driver: an objective defect or a grounded, costed gap (`anti_over_engineering.md` §7B),
+   delivered incrementally (§7E).
+5. **Revisit** at lifecycle triggers — end-of-support dates and radar moves
+   (`migration.md` §7), architecture evaluations (`methods.md` §11) — not only when
+   something breaks.
+
+The anti-over-engineering mandate below protects simplicity, **not the status quo**: it
+blocks change driven by taste or fashion, and this rule blocks the opposite error of keeping
+a superseded design because it is familiar. Domain instances: kernels and operating systems
+(`systems-architecture.md` §2.5), network trust models (`network-architecture.md` §2.5),
+cloud estates (`cloud-architecture.md` §2.1).
 
 ## 2. The Pragmatism & Anti-Over-Engineering Mandate
 
@@ -134,6 +176,19 @@ principles (`PR.xx`) and capabilities constrain solutions, which constrain softw
 ADRs carry a `level:` field; solution/software ADRs carry `complies-with: [PR.xx]`.
 Conformance flows up, decisions cascade down.
 
+**Below the container boundary.** Most work treats the OS, network and cloud as a labelled
+box, and that is right until the label *is* the decision. When the work builds system
+software (kernel, hypervisor, driver, runtime), chooses an isolation boundary or OS/RTOS
+base, designs connectivity or segmentation, sets a region/failure-domain topology, or meets
+a `Q.xx` that only the substrate can meet (jitter, WCET, cross-region latency), use the same
+discipline with the substrate references: `systems-architecture.md`,
+`network-architecture.md`, `cloud-architecture.md`. Keep two questions apart there: *is it
+proven?* and *is this how it would be designed today?* — Linux and POSIX carry 1970s Unix
+assumptions that work but that current OS research would not repeat; decide per mechanism to
+work with, around, or replace them (`systems-architecture.md` §2.5). Shared networks and landing zones are
+enterprise/solution altitude; a system's HLD states what it runs on and needs, and links to
+them.
+
 The documentation model follows recognised industry standards rather than a
 bespoke format, and is built to **conform** (not merely allude) to ISO: the
 **`AD.md`** root delivers the required content of an Architecture Description per
@@ -163,7 +218,8 @@ code changes don't.
 | New/changed **business capability**, portfolio standard, principle, or landscape/roadmap | `enterprise-architecture.md` (relevant section) + enterprise-level ADR |
 | New **solution** to a business problem, cross-system integration, technology selection, or build-vs-buy | `SAD.md` + solution-level ADR; then software changes per affected system |
 | New/changed **business process** — who does what, in what order, across roles/systems | process view (BPMN-style, `references/mermaid-guide.md`) in `enterprise-architecture.md` or `SAD.md` + ADR if a real choice was made; conform to the org's `.bpmn` where one is executed |
-| **Migration / modernization** of an existing system (local-to-global, on-prem→cloud, monolith→distributed/SaaS) | `transition-architecture.md` (As-Is → interim states → To-Be, rollback per state) + ADRs; recover As-Is SDs from runtime (`references/migration.md`) |
+| **Migration / modernization** of an existing system (local-to-global, on-prem→cloud, monolith→distributed/SaaS, platform exit such as mainframe or end-of-support OS) | `transition-architecture.md` (As-Is → interim states → To-Be, rollback per state) + ADRs; recover As-Is SDs from runtime (`references/migration.md`) |
+| **Platform substrate** — landing zone, network topology/segmentation, hybrid connectivity, region/DR topology, fleet OS or CPU-architecture standard, isolation model for a platform | `SAD.md` (or `enterprise-architecture.md` for estate-wide standards) + ADRs; network & trust-zone view; flow matrix in §8 (`references/network-architecture.md`, `cloud-architecture.md`, `systems-architecture.md`) |
 | **Evaluate / review an existing architecture** (pre-migration health-check, due-diligence, "keep investing?") | `architecture-evaluation.md` (ATAM-lite: risks · non-risks · sensitivity · trade-offs → ADRs + fitness functions; `methods.md` §11) |
 | Within a single system | the software table below |
 
@@ -433,16 +489,33 @@ manifest in the index README). Condensed:
 - `references/quantitative-methods.md` — **sizing & statistical methods**: Little's Law and
   Erlangs, M/M/1 and M/M/c queueing *with the assumptions that make them valid*, percentiles
   vs averages, Amdahl/USL, availability and correlated-failure maths, quorums, probabilistic
-  data structures, telemetry sampling bias, and Monte Carlo forecasting. Read before quoting
-  any capacity, latency, availability, or cost number.
+  data structures, telemetry sampling bias, Monte Carlo forecasting, network physics
+  (propagation floor, round trips, bandwidth–delay product, loss-limited TCP, bulk transfer,
+  egress) and real-time schedulability (rate-monotonic bound, response-time analysis, EDF).
+  Read before quoting any capacity, latency, availability, timing, or cost number.
 - `references/reverse-engineering.md` — **legacy code-to-architecture at scale**: the SAR
   discipline (reflexion models, Ducasse & Pollet, SEI), AST tooling (Tree-sitter,
   Structurizr, CodeQL, jQAssistant), LLM-assisted/GraphRAG, polyglot pipeline. Read for any
   reconstruction from existing code.
 - `references/migration.md` — **system modernization & migration (As-Is → To-Be)**: the 7 R's,
-  the three transformation scenarios, modernization/integration patterns (Strangler Fig, ACL,
-  event-driven intermediary), As-Is sequence-diagram recovery from runtime tracing, and
-  data/protocol mapping. Read for any transformation of an existing system.
+  the four transformation scenarios (incl. platform exits: mainframe, proprietary Unix,
+  hypervisor), modernization/integration patterns (Strangler Fig, ACL, event-driven
+  intermediary), As-Is sequence-diagram recovery from runtime tracing, data/protocol mapping,
+  and the end-of-support register + technology radar. Read for any transformation of an
+  existing system or any platform-lifecycle question.
+- `references/systems-architecture.md` — **procedure for the OS/kernel substrate**: derive it
+  from Dockerfiles, manifests and IaC; choose the isolation boundary from the trust model;
+  choose the OS/RTOS base; evidence gates for kernel-level changes; proven vs clean-sheet
+  (the Unix assumptions in Linux, and when to work with, around, or replace them); which safety/security
+  standard applies; support dates recorded with their URL; review flags. Every rule cited.
+- `references/network-architecture.md` — **procedure for network design**: derive the as-is
+  flows from IaC and policies; check placement against the physics floor first; static
+  stability; topology defaults; protocol, retry and load-balancing rules; segmentation,
+  egress and the flow matrix; post-quantum readiness; review flags. Every rule cited.
+- `references/cloud-architecture.md` — **procedure for the cloud estate**: account structure;
+  topology from RTO/RPO; cells, shuffle sharding, static stability; compute-model and tenancy
+  decisions; shared responsibility; sovereignty and exit (DORA, Data Act); review flags.
+  Every rule cited.
 - `references/business-analysis.md` — **master business analysis**: user stories + acceptance
   criteria (Connextra, INVEST, Gherkin, BABOK), the traceability chain, and the **protocol to
   detect & conform to the company's house format** (or create one if absent). Read before

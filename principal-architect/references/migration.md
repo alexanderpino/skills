@@ -25,7 +25,7 @@ expanding Gartner's original 5 R's). Most portfolios use 3–5 of these across t
 > Gartner's 5 R's were Rehost, Refactor, Revise, Rebuild, Replace; AWS added Retire (2016)
 > and Retain (2017), and Relocate later. Reference: AWS Prescriptive Guidance, "The 7 Rs."
 
-## 2. The three transformation scenarios (blueprints)
+## 2. The four transformation scenarios (blueprints)
 
 **A. Local-to-Global** — decentralised, locally-built systems → one central global platform.
 - Forces: data sovereignty/residency, latency, divergent local data models, regional rules.
@@ -47,6 +47,22 @@ expanding Gartner's original 5 R's). Most portfolios use 3–5 of these across t
   time behind an **ACL**; decouple with **event-driven intermediaries**; split the shared DB
   last (data is the hardest part — use CDC, §5). Repurchase capabilities that a SaaS does
   better.
+
+**D. Platform exit — mainframe, proprietary Unix, end-of-support OS or hypervisor.**
+- Forces: establish them with the stakeholders as drivers, never assume them — typically
+  vendor support ending (a dated `C.xx`, §7), cost model, skills, or delivery speed.
+- Blueprint: inventory **transactions and batch jobs**, not just programs, and recover
+  their runtime behaviour (§4) before choosing. Classify each workload with the 7 R's (§1);
+  the cloud providers' mainframe guidance maps them to mainframe options (rehost onto a
+  compatible runtime, automated refactoring, replatform, API-enable in place) (AWS
+  Prescriptive Guidance, *Mainframe modernization*; Azure Architecture Center, *Mainframe
+  and midrange migration*). Displace incrementally with the legacy-displacement patterns —
+  **Event Interception**, **Legacy Mimic**, **Divert the Flow**, and **Parallel Running**
+  with output comparison before each cutover (Cartwright, Horn & Lewis, *Patterns of
+  Legacy Displacement*, martinfowler.com, 2024). Map data explicitly (§5): mainframe data
+  is commonly EBCDIC-encoded with packed-decimal numerics (IBM z/OS documentation), and
+  reconciliation totals per batch run are the acceptance test. The same blueprint applies
+  to proprietary Unix and to VM estates leaving a hypervisor.
 
 ## 3. Modernization & integration patterns — when to use which
 
@@ -127,3 +143,26 @@ Target (To-Be)**, and for each interim state: scope, the patterns used (§3), a 
 analysis**, **rollback strategy**, and **validation/exit criteria** before the next step. This
 is TOGAF ADM Phase E (Opportunities & Solutions) / Phase F (Migration Planning): never jump
 from As-Is to To-Be in one undocumented leap.
+
+## 7. Platform lifecycle — the end-of-support register and the technology radar
+
+Most platform migrations are forced by an end-of-support date. Keep that date visible:
+
+1. **End-of-support register.** For every platform component (OS and kernel line, database
+   engine, runtime, hypervisor, network OS, framework, managed-service version), record the
+   version in use, the vendor's published end of standard and extended support **with the
+   URL**, and the owner. Each entry is a dated `C.xx`. Never fill a date from memory.
+2. **Act on it.** An entry inside the planning horizon becomes a roadmap work package
+   (TOGAF ADM Phases E–F) or a Transition Architecture (§6). An entry past its date is a
+   threat-model finding: CISA lists use of unsupported or end-of-life software in critical
+   systems as a bad practice (CISA, *Bad Practices*), and NIST's patch-management guidance
+   treats retiring unsupported software as part of the program (NIST SP 800-40 Rev. 4).
+3. **Technology radar.** Track technology choices in the rings Adopt / Trial / Assess /
+   Hold (Thoughtworks, *Build Your Own Radar*). A move into Adopt or Hold is an
+   enterprise-level ADR with its driver. New technology enters through Assess and Trial
+   with a named driver, which is how the boring-technology rule
+   (`anti_over_engineering.md`) and change coexist.
+
+Domain procedures: OS, kernel, RTOS and CPU architecture — `systems-architecture.md` §4;
+network transitions such as post-quantum TLS — `network-architecture.md` §2.6; cloud exit
+obligations — `cloud-architecture.md` §2.7.

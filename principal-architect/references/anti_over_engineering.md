@@ -76,6 +76,8 @@ A pervasive anti-pattern in architecture is the **"Not My Style" Syndrome** (or 
 
 Conversely, refusing to fix an architecture that is **objectively, blatantly flawed** leads to catastrophic operational decay.
 
+This gate and the skill's founding question (SKILL.md §1, *proven is not the same as current*) work together. A **clean-sheet gap** — "today we would build this differently, and here is the standard, paper or vendor guidance that says so" — is not taste: it is always **recorded** as debt or an evolution option. It only becomes a **rewrite** when it passes §7B. Taste never does (§7D).
+
 The Principal Architect must strictly arbitrate using this adversarial evaluation gate:
 
 ### A. The Prerequisite: Chesterton’s Fence & Archaeological Protocol
@@ -93,6 +95,8 @@ An architectural refactoring or rewrite is **ONLY** justified if the author prov
 4. **Unpatchable Security / Regulatory Breach:** Structural non-compliance with legal mandates (GDPR, NIS2, SOC2) or unmitigated architectural attack vectors (e.g., plain-text credential persistence).
 5. **FinOps Disproportionality:** Measured cloud expenditure where infrastructure costs exceed reasonable industry benchmarks by an order of magnitude (5x–10x) relative to business value generated (e.g., spending $20,000/mo on an idle Kubernetes/Kafka cluster for a low-traffic internal utility).
 
+6. **Grounded, Costed Clean-Sheet Gap:** the current design is proven but superseded, the gap is documented from current sources (not preference), it threatens a `Q.xx` or `C.xx` now or within the planning horizon (end of support, a regulatory date, measured decline per Lehman's laws), and the cost of keeping it over that horizon is shown to exceed the cost of an incremental move. Without all four parts it stays a recorded debt entry.
+
 ### C. The DORA Metric Test for "Unmaintainable" Code
 Developers frequently claim architecture is "unmaintainable" to justify rewrites. The Principal Architect must reject qualitative complaints ("it is messy", "it's spaghetti") and demand **DORA Metrics**:
 * An architecture is objectively unmaintainable only if metrics prove:
@@ -106,7 +110,7 @@ The Principal Architect must **immediately reject** redesign proposals motivated
 * ❌ *"This codebase has too many layers / not enough layers."* (Taste is not a business case).
 * ❌ *"In my previous company we did this with Kafka / Micro-frontends."* (Resume-Driven Development / NIH syndrome).
 
-**The Golden Rule:** *A difference in architectural style without a demonstrable, measured Objective Defect is NEVER a valid reason for a rewrite.*
+**The Golden Rule:** *A difference in architectural style without a demonstrable, measured Objective Defect is NEVER a valid reason for a rewrite.* The mirror rule: *"it has worked for years" is evidence that it works, never evidence that it is still the right design* — record the clean-sheet gap either way (SKILL.md §1).
 
 ### E. The Second-System Effect Guard (Fred Brooks)
 When an existing architecture **is** objectively defective, the architect tasked with replacing it faces the *Second-System Effect* (the urge to load all accumulated ideas and over-engineered features into the replacement).
