@@ -121,6 +121,8 @@ Hazards become `Q.xx` against the ISO/IEC 25010:2023 **Safety** characteristic
 
 ### 2.5 Proven is not the same as current — separate the two questions
 
+This is the skill's founding question (SKILL.md §1) applied to operating systems.
+
 Linux reimplements the Unix design, and XNU (macOS, iOS) builds on it too through its BSD
 layer [S54]; both expose the same POSIX process and permission model. The core abstractions (processes created with `fork`,
 everything as a file, users and a superuser, synchronous system calls) were published in

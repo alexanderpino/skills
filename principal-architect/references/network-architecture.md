@@ -86,6 +86,13 @@ policy requires.
 
 ### 2.5 Segmentation, ingress and egress
 
+- **Proven vs current** (SKILL.md §1). The perimeter model — a trusted internal network
+  behind a firewall — has decades of use. NIST's zero-trust architecture explains why it no
+  longer holds for remote users, cloud services and lateral movement inside the perimeter
+  [S22]. In an existing estate, record the gap and choose per zone: keep (with a recorded
+  reason), work around (identity-based access per request in front of the existing
+  network), or replace.
+
 - **Zero trust and segmentation are complements.** Grant access per request on identity,
   not network location [S22]; segment into zones with controlled conduits to limit how far
   a compromise spreads [S23].

@@ -1,6 +1,6 @@
 ---
 name: principal-architect
-description: "Master architecture & business-analysis skill. Use BEFORE planning or changing structure, boundaries, interfaces, data, or quality attributes. Use when user mentions architecture, PRD/HLD/SD/SAD/RFC/ADR, C4/ArchiMate diagrams, capabilities, roadmap, migration, threat modeling, SLOs, ERDs, cloud cost, user stories, or acceptance criteria — and for the substrate: kernel/OS design, isolation (containers, microVMs, VMs), embedded/RTOS/safety-critical, network topology/segmentation, cloud landing zones, multi-region/DR, or platform end-of-support. Acts as master architect: derives content from evidence, writes stories in house format, and triages artifacts. Captures software with C4, logs decisions via RFC→ADR, and requires threat models/FinOps in HLDs. Conforms to ISO 42010, ISO 25010; uses TOGAF, ArchiMate, C4, arc42. Output must be human-readable, pragmatic prose; no robotic AI-isms. Use IDs (e.g., F.02) for references."
+description: "Master architecture & business-analysis skill. Use BEFORE planning or changing structure, boundaries, interfaces, data, or quality attributes. Use when user mentions architecture, PRD/HLD/SD/SAD/RFC/ADR, C4/ArchiMate diagrams, capabilities, roadmap, migration, threat modeling, SLOs, ERDs, cloud cost, user stories, or acceptance criteria — and for the substrate: kernel/OS design, isolation (containers, microVMs, VMs), embedded/RTOS/safety-critical, network topology/segmentation, cloud landing zones, multi-region/DR, or platform end-of-support. Acts as master architect: separates proven-by-use from how it would be designed today, derives content from evidence, writes stories in house format, and triages artifacts. Captures software with C4, logs decisions via RFC→ADR, and requires threat models/FinOps in HLDs. Conforms to ISO 42010, ISO 25010; uses TOGAF, ArchiMate, C4, arc42. Output must be human-readable, pragmatic prose; no robotic AI-isms. Use IDs (e.g., F.02) for references."
 ---
 
 # Architecture Docs
@@ -36,6 +36,48 @@ it is measured or derived, and treat an unvalidated assumption as a gap** (`meth
 a confidently wrong number does more damage than an honest adjective, because it survives review.
 See **`references/quantitative-methods.md`** for the formulas, the assumptions each one needs,
 and where they break.
+
+## 1. The founding question — proven is not the same as current
+
+Years of successful use prove that a design **works**. They do not prove it is how you would
+build it **today** if you could start again. Software that is used must keep changing or it
+becomes progressively less satisfactory, and its complexity grows unless work is done to
+reduce it (Lehman, *Programs, Life Cycles, and Laws of Software Evolution*, Proc. IEEE
+1980). People also systematically prefer whatever is already in place (status quo bias —
+Samuelson & Zeckhauser, *J. Risk & Uncertainty* 1988) and keep investing in what they
+already paid for (sunk cost — Arkes & Blumer, *OBHDP* 1985). So for **every existing
+design you evaluate, extend, migrate or build on** — a kernel, a protocol, a data model, an
+integration style, a platform, this skill's own defaults — answer two questions separately
+and never let one answer the other:
+
+1. **Is it proven?** Evidence of fitness so far: operating history, incidents, measured
+   `Q.xx`. Before judging, recover why it was built this way (Chesterton's fence,
+   `anti_over_engineering.md` §7A).
+2. **Would we design it this way today?** Drucker's test: *"If we did not do this already,
+   would we, knowing what we now know, go into it?"* (*Management Challenges for the 21st
+   Century*, 1999). Answer from **current sources** — standards, peer-reviewed research,
+   vendor guidance — never from taste or novelty (`anti_over_engineering.md` §7D).
+
+Then:
+
+3. **Record the gap**, per mechanism with its source, as architectural technical debt or an
+   evolution option (Kruchten, Nord & Ozkaya, *Managing Technical Debt*, SEI 2019) — in the
+   HLD/SD "Known issues / debt", or the `architecture-evaluation.md` clean-sheet section. A
+   gap you can name but do not record is the status quo bias winning silently.
+4. **Decide per mechanism: keep, work around, or replace**, and say which in the ADR.
+   *Keep* is legitimate when the proven design plus its ecosystem still meets the drivers.
+   *Work around* uses the current mechanism inside the proven system. *Replace* needs a
+   driver: an objective defect or a grounded, costed gap (`anti_over_engineering.md` §7B),
+   delivered incrementally (§7E).
+5. **Revisit** at lifecycle triggers — end-of-support dates and radar moves
+   (`migration.md` §7), architecture evaluations (`methods.md` §11) — not only when
+   something breaks.
+
+The anti-over-engineering mandate below protects simplicity, **not the status quo**: it
+blocks change driven by taste or fashion, and this rule blocks the opposite error of keeping
+a superseded design because it is familiar. Domain instances: kernels and operating systems
+(`systems-architecture.md` §2.5), network trust models (`network-architecture.md` §2.5),
+cloud estates (`cloud-architecture.md` §2.1).
 
 ## 2. The Pragmatism & Anti-Over-Engineering Mandate
 

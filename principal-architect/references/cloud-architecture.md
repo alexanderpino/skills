@@ -36,6 +36,11 @@ survive, applicable regulation (DORA, Data Act, residency), and tenant contract 
 
 ### 2.1 Account structure
 
+- **Proven vs current** (SKILL.md §1). Many estates run for years in one shared account or
+  subscription; current provider guidance is separate accounts per workload and
+  environment [S1]. Record the gap and its blast-radius consequence, then move workloads
+  out incrementally rather than leaving the gap undocumented.
+
 - Use **separate accounts per workload and environment**, grouped in an organisational
   hierarchy that reflects how policy differs [S1]. The account is the boundary for IAM,
   quotas and billing [S1].

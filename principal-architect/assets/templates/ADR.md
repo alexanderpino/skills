@@ -30,6 +30,11 @@ and the tensions pulling in different directions. State the problem honestly and
 neutrally — a reader should grasp the situation before seeing the answer. Don't
 describe the solution here.
 
+If the decision keeps, extends, works around or replaces an established design, give
+both answers (SKILL.md §1): **proven?** <evidence — history, incidents, measured Q.xx> ·
+**designed this way today?** <how, with the source> — and say in the Decision whether
+this ADR keeps, works around, or replaces it.
+
 ## Decision
 "We will <do X>." One clear choice, in active voice — not a menu. If real
 alternatives were weighed, name them briefly and say why each lost:

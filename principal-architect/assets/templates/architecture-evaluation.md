@@ -49,6 +49,14 @@ The core ATAM outputs:
 | F1 | risk | Q.01 | <single shared DB is a scaling & blast-radius risk> | High | <split read model — ADR-00NN> |
 | F2 | trade-off | Q.01 ↔ Q.03 | <cache improves latency, weakens consistency> | Med | <bounded staleness — ADR-00NN> |
 
+### Clean-sheet comparison
+For each major approach in §3: is it proven, and would it be designed this way today?
+(SKILL.md §1.) Cite the source for the "today" column; taste is not a source.
+
+| Approach | Proven? (evidence) | Today's design (source) | Gap | Keep / work around / replace |
+|---|---|---|---|---|
+| <shared database between services> | <5 yrs, no data-loss incidents> | <one owner per dataset — data-architecture.md> | <schema coupling> | <keep; debt entry D-03> |
+
 ## 5. Risk themes
 Cluster the risks into themes (e.g. "no horizontal scaling path", "untested failure modes",
 "security debt at the edge"). Themes, not individual risks, drive the roadmap.
