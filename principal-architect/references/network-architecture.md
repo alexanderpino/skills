@@ -4,7 +4,7 @@
 datacenter fabric, WAN); makes a protocol choice with a quality trade-off; places
 segmentation, ingress or egress controls; or must meet a latency or transfer `Q.xx` across
 distance. A system that only *uses* an existing network states its zones and flows in its
-HLD (§3) and links to the network's own SAD; it does not redesign it.
+HLD §6 and §8 (see §3 below) and links to the network's own SAD; it does not redesign it.
 
 **Altitude.** Shared networks (hub, fabric, WAN, address plan) are enterprise or solution
 altitude: one team owns them and many systems depend on them.
@@ -92,7 +92,6 @@ policy requires.
   [S22]. In an existing estate, record the gap and choose per zone: keep (with a recorded
   reason), work around (identity-based access per request in front of the existing
   network), or replace.
-
 - **Zero trust and segmentation are complements.** Grant access per request on identity,
   not network location [S22]; segment into zones with controlled conduits to limit how far
   a compromise spreads [S23].

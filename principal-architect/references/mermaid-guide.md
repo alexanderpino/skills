@@ -338,11 +338,13 @@ and use realization edges (`-.realized by.->`) to link a higher layer to the one
 
 ## Network & trust-zone view
 
-The C4 diagram set (c4model.com: context, container, component, code, plus landscape, dynamic and deployment) has no dedicated network view. When a system spans more than one zone, uses hybrid connectivity, or
-has a non-trivial ingress or egress path, draw one: zones as subgraphs, containers placed in
-the zone they run in, and every edge labelled with **protocol/port · authentication ·
-encryption**. Every edge that crosses a subgraph boundary is a trust-boundary crossing and
-needs a STRIDE row and a line in the flow matrix (`network-architecture.md` §2.5).
+The C4 diagram set (c4model.com: context, container, component, code, plus landscape,
+dynamic and deployment) has no dedicated network view. When a system spans more than one
+zone, uses hybrid connectivity, or has a non-trivial ingress or egress path, draw one:
+zones as subgraphs, containers placed in the zone they run in, and every edge labelled
+with **protocol/port · authentication · encryption**. Every edge that crosses a subgraph
+boundary is a trust-boundary crossing and needs a STRIDE row and a line in the flow matrix
+(`network-architecture.md` §2.5).
 
 ```mermaid
 flowchart LR

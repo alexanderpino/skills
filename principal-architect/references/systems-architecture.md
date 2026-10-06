@@ -64,10 +64,10 @@ candidate; the ADR records the rows, not the verdict:
 
 | Criterion | Evidence to collect per candidate |
 |---|---|
-| Can it run where the system must run? | the vendor's hardware support list and the licence. Example: macOS (XNU) is licensed for Apple hardware only, and cloud Mac capacity comes as dedicated hosts with a 24-hour minimum allocation [S57][S58] |
+| Can it run where the system must run? | the vendor's hardware or board support list and the licence terms, checked when you write. Example: macOS (XNU) is licensed for Apple hardware, and cloud Mac capacity is sold as dedicated hosts with a minimum allocation period [S57][S58] |
 | Where does third-party code run? | the extension model: Linux loadable modules vs eBPF [S24]; on macOS kernel extensions are deprecated in favour of System Extensions and DriverKit in user space [S52]; Microsoft is moving security products out of Windows kernel mode [S56] |
-| How large is the privileged base? | the kernel structure: XNU combines Mach, a BSD layer and the I/O Kit driver framework in one kernel address space [S54] — hybrid, not a microkernel in operation |
-| How is the running system's integrity protected? | boot and runtime integrity mechanisms and what hardware they need: on Apple silicon, Kernel Integrity Protection, Pointer Authentication and the Signed System Volume [S53]; firmware resiliency in general [S27] |
+| How large is the privileged base? | the kernel structure: seL4 keeps the kernel small enough for a full correctness proof [S12]; Linux runs drivers and file systems in the kernel [S10]; XNU combines Mach, a BSD layer and the I/O Kit driver framework in one kernel address space [S54] — hybrid, not a microkernel in operation |
+| How is the running system's integrity protected? | boot and runtime integrity mechanisms and what hardware they need: on Linux, verified block devices (dm-verity) [S65]; on Apple silicon, Kernel Integrity Protection, Pointer Authentication and the Signed System Volume [S53]; firmware resiliency in general [S27] |
 | Can you audit and patch it yourself? | source availability (Linux; XNU's source is published [S55]) and who can ship a fix |
 | Ecosystem, skills, support horizon | drivers, tooling and people available to you; the support dates (§4) |
 
@@ -123,14 +123,17 @@ Hazards become `Q.xx` against the ISO/IEC 25010:2023 **Safety** characteristic
 
 This is the skill's founding question (SKILL.md §1) applied to operating systems.
 
-Linux reimplements the Unix design, and XNU (macOS, iOS) builds on it too through its BSD
-layer [S54]; both expose the same POSIX process and permission model. The core abstractions (processes created with `fork`,
-everything as a file, users and a superuser, synchronous system calls) were published in
-1974 [S33], the POSIX interface was standardised in 1988 [S34], and Linux itself dates from
-1991 [S49]. That design is **proven**: its track record, drivers, tooling and skills are real
-evidence and the reason it is the default. Some of its assumptions are **no longer how the
-research community would build an OS from scratch** [S35][S36]. Treat these as two separate
-questions in every substrate decision, and never let one answer the other.
+Linux reimplements the Unix design, and XNU (macOS, iOS) builds on it through its BSD
+layer [S54]; both expose the same POSIX process and permission model. The core
+abstractions (processes created with `fork`, everything as a file, users and a superuser,
+synchronous system calls) were published in 1974 [S33], the POSIX interface was
+standardised in 1988 [S34], and Linux dates from 1991 [S49]. That design is **proven**: its
+track record, drivers, tooling and skills are real evidence, and the reason it is often the
+incumbent — the incumbent itself is still chosen per §2.2. Some of its assumptions are **no
+longer how the research community would build an OS from scratch** [S35][S36]. Treat these
+as two separate questions in every substrate decision, and never let one answer the other.
+The table covers the Unix lineage; for any other incumbent (Windows NT, a commercial RTOS)
+build the same rows from that system's own sources.
 
 1. **Name the inherited assumption** behind the mechanism the decision touches:
 
@@ -145,27 +148,34 @@ questions in every substrate decision, and never let one answer the other.
 | The OS controls one homogeneous machine | the CPU is the computer | modern platforms are many cores, accelerators and firmware-controlled processors the OS does not govern [S36][S47] | the platform as a distributed system | treat firmware, BMC and device processors as TCB and threat-model them (§2.3, [S27]); where the OS vendor also designs the silicon, kernel integrity can be enforced in hardware (Apple: KIP, PAC, SSV) [S53] |
 
 2. **Decide per mechanism**, and record which of the three the ADR chose:
-   - **Work with it** — the default when building *on* an established OS: the proven design plus its
-     ecosystem beats an untested alternative, the "worse is better" effect [S48], and
+   - **Keep** — the default when building *on* an established OS: the proven design plus
+     its ecosystem beats an untested alternative, the "worse is better" effect [S48], and
      `anti_over_engineering.md` (Chesterton's fence, boring technology) applies.
-   - **Work around it** — use the modern mechanism *inside* the proven OS (column 5), when a
+   - **Work around** — use the current mechanism *inside* the proven OS (last column) when a
      measured `Q.xx` hits the inherited assumption.
-   - **Replace it** — choose or build a clean-sheet design (microkernel, separation kernel,
-     unikernel, capability OS) only when a driver is **structurally** unreachable with the
-     inherited design: a TCB small enough to verify or certify, untrusted multi-tenancy with
-     a small attack surface, or a hard real-time bound. Name that driver in the ADR.
-3. **A global lock is never the target concurrency design.** That covers a big kernel
-   lock, an interpreter lock, a database-wide write lock and a single coordinator every
-   request must pass through. If one is unavoidable as a first step, accept it only as a
-   recorded, time-boxed transition: an ADR with the removal plan, a fitness function that
-   measures contention on it, and the explicit warning that code will start relying on its
-   implicit serialisation — that dependency, not the lock itself, is what made removal take
-   years [S59][S62]. Design new interfaces so that independent operations commute [S63];
-   size what the lock costs with Amdahl/USL (`quantitative-methods.md` §4).
-4. **Do not copy an inherited idiom into an interface you design.** A new platform API,
-   plug-in model, agent runtime or device OS starts from the clean-sheet column: explicit
-   capabilities instead of ambient authority, asynchronous submission, explicit durability.
-   Copying the legacy idiom is acceptable only with a recorded compatibility driver.
+   - **Replace** — choose or build a clean-sheet design (microkernel, separation kernel,
+     unikernel, capability OS) when `anti_over_engineering.md` §7B is met. For a kernel the
+     drivers that typically make it structural are a TCB small enough to verify or certify,
+     untrusted multi-tenancy with a small attack surface, or a hard real-time bound. Name the
+     driver in the ADR.
+3. **A global lock must not be the concurrency design of a path whose `Q.xx` needs
+   throughput to grow with cores or nodes** — a big kernel lock, an interpreter lock, a
+   database-wide write lock, or a stateful coordinator that serialises every request.
+   Size it with Amdahl/USL (`quantitative-methods.md` §4): where the measured or derived
+   serial fraction still meets the `Q.xx` at the projected scale, a single serialisation
+   point is a legitimate **keep** — record it with a fitness function that measures
+   contention. A single writer *per partition* is not a global lock, and a stateless router
+   is not a serialisation point. When a global lock is introduced to retrofit concurrency,
+   record it as a transition with a removal plan, and warn that code will come to rely on
+   its implicit serialisation — that dependency, not the lock itself, is what made removal
+   take years [S59][S62]. Design new interfaces so that independent operations commute
+   [S63].
+4. **Do not copy an inherited OS idiom into a new OS-level or platform interface** — a
+   system-call surface, sandbox or agent runtime, or device OS API. Start from the
+   clean-sheet column: explicit capabilities instead of ambient authority, asynchronous
+   submission, explicit durability. Copying the idiom needs a recorded compatibility driver;
+   consistency with the host system's existing interfaces counts as one (`methods.md` §1,
+   conceptual integrity). Application-level plug-in APIs follow `structure.md` §2.
 
 ---
 
@@ -176,8 +186,8 @@ questions in every substrate decision, and never let one answer the other.
 | PRD | `Q.xx` for jitter, worst-case response, boot time, density; `C.xx` for integrity level, support horizon (with URL), CPU architecture, minimum kernel |
 | HLD §6 | per container: OS + kernel line, runtime, isolation boundary, CPU architecture, node pool |
 | HLD §7 | I/O and concurrency model, scheduling policy, update and rollback mechanism |
-| ADR | for every substrate decision: the inherited assumption it touches and whether it works with, around, or replaces it (§2.5) |
-| HLD §8 | threat rows from §5 below |
+| ADR | for every substrate decision: the inherited assumption it touches and whether it keeps, works around, or replaces it (§2.5) |
+| HLD §8 | a threat row for each §5 flag that applies |
 | SD | task set, priorities, locking protocol, schedulability result (real-time only) |
 | Fitness functions (`automation.md`) | latency test under load as a gate; seccomp-profile drift; image CVE scan; kernel hardening config check; boot-time budget |
 
@@ -213,14 +223,14 @@ Raise each as a finding with its source:
 - a platform component past end of support, or with no recorded support date [S30].
 - a kernel or OS preference ("X is better") recorded without per-criterion evidence, for
   any kernel (§2.2);
-- a global lock or single serialisation point proposed as the concurrency design, or
-  accepted as a transition without a removal plan and contention measurement (§2.5)
-  [S59][S61];
+- a global lock or stateful serialising coordinator on a path whose `Q.xx` needs
+  throughput to grow with cores or nodes, without an Amdahl/USL sizing; or a retrofit
+  global lock without a removal plan and contention measurement (§2.5) [S59][S61];
 - a substrate ADR that answers "is it proven?" but not "would we build it this way now?",
-  or the reverse: rejecting Linux because its design is old, with no driver it
-  structurally cannot meet (§2.5) [S41][S48];
-- a new interface that copies `fork`-style creation, ambient authority or implicit
-  durability without a compatibility driver (§2.5) [S37][S42][S45].
+  or the reverse: rejecting an established OS (Linux, Windows, XNU, a commercial RTOS)
+  because its design is old, with no driver it cannot meet (§2.5) [S41][S48];
+- a new OS-level or platform interface that copies `fork`-style creation, ambient
+  authority or implicit durability without a compatibility driver (§2.5) [S37][S42][S45].
 
 ---
 
@@ -284,11 +294,12 @@ Raise each as a finding with its source:
 | S54 | Apple, *Kernel Programming Guide*, "Kernel Architecture Overview" (Apple Developer Documentation Archive) |
 | S55 | Apple, XNU source, https://github.com/apple-oss-distributions/xnu |
 | S56 | Microsoft, *Windows security and resiliency: Protecting your business*, Windows Experience Blog, 19 November 2024 |
-| S57 | Apple, *macOS Software License Agreement* (virtualisation and leasing clauses) |
-| S58 | AWS, *Amazon EC2 Mac instances FAQ* (24-hour minimum Dedicated Host allocation) |
+| S57 | Apple, *macOS Software License Agreement* (virtualisation and leasing clauses), https://www.apple.com/legal/sla/ |
+| S58 | AWS, *Amazon EC2 Mac instances FAQ* (minimum Dedicated Host allocation), https://aws.amazon.com/ec2/instance-types/mac/faqs/ |
 | S59 | Kernel Newbies, *Linux 2.6.39* release notes (removal of the Big Kernel Lock); LWN.net coverage of the BKL removal (2011) |
 | S60 | Linux.com, *What's New in Linux 2.6.39: Ding Dong, the Big Kernel Lock is Dead* (2011) |
 | S61 | S. Boyd-Wickizer et al., *An Analysis of Linux Scalability to Many Cores*, OSDI 2010 |
 | S62 | PEP 703, *Making the Global Interpreter Lock Optional in CPython* (accepted 2023); PEP 779, criteria for supported free-threaded Python |
 | S63 | A. Clements et al., *The Scalable Commutativity Rule: Designing Scalable Software for Multicore Processors*, SOSP 2013 |
 | S64 | Linux kernel documentation, *What is RCU?*, https://docs.kernel.org/RCU/whatisRCU.html |
+| S65 | Linux kernel documentation, *dm-verity*, https://docs.kernel.org/admin-guide/device-mapper/verity.html |

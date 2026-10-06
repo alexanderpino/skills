@@ -40,7 +40,6 @@ survive, applicable regulation (DORA, Data Act, residency), and tenant contract 
   subscription; current provider guidance is separate accounts per workload and
   environment [S1]. Record the gap and its blast-radius consequence, then move workloads
   out incrementally rather than leaving the gap undocumented.
-
 - Use **separate accounts per workload and environment**, grouped in an organisational
   hierarchy that reflects how policy differs [S1]. The account is the boundary for IAM,
   quotas and billing [S1].
@@ -84,7 +83,7 @@ load; record them as `C.xx` with their URL.
 |---|---|
 | Virtual machines | you own OS patching and scaling; needed for OS-level control, licensing, legacy |
 | Managed containers | container packaging without operating a cluster |
-| Kubernetes | each minor version is supported for about 14 months, so plan an upgrade cadence and a team to run it [S11]; it is not a tenant isolation boundary (`systems-architecture.md` §2.1) |
+| Kubernetes | each minor version has a fixed support window (check its current length [S11]), so plan an upgrade cadence and a team to run it; it is not a tenant isolation boundary (`systems-architecture.md` §2.1) |
 | Functions | execution-time, payload and concurrency limits from the provider's quota page; cold starts; state and coordination outside the function [S12][S13] |
 
 **Cost crossover:** average concurrency is arrival rate × duration (Little's Law [S14],

@@ -86,15 +86,14 @@ Before an architect or developer is permitted to propose an architectural rewrit
 2. What subtle edge cases, concurrency locks, or production guarantees does this seemingly "weird" construction protect?
 * **The Lost Context Protocol:** If the original authors are gone and documentation is nonexistent, the architect **MUST NOT** proceed based on assumptions. They must implement **Characterization Testing** (Golden Master / Snapshot testing or dark-launching shadow traffic) to empirically document the existing system's boundary invariants *before* proposing the replacement.
 
-### B. The 5 "Objective Defects" (When a Redesign is Justified)
-An architectural refactoring or rewrite is **ONLY** justified if the author provides hard, empirical evidence of at least one of these five objective defects:
+### B. The 6 "Objective Defects" (When a Redesign is Justified)
+An architectural refactoring or rewrite is **ONLY** justified if the author provides hard, empirical evidence of at least one of these six objective defects:
 1. **Data Corruption & Consistency Invalidation:** Hard evidence of unresolvable race conditions, unrecoverable data loss, or distributed split-brain scenarios under normal operations.
 2. **Hard Scalability / Bottleneck Wall:** Measured APM traces (Datadog, Dynatrace, Kibana) proving the current architecture cannot meet mandatory, projected business throughput under the **"Cheapest Fix First"** rule:
    * *Prerequisite:* The author must prove that standard mitigations (adding a database index, optimizing queries, in-process batching, or vertical hardware scaling) have failed or are mathematically incapable of meeting the SLA.
 3. **Cascading Systemic Failure:** Incident post-mortems proving that failure in one sub-component routinely drags down unrelated critical business domains due to lack of bulkhead isolation.
 4. **Unpatchable Security / Regulatory Breach:** Structural non-compliance with legal mandates (GDPR, NIS2, SOC2) or unmitigated architectural attack vectors (e.g., plain-text credential persistence).
 5. **FinOps Disproportionality:** Measured cloud expenditure where infrastructure costs exceed reasonable industry benchmarks by an order of magnitude (5x–10x) relative to business value generated (e.g., spending $20,000/mo on an idle Kubernetes/Kafka cluster for a low-traffic internal utility).
-
 6. **Grounded, Costed Clean-Sheet Gap:** the current design is proven but superseded, the gap is documented from current sources (not preference), it threatens a `Q.xx` or `C.xx` now or within the planning horizon (end of support, a regulatory date, measured decline per Lehman's laws), and the cost of keeping it over that horizon is shown to exceed the cost of an incremental move. Without all four parts it stays a recorded debt entry.
 
 ### C. The DORA Metric Test for "Unmaintainable" Code
@@ -110,7 +109,7 @@ The Principal Architect must **immediately reject** redesign proposals motivated
 * ❌ *"This codebase has too many layers / not enough layers."* (Taste is not a business case).
 * ❌ *"In my previous company we did this with Kafka / Micro-frontends."* (Resume-Driven Development / NIH syndrome).
 
-**The Golden Rule:** *A difference in architectural style without a demonstrable, measured Objective Defect is NEVER a valid reason for a rewrite.* The mirror rule: *"it has worked for years" is evidence that it works, never evidence that it is still the right design* — record the clean-sheet gap either way (SKILL.md §1).
+**The Golden Rule:** *A difference in architectural style without a demonstrable Objective Defect — measured, or for item 6 documented from sources — is NEVER a valid reason for a rewrite.* The mirror rule: *"it has worked for years" is evidence that it works, never evidence that it is still the right design* — record the clean-sheet gap either way (SKILL.md §1).
 
 ### E. The Second-System Effect Guard (Fred Brooks)
 When an existing architecture **is** objectively defective, the architect tasked with replacing it faces the *Second-System Effect* (the urge to load all accumulated ideas and over-engineered features into the replacement).
