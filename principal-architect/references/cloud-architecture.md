@@ -1,270 +1,180 @@
-# Cloud architecture — foundations, failure domains, compute, tenancy, exit
+# Cloud architecture — account structure, failure domains, compute, tenancy, exit
 
-Cloud already appears across this skill: FinOps in every HLD and SAD, cloud design patterns
-in `structure.md` §3, the on-premises-to-cloud blueprint in `migration.md`, SLOs and RTO/RPO
-in `operability.md`. What is missing is the layer those assume: **how the cloud estate itself
-is structured, which failures the topology must survive, and how the compute and tenancy
-model is chosen.** Read this file when:
+**Load when** the work sets up or changes a landing zone or account hierarchy; a
+reliability, residency or regulatory driver forces a region or provider topology; a
+compute model is chosen; a multi-tenant SaaS is designed; or sovereignty or exit is a
+driver. FinOps (HLD/SAD §9), cloud design patterns (`structure.md` §3) and on-premises to
+cloud migration (`migration.md`) already live elsewhere; this file covers the decisions
+those assume.
 
-- you set up or change a **landing zone**, account/subscription/project hierarchy, or
-  guardrail policy;
-- a reliability or residency driver forces a **topology decision**: multi-AZ, multi-region,
-  multi-cloud, cells;
-- you **choose a compute model** (VMs, managed containers, Kubernetes, functions, PaaS);
-- you design a **multi-tenant SaaS** platform;
-- **sovereignty, regulation or exit** is a driver (DORA, the EU Data Act, data residency).
+**Altitude.** Landing zone, guardrails and approved regions are enterprise altitude
+(`PR.xx`). A workload's topology, compute model and tenancy model are solution or software
+ADRs whose driver is a `Q.xx` or `C.xx`.
 
-**Altitude.** The landing zone, guardrails and cloud operating model are **enterprise**
-altitude (principles `PR.xx`, TOGAF Phase D building blocks). A workload's region and
-failure-domain topology is a **solution** or **software** decision, recorded as an ADR whose
-driver is a `Q.xx` with an RTO, RPO or latency measure.
+**Grounding rule.** Every rule carries a source `[Sn]`. Quotas, prices, service limits and
+support windows change: look them up when you write and put the URL next to the value.
 
 ---
 
-## 1. Well-Architected frameworks are review lenses, not architecture
+## 1. Derive the cloud estate from evidence before asking
 
-AWS (six pillars: operational excellence, security, reliability, performance efficiency,
-cost optimisation, sustainability), Azure (five pillars) and Google Cloud each publish a
-Well-Architected or Architecture Framework. They are good **checklists** for an
-architecture review (`methods.md` §11). They do not replace drivers: a pillar becomes part of
-the design only when it is written as a `Q.xx` against an ISO/IEC 25010 characteristic with
-a response measure. Reliability maps to reliability, performance efficiency to performance
-efficiency, cost to the FinOps section, operational excellence to operability, security to
-the threat model, and sustainability to a `Q.xx` measured in carbon intensity (§9).
-
----
-
-## 2. The foundation — landing zone and account structure
-
-**The account (AWS), subscription (Azure) or project (Google Cloud) is the strongest
-isolation unit the provider gives you.** IAM, quotas, billing and blast radius all stop at
-it. Use it deliberately:
-
-- **one account per workload per environment** as the default, grouped in an organisational
-  hierarchy (OUs, management groups, folders) that mirrors how policy differs, not the
-  org chart;
-- **guardrails as policy**: service control policies, Azure Policy, organisation policy,
-  enforced centrally (regions allowed, encryption required, public access denied);
-- **one identity provider**, federated, with no long-lived access keys; break-glass accounts
-  that are monitored and tested;
-- **central log archive and security tooling accounts** that workload teams cannot alter
-  (this is the repudiation control in `threat_modeling.md`);
-- **a network hub** (`network-architecture.md` §2) and an address plan for the whole estate;
-- **mandatory tags** for owner, cost centre and environment, because FinOps allocation
-  depends on them.
-
-Use the provider's reference: AWS Control Tower and Landing Zone Accelerator, the Azure
-Cloud Adoption Framework landing zones, or the Google Cloud enterprise foundations blueprint.
-Customise them through ADRs rather than starting from a blank page.
-
----
-
-## 3. Failure domains and topology
-
-Name the failure the system must survive, then pick the cheapest topology that survives it.
-
-```mermaid
-flowchart LR
-  h[Host / node] --> r[Rack / power] --> az[Availability Zone] --> reg[Region] --> p[Provider / jurisdiction]
-```
-
-| Failure to survive | Topology | Typical RTO | Relative cost |
-|---|---|---|---|
-| host or zone loss | **multi-AZ** in one region (the production default) | seconds to minutes | low |
-| region loss, hours acceptable | **backup and restore** to a second region | hours | lowest of the multi-region options |
-| region loss, tens of minutes | **pilot light**: data replicated, core services provisioned but scaled down | tens of minutes | moderate |
-| region loss, minutes | **warm standby**: a smaller full copy running | minutes | high |
-| region loss, near zero; or global latency | **multi-site active/active** | near zero | highest; data consistency becomes the hard problem |
-
-The ladder follows the AWS disaster-recovery strategies. The cost rises steeply at each rung,
-so the RTO and RPO in `operability.md` must justify the rung. A multi-region design is never
-the default.
-
-**Multi-cloud is rarely the right answer to resilience.** A second region from the same
-provider gives most of the availability at a fraction of the cost and complexity. Legitimate
-multi-cloud drivers are regulatory (concentration risk and exit plans under DORA, Regulation
-(EU) 2022/2554, applicable since January 2025), sovereignty, or a clearly better service
-elsewhere. Record the price: the lowest common denominator of services, two sets of skills,
-and cross-provider egress.
-
----
-
-## 4. Limiting blast radius
-
-Availability Zones protect against infrastructure failure. Most outages come from **bad
-deployments, bad configuration and overload**, which hit every zone at once. These patterns
-address that:
-
-- **Cell-based architecture.** Split the workload into identical, independent cells, each
-  serving a subset of customers, behind a thin routing layer. A bad change or a poison
-  request then hits one cell, not everyone. Cells also bound the size of every test
-  environment and scaling problem (AWS Well-Architected, *Reducing the Scope of Impact with
-  Cell-Based Architecture*). The router is the one shared component and must stay very
-  simple.
-- **Shuffle sharding.** Give each customer a random combination of a few workers out of many,
-  so that one noisy or malicious customer shares its full set of workers with almost no one
-  else (AWS Builders' Library).
-- **Static stability.** Stay up on last-known-good state when a dependency or control plane
-  fails (`network-architecture.md` §1). Pre-provision capacity for zone loss instead of
-  launching it during the incident.
-- **Constant work.** Systems that do the same amount of work whether healthy or failing
-  (for example, pushing the full configuration every cycle instead of deltas) have no
-  untested failure mode. Avoid bimodal behaviour.
-- **Safe deployments.** Roll out per cell, zone and region, with bake time, automatic
-  rollback on alarms and a one-box or canary stage. A deployment pipeline is a reliability
-  mechanism and belongs in HLD §7.
-- **Quotas and limits are constraints.** Service quotas, API rate limits and account limits
-  are `C.xx` items. Check them for the peak scenario, including failover, when the second
-  zone suddenly takes all the traffic.
-
----
-
-## 5. Choosing the compute model
-
-| Model | Buys | Costs / avoid when |
-|---|---|---|
-| **Virtual machines** | full control; any OS; licensing and legacy fit | you patch and scale the OS; lowest abstraction |
-| **Managed containers** (ECS/Fargate, Cloud Run, Azure Container Apps) | container packaging without operating a cluster; scale to zero on some | fewer knobs than Kubernetes; provider-specific |
-| **Kubernetes** (EKS, AKS, GKE, or self-managed) | portable platform API; a large ecosystem; a foundation for an internal platform | a platform that needs a team to run it; not an isolation boundary (`systems-architecture.md` §3) |
-| **Functions** (Lambda, Azure Functions, Cloud Run functions) | no idle cost; scaling per request; little to operate | cold starts; execution time and payload limits; cost at sustained load; harder local testing |
-| **PaaS / managed runtimes** | the provider runs the stack | least control; deepest lock-in |
-
-Two rules keep the choice honest.
-
-1. **Kubernetes is a platform for building platforms.** Choose it when several teams will
-   share it, when portability is a real driver, or when the ecosystem is needed. For a few
-   services and one team, managed containers do the job with far less operating effort.
-2. **Serverless has a cost crossover.** Functions are cheapest for spiky or low traffic.
-   At sustained load, the average concurrency is λ × duration (Little's Law,
-   `quantitative-methods.md` §1). Price that concurrency as always-on containers or
-   instances and compare it with the per-request bill. Record the crossover point in the
-   FinOps section so the decision can be revisited when traffic grows.
-
----
-
-## 6. Multi-tenancy for SaaS
-
-| Model | Isolation | Cost per tenant | Fits |
-|---|---|---|---|
-| **Silo** — dedicated stack (account, VPC or database) per tenant | strongest; simple compliance story | highest; onboarding is provisioning | regulated or very large tenants |
-| **Pool** — shared infrastructure, tenant ID on every row and request | enforced in code and data (row-level security, tenant-scoped credentials) | lowest | many small tenants |
-| **Bridge** — mixed, for example pooled compute with siloed data | per layer | in between | a tiered product (premium tenants get silos) |
-
-The model names come from the AWS SaaS Lens. Whichever model you choose, three things must be
-designed explicitly:
-
-- **Tenant isolation enforcement** — where it happens and how it is tested. The BOLA/IDOR
-  red flag in `threat_modeling.md` §3 is the pooled model's main risk.
-- **Noisy neighbours** — per-tenant quotas and rate limits, and cells or shuffle sharding
-  (§4) for large tenant counts.
-- **Tenant-aware operations** — metering, cost allocation per tenant, and per-tenant SLOs
-  where contracts require them.
-
----
-
-## 7. Shared responsibility and the managed-service trade
-
-The provider is responsible for the security *of* the cloud; you are responsible for
-security *in* it. The split moves with the service model: with IaaS you own the OS and up;
-with PaaS and SaaS you own configuration, identity and data. Write the split for each managed
-service into the threat model, because the gaps sit at the boundary.
-
-A managed service buys operability at the price of control, unit cost and lock-in. **Lock-in
-is a cost, not a sin.** Estimate the switching cost (data volume and egress, API surface,
-retraining) in the ADR, compare it with what the managed service saves each year, and accept
-it knowingly.
-
----
-
-## 8. Sovereignty, residency and exit
-
-- **Residency is not sovereignty.** Data stored in an EU region can still fall under a
-  non-EU jurisdiction through the provider's ownership (the US CLOUD Act is the usual
-  example). Where sovereignty is a driver, record which jurisdiction you need to exclude and
-  choose between sovereign-cloud offerings, EU-owned providers, and technical controls.
-- **Key control is the strongest technical lever.** Customer-managed keys in a key service
-  you control, or external key management or hold-your-own-key arrangements, keep the
-  provider from reading data without your cooperation. Confidential computing
-  (`systems-architecture.md` §3) extends this to data in use.
-- **Exit is now a legal requirement as well as a risk control.** The EU Data Act (Regulation
-  (EU) 2023/2854) has applied since 12 September 2025. It requires providers to support
-  switching, and switching charges, including egress fees for the switch, must be abolished
-  from 12 January 2027. DORA requires financial entities to have exit strategies for critical
-  ICT providers. Architecturally, exit means portable data formats, infrastructure as code,
-  documented dependencies on proprietary services, and a tested export path for core data.
-  Write the exit plan as a section of the SAD, not as a promise.
-
----
-
-## 9. Platform engineering and sustainability
-
-**An internal developer platform is a product.** It pays off once several stream-aligned
-teams repeat the same infrastructure work. It offers paved roads (golden paths) for the
-common cases and lets teams leave them when they need to (Team Topologies, Skelton and Pais).
-Building a platform team for one or two delivery teams is over-engineering.
-
-**Sustainability is measurable.** The Software Carbon Intensity specification (Green
-Software Foundation; ISO/IEC 21031:2024) gives a rate per functional unit. Region choice,
-utilisation and Arm-based instances are the main levers. When an organisation has carbon
-targets, write them as a `Q.xx` with SCI as the response measure.
-
----
-
-## 10. Legacy, modern, future
-
-| Then | Now | Next |
-|---|---|---|
-| owned datacenters, virtualised with VMware | IaaS lift-and-shift, then managed services and containers | serverless and platform-first delivery for new work |
-| one big shared account | landing zones with an account per workload | policy-as-code guardrails, automated account vending |
-| DR as a document | multi-AZ by default, tested DR rungs | cells and continuous resilience testing (chaos engineering) |
-| x86 instances | Arm instances for price-performance | accelerators (GPUs, TPUs, custom AI silicon) as a scarce, reserved resource and a `C.xx` |
-| hyperscaler as the default | sovereign and regional offerings next to hyperscalers | portability enforced by regulation (Data Act, DORA) |
-| trust the operator | customer-managed keys | confidential computing as a default for sensitive workloads |
-| VMware estates | migration pressure after Broadcom's 2023 acquisition and licensing changes | replatforming VM estates to cloud-native virtualisation or containers |
-
----
-
-## 11. How it lands in the artifacts
-
-| Artifact | What goes in |
+| Evidence | What it tells you |
 |---|---|
-| **Enterprise architecture** | landing-zone design, account hierarchy, guardrail principles (`PR.xx`), approved regions, exit strategy for critical providers |
-| **SAD / HLD** | region and failure-domain topology with its DR rung; compute model; tenancy model; shared-responsibility split in §8; quotas as `C.xx`; crossover and egress in §9 |
-| **ADRs** | multi-region or multi-cloud, compute model, tenancy model, cell design, key management model, each managed service that carries lock-in |
-| **Fitness functions** | policy-as-code checks on IaC (guardrails), DR restore drills against the stated RTO/RPO, quota headroom alarms, Infracost cost gate (`automation.md`) |
+| Organisation/account/subscription/project resources, SCPs, Azure Policy, org policies | account structure and guardrails (§2.1) |
+| Region and zone arguments on resources; multi-AZ flags on databases; replication and backup config | the topology actually deployed (§2.2) |
+| Compute resources (instances, container services, clusters, functions) | compute model in use (§2.4) |
+| `tenant_id` columns, row-level-security policies, per-tenant stacks or accounts | tenancy model (§2.5) |
+| Key resources (provider-managed vs customer-managed vs external keys) | key control (§2.7) |
+| Tags on resources | whether cost allocation is possible |
+
+Ask only for what evidence cannot give: **RTO and RPO**, the failure the business must
+survive, applicable regulation (DORA, Data Act, residency), and tenant contract terms.
 
 ---
 
-## 12. Over-engineering traps, cloud edition
+## 2. Decide
 
-- **Multi-cloud for resilience.** A second region of the same provider almost always gives
-  more availability per euro.
-- **Kubernetes for three services and one team.**
-- **Active/active multi-region for an internal tool** whose users would accept an hour of
-  downtime.
-- **A platform team before there are teams to serve.**
-- **Cells before there is a blast-radius problem.** Cells pay off at scale or for strict
-  isolation; before that, multi-AZ and safe deployments carry the load.
-- **The opposite mistake:** one shared production account for every workload, where any
-  compromised role reaches everything.
+### 2.1 Account structure
 
----
+- Use **separate accounts per workload and environment**, grouped in an organisational
+  hierarchy that reflects how policy differs [S1]. The account is the boundary for IAM,
+  quotas and billing [S1].
+- Start from the provider's landing-zone reference and record deviations as ADRs [S2][S3].
+- Central log and security accounts that workload teams cannot alter carry the
+  repudiation control in `threat_modeling.md` [S1].
 
-## 13. Sources
+### 2.2 Topology from RTO/RPO
 
-| Topic | Source |
+1. Name the failure to survive as a `Q.xx` stimulus: host, zone, region, or provider.
+2. Pick the cheapest strategy that meets the RTO/RPO. AWS characterises the four
+   strategies as: backup and restore (hours), pilot light (tens of minutes), warm standby
+   (minutes), multi-site active/active (near real-time), each more complex and costly than
+   the last [S4].
+3. Prove it with a recovery drill against the stated RTO/RPO before claiming it [S4]
+   (`operability.md`), and price it in §9.
+4. **Multi-cloud** needs a driver whose stimulus is the provider itself or a regulation:
+   DORA requires financial entities to have documented, tested exit strategies (Art. 28(8))
+   and to assess ICT concentration risk (Art. 29) [S5]. Record what it costs in services,
+   skills and egress.
+
+### 2.3 Blast radius beyond zones
+
+Zones protect against infrastructure failure; deployments, configuration and poison
+requests hit every zone at once. When a `Q.xx` requires bounded impact:
+
+| Pattern | What it bounds | Source |
+|---|---|---|
+| **Cells** — independent copies of the workload, each serving a subset of customers, behind a thin router | impact of a bad deployment or request to one cell | [S6] |
+| **Shuffle sharding** — each customer on a random small subset of workers | overlap between a noisy or failing customer and others | [S7] |
+| **Static stability** — keep serving on last-known-good state; pre-provision for zone loss | dependence on control planes during failure | [S8] |
+| **Constant work** — same work in healthy and failed states | untested bimodal behaviour | [S9] |
+| **Staged deployment** — per cell/zone/region with bake time and automatic rollback | change-induced outages | [S10] |
+
+Check quotas and limits for the failover case, when the surviving zone or cell takes the
+load; record them as `C.xx` with their URL.
+
+### 2.4 Compute model
+
+| Model | Decide with |
 |---|---|
-| Well-Architected frameworks | AWS Well-Architected Framework; Microsoft Azure Well-Architected Framework; Google Cloud Architecture Framework |
-| Landing zones | AWS Control Tower / Landing Zone Accelerator; Microsoft Cloud Adoption Framework; Google Cloud enterprise foundations blueprint |
-| DR strategies | AWS, *Disaster Recovery of Workloads on AWS* (whitepaper) |
-| Cells, shuffle sharding, static stability, constant work | AWS Well-Architected, *Reducing the Scope of Impact with Cell-Based Architecture*; AWS Builders' Library |
-| SaaS tenancy models | AWS Well-Architected SaaS Lens |
-| Platform teams | M. Skelton, M. Pais, *Team Topologies* (2019) |
-| Software carbon intensity | Green Software Foundation; ISO/IEC 21031:2024 |
-| Regulation | Regulation (EU) 2022/2554 (DORA); Regulation (EU) 2023/2854 (Data Act) |
-| Cloud definitions | NIST SP 800-145 (service and deployment models) |
+| Virtual machines | you own OS patching and scaling; needed for OS-level control, licensing, legacy |
+| Managed containers | container packaging without operating a cluster |
+| Kubernetes | each minor version is supported for about 14 months, so plan an upgrade cadence and a team to run it [S11]; it is not a tenant isolation boundary (`systems-architecture.md` §2.1) |
+| Functions | execution-time, payload and concurrency limits from the provider's quota page; cold starts; state and coordination outside the function [S12][S13] |
 
-Cross-references: networking and the hub — `network-architecture.md`; isolation boundaries
-and confidential computing — `systems-architecture.md` §3; SLOs, RTO/RPO — `operability.md`;
-availability maths — `quantitative-methods.md` §6; FinOps — HLD/SAD §9, `automation.md`;
-on-premises to cloud — `migration.md` §2.
+**Cost crossover:** average concurrency is arrival rate × duration (Little's Law [S14],
+`quantitative-methods.md` §1). Price that concurrency as provisioned capacity and compare it
+with the per-request bill in the provider calculator; record the crossover traffic in §9 so
+the choice is revisited when traffic passes it.
+
+### 2.5 Tenancy (SaaS)
+
+- Choose silo (dedicated resources per tenant), pool (shared, tenant-scoped at every layer)
+  or bridge (mixed per layer) per layer [S15].
+- Whatever the model, design and test **tenant isolation enforcement**: in pooled models it
+  must be applied on every request and query, which is where broken object-level
+  authorisation appears [S16][S17] (`threat_modeling.md` §3).
+- Add per-tenant quotas or cells/shuffle sharding against noisy neighbours [S7][S15].
+
+### 2.6 Shared responsibility
+
+The split between provider and customer moves with the service model (IaaS, PaaS, SaaS)
+[S18][S19]. For each managed service, write who owns patching, configuration, identity and
+data into the threat model; the gaps sit at that boundary. Treat lock-in as a cost: put the
+estimated switching cost in the ADR next to what the service saves.
+
+### 2.7 Sovereignty, residency and exit
+
+- **Residency is not jurisdiction.** US providers can be compelled to disclose data they
+  control regardless of where it is stored (CLOUD Act) [S20]. If jurisdiction is a driver,
+  name it as a `C.xx` and decide between provider options and key control.
+- **Key control:** customer-managed or externally held keys keep the provider from reading
+  data without your keys; confidential computing extends this to data in use
+  (`systems-architecture.md` §2.1).
+- **Exit:** the EU Data Act's switching rules apply since 12 September 2025, and from
+  12 January 2027 providers may not charge switching charges (Art. 29) [S21]. Write the exit
+  plan into the SAD: portable data formats, IaC, the list of proprietary dependencies, and a
+  tested export of core data. Financial entities must test it (DORA Art. 28(8)) [S5].
+
+### 2.8 Platform team and carbon
+
+- Build an internal platform when several stream-aligned teams repeat the same
+  infrastructure work; treat it as a product with paved paths [S22].
+- When the organisation has carbon targets, write them as a `Q.xx` measured in Software
+  Carbon Intensity [S23].
+
+---
+
+## 3. Record
+
+| Where | What |
+|---|---|
+| Enterprise architecture | account hierarchy, guardrails, approved regions, exit strategy for critical providers |
+| PRD | RTO/RPO and the failure to survive; residency/jurisdiction `C.xx`; quotas `C.xx` |
+| SAD / HLD | DR strategy and topology; compute model; tenancy model; shared-responsibility split in §8; crossover and egress in §9 |
+| ADRs | DR strategy, multi-region or multi-cloud, cells, compute model, tenancy model, key-control model, managed services with lock-in |
+| Fitness functions | policy-as-code on IaC; scheduled recovery drills against RTO/RPO; quota headroom alarms; Infracost gate (`automation.md`) |
+
+---
+
+## 4. Flag in review
+
+- a multi-region or multi-cloud design with no `Q.xx` naming the region or provider failure
+  it survives [S4];
+- an RTO/RPO claim with no recovery drill [S4];
+- one shared account for several workloads or environments [S1];
+- pooled tenancy without tested tenant isolation on every request [S16];
+- a Kubernetes cluster with no upgrade plan inside the support window [S11];
+- functions at sustained load with no crossover calculation [S14];
+- residency stated as if it settled jurisdiction [S20];
+- no exit plan where DORA or a critical-provider driver applies [S5][S21].
+
+---
+
+## Sources
+
+| ID | Source |
+|---|---|
+| S1 | AWS whitepaper, *Organizing Your AWS Environment Using Multiple Accounts* |
+| S2 | Microsoft Cloud Adoption Framework, *Azure landing zones* |
+| S3 | AWS Control Tower / Landing Zone Accelerator documentation; Google Cloud, *Enterprise foundations blueprint* |
+| S4 | AWS whitepaper, *Disaster Recovery of Workloads on AWS*, "Disaster recovery options in the cloud" |
+| S5 | Regulation (EU) 2022/2554 (DORA), Art. 28(8) exit strategies, Art. 29 concentration risk |
+| S6 | AWS Well-Architected, *Reducing the Scope of Impact with Cell-Based Architecture* (2023) |
+| S7 | AWS Builders' Library, *Workload isolation using shuffle-sharding* |
+| S8 | AWS Builders' Library, *Static stability using Availability Zones* |
+| S9 | AWS Builders' Library, *Reliability, constant work, and a good cup of coffee* |
+| S10 | AWS Builders' Library, *Automating safe, hands-off deployments* |
+| S11 | Kubernetes, *Releases* (version skew and support period), https://kubernetes.io/releases/ |
+| S12 | E. Jonas et al., *Cloud Programming Simplified: A Berkeley View on Serverless Computing*, UC Berkeley EECS-2019-3 |
+| S13 | J. Hellerstein et al., *Serverless Computing: One Step Forward, Two Steps Back*, CIDR 2019 |
+| S14 | J. D. C. Little, *A Proof for the Queuing Formula L = λW*, Operations Research 9(3), 1961 |
+| S15 | AWS Well-Architected, *SaaS Lens*; AWS whitepaper, *SaaS Tenant Isolation Strategies* |
+| S16 | OWASP, *API Security Top 10 2023*, API1 Broken Object Level Authorization |
+| S17 | OWASP, *Top 10:2025*, A01 Broken Access Control |
+| S18 | NIST SP 800-145, *The NIST Definition of Cloud Computing* (2011) |
+| S19 | AWS, *Shared Responsibility Model*; Microsoft, *Shared responsibility in the cloud* |
+| S20 | 18 U.S.C. § 2713 (CLOUD Act) |
+| S21 | Regulation (EU) 2023/2854 (Data Act), Chapter VI, Art. 29 |
+| S22 | M. Skelton, M. Pais, *Team Topologies*, IT Revolution 2019 |
+| S23 | ISO/IEC 21031:2024, *Software Carbon Intensity (SCI) specification* |

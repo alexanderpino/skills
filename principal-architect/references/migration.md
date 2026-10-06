@@ -49,22 +49,20 @@ expanding Gartner's original 5 R's). Most portfolios use 3–5 of these across t
   better.
 
 **D. Platform exit — mainframe, proprietary Unix, end-of-support OS or hypervisor.**
-- Forces: the platform still works, often very well, but skills are retiring, the cost
-  model (mainframe capacity charges, licence changes) or vendor support no longer fits,
-  and delivery is slow. Batch windows, JCL job chains, CICS/IMS transactions, EBCDIC and
-  packed-decimal data, and undocumented operational knowledge carry most of the risk
-  (`systems-architecture.md` §5).
+- Forces: establish them with the stakeholders as drivers, never assume them — typically
+  vendor support ending (a dated `C.xx`, §7), cost model, skills, or delivery speed.
 - Blueprint: inventory **transactions and batch jobs**, not just programs, and recover
-  their runtime behaviour (§4) before choosing. Then pick per workload: **API-enable in
-  place** (expose transactions through an API layer and strangle from the outside);
-  **rehost** onto an emulation or rehosting runtime (fast, keeps COBOL, keeps the skills
-  problem); **refactor** with automated code conversion (keeps the logic, produces code
-  nobody chose to write; budget for clean-up); or **rebuild/repurchase** per capability.
-  Convert data with explicit encoding and numeric-format mapping (§5) and reconcile
-  totals per batch run. Run old and new in **parallel** with output comparison before
-  each cutover; the batch schedule is the cutover plan. The same blueprint applies to
-  proprietary Unix (AIX, HP-UX, Solaris) and to VM estates leaving a hypervisor after a
-  licensing change.
+  their runtime behaviour (§4) before choosing. Classify each workload with the 7 R's (§1);
+  the cloud providers' mainframe guidance maps them to mainframe options (rehost onto a
+  compatible runtime, automated refactoring, replatform, API-enable in place) (AWS
+  Prescriptive Guidance, *Mainframe modernization*; Azure Architecture Center, *Mainframe
+  and midrange migration*). Displace incrementally with the legacy-displacement patterns —
+  **Event Interception**, **Legacy Mimic**, **Divert the Flow**, and **Parallel Running**
+  with output comparison before each cutover (Cartwright, Horn & Lewis, *Patterns of
+  Legacy Displacement*, martinfowler.com, 2024). Map data explicitly (§5): mainframe data
+  is commonly EBCDIC-encoded with packed-decimal numerics (IBM z/OS documentation), and
+  reconciliation totals per batch run are the acceptance test. The same blueprint applies
+  to proprietary Unix and to VM estates leaving a hypervisor.
 
 ## 3. Modernization & integration patterns — when to use which
 
@@ -148,23 +146,23 @@ from As-Is to To-Be in one undocumented leap.
 
 ## 7. Platform lifecycle — the end-of-support register and the technology radar
 
-Most migrations are not chosen; an end-of-support date forces them. Treat platform lifecycle
-as a standing input to the roadmap rather than a surprise:
+Most platform migrations are forced by an end-of-support date. Keep that date visible:
 
-- **End-of-support register.** For every platform component (OS and kernel line, database
-  engine, runtime, hypervisor, network OS, framework, managed-service version), record the
-  version in use, the vendor's end of standard and extended support, and the owner. Each
-  entry is a `C.xx` with a date. An entry within the planning horizon becomes a work package
-  in the roadmap (TOGAF Phase E/F) or a Transition Architecture (§6). An entry past its date
-  is a security finding in the threat model.
-- **Technology radar.** Keep the organisation's technology choices in four rings, after
-  Thoughtworks: **Adopt** (the default), **Trial** (use on real but contained work),
-  **Assess** (explore with a spike), **Hold** (no new use; plan the exit). A move from Trial
-  to Adopt, or from anything to Hold, is an enterprise-level ADR. The radar is how the
-  "boring technology" rule (`anti_over_engineering.md`) and new technology coexist: new
-  things enter through Assess and Trial with a named driver, instead of being either banned
-  or adopted by fashion.
-- **Domain specifics** — kernel and OS lifecycles, CPU-architecture moves, mainframe exits:
-  `systems-architecture.md` §5; network transitions (IPv6, SD-WAN, post-quantum TLS):
-  `network-architecture.md` §§5, 8; cloud estate evolution and exit obligations:
-  `cloud-architecture.md` §§8, 10.
+1. **End-of-support register.** For every platform component (OS and kernel line, database
+   engine, runtime, hypervisor, network OS, framework, managed-service version), record the
+   version in use, the vendor's published end of standard and extended support **with the
+   URL**, and the owner. Each entry is a dated `C.xx`. Never fill a date from memory.
+2. **Act on it.** An entry inside the planning horizon becomes a roadmap work package
+   (TOGAF ADM Phases E–F) or a Transition Architecture (§6). An entry past its date is a
+   threat-model finding: CISA lists use of unsupported or end-of-life software in critical
+   systems as a bad practice (CISA, *Bad Practices*), and NIST's patch-management guidance
+   treats retiring unsupported software as part of the program (NIST SP 800-40 Rev. 4).
+3. **Technology radar.** Track technology choices in the rings Adopt / Trial / Assess /
+   Hold (Thoughtworks, *Build Your Own Radar*). A move into Adopt or Hold is an
+   enterprise-level ADR with its driver. New technology enters through Assess and Trial
+   with a named driver, which is how the boring-technology rule
+   (`anti_over_engineering.md`) and change coexist.
+
+Domain procedures: OS, kernel, RTOS and CPU architecture — `systems-architecture.md` §4;
+network transitions such as post-quantum TLS — `network-architecture.md` §2.6; cloud exit
+obligations — `cloud-architecture.md` §2.7.

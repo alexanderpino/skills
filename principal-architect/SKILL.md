@@ -458,22 +458,18 @@ manifest in the index README). Condensed:
   intermediary), As-Is sequence-diagram recovery from runtime tracing, data/protocol mapping,
   and the end-of-support register + technology radar. Read for any transformation of an
   existing system or any platform-lifecycle question.
-- `references/systems-architecture.md` — **kernels, operating systems, isolation, real-time**:
-  kernel structure styles (monolithic, microkernel, hybrid, exokernel, unikernel) and what
-  they buy; the kernel mechanisms that are architecture (ABI, I/O model, scheduling, memory,
-  drivers, eBPF, boot chain); the isolation ladder from process to confidential VM; embedded,
-  RTOS and safety-critical design with its standards; platform lifecycle legacy → future.
-  Read for system software, isolation-boundary or OS/RTOS choices, and sub-application `Q.xx`.
-- `references/network-architecture.md` — **network architecture**: data/control/management
-  planes and static stability, datacenter/WAN/cloud/hybrid topology, IP planning, protocol
-  choices (QUIC, TLS 1.3, gRPC, DNS, TSN), load balancing and service mesh, segmentation,
-  egress and post-quantum readiness, edge placement, NetDevOps, and the network & trust-zone
-  view with a flow matrix. Read when connectivity or segmentation is being designed.
-- `references/cloud-architecture.md` — **cloud estate architecture**: landing zones and account
-  structure, failure domains and the DR ladder, cells/shuffle sharding/static stability,
-  compute-model selection (VMs, containers, Kubernetes, functions), SaaS tenancy models,
-  shared responsibility, sovereignty and exit (DORA, EU Data Act), platform engineering.
-  Read for landing-zone, multi-region, compute-model or tenancy decisions.
+- `references/systems-architecture.md` — **procedure for the OS/kernel substrate**: derive it
+  from Dockerfiles, manifests and IaC; choose the isolation boundary from the trust model;
+  choose the OS/RTOS base; evidence gates for kernel-level changes; which safety/security
+  standard applies; support dates recorded with their URL; review flags. Every rule cited.
+- `references/network-architecture.md` — **procedure for network design**: derive the as-is
+  flows from IaC and policies; check placement against the physics floor first; static
+  stability; topology defaults; protocol, retry and load-balancing rules; segmentation,
+  egress and the flow matrix; post-quantum readiness; review flags. Every rule cited.
+- `references/cloud-architecture.md` — **procedure for the cloud estate**: account structure;
+  topology from RTO/RPO; cells, shuffle sharding, static stability; compute-model and tenancy
+  decisions; shared responsibility; sovereignty and exit (DORA, Data Act); review flags.
+  Every rule cited.
 - `references/business-analysis.md` — **master business analysis**: user stories + acceptance
   criteria (Connextra, INVEST, Gherkin, BABOK), the traceability chain, and the **protocol to
   detect & conform to the company's house format** (or create one if absent). Read before

@@ -128,7 +128,7 @@ credible threat; sign off by setting `security-reviewed: true`.
 > crosses an element) as the priority. A significant residual risk becomes an ADR.
 
 **Flow matrix** — only when the system spans more than one network zone; one row per
-allowed flow across a zone boundary (`references/network-architecture.md` §5):
+allowed flow across a zone boundary (`references/network-architecture.md` §2.5):
 
 | Source (zone / container) | Destination | Protocol / port | AuthN | Encryption | Justified by |
 |---|---|---|---|---|---|

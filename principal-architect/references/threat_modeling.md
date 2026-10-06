@@ -15,11 +15,11 @@ You must evaluate architectures assuming the attacker *is already inside the net
 * Demand **Blast Radius Containment**: If Service A is compromised via Remote Code Execution (RCE), what is the maximum damage it can do? It should not have blanket database access or wildcard `s3:*` IAM permissions.
 
 **Below the application.** Identity on every hop does not make the substrate irrelevant. Add rows for these whenever they apply:
-* **Shared kernel.** Containers share the host kernel, so any kernel privilege escalation is a container escape. Untrusted or multi-tenant code needs a sandbox or hardware-virtualisation boundary (`systems-architecture.md` §3). Flag privileged containers, host mounts and `hostNetwork`.
-* **Kernel-mode third-party code.** Security agents and drivers in kernel mode have whole-machine blast radius, for attackers and for bad updates (`systems-architecture.md` §1).
-* **Boot and update chain.** Who can change what boots, and can a bad image be rolled back?
-* **Network placement.** Identity decides whether a call is allowed; segmentation limits how far a compromised host gets. Demand default-deny **egress** and a **flow matrix** for every zone crossing (`network-architecture.md` §5).
-* **Long-lived confidentiality.** Data that must stay secret beyond about 2030 needs a post-quantum plan for its transport and key exchange now (`network-architecture.md` §5).
+* **Shared kernel.** Containers share the host kernel, so a kernel compromise reaches every container on the host (NIST SP 800-190). Untrusted or multi-tenant code needs a sandboxed runtime or VM boundary (Kubernetes, *Multi-tenancy*). Flag privileged containers, host namespaces and `hostPath` mounts (NSA/CISA *Kubernetes Hardening Guide*). Procedure: `systems-architecture.md` §2.1.
+* **Kernel-mode third-party code.** Its failures take the whole machine down; a faulty update to one kernel-mode security driver crashed about 8.5 million Windows devices in July 2024 (Microsoft, 20 July 2024). Demand staged rollout of its updates (`systems-architecture.md` §2.3).
+* **Firmware and boot chain.** Who can change what boots, and can corruption be detected and recovered (NIST SP 800-193)?
+* **Network placement.** Identity decides whether a call is allowed (NIST SP 800-207); zones and conduits limit how far a compromise spreads (IEC 62443-3-2). Demand egress filtering (NIST SP 800-41r1) and a flow-matrix row for every zone crossing (`network-architecture.md` §2.5).
+* **Long-lived confidentiality.** Data that must outlive the post-quantum transition needs a migration plan for its key exchange now (Mosca 2018; NIST IR 8547 draft: deprecate quantum-vulnerable public-key algorithms after 2030, disallow after 2035). Procedure: `network-architecture.md` §2.6.
 
 ---
 

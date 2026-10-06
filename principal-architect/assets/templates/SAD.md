@@ -137,7 +137,7 @@ and **RTO/RPO**, per `references/operability.md` — an availability target here
 constrains every member system's design below it.
 
 Name the **failure-domain topology and DR rung** that meets the RTO/RPO
-(`references/cloud-architecture.md` §3), the **network connectivity** between member
+(`references/cloud-architecture.md` §2.2), the **network connectivity** between member
 systems, zones and sites (`references/network-architecture.md` — link the shared network's
 own SAD rather than copying it), and any **substrate constraint** the solution imposes on
 its systems (isolation boundary, OS support horizon, integrity level;

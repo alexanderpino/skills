@@ -338,11 +338,11 @@ and use realization edges (`-.realized by.->`) to link a higher layer to the one
 
 ## Network & trust-zone view
 
-C4 has no network view. When a system spans more than one zone, uses hybrid connectivity, or
+The C4 diagram set (c4model.com: context, container, component, code, plus landscape, dynamic and deployment) has no dedicated network view. When a system spans more than one zone, uses hybrid connectivity, or
 has a non-trivial ingress or egress path, draw one: zones as subgraphs, containers placed in
 the zone they run in, and every edge labelled with **protocol/port · authentication ·
 encryption**. Every edge that crosses a subgraph boundary is a trust-boundary crossing and
-needs a STRIDE row and a line in the flow matrix (`network-architecture.md` §5).
+needs a STRIDE row and a line in the flow matrix (`network-architecture.md` §2.5).
 
 ```mermaid
 flowchart LR
@@ -372,7 +372,7 @@ flowchart LR
 
 For the **deployment view**, nest `Deployment_Node`s to show the isolation boundary, for
 example region → AZ → node pool (`"Linux 6.12, gVisor"`) → container. That makes the
-substrate choices from `systems-architecture.md` §3 visible without a separate diagram.
+substrate choices from `systems-architecture.md` §2.1 visible without a separate diagram.
 
 ## Migration & transition views
 

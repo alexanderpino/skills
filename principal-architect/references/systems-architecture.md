@@ -1,321 +1,190 @@
-# Systems architecture — kernels, operating systems, isolation, real-time
+# Systems architecture — kernel, OS, isolation, real-time
 
-The rest of this skill stops at the container boundary. Below it, the HLD deployment view
-holds one label, `"<OS / runtime>"`, and for most work that is correct: the operating system
-is a commodity and the interesting decisions live above it. This file is for the cases where
-the label is the decision. Read it when:
+**Load when** the work builds system software (kernel, hypervisor, driver, firmware,
+container runtime, storage/I/O layer); chooses the isolation boundary between workloads;
+chooses an OS or RTOS base; must meet a `Q.xx` only the substrate can meet (jitter,
+worst-case response time, boot time, density); or hits a platform end-of-support date.
+Otherwise the OS stays a label in HLD §6 and you do not load this file.
 
-- you are **building system software** — a kernel, hypervisor, driver, firmware, container
-  runtime, or the storage/I/O layer of a database or broker;
-- you are **choosing the isolation boundary** between workloads (process, container,
-  sandbox, microVM, VM, confidential VM, dedicated host), above all for multi-tenant or
-  untrusted code;
-- you are **choosing the OS base for a product** (RTOS vs embedded Linux vs a separation
-  kernel) or a fleet (distribution, kernel line, CPU architecture);
-- a `Q.xx` scenario **can only be met below the application** — tail latency, jitter, boot
-  time, density, determinism, a worst-case execution bound;
-- a **platform lifecycle** event forces a decision — an OS reaching end of support, a kernel
-  upgrade, a move from x86 to Arm, a mainframe exit.
-
-**Altitude.** An operating system or hypervisor *as the product* is **software** altitude
-with an unusual entity of interest: its users are programs, and its published interface is
-the system-call ABI and the driver model. Choosing an isolation boundary or OS base *for an
-application* is an ADR at **software** or **solution** altitude. A fleet-wide OS, kernel or
-CPU-architecture standard is an **enterprise** technology building block (TOGAF Phase D) and
-usually a principle (`PR.xx`).
-
-The stance from `anti_over_engineering.md` holds here too, and is easier to violate: kernel
-bypass, custom kernel modules and real-time tuning are expensive to build and expensive to
-operate. Every mechanism below is justified by a measured driver or not at all.
+**Grounding rule.** Every rule below carries a source `[Sn]` (table at the end). Do not add
+claims to architecture documents that you cannot cite the same way. Version numbers,
+support dates, quotas and prices change: look them up in the vendor's current
+documentation when you write, put the URL next to the value, and never quote them from
+memory.
 
 ---
 
-## 1. Kernel structure — the styles and what they buy
+## 1. Derive the substrate from evidence before asking
 
-The structural question for any operating system is **what runs in privileged mode**,
-because everything there shares one fault domain and one trusted computing base (TCB).
+Read these before you ask anyone anything (`methods.md` §10):
 
-| Style | Idea | Examples | Buys | Costs |
-|---|---|---|---|---|
-| **Monolithic** (with loadable modules) | file systems, network stack, drivers all in one privileged address space | Linux, FreeBSD, OpenBSD | fastest in-kernel paths; the largest driver and tooling ecosystem | one buggy driver can take the machine down; TCB of millions of lines |
-| **Microkernel** | kernel keeps only address spaces, threads, IPC and scheduling; drivers, file systems and network stacks run as user-mode servers | seL4, QNX Neutrino, the L4 family, MINIX 3, Zircon (Fuchsia) | fault isolation, restartable drivers, small TCB, formal verification becomes feasible | a service call becomes IPC; smaller ecosystem; performance depends on IPC design |
-| **Hybrid** | microkernel-derived structure, but most services run in kernel mode for speed | Windows NT, XNU (macOS/iOS: Mach + BSD) | compatibility and performance with a modular internal design | the TCB of a monolith; most isolation benefits are given back |
-| **Exokernel / library OS** | kernel only multiplexes hardware securely; abstractions live in user-space libraries | MIT Exokernel, Demikernel; DPDK/SPDK as the pragmatic cousin | application-specific abstractions, lowest latency | each application inherits hard problems the OS used to solve |
-| **Unikernel** | application + only the OS library code it needs, linked into one single-address-space image on a hypervisor | MirageOS, Unikraft | tiny image, fast boot, small attack surface | no shell, no standard debugging or observability; the hypervisor carries all isolation |
-| **Multikernel** | the OS as a distributed system: one kernel per core, communicating by messages | Barrelfish | scales across many-core and heterogeneous hardware | research; little production use |
+| Evidence | What it tells you |
+|---|---|
+| `FROM` lines in Dockerfiles; `/etc/os-release` in images; AMI/image IDs in IaC | OS distribution and version → support horizon (§4) |
+| Kubernetes manifests: `runtimeClassName`, `securityContext.privileged`, `hostNetwork`, `hostPID`, `hostPath`, added capabilities, seccomp profile, `resources.limits.cpu` | the actual isolation boundary and CPU-throttling exposure (§2.1, §2.3) |
+| IaC instance and node-pool types, confidential-VM flags, dedicated hosts | CPU architecture, isolation, co-tenancy |
+| Kernel boot args (`isolcpus`, `nohz_full`), `sysctl` files, kernel `.config` | real-time or performance tuning already in place |
+| Source: `epoll`/`kqueue`/IOCP/`io_uring` calls, DPDK/SPDK/AF_XDP libraries, `.ko` modules, eBPF programs | I/O model, kernel bypass, kernel-mode code (§2.3) |
+| RTOS config (`FreeRTOSConfig.h`, Zephyr `prj.conf`, Kconfig), linker scripts, safety plan, MISRA deviations | embedded base, task model, integrity level (§2.2) |
 
-Three pieces of history keep this table honest:
-
-- **"Microkernels are slow" is a claim about Mach, not a law.** First-generation
-  microkernels paid heavily for IPC. Liedtke's L4 showed IPC could be made an order of
-  magnitude cheaper by designing the kernel around it, and stated the design rule still used
-  today: a concept is tolerated inside the microkernel only if moving it outside would
-  prevent the system's required functionality (Liedtke, *On µ-Kernel Construction*, SOSP
-  1995).
-- **A small TCB is what makes proof possible.** seL4 was the first general-purpose OS kernel
-  with a machine-checked proof of functional correctness (Klein et al., SOSP 2009), later
-  extended to integrity, confidentiality and binary correctness. That only works because the
-  kernel is around ten thousand lines of C. You cannot prove a monolith.
-- **Drivers are where kernels break.** Device drivers showed error rates three to seven
-  times higher than the rest of the kernel (Chou et al., SOSP 2001), and drivers caused
-  most Windows XP crashes (Swift et al., *Nooks*, SOSP 2003). The July 2024 CrowdStrike
-  incident, a faulty content update read by a kernel-mode security driver that crashed about
-  8.5 million Windows machines (Microsoft's estimate), is the same lesson at fleet scale:
-  **third-party code in kernel mode has a whole-machine blast radius.** Microsoft's response
-  was to start moving security vendors out of the kernel.
-
-**How to decide.** The architectural question is *how large the trusted base may be, and
-what must survive a failed component*. For general-purpose servers and desktops the
-monolithic kernel wins on ecosystem and the choice is really a distribution and lifecycle
-choice (§5). Reach for a microkernel or separation kernel when an assurance driver
-dominates: certification (§4), a small verifiable TCB, mixed-criticality on one chip, or
-fault containment that must not depend on driver quality. The same idea at application level
-is the **microkernel (plug-in) architecture style** in `structure.md` §2.
+Ask only for what evidence cannot give: **who supplies the code that runs here** (the trust
+model), the **integrity level** if any, the **timing requirement with its response
+measure**, and the **field life** of the product.
 
 ---
 
-## 2. The kernel mechanisms that are architecture
+## 2. Decide
 
-Most kernel behaviour is implementation detail. These mechanisms are not, because they fix
-a quality ceiling, a security surface or a compatibility contract that is expensive to change
-later. Each one is ADR-worthy when it is chosen or changed.
+### 2.1 Isolation boundary
 
-| Mechanism | Options | What it decides |
+1. **Classify the code** that will share the host: one owner and trusted, or several
+   tenants / untrusted code.
+2. **Containers share the host kernel**, so a kernel compromise reaches every container on
+   it [S1]. For one trusted owner that is acceptable; group containers on hosts by
+   sensitivity [S1].
+3. **For untrusted or multi-tenant code, require more than namespaces.** Kubernetes itself
+   states that namespaces are not a hard isolation boundary and points to sandboxed
+   runtimes or separate nodes/VMs for strong isolation [S2][S3]. Hardware virtualisation
+   with a minimal VMM is the boundary AWS chose for multi-tenant serverless; the published
+   figures are under 125 ms to guest init and under 5 MiB VMM overhead [S4].
+4. **Shared hardware leaks across software boundaries** (Spectre, Meltdown) [S5][S6]. When a
+   tenant's threat model includes side channels, require no co-residency on SMT siblings
+   (Linux core scheduling exists for this [S7]) or dedicated hosts.
+5. **Confidential computing** protects data in use from the host operator through a
+   hardware TEE with attestation [S8]. It only works if secrets are released after the
+   attestation is verified [S9]: make that a step in the deployment flow, not a slide.
+6. **Record** an ADR whose driver is the trust model, the option chosen, and the density or
+   cost given up (HLD §9).
+
+### 2.2 OS or RTOS base
+
+- **General-purpose servers:** default to the distribution the organisation already
+  operates (the boring-technology rule, `anti_over_engineering.md`). The decision that
+  matters is the support horizon (§4).
+- **A small trusted base or fault containment is a driver** (certification, security
+  kernel, drivers of unknown quality): consider a microkernel or separation kernel. Drivers
+  have measured error rates three to seven times higher than the rest of a monolithic
+  kernel [S10] and caused most crashes in Windows XP [S11]; a small kernel is what made a
+  full functional-correctness proof possible (seL4) [S12].
+- **Hard real-time:** the response measure is a **worst-case bound**, never a percentile
+  [S13]. Prove it with schedulability analysis (`quantitative-methods.md` §12). A Linux
+  latency test reports the maximum *observed*, which is evidence, not a bound — label it so.
+- **Shared resources across priorities:** name the locking protocol (priority inheritance
+  or priority ceiling) [S14]. Unbounded priority inversion reset Mars Pathfinder until
+  priority inheritance was enabled [S15].
+- **Mixed criticality on one chip:** partition in space and time (ARINC 653) so one
+  partition cannot change another's timing [S16][S17].
+- **Integrity level applies (SIL/ASIL/DAL/class):** identify the standard (§2.4) and ask the
+  OS vendor for the evidence it requires for pre-existing software, such as a safety manual
+  or certificate [S18]. Record the level as `C.xx`.
+
+### 2.3 Kernel-level changes that need an ADR and an evidence gate
+
+| Change | Gate before deciding | Why it is significant |
 |---|---|---|
-| **Kernel/user boundary (ABI)** | the system-call ABI; vDSO; Windows' stable Win32 API over unstable syscall numbers | a published contract (`interfaces.md`); Linux's rule is that changes must not break user space |
-| **I/O model** | thread per connection (blocking) · readiness (`epoll`, `kqueue`) · completion (IOCP, `io_uring`) · kernel bypass (DPDK, SPDK, RDMA, AF_XDP) | throughput per core, tail latency, how much of the kernel's tooling and security you keep |
-| **Scheduling** | fair share (Linux EEVDF since 6.6, replacing CFS) · real-time classes (`SCHED_FIFO`, `SCHED_DEADLINE`) · `PREEMPT_RT` (mainline since 6.12) · BPF-defined schedulers (`sched_ext`, 6.12) · CPU isolation and pinning | latency distribution and jitter under contention |
-| **Memory** | overcommit and OOM policy · NUMA placement · huge pages · page cache vs direct I/O · cgroup memory limits | predictability under pressure; which process dies first |
-| **Drivers** | in-kernel · user-mode (VFIO/UIO, Windows UMDF, Fuchsia driver components) | fault isolation vs performance (§1) |
-| **Extensibility** | loadable kernel modules · eBPF (verifier-checked, bounded programs for networking, tracing, security and scheduling) | whether extension code can crash or compromise the kernel |
-| **Boot and update chain** | UEFI Secure Boot · measured boot (TPM 2.0) · verified boot (dm-verity, Android Verified Boot) · image-based, A/B-updated OS (Bottlerocket, Flatcar, Talos, ChromeOS) | integrity of what runs, and whether a bad update can be rolled back |
+| I/O model (blocking → readiness → completion → kernel bypass) | a profile showing the kernel I/O path is the bottleneck [S19] | rewrites the program's structure; bypass gives up the kernel's security and management functions [S20] |
+| Adopt `io_uring` | threat model row for it | 60% of exploits submitted to Google's kernel bounty in 2022 used it; Google disabled it on ChromeOS and production servers [S21] |
+| CPU limits on latency-critical workloads | load test with the limits in place | bandwidth control throttles a group for the rest of the period once its quota is spent, which shows up as tail latency, not in average CPU [S22] |
+| Third-party kernel-mode component (agent, driver) | staged rollout and rollback for its updates, including content updates | a faulty update to one kernel-mode security driver crashed about 8.5 million Windows devices in July 2024 [S23] |
+| Kernel extension | prefer eBPF over a loadable module where the use case fits | eBPF programs pass a verifier before loading; modules run unchecked with full privilege [S24] |
+| Language for new system components | none; record it | memory-safety bugs are about 70% of Microsoft's CVEs [S25]; CISA/NSA ask vendors for memory-safe roadmaps [S26] |
+| Boot or update chain | — | platform firmware must be protected, detect corruption and recover [S27] |
 
-Some forces in this table are worth spelling out, because teams get them wrong repeatedly.
+### 2.4 Which safety or product-security standard applies
 
-**The I/O model is a one-way-ish door.** Thread-per-connection is the simplest model and is
-fine until memory per thread and context switches dominate (the C10K problem, Kegel 1999).
-Readiness models scale to very large connection counts. Completion models cut system calls
-further. Kernel bypass gives the lowest latency, but you then own the driver, give up the
-kernel's firewall, tracing and accounting, and burn cores on busy-polling. Each step changes
-how the whole program is written, so moving between them is a rewrite rather than a
-refactor. Newer is also not automatically safer: Google reported that 60% of the exploits
-submitted to its kernel bug bounty in 2022 targeted `io_uring`, and disabled it on ChromeOS
-and its production servers and blocked it for Android apps (Google Security Blog, June 2023).
-Choosing an I/O interface means choosing an attack surface as well.
-
-**CPU limits are a latency decision, not just a cost one.** Under cgroup CPU bandwidth
-control, a container that exhausts its quota early in a scheduling period is throttled for
-the rest of it, even if its *average* use is far below the limit. The result is tail-latency
-spikes that do not show in average CPU graphs. Whether a platform sets CPU limits, only
-requests, or pins latency-critical work to isolated cores is a platform-wide decision worth
-an ADR.
-
-**Memory safety is a kernel-architecture concern now.** Around 70% of the vulnerabilities
-Microsoft assigns CVEs to are memory-safety bugs (MSRC, 2019), and Chromium reports a similar
-share. That is the driver behind Rust support in Linux (since 6.1), Rust components in the
-Windows kernel, and memory-safe Android system code. Picking the language of a new driver or
-system component is a security decision with a measurable base rate.
-
-**Measure before you change any of this.** Profile with `perf`, eBPF tooling (`bpftrace`,
-BCC), `ftrace`, and for real-time work `cyclictest` under a load generator such as
-`stress-ng`. A mechanism change without a profile that shows the kernel is the bottleneck is
-the systems version of Resume Driven Development.
-
----
-
-## 3. Isolation and virtualisation — choosing the boundary
-
-The question is not "containers or VMs". It is **what an attacker must break to get from one
-workload to another, and what that boundary costs in density, startup time and
-compatibility.** Start from the trust model, then choose the cheapest boundary that meets it.
-
-| Boundary | Mechanism | What the attacker must break | Startup | Density | Fits |
-|---|---|---|---|---|---|
-| **Process** | address spaces, users, seccomp, LSM | the kernel or its permission model | ms | highest | trusted code of one owner |
-| **Container** | namespaces + cgroups + capabilities + seccomp + SELinux/AppArmor; **shared host kernel** | one kernel privilege-escalation bug | ms–1 s | very high | trusted workloads of one tenant; packaging and scheduling |
-| **Sandboxed container** | gVisor (a user-space kernel intercepting syscalls) · Kata Containers (a lightweight VM per pod) | the sandbox kernel plus a narrow host interface, or a hypervisor | fast; syscall-heavy work pays | high | semi-trusted or multi-tenant workloads on Kubernetes |
-| **MicroVM** | Firecracker or Cloud Hypervisor on KVM with a minimal device model | hardware virtualisation plus a minimal VMM | ~125 ms to guest init | VMM overhead < 5 MiB per VM | serverless; untrusted multi-tenant code |
-| **Virtual machine** | KVM/QEMU, Hyper-V, ESXi, Xen | the hypervisor and its device emulation | seconds | lower | arbitrary guest OS, legacy, licensing boundaries |
-| **Confidential VM** | AMD SEV-SNP, Intel TDX, Arm CCA, with remote attestation | the CPU's memory encryption; **the host and cloud operator are outside the TCB** | VM + attestation | VM, small overhead | data in use that must be protected from the operator |
-| **Wasm sandbox** | Wasmtime, WAMR; WASI capabilities | the runtime's bounds checks and capability model | µs–ms | very high | plugins, edge functions, untrusted extension code in-process |
-| **Dedicated hardware** | dedicated host, bare metal, air gap | physical access | — | lowest | side-channel-sensitive, regulated or licensing-bound workloads |
-
-Four rules follow from the table.
-
-1. **Untrusted multi-tenant code needs a hardware virtualisation boundary at minimum.**
-   With a shared kernel, every kernel privilege-escalation bug is a tenant escape. This is the
-   reason AWS built Firecracker for Lambda rather than packing tenants into containers on a
-   shared kernel (Agache et al., NSDI 2020). Single-tenant trusted code does not need that
-   boundary, and paying for it is over-engineering.
-2. **Kubernetes is a scheduler, not an isolation boundary.** A namespace is an
-   administrative scope. Hard multi-tenancy on Kubernetes needs node isolation, sandboxed
-   runtimes (`RuntimeClass` with gVisor or Kata), or a cluster per tenant.
-3. **Shared hardware leaks across every software boundary.** Spectre and Meltdown (2018)
-   showed that caches, branch predictors and SMT siblings leak data across processes, VMs
-   and enclaves. Mitigations cost performance. For the highest-assurance tenants the honest
-   answer is no co-tenancy: dedicated hosts, or core scheduling that never shares SMT
-   siblings across trust domains.
-4. **Confidential computing changes who you trust, not whether you need to.** It removes the
-   operator from the TCB but adds the CPU vendor's firmware and the attestation service. It
-   only delivers value if the deployment pipeline actually verifies attestation before
-   releasing secrets.
-
-**Where virtualisation came from, and where it is going.** Popek and Goldberg (1974) set
-out the formal requirements for a virtualisable architecture. IBM met them on the mainframe
-in the early 1970s (CP-67, then VM/370), and LPARs still partition mainframes today. x86 did
-not meet them until hardware assists arrived in 2005–2006 (Intel VT-x, AMD-V). Before that,
-VMware used binary translation and Xen used paravirtualisation. The current direction moves
-the hypervisor's I/O, networking and storage work onto dedicated hardware (AWS Nitro,
-DPUs/IPUs such as NVIDIA BlueField), which makes VM overhead close to bare metal and removes
-most of the host from the tenant's attack surface.
-
----
-
-## 4. Embedded, real-time and safety-critical systems
-
-**Real-time means predictable, not fast.** A *hard* real-time task fails the system when it
-misses a deadline. A *firm* one produces a worthless result if late. A *soft* one degrades.
-The response measure of a hard real-time `Q.xx` is a **bound on the worst case**
-(worst-case execution time and worst-case response time), never a percentile. A p99.99
-latency figure is not a real-time guarantee, however good it looks.
-
-**Choosing the base.**
-
-| Base | Use when | Costs |
-|---|---|---|
-| **Bare metal** (super-loop, interrupts) | tiny MCU, one job, hard timing | no isolation; everything is hand-built |
-| **RTOS** (FreeRTOS, Zephyr, Eclipse ThreadX, VxWorks, QNX, INTEGRITY, PikeOS) | hard deadlines, small footprint, certification evidence available | smaller ecosystem; you build the services Linux gives for free |
-| **Linux + `PREEMPT_RT`** | firm or soft deadlines with a rich ecosystem (robotics, industrial PCs, audio) | measured, not proven, latency bounds; hard to certify at the highest integrity levels |
-| **Separation kernel / hypervisor with partitions** | mixed criticality on one SoC: a certified RTOS partition next to a Linux partition | integration complexity; the partition schedule becomes a first-class design artifact |
-
-**Partitioning is the architecture.** ARINC 653 defines spatial partitioning (each partition
-has its own memory) and temporal partitioning (each partition has fixed time windows), so
-that a fault or overrun in one partition cannot change the timing of another. This is the
-basis of Integrated Modular Avionics (DO-297) and the model to borrow for any
-mixed-criticality system.
-
-**Schedulability is maths, not hope.** For periodic tasks under fixed-priority scheduling
-with rate-monotonic priority assignment, the Liu and Layland utilisation bound and exact
-response-time analysis tell you before you build whether the task set meets its deadlines.
-EDF can schedule up to 100% utilisation under its assumptions. The formulas and their
-assumptions are in `quantitative-methods.md` §12.
-
-**Priority inversion is the classic failure.** In 1997 Mars Pathfinder kept resetting because
-a low-priority task held a mutex needed by a high-priority task while medium-priority tasks
-ran. The fix was to enable priority inheritance on that mutex in VxWorks. The protocols
-(priority inheritance, priority ceiling) are in Sha, Rajkumar and Lehoczky (1990). Any design
-with shared resources across priorities must name its protocol.
-
-**The standards set the process and the evidence.**
+Each cell names the governing standard itself; use the edition the project is bound to.
 
 | Domain | Safety | Security |
 |---|---|---|
-| Generic / industrial | **IEC 61508** (SIL 1–4) | **IEC 62443** (zones and conduits, security levels) |
-| Automotive | **ISO 26262** (ASIL A–D); AUTOSAR Classic and Adaptive | **ISO/SAE 21434**; UN R155 (cybersecurity) and R156 (software updates) |
-| Avionics | **DO-178C** (DAL A–E), DO-330 (tools), DO-297 (IMA), ARINC 653 | DO-326A / ED-202A (airworthiness security) |
-| Medical | **IEC 62304** (software safety classes A–C) | IEC 81001-5-1 |
-| Railway | **EN 50716:2023** (replaces EN 50128 and EN 50657) | CLC/TS 50701 |
-| All products with digital elements sold in the EU | — | **Cyber Resilience Act** (Reg. (EU) 2024/2847): vulnerability and incident reporting since 11 Sept 2026, full obligations from 11 Dec 2027 |
+| Generic / industrial | IEC 61508 | IEC 62443 |
+| Automotive | ISO 26262 | ISO/SAE 21434; UN R155, R156 |
+| Avionics | DO-178C (+ DO-330, DO-297) | DO-326A / ED-202A |
+| Medical | IEC 62304 | IEC 81001-5-1 |
+| Railway | EN 50716:2023 (replaced EN 50128 and EN 50657) [S28] | CLC/TS 50701 |
+| Any product with digital elements on the EU market | — | Cyber Resilience Act, Reg. (EU) 2024/2847: reporting obligations from 11 Sep 2026, other obligations from 11 Dec 2027 [S29] |
 
-Coding standards (MISRA C:2023, MISRA C++:2023) and hazard-analysis techniques (HARA in
-ISO 26262, FMEA, FTA, STPA) are inputs to the architecture, not part of it. Cite them; do not
-expand them in the architecture description.
-
-**How it lands in the artifacts.** Safety is a top-level characteristic in ISO/IEC
-25010:2023 (operational constraint, risk identification, fail safe, hazard warning, safe
-integration), so hazards become `Q.xx` scenarios against that characteristic. The integrity
-level (SIL, ASIL, DAL, class) is a `C.xx` constraint that drives process and tooling. The
-partition and schedule are a view in the HLD. The safety case (often in GSN notation) is
-linked from `AD.md` as a separate artifact, never retyped into it.
+Hazards become `Q.xx` against the ISO/IEC 25010:2023 **Safety** characteristic
+(`standards.md`). Link the safety case from `AD.md`; do not retype it.
 
 ---
 
-## 5. Platform lifecycle — legacy, modern, future
+## 3. Record
 
-**Legacy is not the same as obsolete.** A platform is a liability when its skills, cost
-model, vendor support or security posture no longer meet the drivers, not because it is old.
-The mainframe is the standing example: z/OS still runs core transaction processing at banks,
-insurers and governments because it is extremely reliable at high throughput. The pressure to
-leave comes from skills scarcity, the capacity-based cost model and delivery speed, not from
-the technology failing. Treat a platform exit as a migration with its own blueprint
-(`migration.md` §2, scenario D), not as a clean-up task.
-
-| Area | Then | Now | Next |
-|---|---|---|---|
-| **Kernels** | proprietary Unix (AIX, HP-UX, Solaris), mainframe OS | Linux everywhere on servers; NT on Windows; microkernels in safety and automotive | memory-safe languages in kernels (Rust); verified components (seL4); BPF-defined policy (`sched_ext`) |
-| **Isolation** | physical servers, LPARs | VMs and containers | microVMs and sandboxes by default for untrusted code; confidential computing as a default; hypervisor work on DPUs/IPUs |
-| **Extension model** | loadable modules and kernel-mode agents | eBPF on Linux (and eBPF for Windows) | security and observability vendors out of kernel mode |
-| **I/O** | blocking threads, `select` | `epoll`/`kqueue`, `io_uring` where its attack surface is acceptable | user-space data planes for specialised work; CXL-attached and tiered memory |
-| **CPU architecture** | x86 monoculture | Arm in cloud (Graviton, Axion, Cobalt) and client | RISC-V in embedded; capability hardware (CHERI, Arm Morello, CHERIoT) |
-| **Portable sandboxes** | JVM/CLR | Wasm in browsers and at the edge | the WASI component model as a portable, capability-secured unit of deployment |
-| **Embedded / vehicle** | ECU per function on an OSEK RTOS | AUTOSAR Classic + Adaptive, domain controllers | zonal, software-defined vehicles: few powerful computers with mixed-criticality partitioning and over-the-air updates |
-
-**Support lifecycles are constraints, and end-of-support dates are roadmap items.** Record
-the support horizon of every platform component as a `C.xx` with the date. Since 2023 the
-upstream Linux project commits to about two years of support for new LTS kernels, with some
-lines extended case by case (check kernel.org for current dates). Products that need ten
-years or more rely on the Civil Infrastructure Platform's super-long-term kernels or a vendor
-or distribution lifecycle. Windows 10 reaching end of support in October 2025 is a recent
-example of a date that forced fleet-wide work. A product with a fifteen-year field life and
-no kernel-maintenance plan has an unrecorded risk. How to keep a technology radar and an
-end-of-support register is in `migration.md` §7.
-
-**A CPU-architecture move is a portability decision.** Moving to Arm for price-performance is
-usually a rebuild, not a rewrite, if the code avoids architecture-specific intrinsics and the
-build produces multi-architecture images. Record it as an ADR with the measured
-price-performance and the components that block it.
-
----
-
-## 6. How it lands in the artifacts
-
-| Artifact | What goes in |
+| Where | What |
 |---|---|
-| **PRD** | `Q.xx` for tail latency, jitter, boot time, density, WCET; `C.xx` for integrity level, OS support horizon, CPU architecture, minimum kernel version |
-| **HLD §6 Deployment** | per container: OS and kernel line, runtime, **isolation boundary**, CPU architecture, and the node pool it runs on |
-| **HLD §7 Cross-cutting** | I/O and concurrency model, scheduling policy, update and rollback mechanism |
-| **HLD §8 Threat model** | rows for the shared kernel, privileged containers, kernel-mode agents and drivers, the boot chain, side channels, and the cloud metadata service |
-| **ADRs** | kernel or RTOS choice, isolation boundary, I/O model change, any third-party kernel-mode component, real-time policy, CPU-architecture switch, OS lifecycle strategy |
-| **Fitness functions** (`automation.md`) | `cyclictest` worst-case latency gate under load; seccomp profile drift check; image CVE scan; kernel hardening config check (for example `kernel-hardening-checker` against KSPP settings); boot-time budget |
+| PRD | `Q.xx` for jitter, worst-case response, boot time, density; `C.xx` for integrity level, support horizon (with URL), CPU architecture, minimum kernel |
+| HLD §6 | per container: OS + kernel line, runtime, isolation boundary, CPU architecture, node pool |
+| HLD §7 | I/O and concurrency model, scheduling policy, update and rollback mechanism |
+| HLD §8 | threat rows from §5 below |
+| SD | task set, priorities, locking protocol, schedulability result (real-time only) |
+| Fitness functions (`automation.md`) | latency test under load as a gate; seccomp-profile drift; image CVE scan; kernel hardening config check; boot-time budget |
 
 ---
 
-## 7. Over-engineering traps, systems edition
+## 4. Lifecycle — dates come from the vendor, not from memory
 
-- **Kernel bypass before proof.** DPDK, RDMA or a user-space network stack without a profile
-  that shows the kernel stack is the bottleneck. You inherit a driver and lose your tooling.
-- **A kernel module where eBPF or user space would do.** A module runs with full privilege
-  and no verifier. Its failure mode is the whole machine.
-- **A microkernel or RTOS without a real-time or assurance driver.** You pay in ecosystem and
-  skills for a guarantee nobody asked for.
-- **Unikernels for services that need debugging in production.** The tooling you rely on at
-  3 a.m. is not there.
-- **Real-time tuning without a jitter requirement.** `isolcpus`, `nohz_full` and IRQ pinning
-  make the platform harder to operate. Do it only for a measured `Q.xx`.
-- **The opposite mistake:** shared-kernel containers for untrusted multi-tenant code. That is
-  under-engineering, and the threat model must flag it.
+1. List every platform component found in §1 (OS, kernel line, RTOS, hypervisor, runtime).
+2. For each, look up the vendor's published end of standard and extended support; record
+   it as a `C.xx` with the date **and the URL**.
+3. Running unsupported software in critical systems is on CISA's list of bad practices
+   [S30]: an entry past its date is a threat-model finding; an entry inside the planning
+   horizon is a roadmap work package (`migration.md` §7).
+4. If the product's field life exceeds the support horizon, record the gap as a risk with a
+   plan (vendor extended support, or a long-term maintained kernel such as the Civil
+   Infrastructure Platform's [S31]).
+5. A CPU-architecture or OS-family change is an ADR with measured price-performance and the
+   components that block it.
 
 ---
 
-## 8. Sources
+## 5. Flag in review
 
-| Topic | Source |
+Raise each as a finding with its source:
+
+- untrusted or multi-tenant code on shared-kernel containers without a sandbox or VM [S1][S2];
+- privileged containers, host namespaces or `hostPath` mounts without a recorded reason [S32];
+- a hard real-time requirement stated as a percentile, or a "bound" that is a test maximum [S13];
+- shared resources across priorities with no named locking protocol [S14];
+- kernel-mode third-party code without staged update rollout [S23];
+- kernel bypass, custom modules or real-time tuning without the profile or `Q.xx` that
+  justifies them (`anti_over_engineering.md`, Metrics First) [S19];
+- a platform component past end of support, or with no recorded support date [S30].
+
+---
+
+## Sources
+
+| ID | Source |
 |---|---|
-| Microkernel minimality, fast IPC | J. Liedtke, *Improving IPC by Kernel Design* (SOSP 1993); *On µ-Kernel Construction* (SOSP 1995) |
-| Formally verified kernel | G. Klein et al., *seL4: Formal Verification of an OS Kernel* (SOSP 2009); seL4 Foundation |
-| Exokernel, multikernel | D. Engler, F. Kaashoek, J. O'Toole, *Exokernel* (SOSP 1995); A. Baumann et al., *The Multikernel* (SOSP 2009) |
-| Driver fault rates | A. Chou et al., *An Empirical Study of Operating Systems Errors* (SOSP 2001); M. Swift et al., *Improving the Reliability of Commodity Operating Systems* (SOSP 2003) |
-| Virtualisation requirements | G. Popek, R. Goldberg, *Formal Requirements for Virtualizable Third Generation Architectures* (CACM 1974) |
-| MicroVMs | A. Agache et al., *Firecracker: Lightweight Virtualization for Serverless Applications* (NSDI 2020) |
-| `io_uring` exploit share | Google Security Blog, *Learnings from kCTF VRP's 42 Linux kernel exploits submissions* (June 2023) |
-| Memory-safety share of CVEs | Microsoft Security Response Center (2019); Chromium security team |
-| Real-time scheduling | C. L. Liu, J. Layland (JACM 1973); M. Joseph, P. Pandya (1986); N. Audsley et al. (1993); L. Sha, R. Rajkumar, J. Lehoczky, *Priority Inheritance Protocols* (IEEE TC 1990) |
-| Partitioning | ARINC 653; RTCA DO-297 |
-| OS textbooks for orientation | A. Tanenbaum, H. Bos, *Modern Operating Systems*; R. Arpaci-Dusseau, A. Arpaci-Dusseau, *Operating Systems: Three Easy Pieces* |
-| POSIX | IEEE Std 1003.1 / ISO/IEC 9945 |
-| Safety and security standards | IEC 61508, ISO 26262, DO-178C, IEC 62304, EN 50716:2023, IEC 62443, ISO/SAE 21434, Regulation (EU) 2024/2847 (CRA) |
-
-Cross-references: style catalogue (microkernel/plug-in) — `structure.md` §2; schedulability
-and latency maths — `quantitative-methods.md` §§11–12; network and cloud substrate —
-`network-architecture.md`, `cloud-architecture.md`; platform exits and lifecycle —
-`migration.md` §§2, 7; threat model — `threat_modeling.md`.
+| S1 | NIST SP 800-190, *Application Container Security Guide* (2017), https://doi.org/10.6028/NIST.SP.800-190 |
+| S2 | Kubernetes documentation, *Multi-tenancy*, https://kubernetes.io/docs/concepts/security/multi-tenancy/ |
+| S3 | Kubernetes documentation, *Runtime Class*, https://kubernetes.io/docs/concepts/containers/runtime-class/ |
+| S4 | A. Agache et al., *Firecracker: Lightweight Virtualization for Serverless Applications*, NSDI 2020 |
+| S5 | P. Kocher et al., *Spectre Attacks: Exploiting Speculative Execution*, IEEE S&P 2019 |
+| S6 | M. Lipp et al., *Meltdown: Reading Kernel Memory from User Space*, USENIX Security 2018 |
+| S7 | Linux kernel documentation, *Core Scheduling*, https://docs.kernel.org/admin-guide/hw-vuln/core-scheduling.html |
+| S8 | Confidential Computing Consortium, *Confidential Computing: Hardware-Based Trusted Execution for Applications and Data* (white paper) |
+| S9 | RFC 9334, *Remote ATtestation procedureS (RATS) Architecture* (2023) |
+| S10 | A. Chou et al., *An Empirical Study of Operating Systems Errors*, SOSP 2001 |
+| S11 | M. Swift, B. Bershad, H. Levy, *Improving the Reliability of Commodity Operating Systems*, SOSP 2003 |
+| S12 | G. Klein et al., *seL4: Formal Verification of an OS Kernel*, SOSP 2009 |
+| S13 | G. Buttazzo, *Hard Real-Time Computing Systems*, 3rd ed., Springer 2011 |
+| S14 | L. Sha, R. Rajkumar, J. Lehoczky, *Priority Inheritance Protocols*, IEEE Trans. Computers 39(9), 1990 |
+| S15 | G. Reeves (JPL), *What really happened on Mars?*, account of the Mars Pathfinder resets, 1997 |
+| S16 | ARINC Specification 653, *Avionics Application Software Standard Interface* |
+| S17 | RTCA DO-297, *Integrated Modular Avionics Development Guidance* |
+| S18 | IEC 61508-3:2010 (pre-existing software elements); IEC TS 61508-3-1:2016 (proven-in-use) |
+| S19 | B. Gregg, *Systems Performance*, 2nd ed., Addison-Wesley 2020 |
+| S20 | T. Høiland-Jørgensen et al., *The eXpress Data Path*, CoNEXT 2018 |
+| S21 | Google Security Blog, *Learnings from kCTF VRP's 42 Linux kernel exploits submissions*, June 2023 |
+| S22 | Linux kernel documentation, *CFS Bandwidth Control*, https://docs.kernel.org/scheduler/sched-bwc.html |
+| S23 | Microsoft, *Helping our customers through the CrowdStrike outage*, 20 July 2024 |
+| S24 | Linux kernel documentation, *eBPF verifier*, https://docs.kernel.org/bpf/verifier.html |
+| S25 | Microsoft Security Response Center, *A proactive approach to more secure code*, July 2019 |
+| S26 | CISA, NSA et al., *The Case for Memory Safe Roadmaps*, December 2023 |
+| S27 | NIST SP 800-193, *Platform Firmware Resiliency Guidelines* (2018) |
+| S28 | CENELEC EN 50716:2023, *Railway applications — Requirements for software development* |
+| S29 | Regulation (EU) 2024/2847 (Cyber Resilience Act), Art. 14 and Art. 71 |
+| S30 | CISA, *Bad Practices* (use of unsupported or end-of-life software) |
+| S31 | Civil Infrastructure Platform, super long-term support kernels, https://www.cip-project.org |
+| S32 | NSA and CISA, *Kubernetes Hardening Guide* (2022) |
