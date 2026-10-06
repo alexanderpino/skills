@@ -266,7 +266,10 @@ need a pros/cons comparison (`references/standards.md`).
 - **Smells → anti-patterns** (record in "Known issues / debt", tag the quality they
   threaten): god object / mega-service (maintainability, performance), cyclic
   dependency (maintainability), dense undecomposed structure (modifiability),
-  deficient/near-duplicate names (communication). Detect via the dependency graph and
+  deficient/near-duplicate names (communication), **global serialisation point** — one
+  lock, one coordinator or one write path every request must pass (performance efficiency,
+  scalability; the big-kernel-lock pattern, `systems-architecture.md` §2.5; size its cost
+  with Amdahl/USL, `quantitative-methods.md` §4). Detect via the dependency graph and
   simple metrics (file/dir size, fan-in/out, cycle detection). Recording a smell is a
   legitimate outcome — a deliberate "we accept this for now" beats silent debt.
 

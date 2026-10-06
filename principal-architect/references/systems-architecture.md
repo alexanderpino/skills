@@ -140,6 +140,7 @@ questions in every substrate decision, and never let one answer the other.
 | Synchronous, one-at-a-time system calls; kernel on every I/O | devices are slow relative to a mode switch | at microsecond-scale devices, mode switches and cache pollution dominate [S38]; dataplane designs put the kernel in the control plane only [S39][S40] | asynchronous, batched submission; kernel as control plane | `io_uring` (with its attack-surface caveat, §2.3), AF_XDP [S51] |
 | Monolithic kernel in C, one privileged address space | one trusted team, few drivers, no hostile network | 40% of critical Linux CVEs would be eliminated, and almost all others reduced below critical, by a verified-microkernel design [S41]; memory-safety bugs dominate CVEs [S25] | microkernel with user-mode servers; memory-safe languages | Linux: Rust for new drivers [S50], eBPF instead of modules [S24]; XNU: drivers in user space through DriverKit [S52] |
 | Ambient authority: user IDs, a superuser, global namespaces | a shared time-sharing machine with trusted users | programs act with authority they did not intend to use (the confused deputy) [S42] | capabilities: a program holds only the handles it was given | Capsicum on FreeBSD [S43]; Landlock, seccomp, namespaces on Linux [S44]; App Sandbox and entitlements on Apple platforms [S53] |
+| A global lock (Linux's Big Kernel Lock, CPython's GIL) | few CPUs; serialise everything to add multiprocessor support quickly | one lock serialises all work and adds latency; code comes to depend on its implicit serialisation, so Linux needed until 2.6.39 (2011) to remove the BKL [S59][S60], and making CPython's GIL optional required an ABI-incompatible build [S62]; the bottlenecks yield to per-core data and finer-grained locking [S61] | no global serialisation point; interfaces whose operations commute, so they can be implemented to scale [S63] | fine-grained locks, per-CPU data, RCU [S64] |
 | File durability through `write`/`fsync`/`rename` conventions | simple disks, single writer | applications routinely get crash consistency wrong on POSIX file systems [S45], and `fsync` failure handling is unreliable [S46] | explicit, ordered or transactional storage interfaces | delegate durability to a storage engine that has been tested for it; do not hand-roll |
 | The OS controls one homogeneous machine | the CPU is the computer | modern platforms are many cores, accelerators and firmware-controlled processors the OS does not govern [S36][S47] | the platform as a distributed system | treat firmware, BMC and device processors as TCB and threat-model them (§2.3, [S27]); where the OS vendor also designs the silicon, kernel integrity can be enforced in hardware (Apple: KIP, PAC, SSV) [S53] |
 
@@ -153,7 +154,15 @@ questions in every substrate decision, and never let one answer the other.
      unikernel, capability OS) only when a driver is **structurally** unreachable with the
      inherited design: a TCB small enough to verify or certify, untrusted multi-tenancy with
      a small attack surface, or a hard real-time bound. Name that driver in the ADR.
-3. **Do not copy an inherited idiom into an interface you design.** A new platform API,
+3. **A global lock is never the target concurrency design.** That covers a big kernel
+   lock, an interpreter lock, a database-wide write lock and a single coordinator every
+   request must pass through. If one is unavoidable as a first step, accept it only as a
+   recorded, time-boxed transition: an ADR with the removal plan, a fitness function that
+   measures contention on it, and the explicit warning that code will start relying on its
+   implicit serialisation — that dependency, not the lock itself, is what made removal take
+   years [S59][S62]. Design new interfaces so that independent operations commute [S63];
+   size what the lock costs with Amdahl/USL (`quantitative-methods.md` §4).
+4. **Do not copy an inherited idiom into an interface you design.** A new platform API,
    plug-in model, agent runtime or device OS starts from the clean-sheet column: explicit
    capabilities instead of ambient authority, asynchronous submission, explicit durability.
    Copying the legacy idiom is acceptable only with a recorded compatibility driver.
@@ -204,6 +213,9 @@ Raise each as a finding with its source:
 - a platform component past end of support, or with no recorded support date [S30].
 - a kernel or OS preference ("X is better") recorded without per-criterion evidence, for
   any kernel (§2.2);
+- a global lock or single serialisation point proposed as the concurrency design, or
+  accepted as a transition without a removal plan and contention measurement (§2.5)
+  [S59][S61];
 - a substrate ADR that answers "is it proven?" but not "would we build it this way now?",
   or the reverse: rejecting Linux because its design is old, with no driver it
   structurally cannot meet (§2.5) [S41][S48];
@@ -274,3 +286,9 @@ Raise each as a finding with its source:
 | S56 | Microsoft, *Windows security and resiliency: Protecting your business*, Windows Experience Blog, 19 November 2024 |
 | S57 | Apple, *macOS Software License Agreement* (virtualisation and leasing clauses) |
 | S58 | AWS, *Amazon EC2 Mac instances FAQ* (24-hour minimum Dedicated Host allocation) |
+| S59 | Kernel Newbies, *Linux 2.6.39* release notes (removal of the Big Kernel Lock); LWN.net coverage of the BKL removal (2011) |
+| S60 | Linux.com, *What's New in Linux 2.6.39: Ding Dong, the Big Kernel Lock is Dead* (2011) |
+| S61 | S. Boyd-Wickizer et al., *An Analysis of Linux Scalability to Many Cores*, OSDI 2010 |
+| S62 | PEP 703, *Making the Global Interpreter Lock Optional in CPython* (accepted 2023); PEP 779, criteria for supported free-threaded Python |
+| S63 | A. Clements et al., *The Scalable Commutativity Rule: Designing Scalable Software for Multicore Processors*, SOSP 2013 |
+| S64 | Linux kernel documentation, *What is RCU?*, https://docs.kernel.org/RCU/whatisRCU.html |
