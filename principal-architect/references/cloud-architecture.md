@@ -57,14 +57,15 @@ survive, applicable regulation (DORA, Data Act, residency), and tenant contract 
 3. Prove it with a recovery drill against the stated RTO/RPO before claiming it [S4]
    (`operability.md`), and price it in §9.
 4. **Multi-cloud** needs a driver whose stimulus is the provider itself or a regulation:
-   DORA requires financial entities to have documented, tested exit strategies (Art. 28(8))
+   DORA requires financial entities to have documented, tested exit strategies for ICT
+   services supporting critical or important functions (Art. 28(8))
    and to assess ICT concentration risk (Art. 29) [S5]. Record what it costs in services,
    skills and egress.
 
 ### 2.3 Blast radius beyond zones
 
 Zones protect against infrastructure failure; deployments, configuration and poison
-requests hit every zone at once. When a `Q.xx` requires bounded impact:
+requests hit every zone at once [S6]. When a `Q.xx` requires bounded impact:
 
 | Pattern | What it bounds | Source |
 |---|---|---|
@@ -112,13 +113,18 @@ estimated switching cost in the ADR next to what the service saves.
 - **Residency is not jurisdiction.** US providers can be compelled to disclose data they
   control regardless of where it is stored (CLOUD Act) [S20]. If jurisdiction is a driver,
   name it as a `C.xx` and decide between provider options and key control.
-- **Key control:** customer-managed or externally held keys keep the provider from reading
-  data without your keys; confidential computing extends this to data in use
+- **Key control:** customer-managed keys in the provider's key service give you control of
+  key policy, rotation and revocation, but the provider still operates that service; only
+  keys held outside the provider (an external key store, client-side encryption) withhold
+  plaintext from it [S24]. Confidential computing extends protection to data in use
   (`systems-architecture.md` §2.1).
 - **Exit:** the EU Data Act's switching rules apply since 12 September 2025, and from
-  12 January 2027 providers may not charge switching charges (Art. 29) [S21]. Write the exit
+  12 January 2027 providers may not charge switching charges (Art. 29), except for
+  custom-built services and non-production versions (Art. 31) [S21]; check for later
+  amendments to Chapter VI before relying on it. Write the exit
   plan into the SAD: portable data formats, IaC, the list of proprietary dependencies, and a
-  tested export of core data. Financial entities must test it (DORA Art. 28(8)) [S5].
+  tested export of core data. Financial entities must test it for ICT services supporting critical or important
+  functions (DORA Art. 28(8)) [S5].
 
 ### 2.8 Platform team and carbon
 
@@ -179,6 +185,7 @@ estimated switching cost in the ADR next to what the service saves.
 | S18 | NIST SP 800-145, *The NIST Definition of Cloud Computing* (2011) |
 | S19 | AWS, *Shared Responsibility Model*; Microsoft, *Shared responsibility in the cloud* |
 | S20 | 18 U.S.C. § 2713 (CLOUD Act) |
-| S21 | Regulation (EU) 2023/2854 (Data Act), Chapter VI, Art. 29 |
+| S21 | Regulation (EU) 2023/2854 (Data Act), Chapter VI, Art. 29 and Art. 31 |
 | S22 | M. Skelton, M. Pais, *Team Topologies*, IT Revolution 2019 |
 | S23 | ISO/IEC 21031:2024, *Software Carbon Intensity (SCI) specification* |
+| S24 | AWS documentation, *External key stores* (AWS KMS XKS), https://docs.aws.amazon.com/kms/latest/developerguide/keystore-external.html |
