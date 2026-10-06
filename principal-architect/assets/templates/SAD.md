@@ -102,6 +102,13 @@ and trust boundaries between systems. Use **STRIDE** per element/flow and map to
 |---|---|---|---|---|---|
 | <e.g. System A → B API> | Spoofing | <…> | A01 Broken Access Control | <mTLS, authz> | <team> |
 
+**Flow matrix** — when the solution spans more than one network zone; one row per allowed
+flow across a zone boundary (`references/network-architecture.md` §2.5):
+
+| Source (zone / system) | Destination | Protocol / port | AuthN | Encryption | Justified by |
+|---|---|---|---|---|---|
+| <System A / app zone> | <System B / partner zone> | <HTTPS 443> | <mTLS> | <TLS 1.3> | <F.NN> |
+
 > Cross-system flows are the highest-risk surface; model A03 Software Supply Chain Failures
 > for third-party/SaaS dependencies. A significant residual risk becomes an ADR.
 

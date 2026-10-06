@@ -55,8 +55,8 @@ expanding Gartner's original 5 R's). Most portfolios use 3–5 of these across t
   their runtime behaviour (§4) before choosing. Classify each workload with the 7 R's (§1);
   the cloud providers' mainframe guidance maps them to mainframe options (rehost onto a
   compatible runtime, automated refactoring, replatform, API-enable in place) (AWS
-  Prescriptive Guidance, *Mainframe modernization*; Azure Architecture Center, *Mainframe
-  and midrange migration*). Displace incrementally with the legacy-displacement patterns —
+  Prescriptive Guidance, *Mainframe modernization*; Microsoft Cloud Adoption
+  Framework, *Mainframe migration overview*). Displace incrementally with the legacy-displacement patterns —
   **Event Interception**, **Legacy Mimic**, **Divert the Flow**, and **Parallel Running**
   with output comparison before each cutover (Cartwright, Horn & Lewis, *Patterns of
   Legacy Displacement*, martinfowler.com, 2024). Map data explicitly (§5): mainframe data
@@ -156,7 +156,8 @@ Most platform migrations are forced by an end-of-support date. Keep that date vi
    (TOGAF ADM Phases E–F) or a Transition Architecture (§6). An entry past its date is a
    threat-model finding: CISA lists use of unsupported or end-of-life software in critical
    systems as a bad practice (CISA, *Bad Practices*), and NIST's patch-management guidance
-   treats retiring unsupported software as part of the program (NIST SP 800-40 Rev. 4).
+   treats end-of-life software as unpatchable, to be isolated, replaced or decommissioned
+   (NIST SP 800-40 Rev. 4).
 3. **Technology radar.** Track technology choices in the rings Adopt / Trial / Assess /
    Hold (Thoughtworks, *Build Your Own Radar*). A move into Adopt or Hold is an
    enterprise-level ADR with its driver. New technology enters through Assess and Trial

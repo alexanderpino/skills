@@ -1,6 +1,6 @@
 ---
 name: principal-architect
-description: "Master architecture & business-analysis skill. Use BEFORE planning or changing structure, boundaries, interfaces, data, or quality attributes. Use when user mentions architecture, PRD/HLD/SD/SAD/RFC/ADR, C4/ArchiMate diagrams, capabilities, roadmap, migration, threat modeling, SLOs, ERDs, cloud cost, user stories, or acceptance criteria — and for the substrate: kernel/OS design, isolation (containers, microVMs, VMs), embedded/RTOS/safety-critical, network topology/segmentation, cloud landing zones, multi-region/DR, or platform end-of-support. Acts as master architect: separates proven-by-use from how it would be designed today, derives content from evidence, writes stories in house format, and triages artifacts. Captures software with C4, logs decisions via RFC→ADR, and requires threat models/FinOps in HLDs. Conforms to ISO 42010, ISO 25010; uses TOGAF, ArchiMate, C4, arc42. Output must be human-readable, pragmatic prose; no robotic AI-isms. Use IDs (e.g., F.02) for references."
+description: "Master architecture & business-analysis skill. Use BEFORE planning or changing structure, boundaries, interfaces, data, or quality attributes. Use when user mentions architecture, PRD/HLD/SD/SAD/RFC/ADR, C4/ArchiMate diagrams, capabilities, roadmap, migration, threat modeling, SLOs, ERDs, cloud cost, user stories, or acceptance criteria — and the substrate: OS/kernel choice, workload isolation, embedded/RTOS/safety-critical, network topology/segmentation, landing zones, multi-region/DR, end-of-support. Acts as master architect: separates proven-by-use from how it would be designed today, derives content from evidence, writes house-format stories, triages artifacts. Captures software with C4, logs decisions via RFC→ADR, and requires threat models/FinOps in HLDs. Conforms to ISO 42010, ISO 25010; uses TOGAF, ArchiMate, C4, arc42. Output must be human-readable, pragmatic prose; no robotic AI-isms. Use IDs (e.g., F.02) for references."
 ---
 
 # Architecture Docs
@@ -39,14 +39,11 @@ and where they break.
 
 ## 1. The founding question — proven is not the same as current
 
-Years of successful use prove that a design **works**. They do not prove it is how you would
-build it **today** if you could start again. Software that is used must keep changing or it
-becomes progressively less satisfactory, and its complexity grows unless work is done to
-reduce it (Lehman, *Programs, Life Cycles, and Laws of Software Evolution*, Proc. IEEE
-1980). People also systematically prefer whatever is already in place (status quo bias —
-Samuelson & Zeckhauser, *J. Risk & Uncertainty* 1988) and keep investing in what they
-already paid for (sunk cost — Arkes & Blumer, *OBHDP* 1985). So for **every existing
-design you evaluate, extend, migrate or build on** — a kernel, a protocol, a data model, an
+Years of successful use prove that a design **works**, not that you would build it this way
+**today**: software in real-world use must keep changing or it becomes progressively less useful (Lehman 1980), and people
+favour what is in place and what they already paid for (Samuelson & Zeckhauser 1988; Arkes &
+Blumer 1985 — full grounding in `standards.md`). So for **every existing design you
+evaluate, extend, migrate or build on** — a kernel, a protocol, a data model, an
 integration style, a platform, this skill's own defaults — answer two questions separately
 and never let one answer the other:
 
@@ -61,14 +58,14 @@ and never let one answer the other:
 Then:
 
 3. **Record the gap**, per mechanism with its source, as architectural technical debt or an
-   evolution option (Kruchten, Nord & Ozkaya, *Managing Technical Debt*, SEI 2019) — in the
+   evolution option (Kruchten, Nord & Ozkaya, *Managing Technical Debt*, Addison-Wesley/SEI Series, 2019) — in the
    HLD/SD "Known issues / debt", or the `architecture-evaluation.md` clean-sheet section. A
    gap you can name but do not record is the status quo bias winning silently.
 4. **Decide per mechanism: keep, work around, or replace**, and say which in the ADR.
    *Keep* is legitimate when the proven design plus its ecosystem still meets the drivers.
    *Work around* uses the current mechanism inside the proven system. *Replace* needs a
    driver: an objective defect or a grounded, costed gap (`anti_over_engineering.md` §7B),
-   delivered incrementally (§7E).
+   delivered incrementally (`anti_over_engineering.md` §7E).
 5. **Revisit** at lifecycle triggers — end-of-support dates and radar moves
    (`migration.md` §7), architecture evaluations (`methods.md` §11) — not only when
    something breaks.
@@ -182,10 +179,8 @@ software (kernel, hypervisor, driver, runtime), chooses an isolation boundary or
 base, designs connectivity or segmentation, sets a region/failure-domain topology, or meets
 a `Q.xx` that only the substrate can meet (jitter, WCET, cross-region latency), use the same
 discipline with the substrate references: `systems-architecture.md`,
-`network-architecture.md`, `cloud-architecture.md`. Keep two questions apart there: *is it
-proven?* and *is this how it would be designed today?* — Linux and POSIX carry 1970s Unix
-assumptions that work but that current OS research would not repeat; decide per mechanism to
-work with, around, or replace them (`systems-architecture.md` §2.5). Shared networks and landing zones are
+`network-architecture.md`, `cloud-architecture.md`, and apply §1 there too (the OS
+instance is `systems-architecture.md` §2.5). Shared networks and landing zones are
 enterprise/solution altitude; a system's HLD states what it runs on and needs, and links to
 them.
 
@@ -505,9 +500,9 @@ manifest in the index README). Condensed:
   existing system or any platform-lifecycle question.
 - `references/systems-architecture.md` — **procedure for the OS/kernel substrate**: derive it
   from Dockerfiles, manifests and IaC; choose the isolation boundary from the trust model;
-  choose the OS/RTOS base; evidence gates for kernel-level changes; proven vs clean-sheet
-  (the Unix assumptions in Linux, and when to work with, around, or replace them); which safety/security
-  standard applies; support dates recorded with their URL; review flags. Every rule cited.
+  choose the OS/RTOS base per criterion; evidence gates for kernel-level changes; §1
+  applied to operating systems (inherited assumptions; keep, work around, or replace;
+  global locks); which safety/security standard applies; support dates recorded with their URL; review flags. Every rule cited.
 - `references/network-architecture.md` — **procedure for network design**: derive the as-is
   flows from IaC and policies; check placement against the physics floor first; static
   stability; topology defaults; protocol, retry and load-balancing rules; segmentation,

@@ -55,7 +55,7 @@ For each major approach in §3: is it proven, and would it be designed this way 
 
 | Approach | Proven? (evidence) | Today's design (source) | Gap | Keep / work around / replace |
 |---|---|---|---|---|
-| <shared database between services> | <5 yrs, no data-loss incidents> | <one owner per dataset — data-architecture.md> | <schema coupling> | <keep; debt entry D-03> |
+| <shared database between services> | <5 yrs, no data-loss incidents> | <database per service — Richardson, microservices.io; one model per bounded context — Evans, *DDD*> | <schema coupling> | <keep; debt entry D-03> |
 
 ## 5. Risk themes
 Cluster the risks into themes (e.g. "no horizontal scaling path", "untested failure modes",

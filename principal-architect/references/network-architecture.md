@@ -4,7 +4,7 @@
 datacenter fabric, WAN); makes a protocol choice with a quality trade-off; places
 segmentation, ingress or egress controls; or must meet a latency or transfer `Q.xx` across
 distance. A system that only *uses* an existing network states its zones and flows in its
-HLD (§3) and links to the network's own SAD; it does not redesign it.
+HLD §6 and §8 (see §3 below) and links to the network's own SAD; it does not redesign it.
 
 **Altitude.** Shared networks (hub, fabric, WAN, address plan) are enterprise or solution
 altitude: one team owns them and many systems depend on them.
@@ -51,8 +51,9 @@ policy requires.
   is impaired** (static stability) [S5]. Recovery plans that require control-plane actions
   during the incident (launching capacity, API-driven route changes) depend on the thing
   most likely to be degraded; pre-provision instead [S5].
-- Keep an **out-of-band management path**: in the October 2021 Facebook outage the
-  backbone disconnection also cut the tools and access engineers needed to recover [S6].
+- Keep an **out-of-band management path that does not depend on the production backbone
+  or its DNS**: in the October 2021 Facebook outage both primary and out-of-band access went
+  down and the loss of DNS broke internal tools, so engineers had to go on site [S6].
 - Record both in HLD/SAD §7 or §10 (operability).
 
 ### 2.3 Topology
@@ -79,7 +80,8 @@ policy requires.
   jitter, and retry at one layer [S18][S19]. Check every client config found in §1.
 - **Health checks** that test shared dependencies can remove a whole fleet at once; prefer
   local checks and fail open when all targets look unhealthy [S20].
-- **Service mesh:** it adds a control plane and a data-plane proxy per pod or node [S21].
+- **Service mesh:** it adds a control plane and a data-plane proxy per pod [S21], or per
+  node in sidecarless (ambient) mode [S34].
   Adopt it when a driver (uniform mTLS, traffic policy, telemetry) spans many services and
   the team can operate that control plane; otherwise use platform identity and a plain
   ingress (`enterprise-architecture-bingo.md`).
@@ -92,13 +94,13 @@ policy requires.
   [S22]. In an existing estate, record the gap and choose per zone: keep (with a recorded
   reason), work around (identity-based access per request in front of the existing
   network), or replace.
-
 - **Zero trust and segmentation are complements.** Grant access per request on identity,
   not network location [S22]; segment into zones with controlled conduits to limit how far
   a compromise spreads [S23].
 - **Egress:** filter outbound traffic, not only inbound [S24]. Default-deny egress with an
-  allow-list breaks SSRF-to-metadata and exfiltration paths; on AWS also require IMDSv2
-  [S25].
+  allow-list cuts exfiltration and callback paths. It does not protect the instance
+  metadata endpoint, which network filtering does not see [S33]; on AWS require IMDSv2
+  against SSRF to metadata [S25].
 - **Flow matrix:** one row per allowed flow across a zone boundary (source, destination,
   protocol/port, authentication, encryption, justifying `F.xx`). Every row is a trust
   boundary crossing and gets a STRIDE entry [S26][S23]. A flow without a justification is a
@@ -113,11 +115,12 @@ policy requires.
 2. **Inventory** cryptographic use and TLS termination points (a cryptographic bill of
    materials) [S28].
 3. **Plan against the published timeline:** ML-KEM, ML-DSA and SLH-DSA are standardised
-   [S29]; NIST's draft transition plan deprecates quantum-vulnerable public-key algorithms
-   after 2030 and disallows them after 2035 [S30].
+   [S29]; NIST's draft transition plan deprecates quantum-vulnerable public-key algorithms at
+   112-bit security strength (e.g. RSA-2048) after 2030 and disallows all of them after
+   2035 [S30].
 4. **Write crypto-agility as a `Q.xx`** (modifiability: algorithms change by configuration
-   at every termination point you own) and test larger handshakes on constrained links
-   before switching signatures [S31].
+   at every termination point you own) and test post-quantum handshake size and latency on
+   your own links before switching signatures [S31].
 
 ---
 
@@ -186,3 +189,5 @@ policy requires.
 | S30 | NIST IR 8547 (initial public draft), *Transition to Post-Quantum Cryptography Standards* (2024) |
 | S31 | NIST SP 1800-38, *Migration to Post-Quantum Cryptography* (NCCoE practice guide) |
 | S32 | A. Fogel et al., *A General Approach to Network Configuration Analysis* (Batfish), NSDI 2015 |
+| S33 | AWS documentation, *Security groups for your VPC* (traffic to instance metadata is not filtered), https://docs.aws.amazon.com/vpc/latest/userguide/vpc-security-groups.html |
+| S34 | Istio documentation, *Ambient mode overview*, https://istio.io/latest/docs/ambient/overview/ |
