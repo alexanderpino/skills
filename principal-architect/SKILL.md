@@ -1,6 +1,6 @@
 ---
 name: principal-architect
-description: "Master architecture & business-analysis skill. Use BEFORE planning or changing structure, boundaries, interfaces, data, or quality attributes. Use when user mentions architecture, PRD/HLD/SD/SAD/RFC/ADR, C4/ArchiMate diagrams, capabilities, roadmap, migration, threat modeling, SLOs, ERDs, cloud cost, user stories, or acceptance criteria. Acts as master architect: derives content from evidence, writes stories in house format, and triages artifacts. Captures software with C4, logs decisions via RFC→ADR, and requires threat models/FinOps in HLDs. Conforms to ISO 42010, ISO 25010; uses TOGAF, ArchiMate, C4, arc42. Output must be human-readable, pragmatic prose; no robotic AI-isms. Use IDs (e.g., F.02) for references."
+description: "Master architecture & business-analysis skill. Use BEFORE planning or changing structure, boundaries, interfaces, data, or quality attributes. Use when user mentions architecture, PRD/HLD/SD/SAD/RFC/ADR, C4/ArchiMate diagrams, capabilities, roadmap, migration, threat modeling, SLOs, ERDs, cloud cost, user stories, or acceptance criteria — and for the substrate: kernel/OS design, isolation (containers, microVMs, VMs), embedded/RTOS/safety-critical, network topology/segmentation, cloud landing zones, multi-region/DR, or platform end-of-support. Acts as master architect: derives content from evidence, writes stories in house format, and triages artifacts. Captures software with C4, logs decisions via RFC→ADR, and requires threat models/FinOps in HLDs. Conforms to ISO 42010, ISO 25010; uses TOGAF, ArchiMate, C4, arc42. Output must be human-readable, pragmatic prose; no robotic AI-isms. Use IDs (e.g., F.02) for references."
 ---
 
 # Architecture Docs
@@ -134,6 +134,16 @@ principles (`PR.xx`) and capabilities constrain solutions, which constrain softw
 ADRs carry a `level:` field; solution/software ADRs carry `complies-with: [PR.xx]`.
 Conformance flows up, decisions cascade down.
 
+**Below the container boundary.** Most work treats the OS, network and cloud as a labelled
+box, and that is right until the label *is* the decision. When the work builds system
+software (kernel, hypervisor, driver, runtime), chooses an isolation boundary or OS/RTOS
+base, designs connectivity or segmentation, sets a region/failure-domain topology, or meets
+a `Q.xx` that only the substrate can meet (jitter, WCET, cross-region latency), use the same
+discipline with the substrate references: `systems-architecture.md`,
+`network-architecture.md`, `cloud-architecture.md`. Shared networks and landing zones are
+enterprise/solution altitude; a system's HLD states what it runs on and needs, and links to
+them.
+
 The documentation model follows recognised industry standards rather than a
 bespoke format, and is built to **conform** (not merely allude) to ISO: the
 **`AD.md`** root delivers the required content of an Architecture Description per
@@ -163,7 +173,8 @@ code changes don't.
 | New/changed **business capability**, portfolio standard, principle, or landscape/roadmap | `enterprise-architecture.md` (relevant section) + enterprise-level ADR |
 | New **solution** to a business problem, cross-system integration, technology selection, or build-vs-buy | `SAD.md` + solution-level ADR; then software changes per affected system |
 | New/changed **business process** — who does what, in what order, across roles/systems | process view (BPMN-style, `references/mermaid-guide.md`) in `enterprise-architecture.md` or `SAD.md` + ADR if a real choice was made; conform to the org's `.bpmn` where one is executed |
-| **Migration / modernization** of an existing system (local-to-global, on-prem→cloud, monolith→distributed/SaaS) | `transition-architecture.md` (As-Is → interim states → To-Be, rollback per state) + ADRs; recover As-Is SDs from runtime (`references/migration.md`) |
+| **Migration / modernization** of an existing system (local-to-global, on-prem→cloud, monolith→distributed/SaaS, platform exit such as mainframe or end-of-support OS) | `transition-architecture.md` (As-Is → interim states → To-Be, rollback per state) + ADRs; recover As-Is SDs from runtime (`references/migration.md`) |
+| **Platform substrate** — landing zone, network topology/segmentation, hybrid connectivity, region/DR topology, fleet OS or CPU-architecture standard, isolation model for a platform | `SAD.md` (or `enterprise-architecture.md` for estate-wide standards) + ADRs; network & trust-zone view; flow matrix in §8 (`references/network-architecture.md`, `cloud-architecture.md`, `systems-architecture.md`) |
 | **Evaluate / review an existing architecture** (pre-migration health-check, due-diligence, "keep investing?") | `architecture-evaluation.md` (ATAM-lite: risks · non-risks · sensitivity · trade-offs → ADRs + fitness functions; `methods.md` §11) |
 | Within a single system | the software table below |
 
@@ -433,16 +444,36 @@ manifest in the index README). Condensed:
 - `references/quantitative-methods.md` — **sizing & statistical methods**: Little's Law and
   Erlangs, M/M/1 and M/M/c queueing *with the assumptions that make them valid*, percentiles
   vs averages, Amdahl/USL, availability and correlated-failure maths, quorums, probabilistic
-  data structures, telemetry sampling bias, and Monte Carlo forecasting. Read before quoting
-  any capacity, latency, availability, or cost number.
+  data structures, telemetry sampling bias, Monte Carlo forecasting, network physics
+  (propagation floor, round trips, bandwidth–delay product, loss-limited TCP, bulk transfer,
+  egress) and real-time schedulability (rate-monotonic bound, response-time analysis, EDF).
+  Read before quoting any capacity, latency, availability, timing, or cost number.
 - `references/reverse-engineering.md` — **legacy code-to-architecture at scale**: the SAR
   discipline (reflexion models, Ducasse & Pollet, SEI), AST tooling (Tree-sitter,
   Structurizr, CodeQL, jQAssistant), LLM-assisted/GraphRAG, polyglot pipeline. Read for any
   reconstruction from existing code.
 - `references/migration.md` — **system modernization & migration (As-Is → To-Be)**: the 7 R's,
-  the three transformation scenarios, modernization/integration patterns (Strangler Fig, ACL,
-  event-driven intermediary), As-Is sequence-diagram recovery from runtime tracing, and
-  data/protocol mapping. Read for any transformation of an existing system.
+  the four transformation scenarios (incl. platform exits: mainframe, proprietary Unix,
+  hypervisor), modernization/integration patterns (Strangler Fig, ACL, event-driven
+  intermediary), As-Is sequence-diagram recovery from runtime tracing, data/protocol mapping,
+  and the end-of-support register + technology radar. Read for any transformation of an
+  existing system or any platform-lifecycle question.
+- `references/systems-architecture.md` — **kernels, operating systems, isolation, real-time**:
+  kernel structure styles (monolithic, microkernel, hybrid, exokernel, unikernel) and what
+  they buy; the kernel mechanisms that are architecture (ABI, I/O model, scheduling, memory,
+  drivers, eBPF, boot chain); the isolation ladder from process to confidential VM; embedded,
+  RTOS and safety-critical design with its standards; platform lifecycle legacy → future.
+  Read for system software, isolation-boundary or OS/RTOS choices, and sub-application `Q.xx`.
+- `references/network-architecture.md` — **network architecture**: data/control/management
+  planes and static stability, datacenter/WAN/cloud/hybrid topology, IP planning, protocol
+  choices (QUIC, TLS 1.3, gRPC, DNS, TSN), load balancing and service mesh, segmentation,
+  egress and post-quantum readiness, edge placement, NetDevOps, and the network & trust-zone
+  view with a flow matrix. Read when connectivity or segmentation is being designed.
+- `references/cloud-architecture.md` — **cloud estate architecture**: landing zones and account
+  structure, failure domains and the DR ladder, cells/shuffle sharding/static stability,
+  compute-model selection (VMs, containers, Kubernetes, functions), SaaS tenancy models,
+  shared responsibility, sovereignty and exit (DORA, EU Data Act), platform engineering.
+  Read for landing-zone, multi-region, compute-model or tenancy decisions.
 - `references/business-analysis.md` — **master business analysis**: user stories + acceptance
   criteria (Connextra, INVEST, Gherkin, BABOK), the traceability chain, and the **protocol to
   detect & conform to the company's house format** (or create one if absent). Read before

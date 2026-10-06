@@ -115,6 +115,11 @@ Pick the *internal* shape against the drivers. The menu, with the honest trade:
 | **Microservices** | independently deployable services per context | independent scaling/deploy/teams at real scale | distributed-systems tax; an *org* decision, not a default |
 | **Event-Driven** | components react to events via a broker | temporal decoupling, fan-out, audit, ingestion | harder to reason about flow; eventual consistency |
 | **Pipeline / Dataflow** | stages transforming a stream | batch/stream processing, ETL, compilers | poor fit for interactive request/response |
+| **Microkernel (Plug-in)** | minimal core + independently developed plug-ins behind a stable extension contract | products with customer- or partner-specific variation (IDEs, browsers, rules engines, insurance/tax products) | the plug-in contract becomes a published interface (`interfaces.md`); plug-ins with full privilege share the core's fate (see `systems-architecture.md` §1 for the OS-level version of the same trade) |
+| **Service-based** | a few coarse-grained domain services, often sharing one database | the pragmatic step between monolith and microservices; independent deploys without the full distributed tax | the shared database couples schemas; services grow large |
+| **Space-based** | processing units with replicated in-memory data grids; the database is written asynchronously | extreme, spiky concurrency where the database is the bottleneck (ticketing, auctions) | complex; eventual consistency with the store; hard to test; expensive memory |
+| **Serverless (functions + managed services)** | event-triggered functions stitched together by managed queues, stores and gateways | spiky or low traffic; event glue; small teams that want no servers | cold starts, execution limits, provider lock-in, cost crossover at sustained load (`cloud-architecture.md` §5); flow is spread across configuration |
+| **Cell-based** | the whole stack replicated as independent cells, each serving a subset of customers, behind a thin router | blast-radius containment and bounded scaling at large scale | the router is a critical shared component; cross-cell operations and rebalancing are hard; overhead below real scale (`cloud-architecture.md` §4) |
 
 **Defaults and reversibility (the architect's bias):**
 - **Modular monolith first.** It gives you clean boundaries (so you *can* split
@@ -124,6 +129,10 @@ Pick the *internal* shape against the drivers. The menu, with the honest trade:
 - A structuring choice is a **one-way-ish door** (`methods.md` §1) — costly to undo.
   That's exactly what an ADR is for. The *boundaries* matter more than the *style*:
   good boundaries make the style swappable; bad ones don't.
+- **The substrate below the style** — kernel and OS structure, isolation boundaries,
+  network topology, cloud failure domains — is chosen with the same discipline but has
+  its own trade-offs: see `systems-architecture.md`, `network-architecture.md` and
+  `cloud-architecture.md`.
 
 **The principles underneath** (Robert C. Martin's *component* principles — these are
 the architecture-altitude cousins of SOLID, and more relevant here than SOLID itself):
@@ -272,6 +281,8 @@ originating author. Consolidated so it's auditable (full mapping in `standards.m
 | Evolutionary architecture, fitness functions (§4) | *Building Evolutionary Architectures* | **Thoughtworks** — Ford, Parsons & Kua |
 | Architecture runway, intentional vs emergent (§4) | **SAFe** (Architectural Runway); Continuous Architecture | **Scaled Agile, Inc.**; Erder, Pureur & Woods |
 | Strangler Fig (§3), Anti-Corruption Layer (§§1, 3) | martinfowler.com; *DDD* (Evans) | Fowler; Evans (see `migration.md`) |
+| Microkernel (plug-in), service-based, space-based styles (§2) | *Fundamentals of Software Architecture* | Mark Richards & Neal Ford |
+| Cell-based architecture (§2) | *Reducing the Scope of Impact with Cell-Based Architecture* (Well-Architected whitepaper) | **AWS** |
 
 When a claim and a team's mandated standard disagree, **conform to the team's** (the
 skill's standing rule, `standards.md`); record the divergence in an ADR.

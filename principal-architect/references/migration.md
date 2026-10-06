@@ -25,7 +25,7 @@ expanding Gartner's original 5 R's). Most portfolios use 3–5 of these across t
 > Gartner's 5 R's were Rehost, Refactor, Revise, Rebuild, Replace; AWS added Retire (2016)
 > and Retain (2017), and Relocate later. Reference: AWS Prescriptive Guidance, "The 7 Rs."
 
-## 2. The three transformation scenarios (blueprints)
+## 2. The four transformation scenarios (blueprints)
 
 **A. Local-to-Global** — decentralised, locally-built systems → one central global platform.
 - Forces: data sovereignty/residency, latency, divergent local data models, regional rules.
@@ -47,6 +47,24 @@ expanding Gartner's original 5 R's). Most portfolios use 3–5 of these across t
   time behind an **ACL**; decouple with **event-driven intermediaries**; split the shared DB
   last (data is the hardest part — use CDC, §5). Repurchase capabilities that a SaaS does
   better.
+
+**D. Platform exit — mainframe, proprietary Unix, end-of-support OS or hypervisor.**
+- Forces: the platform still works, often very well, but skills are retiring, the cost
+  model (mainframe capacity charges, licence changes) or vendor support no longer fits,
+  and delivery is slow. Batch windows, JCL job chains, CICS/IMS transactions, EBCDIC and
+  packed-decimal data, and undocumented operational knowledge carry most of the risk
+  (`systems-architecture.md` §5).
+- Blueprint: inventory **transactions and batch jobs**, not just programs, and recover
+  their runtime behaviour (§4) before choosing. Then pick per workload: **API-enable in
+  place** (expose transactions through an API layer and strangle from the outside);
+  **rehost** onto an emulation or rehosting runtime (fast, keeps COBOL, keeps the skills
+  problem); **refactor** with automated code conversion (keeps the logic, produces code
+  nobody chose to write; budget for clean-up); or **rebuild/repurchase** per capability.
+  Convert data with explicit encoding and numeric-format mapping (§5) and reconcile
+  totals per batch run. Run old and new in **parallel** with output comparison before
+  each cutover; the batch schedule is the cutover plan. The same blueprint applies to
+  proprietary Unix (AIX, HP-UX, Solaris) and to VM estates leaving a hypervisor after a
+  licensing change.
 
 ## 3. Modernization & integration patterns — when to use which
 
@@ -127,3 +145,26 @@ Target (To-Be)**, and for each interim state: scope, the patterns used (§3), a 
 analysis**, **rollback strategy**, and **validation/exit criteria** before the next step. This
 is TOGAF ADM Phase E (Opportunities & Solutions) / Phase F (Migration Planning): never jump
 from As-Is to To-Be in one undocumented leap.
+
+## 7. Platform lifecycle — the end-of-support register and the technology radar
+
+Most migrations are not chosen; an end-of-support date forces them. Treat platform lifecycle
+as a standing input to the roadmap rather than a surprise:
+
+- **End-of-support register.** For every platform component (OS and kernel line, database
+  engine, runtime, hypervisor, network OS, framework, managed-service version), record the
+  version in use, the vendor's end of standard and extended support, and the owner. Each
+  entry is a `C.xx` with a date. An entry within the planning horizon becomes a work package
+  in the roadmap (TOGAF Phase E/F) or a Transition Architecture (§6). An entry past its date
+  is a security finding in the threat model.
+- **Technology radar.** Keep the organisation's technology choices in four rings, after
+  Thoughtworks: **Adopt** (the default), **Trial** (use on real but contained work),
+  **Assess** (explore with a spike), **Hold** (no new use; plan the exit). A move from Trial
+  to Adopt, or from anything to Hold, is an enterprise-level ADR. The radar is how the
+  "boring technology" rule (`anti_over_engineering.md`) and new technology coexist: new
+  things enter through Assess and Trial with a named driver, instead of being either banned
+  or adopted by fashion.
+- **Domain specifics** — kernel and OS lifecycles, CPU-architecture moves, mainframe exits:
+  `systems-architecture.md` §5; network transitions (IPv6, SD-WAN, post-quantum TLS):
+  `network-architecture.md` §§5, 8; cloud estate evolution and exit obligations:
+  `cloud-architecture.md` §§8, 10.

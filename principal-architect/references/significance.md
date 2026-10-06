@@ -26,6 +26,11 @@ treat it as significant if it touches any of:
 7. **Pattern or style** — adopts or drops an architectural style or pattern
    (e.g. facade, modular monolith, pipeline) across more than one component. *Choosing*
    one (with its trade-offs) is in `references/structure.md`.
+8. **Platform substrate** — changes the OS, kernel line or RTOS, the isolation boundary
+   between workloads (container, sandbox, microVM, VM, confidential VM), the CPU
+   architecture, the network topology or segmentation, or the region/failure-domain
+   topology (`systems-architecture.md`, `network-architecture.md`,
+   `cloud-architecture.md`).
 
 If a change hits **none** of these, it is local or trivial — document lightly or
 not at all (see the proportional-rigour table in SKILL.md).
@@ -38,7 +43,7 @@ Did you choose between real alternatives, and is the choice expensive to undo?
         ├── No  → No ADR. Update the SD if it now mis-describes behaviour.
         │
         └── Yes → Does it touch structure / interface / dependency / data /
-                  quality / cross-cutting / pattern (the 7 above)?
+                  quality / cross-cutting / pattern / substrate (the 8 above)?
                         │
                         ├── No  → Borderline. A short ADR is cheap insurance;
                         │         write one if anyone might later ask "why".

@@ -14,6 +14,13 @@ You must evaluate architectures assuming the attacker *is already inside the net
 * Demand **Identity-Based Segmentation**: Every service-to-service call must be authenticated and authorized (e.g., mTLS, JWT bearer token passing, or AWS IAM roles).
 * Demand **Blast Radius Containment**: If Service A is compromised via Remote Code Execution (RCE), what is the maximum damage it can do? It should not have blanket database access or wildcard `s3:*` IAM permissions.
 
+**Below the application.** Identity on every hop does not make the substrate irrelevant. Add rows for these whenever they apply:
+* **Shared kernel.** Containers share the host kernel, so any kernel privilege escalation is a container escape. Untrusted or multi-tenant code needs a sandbox or hardware-virtualisation boundary (`systems-architecture.md` §3). Flag privileged containers, host mounts and `hostNetwork`.
+* **Kernel-mode third-party code.** Security agents and drivers in kernel mode have whole-machine blast radius, for attackers and for bad updates (`systems-architecture.md` §1).
+* **Boot and update chain.** Who can change what boots, and can a bad image be rolled back?
+* **Network placement.** Identity decides whether a call is allowed; segmentation limits how far a compromised host gets. Demand default-deny **egress** and a **flow matrix** for every zone crossing (`network-architecture.md` §5).
+* **Long-lived confidentiality.** Data that must stay secret beyond about 2030 needs a post-quantum plan for its transport and key exchange now (`network-architecture.md` §5).
+
 ---
 
 ## 2. STRIDE Application on C4 Diagrams

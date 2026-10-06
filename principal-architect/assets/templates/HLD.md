@@ -88,6 +88,13 @@ C4Deployment
   }
 ```
 
+> Where the substrate matters, state per container the **OS / kernel line, runtime,
+> isolation boundary** (container, sandbox, microVM, VM, confidential VM), **CPU
+> architecture**, and the **network zone** it runs in; for more than one zone add the
+> network & trust-zone view (`references/mermaid-guide.md`). Choices and their trade-offs:
+> `references/systems-architecture.md`, `references/network-architecture.md`,
+> `references/cloud-architecture.md`. Region/AZ topology follows from the RTO/RPO in §7.
+
 ## 7. Cross-cutting concerns
 How the system handles, across components: communication style (e.g. files vs
 shared memory vs network), concurrency, error handling, configuration, security.
@@ -119,6 +126,13 @@ credible threat; sign off by setting `security-reviewed: true`.
 > STRIDE = **S**poofing · **T**ampering · **R**epudiation · **I**nformation disclosure ·
 > **D**enial of service · **E**levation of privilege. Treat trust boundaries (where data
 > crosses an element) as the priority. A significant residual risk becomes an ADR.
+
+**Flow matrix** — only when the system spans more than one network zone; one row per
+allowed flow across a zone boundary (`references/network-architecture.md` §5):
+
+| Source (zone / container) | Destination | Protocol / port | AuthN | Encryption | Justified by |
+|---|---|---|---|---|---|
+| <app / API> | <data / DB> | <TCP 5432> | <IAM auth> | <TLS 1.3> | <F.NN> |
 
 ### Privacy & data protection (DPIA)
 **Mandatory where the system processes personal or otherwise regulated data** — else state
