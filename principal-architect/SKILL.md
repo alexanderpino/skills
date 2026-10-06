@@ -40,7 +40,7 @@ and where they break.
 ## 1. The founding question — proven is not the same as current
 
 Years of successful use prove that a design **works**, not that you would build it this way
-**today**: software in use must keep changing or it degrades (Lehman 1980), and people
+**today**: software in real-world use must keep changing or it becomes progressively less useful (Lehman 1980), and people
 favour what is in place and what they already paid for (Samuelson & Zeckhauser 1988; Arkes &
 Blumer 1985 — full grounding in `standards.md`). So for **every existing design you
 evaluate, extend, migrate or build on** — a kernel, a protocol, a data model, an
@@ -58,7 +58,7 @@ and never let one answer the other:
 Then:
 
 3. **Record the gap**, per mechanism with its source, as architectural technical debt or an
-   evolution option (Kruchten, Nord & Ozkaya, *Managing Technical Debt*, SEI 2019) — in the
+   evolution option (Kruchten, Nord & Ozkaya, *Managing Technical Debt*, Addison-Wesley/SEI Series, 2019) — in the
    HLD/SD "Known issues / debt", or the `architecture-evaluation.md` clean-sheet section. A
    gap you can name but do not record is the status quo bias winning silently.
 4. **Decide per mechanism: keep, work around, or replace**, and say which in the ADR.

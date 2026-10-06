@@ -42,11 +42,13 @@ measure**, and the **field life** of the product.
 2. **Containers share the host kernel**, so a kernel compromise reaches every container on
    it [S1]. For one trusted owner that is acceptable; group containers on hosts by
    sensitivity [S1].
-3. **For untrusted or multi-tenant code, require more than namespaces.** Kubernetes itself
-   states that namespaces are not a hard isolation boundary and points to sandboxed
-   runtimes or separate nodes/VMs for strong isolation [S2][S3]. Hardware virtualisation
-   with a minimal VMM is the boundary AWS chose for multi-tenant serverless; the published
-   figures are under 125 ms to guest init and under 5 MiB VMM overhead [S4].
+3. **For untrusted or multi-tenant code, require more than a shared kernel.** Kubernetes'
+   own documentation says containers offer a weaker isolation boundary than
+   hardware-virtualised VMs, and recommends sandboxing (a VM or user-space kernel per pod),
+   dedicated nodes or dedicated clusters when tenants run untrusted code [S2][S3].
+   Hardware virtualisation with a minimal VMM is the boundary AWS chose for multi-tenant
+   serverless; the published figures are under 125 ms to guest init and under 5 MB memory
+   overhead per microVM [S4].
 4. **Shared hardware leaks across software boundaries** (Spectre, Meltdown) [S5][S6]. When a
    tenant's threat model includes side channels, require no co-residency on SMT siblings
    (Linux core scheduling exists for this [S7]) or dedicated hosts.
@@ -65,7 +67,7 @@ candidate; the ADR records the rows, not the verdict:
 | Criterion | Evidence to collect per candidate |
 |---|---|
 | Can it run where the system must run? | the vendor's hardware or board support list and the licence terms, checked when you write. Example: macOS (XNU) is licensed for Apple hardware, and cloud Mac capacity is sold as dedicated hosts with a minimum allocation period [S57][S58] |
-| Where does third-party code run? | the extension model: Linux loadable modules vs eBPF [S24]; on macOS kernel extensions are deprecated in favour of System Extensions and DriverKit in user space [S52]; Microsoft is moving security products out of Windows kernel mode [S56] |
+| Where does third-party code run? | the extension model: on Linux, loadable modules or eBPF programs, which must pass a verifier before loading [S24]; on macOS kernel extensions are deprecated in favour of System Extensions and DriverKit in user space [S52]; Microsoft is moving security products out of Windows kernel mode [S56] |
 | How large is the privileged base? | the kernel structure: seL4 keeps the kernel small enough for a full correctness proof [S12]; Linux runs drivers and file systems in the kernel [S10]; XNU combines Mach, a BSD layer and the I/O Kit driver framework in one kernel address space [S54] — hybrid, not a microkernel in operation |
 | How is the running system's integrity protected? | boot and runtime integrity mechanisms and what hardware they need: on Linux, verified block devices (dm-verity) [S65]; on Apple silicon, Kernel Integrity Protection, Pointer Authentication and the Signed System Volume [S53]; firmware resiliency in general [S27] |
 | Can you audit and patch it yourself? | source availability (Linux; XNU's source is published [S55]) and who can ship a fix |
@@ -75,9 +77,9 @@ candidate; the ADR records the rows, not the verdict:
   operates (the boring-technology rule, `anti_over_engineering.md`). The decision that
   matters is the support horizon (§4).
 - **A small trusted base or fault containment is a driver** (certification, security
-  kernel, drivers of unknown quality): consider a microkernel or separation kernel. Drivers
-  have measured error rates three to seven times higher than the rest of a monolithic
-  kernel [S10] and caused most crashes in Windows XP [S11]; a small kernel is what made a
+  kernel, drivers of unknown quality): consider a microkernel or separation kernel. Device
+  drivers in Linux and OpenBSD had error rates up to three to seven times higher than the
+  rest of the kernel [S10] and caused most crashes in Windows XP [S11]; a small kernel is what made a
   full functional-correctness proof possible (seL4) [S12].
 - **Hard real-time:** the response measure is a **worst-case bound**, never a percentile
   [S13]. Prove it with schedulability analysis (`quantitative-methods.md` §12). A Linux
@@ -96,10 +98,10 @@ candidate; the ADR records the rows, not the verdict:
 | Change | Gate before deciding | Why it is significant |
 |---|---|---|
 | I/O model (blocking → readiness → completion → kernel bypass) | a profile showing the kernel I/O path is the bottleneck [S19] | rewrites the program's structure; bypass gives up the kernel's security and management functions [S20] |
-| Adopt `io_uring` | threat model row for it | 60% of exploits submitted to Google's kernel bounty in 2022 used it; Google disabled it on ChromeOS and production servers [S21] |
+| Adopt `io_uring` | threat model row for it | 60% of the exploits submitted to Google's kernel bounty in the year to June 2023 used it; Google disabled it on ChromeOS and production servers [S21] |
 | CPU limits on latency-critical workloads | load test with the limits in place | bandwidth control throttles a group for the rest of the period once its quota is spent, which shows up as tail latency, not in average CPU [S22] |
 | Third-party kernel-mode component (agent, driver) | staged rollout and rollback for its updates, including content updates | a faulty update to one kernel-mode security driver crashed about 8.5 million Windows devices in July 2024 [S23]; Apple and Microsoft are both moving such components out of kernel mode [S52][S56] |
-| Kernel extension | prefer eBPF over a loadable module where the use case fits | eBPF programs pass a verifier before loading; modules run unchecked with full privilege [S24] |
+| Kernel extension | prefer eBPF over a loadable module where the use case fits | eBPF programs must pass a verifier before loading [S24]; a loadable module has no equivalent check and runs with full kernel privilege |
 | Language for new system components | none; record it | memory-safety bugs are about 70% of Microsoft's CVEs [S25]; CISA/NSA ask vendors for memory-safe roadmaps [S26] |
 | Boot or update chain | — | platform firmware must be protected, detect corruption and recover [S27] |
 
@@ -114,7 +116,7 @@ Each cell names the governing standard itself; use the edition the project is bo
 | Avionics | DO-178C (+ DO-330, DO-297) | DO-326A / ED-202A |
 | Medical | IEC 62304 | IEC 81001-5-1 |
 | Railway | EN 50716:2023 (replaced EN 50128 and EN 50657) [S28] | CLC/TS 50701 |
-| Any product with digital elements on the EU market | — | Cyber Resilience Act, Reg. (EU) 2024/2847: reporting obligations from 11 Sep 2026, other obligations from 11 Dec 2027 [S29] |
+| Any product with digital elements on the EU market | — | Cyber Resilience Act, Reg. (EU) 2024/2847: reporting obligations (Art. 14) apply since 11 Sep 2026, the remaining obligations from 11 Dec 2027 (Art. 71) [S29] |
 
 Hazards become `Q.xx` against the ISO/IEC 25010:2023 **Safety** characteristic
 (`standards.md`). Link the safety case from `AD.md`; do not retype it.
@@ -124,7 +126,7 @@ Hazards become `Q.xx` against the ISO/IEC 25010:2023 **Safety** characteristic
 This is the skill's founding question (SKILL.md §1) applied to operating systems.
 
 Linux reimplements the Unix design, and XNU (macOS, iOS) builds on it through its BSD
-layer [S54]; both expose the same POSIX process and permission model. The core
+layer [S54]; both implement the POSIX process and permission model [S34]. The core
 abstractions (processes created with `fork`, everything as a file, users and a superuser,
 synchronous system calls) were published in 1974 [S33], the POSIX interface was
 standardised in 1988 [S34], and Linux dates from 1991 [S49]. That design is **proven**: its
@@ -140,16 +142,17 @@ build the same rows from that system's own sources.
 | Mechanism | Assumption of its era | What has changed (source) | Clean-sheet direction | In current kernels |
 |---|---|---|---|---|
 | `fork` + `exec` | copying a small address space is cheap | fork is slow for large address spaces, unsafe with threads, and constrains OS design; the authors argue it should be deprecated [S37] | spawn-style creation | `posix_spawn` [S34], `vfork`/`clone3` |
-| Synchronous, one-at-a-time system calls; kernel on every I/O | devices are slow relative to a mode switch | at microsecond-scale devices, mode switches and cache pollution dominate [S38]; dataplane designs put the kernel in the control plane only [S39][S40] | asynchronous, batched submission; kernel as control plane | `io_uring` (with its attack-surface caveat, §2.3), AF_XDP [S51] |
-| Monolithic kernel in C, one privileged address space | one trusted team, few drivers, no hostile network | 40% of critical Linux CVEs would be eliminated, and almost all others reduced below critical, by a verified-microkernel design [S41]; memory-safety bugs dominate CVEs [S25] | microkernel with user-mode servers; memory-safe languages | Linux: Rust for new drivers [S50], eBPF instead of modules [S24]; XNU: drivers in user space through DriverKit [S52] |
-| Ambient authority: user IDs, a superuser, global namespaces | a shared time-sharing machine with trusted users | programs act with authority they did not intend to use (the confused deputy) [S42] | capabilities: a program holds only the handles it was given | Capsicum on FreeBSD [S43]; Landlock, seccomp, namespaces on Linux [S44]; App Sandbox and entitlements on Apple platforms [S53] |
+| Synchronous, one-at-a-time system calls; kernel on every I/O | devices are slow relative to a mode switch | a synchronous system call costs more than the mode switch: it flushes the pipeline and pollutes caches and TLBs, degrading user-mode performance [S38]; dataplane designs put the kernel in the control plane only [S39][S40] | asynchronous, batched submission; kernel as control plane | `io_uring` (with its attack-surface caveat, §2.3), AF_XDP [S51] |
+| Monolithic kernel in C, one privileged address space | one trusted team, few drivers, no hostile network | 40% of critical Linux CVEs would be eliminated, and almost all others reduced below critical, by a verified-microkernel design [S41]; memory-safety bugs are about 70% of Microsoft's CVEs [S25] | microkernel with user-mode servers; memory-safe languages | Linux: Rust for new drivers [S50], eBPF instead of modules [S24]; XNU: drivers in user space through DriverKit [S52] |
+| Ambient authority: user IDs, a superuser, global namespaces | a shared time-sharing machine with trusted users | programs act with authority they did not intend to use (the confused deputy) [S42] | capabilities: a program holds only the handles it was given | Capsicum on FreeBSD [S43]; Landlock [S44], seccomp [S66] and namespaces [S67] on Linux; App Sandbox and entitlements on Apple platforms [S53] |
 | A global lock (Linux's Big Kernel Lock, CPython's GIL) | few CPUs; serialise everything to add multiprocessor support quickly | one lock serialises all work and adds latency; code comes to depend on its implicit serialisation, so Linux needed until 2.6.39 (2011) to remove the BKL [S59][S60], and making CPython's GIL optional required an ABI-incompatible build [S62]; the bottlenecks yield to per-core data and finer-grained locking [S61] | no global serialisation point; interfaces whose operations commute, so they can be implemented to scale [S63] | fine-grained locks, per-CPU data, RCU [S64] |
 | File durability through `write`/`fsync`/`rename` conventions | simple disks, single writer | applications routinely get crash consistency wrong on POSIX file systems [S45], and `fsync` failure handling is unreliable [S46] | explicit, ordered or transactional storage interfaces | delegate durability to a storage engine that has been tested for it; do not hand-roll |
 | The OS controls one homogeneous machine | the CPU is the computer | modern platforms are many cores, accelerators and firmware-controlled processors the OS does not govern [S36][S47] | the platform as a distributed system | treat firmware, BMC and device processors as TCB and threat-model them (§2.3, [S27]); where the OS vendor also designs the silicon, kernel integrity can be enforced in hardware (Apple: KIP, PAC, SSV) [S53] |
 
 2. **Decide per mechanism**, and record which of the three the ADR chose:
    - **Keep** — the default when building *on* an established OS: the proven design plus
-     its ecosystem beats an untested alternative, the "worse is better" effect [S48], and
+     its ecosystem; a simpler design that is already widely adopted tends to beat a
+     better-designed newcomer ("worse is better") [S48], and
      `anti_over_engineering.md` (Chesterton's fence, boring technology) applies.
    - **Work around** — use the current mechanism *inside* the proven OS (last column) when a
      measured `Q.xx` hits the inherited assumption.
@@ -285,7 +288,7 @@ Raise each as a finding with its source:
 | S45 | T. S. Pillai et al., *All File Systems Are Not Created Equal: On the Complexity of Crafting Crash-Consistent Applications*, OSDI 2014 |
 | S46 | A. Rebello et al., *Can Applications Recover from fsync Failures?*, USENIX ATC 2020 |
 | S47 | A. Baumann, *Hardware is the new software*, HotOS 2017 |
-| S48 | R. Gabriel, *Lisp: Good News, Bad News, How to Win Big* ("worse is better"), 1991 |
+| S48 | R. Gabriel, *Lisp: Good News, Bad News, How to Win Big* ("worse is better"; written 1989–90, published in *AI Expert*, 1991) |
 | S49 | L. Torvalds, announcement of Linux on comp.os.minix, 25 August 1991 |
 | S50 | Linux kernel documentation, *Rust*, https://docs.kernel.org/rust/index.html |
 | S51 | Linux kernel documentation, *AF_XDP*, https://docs.kernel.org/networking/af_xdp.html |
@@ -303,3 +306,5 @@ Raise each as a finding with its source:
 | S63 | A. Clements et al., *The Scalable Commutativity Rule: Designing Scalable Software for Multicore Processors*, SOSP 2013 |
 | S64 | Linux kernel documentation, *What is RCU?*, https://docs.kernel.org/RCU/whatisRCU.html |
 | S65 | Linux kernel documentation, *dm-verity*, https://docs.kernel.org/admin-guide/device-mapper/verity.html |
+| S66 | Linux kernel documentation, *Seccomp BPF*, https://docs.kernel.org/userspace-api/seccomp_filter.html |
+| S67 | Linux man-pages, *namespaces(7)*, https://man7.org/linux/man-pages/man7/namespaces.7.html |
