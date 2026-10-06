@@ -140,7 +140,10 @@ software (kernel, hypervisor, driver, runtime), chooses an isolation boundary or
 base, designs connectivity or segmentation, sets a region/failure-domain topology, or meets
 a `Q.xx` that only the substrate can meet (jitter, WCET, cross-region latency), use the same
 discipline with the substrate references: `systems-architecture.md`,
-`network-architecture.md`, `cloud-architecture.md`. Shared networks and landing zones are
+`network-architecture.md`, `cloud-architecture.md`. Keep two questions apart there: *is it
+proven?* and *is this how it would be designed today?* — Linux and POSIX carry 1970s Unix
+assumptions that work but that current OS research would not repeat; decide per mechanism to
+work with, around, or replace them (`systems-architecture.md` §2.5). Shared networks and landing zones are
 enterprise/solution altitude; a system's HLD states what it runs on and needs, and links to
 them.
 
@@ -460,7 +463,8 @@ manifest in the index README). Condensed:
   existing system or any platform-lifecycle question.
 - `references/systems-architecture.md` — **procedure for the OS/kernel substrate**: derive it
   from Dockerfiles, manifests and IaC; choose the isolation boundary from the trust model;
-  choose the OS/RTOS base; evidence gates for kernel-level changes; which safety/security
+  choose the OS/RTOS base; evidence gates for kernel-level changes; proven vs clean-sheet
+  (the Unix assumptions in Linux, and when to work with, around, or replace them); which safety/security
   standard applies; support dates recorded with their URL; review flags. Every rule cited.
 - `references/network-architecture.md` — **procedure for network design**: derive the as-is
   flows from IaC and policies; check placement against the physics floor first; static

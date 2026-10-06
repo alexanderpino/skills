@@ -106,6 +106,42 @@ Each cell names the governing standard itself; use the edition the project is bo
 Hazards become `Q.xx` against the ISO/IEC 25010:2023 **Safety** characteristic
 (`standards.md`). Link the safety case from `AD.md`; do not retype it.
 
+### 2.5 Proven is not the same as current — separate the two questions
+
+Linux reimplements the Unix design: the core abstractions (processes created with `fork`,
+everything as a file, users and a superuser, synchronous system calls) were published in
+1974 [S33], the POSIX interface was standardised in 1988 [S34], and Linux itself dates from
+1991 [S49]. That design is **proven**: its track record, drivers, tooling and skills are real
+evidence and the reason it is the default. Some of its assumptions are **no longer how the
+research community would build an OS from scratch** [S35][S36]. Treat these as two separate
+questions in every substrate decision, and never let one answer the other.
+
+1. **Name the inherited assumption** behind the mechanism the decision touches:
+
+| Mechanism | Assumption of its era | What has changed (source) | Clean-sheet direction | Inside Linux today |
+|---|---|---|---|---|
+| `fork` + `exec` | copying a small address space is cheap | fork is slow for large address spaces, unsafe with threads, and constrains OS design; the authors argue it should be deprecated [S37] | spawn-style creation | `posix_spawn` [S34], `vfork`/`clone3` |
+| Synchronous, one-at-a-time system calls; kernel on every I/O | devices are slow relative to a mode switch | at microsecond-scale devices, mode switches and cache pollution dominate [S38]; dataplane designs put the kernel in the control plane only [S39][S40] | asynchronous, batched submission; kernel as control plane | `io_uring` (with its attack-surface caveat, §2.3), AF_XDP [S51] |
+| Monolithic kernel in C, one privileged address space | one trusted team, few drivers, no hostile network | 40% of critical Linux CVEs would be eliminated, and almost all others reduced below critical, by a verified-microkernel design [S41]; memory-safety bugs dominate CVEs [S25] | microkernel with user-mode servers; memory-safe languages | Rust for new drivers [S50]; eBPF instead of modules [S24] |
+| Ambient authority: user IDs, a superuser, global namespaces | a shared time-sharing machine with trusted users | programs act with authority they did not intend to use (the confused deputy) [S42] | capabilities: a program holds only the handles it was given | Capsicum on FreeBSD [S43]; Landlock, seccomp, namespaces on Linux [S44] |
+| File durability through `write`/`fsync`/`rename` conventions | simple disks, single writer | applications routinely get crash consistency wrong on POSIX file systems [S45], and `fsync` failure handling is unreliable [S46] | explicit, ordered or transactional storage interfaces | delegate durability to a storage engine that has been tested for it; do not hand-roll |
+| The OS controls one homogeneous machine | the CPU is the computer | modern platforms are many cores, accelerators and firmware-controlled processors the OS does not govern [S36][S47] | the platform as a distributed system | treat firmware, BMC and device processors as TCB and threat-model them (§2.3, [S27]) |
+
+2. **Decide per mechanism**, and record which of the three the ADR chose:
+   - **Work with it** — the default when building *on* Linux: the proven design plus its
+     ecosystem beats an untested alternative, the "worse is better" effect [S48], and
+     `anti_over_engineering.md` (Chesterton's fence, boring technology) applies.
+   - **Work around it** — use the modern mechanism *inside* the proven OS (column 5), when a
+     measured `Q.xx` hits the inherited assumption.
+   - **Replace it** — choose or build a clean-sheet design (microkernel, separation kernel,
+     unikernel, capability OS) only when a driver is **structurally** unreachable with the
+     inherited design: a TCB small enough to verify or certify, untrusted multi-tenancy with
+     a small attack surface, or a hard real-time bound. Name that driver in the ADR.
+3. **Do not copy an inherited idiom into an interface you design.** A new platform API,
+   plug-in model, agent runtime or device OS starts from the clean-sheet column: explicit
+   capabilities instead of ambient authority, asynchronous submission, explicit durability.
+   Copying the legacy idiom is acceptable only with a recorded compatibility driver.
+
 ---
 
 ## 3. Record
@@ -115,6 +151,7 @@ Hazards become `Q.xx` against the ISO/IEC 25010:2023 **Safety** characteristic
 | PRD | `Q.xx` for jitter, worst-case response, boot time, density; `C.xx` for integrity level, support horizon (with URL), CPU architecture, minimum kernel |
 | HLD §6 | per container: OS + kernel line, runtime, isolation boundary, CPU architecture, node pool |
 | HLD §7 | I/O and concurrency model, scheduling policy, update and rollback mechanism |
+| ADR | for every substrate decision: the inherited assumption it touches and whether it works with, around, or replaces it (§2.5) |
 | HLD §8 | threat rows from §5 below |
 | SD | task set, priorities, locking protocol, schedulability result (real-time only) |
 | Fitness functions (`automation.md`) | latency test under load as a gate; seccomp-profile drift; image CVE scan; kernel hardening config check; boot-time budget |
@@ -149,6 +186,11 @@ Raise each as a finding with its source:
 - kernel bypass, custom modules or real-time tuning without the profile or `Q.xx` that
   justifies them (`anti_over_engineering.md`, Metrics First) [S19];
 - a platform component past end of support, or with no recorded support date [S30].
+- a substrate ADR that answers "is it proven?" but not "would we build it this way now?",
+  or the reverse: rejecting Linux because its design is old, with no driver it
+  structurally cannot meet (§2.5) [S41][S48];
+- a new interface that copies `fork`-style creation, ambient authority or implicit
+  durability without a compatibility driver (§2.5) [S37][S42][S45].
 
 ---
 
@@ -188,3 +230,22 @@ Raise each as a finding with its source:
 | S30 | CISA, *Bad Practices* (use of unsupported or end-of-life software) |
 | S31 | Civil Infrastructure Platform, super long-term support kernels, https://www.cip-project.org |
 | S32 | NSA and CISA, *Kubernetes Hardening Guide* (2022) |
+| S33 | D. Ritchie, K. Thompson, *The UNIX Time-Sharing System*, CACM 17(7), 1974 |
+| S34 | IEEE Std 1003.1 (POSIX.1), first edition 1988; current edition defines `posix_spawn` |
+| S35 | A. Baumann et al., *The Multikernel: A New OS Architecture for Scalable Multicore Systems*, SOSP 2009 |
+| S36 | T. Roscoe, *It's Time for Operating Systems to Rediscover Hardware*, keynote, USENIX OSDI/ATC 2021 |
+| S37 | A. Baumann, J. Appavoo, O. Krieger, T. Roscoe, *A fork() in the road*, HotOS 2019 |
+| S38 | L. Soares, M. Stumm, *FlexSC: Flexible System Call Scheduling with Exception-Less System Calls*, OSDI 2010 |
+| S39 | S. Peter et al., *Arrakis: The Operating System is the Control Plane*, OSDI 2014 |
+| S40 | A. Belay et al., *IX: A Protected Dataplane Operating System for High Throughput and Low Latency*, OSDI 2014 |
+| S41 | S. Biggs, D. Lee, G. Heiser, *The Jury Is In: Monolithic OS Design Is Flawed*, APSys 2018 |
+| S42 | N. Hardy, *The Confused Deputy (or why capabilities might have been invented)*, ACM SIGOPS OSR 22(4), 1988 |
+| S43 | R. Watson, J. Anderson, B. Laurie, K. Kennaway, *Capsicum: Practical Capabilities for UNIX*, USENIX Security 2010 |
+| S44 | Linux kernel documentation, *Landlock: unprivileged access control*, https://docs.kernel.org/userspace-api/landlock.html |
+| S45 | T. S. Pillai et al., *All File Systems Are Not Created Equal: On the Complexity of Crafting Crash-Consistent Applications*, OSDI 2014 |
+| S46 | A. Rebello et al., *Can Applications Recover from fsync Failures?*, USENIX ATC 2020 |
+| S47 | A. Baumann, *Hardware is the new software*, HotOS 2017 |
+| S48 | R. Gabriel, *Lisp: Good News, Bad News, How to Win Big* ("worse is better"), 1991 |
+| S49 | L. Torvalds, announcement of Linux on comp.os.minix, 25 August 1991 |
+| S50 | Linux kernel documentation, *Rust*, https://docs.kernel.org/rust/index.html |
+| S51 | Linux kernel documentation, *AF_XDP*, https://docs.kernel.org/networking/af_xdp.html |
