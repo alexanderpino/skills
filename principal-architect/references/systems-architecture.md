@@ -58,6 +58,19 @@ measure**, and the **field life** of the product.
 
 ### 2.2 OS or RTOS base
 
+**Compare kernels per criterion, never by reputation.** "X is the better kernel" is a
+hypothesis, whoever says it, Linux included. Turn it into rows and collect evidence per
+candidate; the ADR records the rows, not the verdict:
+
+| Criterion | Evidence to collect per candidate |
+|---|---|
+| Can it run where the system must run? | the vendor's hardware support list and the licence. Example: macOS (XNU) is licensed for Apple hardware only, and cloud Mac capacity comes as dedicated hosts with a 24-hour minimum allocation [S57][S58] |
+| Where does third-party code run? | the extension model: Linux loadable modules vs eBPF [S24]; on macOS kernel extensions are deprecated in favour of System Extensions and DriverKit in user space [S52]; Microsoft is moving security products out of Windows kernel mode [S56] |
+| How large is the privileged base? | the kernel structure: XNU combines Mach, a BSD layer and the I/O Kit driver framework in one kernel address space [S54] — hybrid, not a microkernel in operation |
+| How is the running system's integrity protected? | boot and runtime integrity mechanisms and what hardware they need: on Apple silicon, Kernel Integrity Protection, Pointer Authentication and the Signed System Volume [S53]; firmware resiliency in general [S27] |
+| Can you audit and patch it yourself? | source availability (Linux; XNU's source is published [S55]) and who can ship a fix |
+| Ecosystem, skills, support horizon | drivers, tooling and people available to you; the support dates (§4) |
+
 - **General-purpose servers:** default to the distribution the organisation already
   operates (the boring-technology rule, `anti_over_engineering.md`). The decision that
   matters is the support horizon (§4).
@@ -85,7 +98,7 @@ measure**, and the **field life** of the product.
 | I/O model (blocking → readiness → completion → kernel bypass) | a profile showing the kernel I/O path is the bottleneck [S19] | rewrites the program's structure; bypass gives up the kernel's security and management functions [S20] |
 | Adopt `io_uring` | threat model row for it | 60% of exploits submitted to Google's kernel bounty in 2022 used it; Google disabled it on ChromeOS and production servers [S21] |
 | CPU limits on latency-critical workloads | load test with the limits in place | bandwidth control throttles a group for the rest of the period once its quota is spent, which shows up as tail latency, not in average CPU [S22] |
-| Third-party kernel-mode component (agent, driver) | staged rollout and rollback for its updates, including content updates | a faulty update to one kernel-mode security driver crashed about 8.5 million Windows devices in July 2024 [S23] |
+| Third-party kernel-mode component (agent, driver) | staged rollout and rollback for its updates, including content updates | a faulty update to one kernel-mode security driver crashed about 8.5 million Windows devices in July 2024 [S23]; Apple and Microsoft are both moving such components out of kernel mode [S52][S56] |
 | Kernel extension | prefer eBPF over a loadable module where the use case fits | eBPF programs pass a verifier before loading; modules run unchecked with full privilege [S24] |
 | Language for new system components | none; record it | memory-safety bugs are about 70% of Microsoft's CVEs [S25]; CISA/NSA ask vendors for memory-safe roadmaps [S26] |
 | Boot or update chain | — | platform firmware must be protected, detect corruption and recover [S27] |
@@ -108,7 +121,8 @@ Hazards become `Q.xx` against the ISO/IEC 25010:2023 **Safety** characteristic
 
 ### 2.5 Proven is not the same as current — separate the two questions
 
-Linux reimplements the Unix design: the core abstractions (processes created with `fork`,
+Linux reimplements the Unix design, and XNU (macOS, iOS) builds on it too through its BSD
+layer [S54]; both expose the same POSIX process and permission model. The core abstractions (processes created with `fork`,
 everything as a file, users and a superuser, synchronous system calls) were published in
 1974 [S33], the POSIX interface was standardised in 1988 [S34], and Linux itself dates from
 1991 [S49]. That design is **proven**: its track record, drivers, tooling and skills are real
@@ -118,17 +132,17 @@ questions in every substrate decision, and never let one answer the other.
 
 1. **Name the inherited assumption** behind the mechanism the decision touches:
 
-| Mechanism | Assumption of its era | What has changed (source) | Clean-sheet direction | Inside Linux today |
+| Mechanism | Assumption of its era | What has changed (source) | Clean-sheet direction | In current kernels |
 |---|---|---|---|---|
 | `fork` + `exec` | copying a small address space is cheap | fork is slow for large address spaces, unsafe with threads, and constrains OS design; the authors argue it should be deprecated [S37] | spawn-style creation | `posix_spawn` [S34], `vfork`/`clone3` |
 | Synchronous, one-at-a-time system calls; kernel on every I/O | devices are slow relative to a mode switch | at microsecond-scale devices, mode switches and cache pollution dominate [S38]; dataplane designs put the kernel in the control plane only [S39][S40] | asynchronous, batched submission; kernel as control plane | `io_uring` (with its attack-surface caveat, §2.3), AF_XDP [S51] |
-| Monolithic kernel in C, one privileged address space | one trusted team, few drivers, no hostile network | 40% of critical Linux CVEs would be eliminated, and almost all others reduced below critical, by a verified-microkernel design [S41]; memory-safety bugs dominate CVEs [S25] | microkernel with user-mode servers; memory-safe languages | Rust for new drivers [S50]; eBPF instead of modules [S24] |
-| Ambient authority: user IDs, a superuser, global namespaces | a shared time-sharing machine with trusted users | programs act with authority they did not intend to use (the confused deputy) [S42] | capabilities: a program holds only the handles it was given | Capsicum on FreeBSD [S43]; Landlock, seccomp, namespaces on Linux [S44] |
+| Monolithic kernel in C, one privileged address space | one trusted team, few drivers, no hostile network | 40% of critical Linux CVEs would be eliminated, and almost all others reduced below critical, by a verified-microkernel design [S41]; memory-safety bugs dominate CVEs [S25] | microkernel with user-mode servers; memory-safe languages | Linux: Rust for new drivers [S50], eBPF instead of modules [S24]; XNU: drivers in user space through DriverKit [S52] |
+| Ambient authority: user IDs, a superuser, global namespaces | a shared time-sharing machine with trusted users | programs act with authority they did not intend to use (the confused deputy) [S42] | capabilities: a program holds only the handles it was given | Capsicum on FreeBSD [S43]; Landlock, seccomp, namespaces on Linux [S44]; App Sandbox and entitlements on Apple platforms [S53] |
 | File durability through `write`/`fsync`/`rename` conventions | simple disks, single writer | applications routinely get crash consistency wrong on POSIX file systems [S45], and `fsync` failure handling is unreliable [S46] | explicit, ordered or transactional storage interfaces | delegate durability to a storage engine that has been tested for it; do not hand-roll |
-| The OS controls one homogeneous machine | the CPU is the computer | modern platforms are many cores, accelerators and firmware-controlled processors the OS does not govern [S36][S47] | the platform as a distributed system | treat firmware, BMC and device processors as TCB and threat-model them (§2.3, [S27]) |
+| The OS controls one homogeneous machine | the CPU is the computer | modern platforms are many cores, accelerators and firmware-controlled processors the OS does not govern [S36][S47] | the platform as a distributed system | treat firmware, BMC and device processors as TCB and threat-model them (§2.3, [S27]); where the OS vendor also designs the silicon, kernel integrity can be enforced in hardware (Apple: KIP, PAC, SSV) [S53] |
 
 2. **Decide per mechanism**, and record which of the three the ADR chose:
-   - **Work with it** — the default when building *on* Linux: the proven design plus its
+   - **Work with it** — the default when building *on* an established OS: the proven design plus its
      ecosystem beats an untested alternative, the "worse is better" effect [S48], and
      `anti_over_engineering.md` (Chesterton's fence, boring technology) applies.
    - **Work around it** — use the modern mechanism *inside* the proven OS (column 5), when a
@@ -186,6 +200,8 @@ Raise each as a finding with its source:
 - kernel bypass, custom modules or real-time tuning without the profile or `Q.xx` that
   justifies them (`anti_over_engineering.md`, Metrics First) [S19];
 - a platform component past end of support, or with no recorded support date [S30].
+- a kernel or OS preference ("X is better") recorded without per-criterion evidence, for
+  any kernel (§2.2);
 - a substrate ADR that answers "is it proven?" but not "would we build it this way now?",
   or the reverse: rejecting Linux because its design is old, with no driver it
   structurally cannot meet (§2.5) [S41][S48];
@@ -249,3 +265,10 @@ Raise each as a finding with its source:
 | S49 | L. Torvalds, announcement of Linux on comp.os.minix, 25 August 1991 |
 | S50 | Linux kernel documentation, *Rust*, https://docs.kernel.org/rust/index.html |
 | S51 | Linux kernel documentation, *AF_XDP*, https://docs.kernel.org/networking/af_xdp.html |
+| S52 | Apple Developer, *Deprecated Kernel Extensions and System Extension Alternatives*, https://developer.apple.com/support/kernel-extensions/ |
+| S53 | Apple, *Apple Platform Security* guide, https://support.apple.com/guide/security/ |
+| S54 | Apple, *Kernel Programming Guide*, "Kernel Architecture Overview" (Apple Developer Documentation Archive) |
+| S55 | Apple, XNU source, https://github.com/apple-oss-distributions/xnu |
+| S56 | Microsoft, *Windows security and resiliency: Protecting your business*, Windows Experience Blog, 19 November 2024 |
+| S57 | Apple, *macOS Software License Agreement* (virtualisation and leasing clauses) |
+| S58 | AWS, *Amazon EC2 Mac instances FAQ* (24-hour minimum Dedicated Host allocation) |
