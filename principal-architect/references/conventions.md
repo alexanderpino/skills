@@ -209,7 +209,27 @@ sed -n '/^|/p' docs/architecture/decisions/README.md
 If a new field would be useful to filter on, add it to front-matter rather than
 burying the fact in prose — prose is for humans, front-matter is for agents.
 
-## 7. Style
+## 7. Change folders (`changes/<id>/`)
+
+A change is the unit the workflows in `references/workflows/` plan, apply, verify and
+archive. Its folder holds two files, scaffolded by `arch.py new`:
+
+- `change.md` — front-matter `id` (kebab-case, the folder name), `title`, `status`
+  (`draft` while active, `done` once archived), `level`, `archetype` (a Triage row:
+  `local`, `significant`, `published-interface`, …), `date`, `base` (the branch it is
+  compared against), `affects`, `records` (the ADR/RFC ids it minted) and `conflicts`
+  (accepted ADRs it contradicts; each must be superseded by one of its records). Body:
+  Intent · Evidence · Decisions on record · Triage · Assumptions and gaps.
+- `tasks.md` — `- [ ] N.M <edit>` checkboxes, each naming its target path in
+  backticks; `arch.py verify` checks that every path a ticked task names really changed.
+
+Records live in `decisions/` from the moment they are minted (status `proposed`/`draft`),
+so links to them never move. Archive accepts them, syncs the decision log, and moves the
+folder to `changes/archive/YYYY-MM-DD-<id>/` with its relative links rewritten. Archived
+changes are history: never edit or delete them. Never hand-edit the state fields
+(`status`, `records`, a record's `status`); the CLI keeps them consistent.
+
+## 8. Style
 
 - **Write for humans, index for machines.** The YAML front-matter and IDs exist so agents can filter and find things. The document body itself **must** be written as natural, human-readable prose. Write exactly as a human Principal Architect would: use clear, accessible terminology, explain the *why* conversationally, and avoid robotic "AI-isms" or overly rigid jargon.
 - Imperative, concrete, short. A doc nobody updates is a liability.

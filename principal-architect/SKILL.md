@@ -243,6 +243,38 @@ possible the whole set is enforced as **Architecture-as-Code in CI** — front-m
 linting, conformance-checklist validation, diagram rendering, architecture fitness functions,
 and an Infracost cost gate (`references/automation.md`).
 
+## Change workflow — the steps below, made repeatable
+
+Any change the triage says needs documentation runs as a **change**: a folder
+`<root>/changes/<id>/` holding `change.md` (intent, evidence, binding decisions, triage,
+assumptions) and `tasks.md` (one checkbox per edit), plus the ADRs/RFCs it mints into
+`decisions/`. The state lives in files and is read by one CLI, so the work survives a
+new session and nobody has to remember what was done. The CLI is
+`python3 <this skill's directory>/scripts/arch.py` (written `ARCH` in the workflows):
+pure stdlib, `--json` on every command, and the source of truth for state.
+
+```mermaid
+flowchart LR
+    C[consult<br/>read-only] --> P[propose<br/>planning only] --> A[apply<br/>tasks] --> V[verify<br/>two gates] --> R[archive<br/>accept + log]
+    B[bootstrap<br/>no docs yet] --> P
+```
+
+| Workflow | Does | Boundary | CLI it drives | Command |
+| --- | --- | --- | --- | --- |
+| `references/workflows/consult.md` | Steps 0–1: what binds the work, conflicts, triage | writes nothing | `context`, `consult` | `/arch-consult` |
+| `references/workflows/propose.md` | plan the change, mint records, write tasks | no living docs, no code | `new`, `record`, `status` | `/arch-propose` |
+| `references/workflows/apply.md` | Steps 2–4, task by task | only what a task names | `status`, `consult` | `/arch-apply` |
+| `references/workflows/verify.md` | Step 5: mechanical + judgement gate | reports, does not fix | `verify` | `/arch-verify` |
+| `references/workflows/archive.md` | accept records, sync the log, archive | only after the user's yes | `archive` | `/arch-archive` |
+| `references/workflows/bootstrap.md` | first docs for one slice | one slice, confirmed first | `init`, `new` | `/arch-bootstrap` |
+
+When a request matches one of these, **read that workflow file and follow its steps** —
+with or without the command; `/principal-architect help` explains them to the user. A
+`trivial` change gets no change folder. The CLI enforces the triage mechanically: an
+archetype that requires a decision record cannot leave `blocked` without one, a
+contradicted ADR (`conflicts:`) blocks until a record in the change supersedes it, and
+archive refuses while verify reports anything CRITICAL.
+
 ## Step 0 — Locate the docs root
 
 Resolve where architecture docs live, in this order, and **use the first hit**:
@@ -257,7 +289,9 @@ Resolve where architecture docs live, in this order, and **use the first hit**:
    pointer. If one exists, use it — do not create a competing tree.
 3. **Default.** `docs/architecture/`. Create it (see Step 4 for the layout).
 
-Run a quick check before assuming, e.g.:
+`arch.py context --json` applies this order deterministically and reports which rule
+won (`root_resolved_by`), the inventory, and the next free ADR/RFC numbers. Without
+the CLI, check before assuming:
 `ls docs/architecture docs/adr docs/decisions architecture adr 2>/dev/null` and
 `grep -ri "architecture" .architecture.* mkdocs.yml 2>/dev/null`.
 
@@ -274,7 +308,9 @@ Before you write a plan or touch code:
 2. **Read what's relevant to the task** — not everything. Typically: the PRD
    drivers the task touches, the HLD section for the affected area, the SD(s) for
    the affected component(s), and any ADR whose `affects:` front-matter overlaps
-   the task. Grep is your friend:
+   the task. `arch.py consult --json` finds them from the files the work touches
+   (`ARCH-REF:` markers are strong evidence; `affects:` and name matches are
+   candidates to read), or grep directly:
    `grep -rl "affects:.*<component>" <root>/decisions/`.
 3. **Check for conflicts.** If the intended approach contradicts an `accepted`
    ADR, stop and surface it. Either the plan changes, or a new ADR **supersedes**
@@ -442,15 +478,20 @@ twenty, and that keeps the docs ISO-conformant. Letting them drift defeats the s
 Docs you wrote but never checked are docs you assume are right. Two gates, in this order;
 the work is not finished until both pass or every open item is named in your report.
 
-**Mechanical gate — run the validator.** It ships in `assets/ci/tools/arch_lint.py`
-(pure stdlib; copy it to the target repo's `tools/` if it isn't there yet, per
-`assets/ci/README.md`):
+**Mechanical gate — run the validator.** For a change, `arch.py verify --change <id>
+--json` runs it and adds the change checks: planning complete, every task done, every
+path a done task names actually changed, `ARCH-REF:` markers for the change's ADRs in
+the code it touched, new docs linked from the index, HLD/SAD review flags, and the
+decision log in sync. The verify workflow (`references/workflows/verify.md`) reports
+the result. Without a change, run the validator directly; it ships in
+`assets/ci/tools/arch_lint.py` (pure stdlib; copy it to the target repo's `tools/` if
+it isn't there yet, per `assets/ci/README.md`):
 
 ```bash
 python tools/arch_lint.py all --root <root> --src <src>
 ```
 
-It checks front-matter (required fields, status/level values, `ADR-NNNN` ids, reciprocal
+The validator checks front-matter (required fields, status/level values, `ADR-NNNN` ids, reciprocal
 supersession links, the mandatory threat-model and FinOps sections in every HLD/SAD),
 ISO 42010 conformance (every concern framed, every view governed, no unresolved ❌ in the
 checklist), `ARCH-REF:` drift between code and decisions, and relative links. A
@@ -498,11 +539,19 @@ manifest in the index README). Condensed:
 ├── software/                # PRD.md, HLD.md, SD-<area>.md
 ├── requirements/            # user-story-template.md (house format), US-NNN-<slug>.md
 ├── decisions/               # README.md (log), rfc/RFC-NNNN, ADR-NNNN
+├── changes/                 # <id>/change.md + tasks.md while active; archive/<date>-<id>/ after
 └── diagrams/                # workspace.dsl (Structurizr) + exports/
 ```
 
 ## Reference files
 
+- `references/workflows/` — **the change workflow**, one file per step of the lifecycle
+  (`consult`, `propose`, `apply`, `verify`, `archive`, `bootstrap`): numbered steps, the
+  `arch.py` call and JSON fields each step depends on, state handling, output format,
+  guardrails. Read the one that matches the request and follow it.
+- `scripts/arch.py` — the change-workflow CLI (`context`, `consult`, `new`, `record`,
+  `status`, `list`, `verify`, `log`, `archive`, `init`); `scripts/test_arch.py` is its
+  test suite.
 - `references/repository-structure.md` — the canonical, RAG-optimised folder layout + the
   README manifest. Read before initialising docs.
 - `references/methods.md` — **how a master architect derives the content**: mindset,
@@ -596,19 +645,13 @@ manifest in the index README). Condensed:
   ArchiMate/TOGAF views, sequence/flowchart, and the Structurizr DSL pattern.
 - `references/bluebook.md` / `references/apigee.md` — pointers to the `iplan-developer` skill's Chrome CDP debugging bridge docs/scripts for the SSO-gated x-one Bluebook and Apigee Developer Portal (DTA + PRD) respectively — not duplicated here since the two skills are always installed together.
 
-## Command (optional explicit entry point)
-
-The skill triggers on its own; `commands/principal-architect.md` adds `/principal-architect
-<mode> <task>` for picking the mode deliberately: `consult` (Steps 0–1, read-only),
-`propose` (drafts, nothing accepted), `apply` (Steps 2–4, then validate), `validate`
-(Step 5 alone), `bootstrap` (greenfield / reverse-engineer a slice). `help` prints a guide.
-
 ## Template files (in `assets/templates/`)
 
 Enterprise: `enterprise-architecture.md`, `capability-system-map.md`. Solution: `SAD.md`.
 Migration: `transition-architecture.md`. Software: `AD.md` (ISO 42010 root), `PRD.md`,
 `HLD.md`, `SD.md`. Business analysis: `epic.md`, `user-story.md` (format-adaptive). Decisions: `RFC.md`,
-`ADR.md`, `decision-log.md`. Evaluation: `architecture-evaluation.md` (ATAM-lite review of an
+`ADR.md`, `decision-log.md`. Change workflow: `change/change.md`, `change/tasks.md`
+(filled by `arch.py new`). Evaluation: `architecture-evaluation.md` (ATAM-lite review of an
 existing architecture — distinct from the conformance checklist). Shared: `README.md`
 (index/manifest), `GLOSSARY.md`, `conformance-checklist.md`. Copy the relevant one(s) for the
 altitude and fill them in.

@@ -42,6 +42,10 @@ docs/architecture/
 │   │   └── RFC-NNNN-<slug>.md        # Request for Comments (pre-decision)
 │   └── ADR-NNNN-<slug>.md           # accepted decisions (Nygård/MADR), level-tagged
 │
+├── changes/                      # 🔁 CHANGES — the unit of the change workflow (references/workflows/)
+│   ├── <change-id>/                 # active: change.md (intent, evidence, triage) + tasks.md
+│   └── archive/YYYY-MM-DD-<id>/     # applied and verified; history of why the docs read as they do
+│
 └── diagrams/                     # 🖼  models-as-code (optional but recommended)
     ├── workspace.dsl                # Structurizr DSL — single C4 model, many views
     └── exports/                     # generated SVG/PNG (CI artifact, never hand-edited)

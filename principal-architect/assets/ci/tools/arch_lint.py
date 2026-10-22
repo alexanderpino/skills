@@ -158,6 +158,7 @@ def md_files(root):
 
 def doc_kind(path, fm):
     name = os.path.basename(path)
+    if name == "change.md" and "changes" in os.path.normpath(path).split(os.sep): return "CHANGE"
     if name.startswith("ADR-"): return "ADR"
     if name.startswith("RFC-"): return "RFC"
     if name.startswith("US-"): return "US"
@@ -186,7 +187,7 @@ def check_staleness(path, fm, kind, status, max_age):
     """WARN when a LIVING doc hasn't been reviewed/edited within max_age days.
     ADRs and RFCs are exempt: decision records are immutable history — an old
     accepted ADR is healthy; it gets superseded, never re-reviewed."""
-    if not max_age or kind in ("INDEX", "ADR", "RFC") or status not in ("current", "accepted"):
+    if not max_age or kind in ("INDEX", "ADR", "RFC", "CHANGE") or status not in ("current", "accepted"):
         return
     import datetime as _dt
     newest = max(filter(None, (_as_date(fm.get(k)) for k in ("last-reviewed", "updated", "date"))),

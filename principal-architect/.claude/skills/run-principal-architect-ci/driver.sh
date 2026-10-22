@@ -266,6 +266,13 @@ SOUT0="$("$PY" "$LINT" frontmatter --root "$SROOT" --max-age-days 0 2>&1)"
 echo "$SOUT0" | grep -q "stale: " \
   && bad "--max-age-days 0 should disable staleness" || ok "--max-age-days 0 disables staleness"
 
+echo "== 7. change-workflow CLI (scripts/arch.py) test suite (expect OK) =="
+TOUT="$("$PY" "$UNIT/scripts/test_arch.py" 2>&1)"
+rc=$?
+echo "$TOUT" | tail -4 | sed 's/^/    | /'
+[ "$rc" -eq 0 ] && ok "arch.py lifecycle, supersession, RFC route, init, log and verify tests pass" \
+  || bad "arch.py tests failed, exit $rc"
+
 echo
 echo "Summary: $pass passed, $fail failed."
 [ "$fail" -eq 0 ] && { echo "DRIVER OK"; exit 0; } || { echo "DRIVER FAILED"; exit 1; }
