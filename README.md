@@ -90,7 +90,8 @@ skills/
 ├── principal-architect/                 # unpacked, reviewable skill
 │   ├── SKILL.md                       # router + core mental model
 │   ├── references/                    # load-on-demand deep dives
-│   └── assets/                        # templates (PRD/HLD/SD/ADR…) + CI tooling
+│   ├── assets/                        # templates (PRD/HLD/SD/ADR…) + CI tooling
+│   └── commands/                      # optional /principal-architect wrapper (consult/propose/apply/validate/bootstrap)
 ├── reasoning-matrix/                  # unpacked, reviewable skill
 │   ├── SKILL.md                       # router + six-phase method
 │   └── references/                    # lens catalog + worked example

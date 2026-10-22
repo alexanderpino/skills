@@ -437,6 +437,50 @@ After any create/update:
 The index and AD are the contract that lets an agent navigate in two reads instead of
 twenty, and that keeps the docs ISO-conformant. Letting them drift defeats the skill.
 
+## Step 5 — Validate before you call it done
+
+Docs you wrote but never checked are docs you assume are right. Two gates, in this order;
+the work is not finished until both pass or every open item is named in your report.
+
+**Mechanical gate — run the validator.** It ships in `assets/ci/tools/arch_lint.py`
+(pure stdlib; copy it to the target repo's `tools/` if it isn't there yet, per
+`assets/ci/README.md`):
+
+```bash
+python tools/arch_lint.py all --root <root> --src <src>
+```
+
+It checks front-matter (required fields, status/level values, `ADR-NNNN` ids, reciprocal
+supersession links, the mandatory threat-model and FinOps sections in every HLD/SAD),
+ISO 42010 conformance (every concern framed, every view governed, no unresolved ❌ in the
+checklist), `ARCH-REF:` drift between code and decisions, and relative links. A
+`house-profile.yaml` is picked up automatically. Fix what it reports and re-run until it
+exits `0`; use `--strict` when the docs are meant to be complete, since unfilled
+`<placeholders>` are warnings otherwise. Never silence a finding by deleting the section
+it complains about.
+
+**Judgement gate — what the script cannot see.** Walk the artifacts you produced or
+changed and answer, honestly, for each:
+
+1. **Evidence.** Is every fact traceable to code, config, tests, git history, or a named
+   person — and is every guess marked as an assumption or gap, not stated as fact?
+2. **Numbers.** Does every capacity, latency, availability, or cost figure carry its model
+   and assumptions, and say whether it is measured or derived (`quantitative-methods.md`)?
+3. **Simplicity.** Does the design pass the four checks of the anti-over-engineering
+   mandate (§2) — and if an existing mechanism was kept or replaced, did §1 get both of
+   its questions answered separately, with the gap recorded?
+4. **Triage.** Did the change produce *only* the artifacts its archetype calls for, and
+   is anything it does require (an ADR for a breaking interface, a `Q.xx` for a new
+   quality target, a story in the house format) actually there?
+5. **Consistency.** Do the correspondence rules in `AD.md` §7 still hold — does every
+   view, SD, and diagram that corresponds to what you changed say the same thing?
+6. **Voice.** Does the prose read like an engineer explaining a decision to a peer, with
+   the forces and trade-offs on the page, and none of the banned phrases?
+
+Report the outcome in the plan or PR description: validator result, what the judgement
+gate found, and what remains open and why. A gap you name is a gap the next reader can
+close; a gap you hide is a decision made by accident.
+
 ## Default layout created on first use
 
 Use the **universal, RAG-optimised structure** defined in
@@ -551,6 +595,13 @@ manifest in the index README). Condensed:
 - `references/mermaid-guide.md` — C4 L1–L4 copy-paste snippets, the mandate table,
   ArchiMate/TOGAF views, sequence/flowchart, and the Structurizr DSL pattern.
 - `references/bluebook.md` / `references/apigee.md` — pointers to the `iplan-developer` skill's Chrome CDP debugging bridge docs/scripts for the SSO-gated x-one Bluebook and Apigee Developer Portal (DTA + PRD) respectively — not duplicated here since the two skills are always installed together.
+
+## Command (optional explicit entry point)
+
+The skill triggers on its own; `commands/principal-architect.md` adds `/principal-architect
+<mode> <task>` for picking the mode deliberately: `consult` (Steps 0–1, read-only),
+`propose` (drafts, nothing accepted), `apply` (Steps 2–4, then validate), `validate`
+(Step 5 alone), `bootstrap` (greenfield / reverse-engineer a slice). `help` prints a guide.
 
 ## Template files (in `assets/templates/`)
 
