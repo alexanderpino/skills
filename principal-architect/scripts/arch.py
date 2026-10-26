@@ -24,6 +24,10 @@ Commands (add --json for machine-readable output; every workflow uses it):
                               accept records, sync the log, move the change to changes/archive/
   init     [--yes] [--with-ci]
                               lay down the minimal conformant docs root
+  export   openspec|speckit --change ID [--yes] [--force] [--out DIR]
+                              seed an implementation change from the architecture record
+  export   constitution [--yes] [--force] [--out FILE]
+                              spec-kit constitution from the enterprise principles (PR.xx)
 
 Mutating commands (archive, init) are dry runs unless --yes is given.
 Exit codes: 0 ok · 1 the command ran and reports a failing state (verify with CRITICAL,
@@ -1340,6 +1344,36 @@ def cmd_init(args):
          + ("" if r["applied"] else "\n(dry run — pass --yes to create)"))
 
 
+# ---------------------------------------------------------------- export
+def cmd_export(args):
+    import arch_export
+    ctx = resolve(args)
+    require_root(ctx)
+    me = sys.modules[__name__]
+    if args.target == "constitution":
+        out = arch_export.export_constitution(me, ctx, yes=args.yes, force=args.force, out=args.out)
+        emit(out, args.json, lambda r: f"{'wrote' if r['applied'] else 'would write'} {r['dest']} from "
+                                       f"{', '.join(r['principles'])} ({r['source']})"
+                                       + ("" if r["applied"] else "\n(dry run — pass --yes to write)"))
+        return
+    cid, cdir, archived, _ = select_change(ctx, args.change)
+    state = change_state(ctx, cid, cdir, archived)
+    out = arch_export.export(me, ctx, state, args.target, yes=args.yes, force=args.force, out=args.out)
+
+    def human(r):
+        lines = [f"{'wrote' if r['applied'] else 'would write'} {r['target']} seed at {r['dest']}/"]
+        lines += [f"  {p['action']:<5} {p['path']}{'  (overwrites)' if p['overwrites'] else ''}" for p in r["plan"]]
+        d = r["derived"]
+        lines.append(f"derived from: {', '.join(d['records']) or 'no records'}; drivers {', '.join(d['drivers']) or '-'}; "
+                     f"quality {', '.join(d['quality']) or '-'}; stories {', '.join(d['stories']) or '-'}; capability {d['capability']}")
+        lines += [f"  gap: {g}" for g in r["gaps"]]
+        lines.append(f"gate: {r['gate']}")
+        if not r["applied"]:
+            lines.append("(dry run — pass --yes to write)")
+        return "\n".join(lines)
+    emit(out, args.json, human)
+
+
 # ---------------------------------------------------------------- main
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="arch.py", description=__doc__.split("\n\n")[1],
@@ -1392,6 +1426,13 @@ def main(argv=None):
     p.add_argument("--yes", action="store_true")
     p.add_argument("--with-ci", action="store_true")
     p.set_defaults(fn=cmd_init)
+    p = sub.add_parser("export", parents=[common])
+    p.add_argument("target", choices=["openspec", "speckit", "constitution"])
+    p.add_argument("--change")
+    p.add_argument("--yes", action="store_true")
+    p.add_argument("--force", action="store_true", help="overwrite seeded files at an existing target")
+    p.add_argument("--out", help="target directory (openspec/ or specs/) or file (constitution)")
+    p.set_defaults(fn=cmd_export)
 
     args = ap.parse_args(argv)
     try:

@@ -270,7 +270,7 @@ echo "== 7. change-workflow CLI (scripts/arch.py) test suite (expect OK) =="
 TOUT="$("$PY" "$UNIT/scripts/test_arch.py" 2>&1)"
 rc=$?
 echo "$TOUT" | tail -4 | sed 's/^/    | /'
-[ "$rc" -eq 0 ] && ok "arch.py lifecycle, supersession, RFC route, init, log and verify tests pass" \
+[ "$rc" -eq 0 ] && ok "arch.py lifecycle, supersession, RFC route, init, log, verify and OpenSpec/spec-kit export tests pass" \
   || bad "arch.py tests failed, exit $rc"
 
 echo

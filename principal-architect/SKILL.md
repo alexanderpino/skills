@@ -1,6 +1,6 @@
 ---
 name: principal-architect
-description: "Master architecture & business-analysis skill. Use BEFORE planning or changing structure, boundaries, interfaces, data, or quality attributes. Use when user mentions architecture, PRD/HLD/SD/SAD/RFC/ADR, C4/ArchiMate diagrams, capabilities, roadmap, migration, threat modeling, SLOs, ERDs, cloud cost, user stories, or acceptance criteria — and the substrate: OS/kernel choice, workload isolation, embedded/RTOS/safety-critical, network topology/segmentation, landing zones, multi-region/DR, end-of-support. Acts as master architect: separates proven-by-use from how it would be designed today, derives content from evidence, writes house-format stories, triages artifacts. Captures software with C4, logs decisions via RFC→ADR, and requires threat models/FinOps in HLDs. Conforms to ISO 42010, ISO 25010; uses TOGAF, ArchiMate, C4, arc42. Output must be human-readable, pragmatic prose; no robotic AI-isms. Use IDs (e.g., F.02) for references."
+description: "Master architecture & business-analysis skill. Use BEFORE planning or changing structure, boundaries, interfaces, data, or quality attributes. Use when user mentions architecture, PRD/HLD/SD/SAD/RFC/ADR, C4/ArchiMate diagrams, capabilities, roadmap, migration, threat modeling, SLOs, ERDs, cloud cost, user stories, or acceptance criteria — and the substrate: OS/kernel choice, workload isolation, embedded/RTOS/safety-critical, network topology/segmentation, landing zones, multi-region/DR, end-of-support. Acts as master architect: separates proven-by-use from how it would be designed today, derives content from evidence, writes house-format stories, triages artifacts. Captures software with C4, logs decisions via RFC→ADR, and requires threat models/FinOps in HLDs. Conforms to ISO 42010, ISO 25010; uses TOGAF, ArchiMate, C4, arc42. Hands a decided change over to OpenSpec or spec-kit (proposal/specs/design/tasks, spec/plan/research, constitution) derived from the record. Output must be human-readable, pragmatic prose; no robotic AI-isms. Use IDs (e.g., F.02) for references."
 ---
 
 # Architecture Docs
@@ -257,7 +257,17 @@ pure stdlib, `--json` on every command, and the source of truth for state.
 flowchart LR
     C[consult<br/>read-only] --> P[propose<br/>planning only] --> A[apply<br/>tasks] --> V[verify<br/>two gates] --> R[archive<br/>accept + log]
     B[bootstrap<br/>no docs yet] --> P
+    P -. decided .-> H[handoff<br/>OpenSpec / spec-kit seed]
 ```
+
+**From standards to implementation.** The record is kept in international standards
+(ISO/IEC/IEEE 42010 and 29148, ISO/IEC 25010 scenarios, RFC 2119, Nygård/MADR, TOGAF
+principles). Implementation tools want the same facts in their own shape, so the handoff
+derives them: `F.xx` → requirement, Gherkin acceptance → `#### Scenario` / Given-When-Then,
+`Q.xx` → requirement with its response measure / `SC-NNN`, ADR → design decisions and
+`research.md`, epic scope → goals and non-goals, `PR.xx` → constitution. Every line traces
+back (`*(trace: F.01)*`); what the record lacks is marked, never filled in. The mapping
+table is at the top of `scripts/arch_export.py`.
 
 | Workflow | Does | Boundary | CLI it drives | Command |
 | --- | --- | --- | --- | --- |
@@ -267,6 +277,7 @@ flowchart LR
 | `references/workflows/verify.md` | Step 5: mechanical + judgement gate | reports, does not fix | `verify` | `/arch-verify` |
 | `references/workflows/archive.md` | accept records, sync the log, archive | only after the user's yes | `archive` | `/arch-archive` |
 | `references/workflows/bootstrap.md` | first docs for one slice | one slice, confirmed first | `init`, `new` | `/arch-bootstrap` |
+| `references/workflows/handoff.md` | seed an **OpenSpec** or **spec-kit** change from a decided change | derived, never invented; their validator is the gate | `export` | `/arch-handoff` |
 
 When a request matches one of these, **read that workflow file and follow its steps** —
 with or without the command; `/principal-architect help` explains them to the user. A
@@ -546,12 +557,14 @@ manifest in the index README). Condensed:
 ## Reference files
 
 - `references/workflows/` — **the change workflow**, one file per step of the lifecycle
-  (`consult`, `propose`, `apply`, `verify`, `archive`, `bootstrap`): numbered steps, the
+  (`consult`, `propose`, `apply`, `verify`, `archive`, `bootstrap`, `handoff`): numbered steps, the
   `arch.py` call and JSON fields each step depends on, state handling, output format,
   guardrails. Read the one that matches the request and follow it.
 - `scripts/arch.py` — the change-workflow CLI (`context`, `consult`, `new`, `record`,
-  `status`, `list`, `verify`, `log`, `archive`, `init`); `scripts/test_arch.py` is its
-  test suite.
+  `status`, `list`, `verify`, `log`, `archive`, `init`, `export`); `scripts/arch_export.py`
+  holds the source model and the OpenSpec / spec-kit / constitution renderers, with the
+  mapping table in its docstring; `scripts/test_arch.py` is the test suite (set
+  `OPENSPEC_BIN` to run OpenSpec's own validator on the seed).
 - `references/repository-structure.md` — the canonical, RAG-optimised folder layout + the
   README manifest. Read before initialising docs.
 - `references/methods.md` — **how a master architect derives the content**: mindset,

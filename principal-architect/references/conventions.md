@@ -218,8 +218,10 @@ archive. Its folder holds two files, scaffolded by `arch.py new`:
   (`draft` while active, `done` once archived), `level`, `archetype` (a Triage row:
   `local`, `significant`, `published-interface`, …), `date`, `base` (the branch it is
   compared against), `affects`, `records` (the ADR/RFC ids it minted) and `conflicts`
-  (accepted ADRs it contradicts; each must be superseded by one of its records). Body:
-  Intent · Evidence · Decisions on record · Triage · Assumptions and gaps.
+  (accepted ADRs it contradicts; each must be superseded by one of its records), and
+  `handoff` (set by `arch.py export`: `openspec:<path>` / `speckit:<path>` of the
+  implementation seed derived from this change). Body: Intent · Evidence · Decisions on
+  record · Triage · Assumptions and gaps.
 - `tasks.md` — `- [ ] N.M <edit>` checkboxes, each naming its target path in
   backticks; `arch.py verify` checks that every path a ticked task names really changed.
 

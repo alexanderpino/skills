@@ -390,5 +390,142 @@ class EnvironmentTests(unittest.TestCase):
         self.assertTrue(log["in_sync"], log["issues"])
 
 
+class ExportTests(unittest.TestCase):
+    """The hand-over from the standards-based record to OpenSpec / spec-kit."""
+
+    OPENSPEC = shutil.which("openspec") or os.environ.get("OPENSPEC_BIN")
+
+    def planned(self):
+        r = Repo()
+        rec = r.plan("add-key-rotation")
+        r.tasks("add-key-rotation", "## 1\n- [ ] 1.1 Fill the ADR\n")
+        st, _ = r.run("status", expect=0)
+        self.assertEqual(st["state"], "ready", st["missing"])
+        return r, rec
+
+    def test_blocked_change_cannot_be_handed_over(self):
+        r = Repo()
+        r.run("new", "half", "--title", "Half planned", "--archetype", "significant", expect=0)
+        e, rc = r.run("export", "openspec", "--change", "half")
+        self.assertEqual((rc, e["error"]), (2, "not_ready"))
+
+    def test_openspec_seed_is_derived_and_validates(self):
+        r, rec = self.planned()
+        dry, _ = r.run("export", "openspec", expect=0)
+        self.assertFalse(dry["applied"])
+        self.assertFalse(os.path.exists(r.path("openspec")))
+        d = dry["derived"]
+        self.assertEqual(d["records"], [rec["id"]])
+        self.assertEqual(d["drivers"], ["F.01"])            # from the ADR's satisfies: and the story
+        self.assertEqual(d["stories"], ["US-001"])
+        self.assertEqual(d["capability"], "developer-platform")  # from realizes-capabilities: CAP-developer-platform
+        self.assertIn("docs/architecture/contracts/openapi.yaml", d["contracts"])
+        self.assertEqual(dry["gaps"], [])
+
+        done, _ = r.run("export", "openspec", "--yes", expect=0)
+        self.assertTrue(done["applied"])
+        spec = r.read("openspec/changes/add-key-rotation/specs/developer-platform/spec.md")
+        self.assertIn("## Purpose\n\nExternal integrators can authenticate", spec)   # '**So that**' stripped
+        self.assertIn("### Requirement: Generate an API key", spec)
+        self.assertIn("The system MUST let an authenticated integrator", spec)
+        self.assertEqual(spec.count("#### Scenario:"), 3)                        # one per Gherkin scenario
+        self.assertIn("- **WHEN** I am an authenticated integrator with no API key\n- **AND** I POST /api/keys\n- **THEN** I receive a 201", spec)
+        self.assertIn("*(trace: F.01)*", spec)
+        proposal = r.read("openspec/changes/add-key-rotation/proposal.md")
+        self.assertIn("## Why\n\nRotate keys without downtime. Serves F.01.", proposal)
+        self.assertIn("- `developer-platform`:", proposal)
+        design = r.read("openspec/changes/add-key-rotation/design.md")
+        self.assertIn("### ADR-0002:", design)
+        self.assertIn("OAuth flows, per-endpoint scopes, billing. (EP-001)", design)      # epic out-of-scope → Non-Goals
+        self.assertIn("consequence accepted in ADR-0002", design)                         # plain-prose Consequences kept
+        self.assertIn("## Open Questions\n\n- The 24h window is assumed.", design)
+        tasks = r.read("openspec/changes/add-key-rotation/tasks.md")
+        self.assertIn("ARCH-REF: ADR-0002", tasks)
+        self.assertRegex(tasks, r"(?m)^- \[ \] 2\.1 Implement US-001")
+        self.assertIn("schema: spec-driven", r.read("openspec/changes/add-key-rotation/.openspec.yaml"))
+        self.assertRegex(r.read("docs/architecture/changes/add-key-rotation/change.md"),
+                         r"(?m)^handoff: \[openspec:openspec/changes/add-key-rotation\]")
+
+        e, rc = r.run("export", "openspec", "--yes")
+        self.assertEqual((rc, e["error"]), (2, "target_exists"))
+        r.run("export", "openspec", "--yes", "--force", expect=0)
+
+        if not self.OPENSPEC:
+            self.skipTest("openspec CLI not available (set OPENSPEC_BIN to run the real validator)")
+        subprocess.run([self.OPENSPEC, "init", "--tools", "none", "--no-animation", "."], cwd=r.dir,
+                       capture_output=True, text=True, check=True)
+        p = subprocess.run([self.OPENSPEC, "validate", "add-key-rotation", "--strict", "--no-interactive"],
+                           cwd=r.dir, capture_output=True, text=True)
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        st = subprocess.run([self.OPENSPEC, "status", "--change", "add-key-rotation", "--json"],
+                            cwd=r.dir, capture_output=True, text=True, check=True)
+        self.assertTrue(json.loads(st.stdout)["isPlanningComplete"])
+
+    def test_openspec_modified_when_capability_exists(self):
+        r, rec = self.planned()
+        r.write("openspec/specs/developer-platform/spec.md",
+                "# developer-platform\n\n## Purpose\n\nx\n\n## Requirements\n\n### Requirement: Generate an API key\nold\n\n#### Scenario: s\n- **WHEN** a\n- **THEN** b\n")
+        # the PRD changes F.01 on this branch → MODIFIED against the base branch's PRD
+        prd = "docs/architecture/PRD.md"
+        r.write(prd, r.read(prd).replace("returning the key value exactly once.", "returning the key value exactly once and a rotation handle."))
+        out, _ = r.run("export", "openspec", "--yes", expect=0)
+        self.assertEqual(out["derived"]["prd_delta"]["modified"], ["F.01"])
+        spec = r.read("openspec/changes/add-key-rotation/specs/developer-platform/spec.md")
+        self.assertNotIn("## Purpose", spec)
+        self.assertIn("## MODIFIED Requirements", spec)
+        self.assertIn("a rotation handle", spec)
+        proposal = r.read("openspec/changes/add-key-rotation/proposal.md")
+        self.assertIn("### Modified Capabilities\n- `developer-platform`", proposal)
+
+    def test_speckit_seed(self):
+        r, rec = self.planned()
+        os.makedirs(r.path(".specify/memory"))
+        os.makedirs(r.path("specs/002-older-feature"))        # numbering continues after the highest
+        out, _ = r.run("export", "speckit", "--yes", expect=0)
+        self.assertEqual(out["dest"], "specs/003-add-key-rotation")
+        self.assertEqual(json.loads(r.read(".specify/feature.json")), {"feature_directory": "specs/003-add-key-rotation"})
+        spec = r.read("specs/003-add-key-rotation/spec.md")
+        self.assertIn("### User Story 1 - Generate an API key (Priority: P1)", spec)   # must → P1
+        self.assertIn("**Given** I am an authenticated integrator with no API key, **When** I POST /api/keys, **Then**", spec)
+        self.assertIn("- **FR-001**: The system MUST let an authenticated integrator", spec)
+        self.assertIn("*(trace: F.01)*", spec)
+        self.assertIn("- **SC-001**:", spec)
+        self.assertIn("## Assumptions\n\n- The 24h window is assumed.", spec)
+        self.assertNotIn("NEEDS CLARIFICATION", spec)
+        research = r.read("specs/003-add-key-rotation/research.md")
+        self.assertIn("- **Decision**: We will keep the old key valid", research)
+        plan = r.read("specs/003-add-key-rotation/plan.md")
+        self.assertIn("**Constraints**: C.01:", plan)
+        self.assertIn("**Language/Version**: NEEDS CLARIFICATION", plan)       # honest: the record does not say
+        tasks = r.read("specs/003-add-key-rotation/tasks.md")
+        self.assertRegex(tasks, r"(?m)^- \[ \] T003 \[US1\] Implement US-001")
+        self.assertIn("ARCH-REF: ADR-0002", tasks)
+        self.assertTrue(os.path.exists(r.path("specs/003-add-key-rotation/contracts/openapi.yaml")))
+        self.assertTrue(os.path.exists(r.path("specs/003-add-key-rotation/checklists/requirements.md")))
+        self.assertRegex(r.read("docs/architecture/changes/add-key-rotation/change.md"),
+                         r"(?m)^handoff: \[speckit:specs/003-add-key-rotation\]")
+
+    def test_constitution_from_principles(self):
+        r = Repo()
+        e, rc = r.run("export", "constitution")
+        self.assertEqual((rc, e["error"]), (2, "no_principles"))
+        r.write("docs/architecture/enterprise/enterprise-architecture.md",
+                "---\nid: EA\ntitle: EA\nstatus: current\nlevel: enterprise\nupdated: 2026-01-01\n---\n# EA\n\n"
+                "## 2. Architecture principles\n| ID | Principle | Statement | Rationale |\n|---|---|---|---|\n"
+                "| PR.01 | Buy before build | Prefer a product over bespoke code. | Our edge is not infrastructure. |\n"
+                "| PR.02 | Boring technology | New tech needs an innovation token. | Operability. |\n")
+        dry, _ = r.run("export", "constitution", expect=0)
+        self.assertEqual(dry["principles"], ["PR.01", "PR.02"])
+        self.assertFalse(dry["applied"])
+        done, _ = r.run("export", "constitution", "--yes", expect=0)
+        text = r.read(".specify/memory/constitution.md")
+        self.assertIn("### I. Buy before build (PR.01)", text)
+        self.assertIn("### II. Boring technology (PR.02)", text)
+        self.assertIn("## Additional Constraints\n\n- C.01:", text)
+        self.assertIn("**Version**: 1.0.0", text)
+        e, rc = r.run("export", "constitution", "--yes")
+        self.assertEqual(e["error"], "target_exists")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)

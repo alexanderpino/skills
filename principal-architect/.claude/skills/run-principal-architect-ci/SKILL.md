@@ -69,8 +69,10 @@ asserts, in order:
    passes: it drives `scripts/arch.py` through new → record → status → verify →
    archive in throwaway git repos built from the worked example, plus supersession,
    the RFC route, conflicts, `init`, the decision log, and the not-in-git path where
-   checks must report *skipped*, never *passed*. Run it alone with
-   `python3 scripts/test_arch.py`.
+   checks must report *skipped*, never *passed*, and the OpenSpec / spec-kit / constitution
+   exports (`arch.py export`). Run it alone with `python3 scripts/test_arch.py`; set
+   `OPENSPEC_BIN=<path to the openspec CLI>` to also run OpenSpec's own
+   `validate --strict` on the generated seed (skipped otherwise).
 
 Time-proofing: the *good*-tree fixture dates are rewritten to today's date at
 run time, and the worked-example assertion passes `--max-age-days 0` (its
