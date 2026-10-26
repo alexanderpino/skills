@@ -84,12 +84,19 @@ def _sub_section(text, *keywords):
 
 
 def _bullets(text):
-    out = []
-    for line in text.splitlines():
+    """Top-level bullets, each with its wrapped continuation lines joined (a bullet that
+    runs over several lines is one bullet, not a first line and lost rest)."""
+    out, cur = [], None
+    for line in re.sub(r"<!--.*?-->", "", text, flags=re.S).splitlines():
         m = re.match(r"^\s*[-*]\s+(?:\[[ xX]\]\s+)?(.*\S)\s*$", line)
-        if m and not m.group(1).startswith("<"):
-            out.append(m.group(1))
-    return out
+        if m:
+            cur = m.group(1)
+            out.append(cur)
+        elif cur is not None and line.startswith((" ", "\t")) and line.strip():
+            out[-1] = out[-1] + " " + line.strip()
+        else:
+            cur = None
+    return [b for b in out if not b.startswith("<")]
 
 
 def _paragraphs(text):
@@ -132,6 +139,7 @@ class Source:
         self.arch, self.ctx, self.state = arch, ctx, state
         self.repo, self.root = ctx["repo"], ctx["root"]
         self.notes = []  # what could not be derived, for the report and the seeds
+        self.missing_drivers = []  # F/Q ids a record cites that the PRD does not define (yet)
         self.unparsed_stories = []  # US files whose shape the default parser does not know
 
     def note(self, text):
@@ -175,9 +183,10 @@ class Source:
             decision_text = " ".join(_paragraphs(secs.get("decision", ""))).lower()
             alts = []
             for b in _bullets(secs.get("decision", "")):
-                m = re.match(r"(.+?)\s+[—-]+\s+(?:rejected|not chosen|declined)[,:]?\s*(?:because\s+)?(.*)", b, re.I)
+                m = re.match(r"\**(.+?)\**[\s.:—–-]*(?:rejected|not chosen|declined|dismissed)\b[,:]?\s*(?:because\s+)?(.*)",
+                             b, re.I | re.S)
                 if m:
-                    alts.append((m.group(1).strip(), m.group(2).strip()))
+                    alts.append((m.group(1).strip().strip("*"), " ".join(m.group(2).split())))
             # MADR superset: "## Considered options" + "## Pros and cons of the options"
             pros_cons = secs.get("pros and cons of the options", "")
             for opt in _bullets(secs.get("considered options", "")):
@@ -197,7 +206,7 @@ class Source:
                 "supersedes": _s(fm.get("supersedes")) or None,
                 "context": _paragraphs(secs.get("context", "")),
                 "decision": [p for p in _paragraphs(secs.get("decision", ""))
-                             if not re.match(r"^- ", p)],
+                             if not re.match(r"^- ", p) and not p.rstrip().endswith(":")],  # drop bullet lead-ins
                 "decision_bullets": _bullets(secs.get("decision", "")),
                 "alternatives": alts,
                 "positive": _bullets(_sub_section(cons, "positive")),
@@ -328,8 +337,13 @@ class Source:
             spec = _s(fm.get("api-spec"))
             if not spec:
                 continue
-            sd_affects = set(self.arch.as_list(fm.get("affects"))) | {_s(fm.get("id")).replace("SD-", "")}
-            if not affects or sd_affects & set(affects):
+            sd_affects = {_kebab(a) for a in self.arch.as_list(fm.get("affects"))} | {_kebab(_s(fm.get("id")).replace("SD-", ""))}
+            if affects and not (sd_affects & {_kebab(a) for a in affects}):
+                self.note(f"{self.arch.rel(path, self.repo)} carries api-spec: {spec} but its component names "
+                          f"({', '.join(sorted(sd_affects))}) match none of the change's affects: "
+                          f"({', '.join(affects)}); the contract was not linked")
+                continue
+            if True:
                 cand = os.path.normpath(os.path.join(os.path.dirname(path), spec))
                 if not os.path.exists(cand):
                     cand = os.path.join(self.repo, spec)
@@ -361,25 +375,35 @@ class Source:
         base = ch["base"] if ch["base"] and ch["base"] != "none" else self.arch.default_base(self.repo)
         delta = self.prd_delta(base)
         all_stories, epics = self.stories(), self.epics()
-        # the drivers this change is about: named by its records or its intent/triage
-        f_ids = set()
+        # The drivers this change is about are the ones its records serve (satisfies:) and the
+        # ones the PRD gained or changed on this branch. Intent prose is NOT scope: it cites
+        # existing drivers to explain the status quo, and reading those as the work hands the
+        # implementer behaviour that already exists. Intent is a fallback only when the
+        # records cite nothing, and the seed then says so.
+        cited_f, cited_q = set(), set()
         for r in adrs + rfcs:
-            f_ids |= {x for x in r["satisfies"] if x.startswith("F.")}
-        for text in (ch["intent"], ch["triage"], ch["decisions"]):
-            f_ids |= set(_ids(text, "F"))
-        f_ids |= set(delta["added"]) | set(delta["modified"])
-        q_ids = set()
-        for r in adrs + rfcs:
-            q_ids |= {x for x in r["satisfies"] if x.startswith("Q.")}
-        for text in (ch["intent"], ch["triage"], ch["decisions"]):
-            q_ids |= set(_ids(text, "Q"))
-        stories = [s for s in all_stories if set(s["satisfies"]) & f_ids or s["id"] in ch["intent"]]
-        for s in stories:
-            f_ids |= set(x for x in s["satisfies"] if x.startswith("F."))
-        f_ids = {f for f in sorted(f_ids) if f in prd["F"]} | {f for f in f_ids if f in delta["removed"]}
-        missing_f = [f for f in sorted(f_ids) if f not in prd["F"] and f not in delta["removed"]]
-        for f in missing_f:
-            self.note(f"{f} is referenced but not defined in the PRD")
+            cited_f |= {x for x in r["satisfies"] if x.startswith("F.")}
+            cited_q |= {x for x in r["satisfies"] if x.startswith("Q.")}
+        f_ids = set(cited_f) | set(delta["added"]) | set(delta["modified"])
+        q_ids = set(cited_q)
+        if not f_ids and not q_ids:
+            for text in (ch["intent"], ch["triage"]):
+                f_ids |= set(_ids(text, "F"))
+                q_ids |= set(_ids(text, "Q"))
+            if f_ids or q_ids:
+                self.note("no record cites a driver (satisfies: is empty), so the drivers were taken from "
+                          "the change's Intent/Triage prose: " + ", ".join(sorted(f_ids | q_ids)) +
+                          " — confirm these are the behaviour this change delivers, not the status quo it describes")
+        self.missing_drivers = sorted(f for f in f_ids | q_ids
+                                      if f not in prd["F"] and f not in prd["Q"] and f not in delta["removed"])
+        for f in self.missing_drivers:
+            self.note(f"{f} is cited by a record but not defined in the PRD (written by a later apply task?); "
+                      f"the hand-over cannot derive its requirement until it exists")
+        stories = [s for s in all_stories if set(s["satisfies"]) & f_ids]
+        f_ids = {f for f in f_ids if f in prd["F"]} | {f for f in f_ids if f in delta["removed"]}
+        if f_ids and not (set(delta["added"]) | set(delta["modified"])) & f_ids and delta["resolved"]:
+            self.note("every derived driver (" + ", ".join(sorted(f_ids)) + ") already existed unchanged on "
+                      "the base branch; if this change adds behaviour, the driver for it is missing from the PRD")
         if not f_ids and not q_ids:
             self.note("no F.xx or Q.xx driver is tied to this change (records' satisfies:, Intent, "
                       "or a story); the behaviour contract could not be derived")
@@ -417,6 +441,7 @@ class Source:
             "epic": epic, "capability": capability, "capabilities": caps,
             "contracts": self.contracts(ch["affects"]), "principles": self.principles(),
             "hld_tech": self.hld_tech(), "notes": self.notes, "repo": self.repo,
+            "missing_drivers": self.missing_drivers,
         }
 
     def build(self):
@@ -495,12 +520,14 @@ def _normative(text):
 
 
 def _gherkin_to_openspec(sc):
+    """Given/When/Then kept as GIVEN/WHEN/THEN (+ AND); OpenSpec's validator accepts and
+    preserves the GIVEN line, so precondition and trigger stay distinct."""
     lines = []
-    first_when = (sc["given"] + sc["when"])
-    if first_when:
-        lines.append(f"- **WHEN** {first_when[0]}")
-        for extra in first_when[1:]:
-            lines.append(f"- **AND** {extra}")
+    for i, g in enumerate(sc["given"]):
+        lines.append(f"- **{'GIVEN' if i == 0 else 'AND'}** {g}")
+    whens = sc["when"] or (["the behaviour is exercised"] if not sc["given"] else [])
+    for i, w in enumerate(whens):
+        lines.append(f"- **{'WHEN' if i == 0 else 'AND'}** {w}")
     then = sc["then"] or ["the expected outcome holds [NEEDS CLARIFICATION: no Then step in the source]"]
     lines.append(f"- **THEN** {then[0]}")
     for extra in then[1:]:
@@ -559,7 +586,13 @@ def render_openspec(model, cmd, existing_specs):
         if r["supersedes"]:
             what.append(f"**BREAKING**: supersedes {r['supersedes']}")
     if ch["archetype"] == "published-interface":
-        what.append("**BREAKING**: this change alters a published interface (archetype published-interface)")
+        said = " ".join([ch["intent"], ch["triage"]] + [" ".join(r["decision"] + r["consequences"]) for r in recs]).lower()
+        if re.search(r"\bbreaking\b", said) and not re.search(r"not breaking|non-breaking|additive", said):
+            what.append("**BREAKING**: alters a published interface (the record calls it breaking)")
+        else:
+            what.append("Alters a published interface (archetype `published-interface`)"
+                        + ("; the record calls it additive" if re.search(r"additive|not breaking|non-breaking", said)
+                           else " <!-- principal-architect: the record does not say whether it is breaking -->"))
     for fid in model["delta"]["removed"]:
         what.append(f"**BREAKING**: removes {fid}")
     if not what:
@@ -578,11 +611,13 @@ def render_openspec(model, cmd, existing_specs):
         "<!-- principal-architect: change.md has no Intent; state the problem and why now -->"]) + \
         "\n\n## What Changes\n\n" + "\n".join(f"- {w}" for w in what) + \
         "\n\n## Capabilities\n\n### New Capabilities\n" + \
-        ("\n".join(f"- `{c}`: {_capability_blurb(model)}" for c in new_caps) or
-         "<!-- none: the capability already exists -->") + \
+        ("\n".join(f"- `{c}`: {_capability_blurb(model)} <!-- principal-architect: no openspec/specs/{c} exists yet, "
+                   f"so OpenSpec creates the main spec from this delta; the behaviour may already run in code -->"
+                   for c in new_caps) or
+         "<!-- none: the capability already has a main spec -->") + \
         "\n\n### Modified Capabilities\n" + \
         ("\n".join(f"- `{c}`: requirements change for {', '.join(model['F']) or 'this change'}" for c in mod_caps) or
-         "<!-- none: this change introduces the capability -->") + \
+         "<!-- none: no main spec for this capability yet -->") + \
         (f"\n\n<!-- principal-architect: capability path '{cap}' was derived "
          f"({'from realizes-capabilities' if model['capabilities'] else 'from affects:, unconfirmed'}); "
          f"run `openspec list --specs` and reuse an existing path if one fits -->") + \
@@ -594,7 +629,7 @@ def render_openspec(model, cmd, existing_specs):
     for r in recs:
         ctx += [f"{p} ({r['id']})" for p in r["context"]]
     if ch["evidence"]:
-        ctx.append("Evidence: " + " ".join(ch["evidence"].split()))
+        ctx.append("**Evidence on record (change.md):**\n\n" + ch["evidence"].strip())
     goals, nongoals = [], []
     if model["epic"]:
         if model["epic"]["in_scope"]:
@@ -666,7 +701,9 @@ def render_openspec(model, cmd, existing_specs):
     for qid, q in model["Q"].items():
         when, then = _q_scenario(q)
         char = q.get("characteristic", "")
-        desc = f"The {q.get('artifact', 'system')} SHALL {q.get('response', 'meet ' + q['name'])}" + \
+        art = q.get("artifact", "the system")
+        art = art if art.lower().startswith(("the ", "a ", "an ", "all ", "every ")) else "the " + art
+        desc = f"{art[:1].upper()}{art[1:]} SHALL ensure that {q.get('response', q['name'] + ' holds')}" + \
                (f" (ISO 25010: {char})" if char else "") + "."
         if q.get("measure"):
             desc += f" Response measure: {q['measure']}."
@@ -712,7 +749,9 @@ def render_openspec(model, cmd, existing_specs):
             groups.append((f"{n}. {s['id']} — {s['title']}", items))
         n += 1
     q_items = [f"Verify {qid} by {q.get('verification') or 'its means of verification'} ({q.get('measure') or q['name']})" for qid, q in model["Q"].items()]
-    ref_items = [f"Mark the site that enacts {r['id']} with `ARCH-REF: {r['id']}` in {', '.join(ch['affects']) or 'the code'} and verify `arch.py verify --change {ch['id']}` reports breadcrumbs passed" for r in adrs]
+    sites = model.get("marker_sites") or []
+    where = ", ".join(f"`{p}`" for p in sites) or (", ".join(ch["affects"]) + " (component names; the record names no file)" if ch["affects"] else "the code that enacts it")
+    ref_items = [f"Mark the site that enacts {r['id']} with `ARCH-REF: {r['id']}` in {where} and verify `arch.py verify --change {ch['id']}` reports breadcrumbs passed" for r in adrs]
     if q_items or ref_items:
         groups.append((f"{n}. Verification and traceability", q_items + ref_items))
     tasks = prov + "# Tasks\n\n"
@@ -940,6 +979,13 @@ def export(arch, ctx, state, target, yes=False, force=False, out=None):
     model = Source(arch, ctx, state).build()
     repo = ctx["repo"]
     cid = state["change"]
+    if model["missing_drivers"] and not force:
+        raise arch.CliError("drivers_missing",
+                            f"the records cite {', '.join(model['missing_drivers'])}, which the PRD does not define "
+                            f"yet; a seed written now would describe the status quo, not this change. Run the apply "
+                            f"workflow first (the task that writes the driver), then export. --force overrides and "
+                            f"marks the gap in the seed", missing=model["missing_drivers"])
+    model["marker_sites"] = sorted({p for t in state.get("tasks", []) if "ARCH-REF" in t["text"] for p in t["paths"]})
     if target == "openspec":
         root = out or os.path.join(repo, "openspec")
         existing = {}
@@ -957,8 +1003,9 @@ def export(arch, ctx, state, target, yes=False, force=False, out=None):
             model["notes"].append(f"{arch.rel(root, repo)}/config.yaml not found: run `openspec init` in the "
                                   f"repository before `openspec validate`")
         gate = f"openspec validate {cid} --strict"
-        after = (f"Finish the seed with OpenSpec's own flow: `openspec status --change {cid}`, then "
-                 f"`openspec instructions <artifact> --change {cid} --json` per artifact, and `{gate}`.")
+        after = (f"`openspec status --change {cid}` will show the four artifacts as present; OpenSpec has no "
+                 f"review step of its own, so read them as the implementer will before `{gate}`, and go on with "
+                 f"`openspec instructions apply --change {cid} --json` only when they describe this change.")
     else:
         root = out or os.path.join(repo, "specs")
         n = 1

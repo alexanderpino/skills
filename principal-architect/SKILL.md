@@ -210,27 +210,33 @@ code changes don't.
 
 | Work | Produce |
 | --- | --- |
-| New/changed **business capability**, portfolio standard, principle, or landscape/roadmap | `enterprise-architecture.md` (relevant section) + enterprise-level ADR |
-| New **solution** to a business problem, cross-system integration, technology selection, or build-vs-buy | `SAD.md` + solution-level ADR; then software changes per affected system |
-| New/changed **business process** — who does what, in what order, across roles/systems | process view (BPMN-style, `references/mermaid-guide.md`) in `enterprise-architecture.md` or `SAD.md` + ADR if a real choice was made; conform to the org's `.bpmn` where one is executed |
-| **Migration / modernization** of an existing system (local-to-global, on-prem→cloud, monolith→distributed/SaaS, platform exit such as mainframe or end-of-support OS) | `transition-architecture.md` (As-Is → interim states → To-Be, rollback per state) + ADRs; recover As-Is SDs from runtime (`references/migration.md`) |
-| **Platform substrate** — landing zone, network topology/segmentation, hybrid connectivity, region/DR topology, fleet OS or CPU-architecture standard, isolation model for a platform | `SAD.md` (or `enterprise-architecture.md` for estate-wide standards) + ADRs; network & trust-zone view; flow matrix in §8 (`references/network-architecture.md`, `cloud-architecture.md`, `systems-architecture.md`) |
-| **Evaluate / review an existing architecture** (pre-migration health-check, due-diligence, "keep investing?") | `architecture-evaluation.md` (ATAM-lite: risks · non-risks · sensitivity · trade-offs → ADRs + fitness functions; `methods.md` §11) |
+| New/changed **business capability**, portfolio standard, principle, or landscape/roadmap (`capability`) | `enterprise-architecture.md` (relevant section) + enterprise-level ADR |
+| New **solution** to a business problem, cross-system integration, technology selection, or build-vs-buy (`solution`) | `SAD.md` + solution-level ADR; then software changes per affected system |
+| New/changed **business process** — who does what, in what order, across roles/systems (`process`) | process view (BPMN-style, `references/mermaid-guide.md`) in `enterprise-architecture.md` or `SAD.md` + ADR if a real choice was made; conform to the org's `.bpmn` where one is executed |
+| **Migration / modernization** of an existing system (local-to-global, on-prem→cloud, monolith→distributed/SaaS, platform exit such as mainframe or end-of-support OS) (`migration`) | `transition-architecture.md` (As-Is → interim states → To-Be, rollback per state) + ADRs; recover As-Is SDs from runtime (`references/migration.md`) |
+| **Platform substrate** — landing zone, network topology/segmentation, hybrid connectivity, region/DR topology, fleet OS or CPU-architecture standard, isolation model for a platform (`platform`) | `SAD.md` (or `enterprise-architecture.md` for estate-wide standards) + ADRs; network & trust-zone view; flow matrix in §8 (`references/network-architecture.md`, `cloud-architecture.md`, `systems-architecture.md`) |
+| **Evaluate / review an existing architecture** (pre-migration health-check, due-diligence, "keep investing?") (`evaluation`) | `architecture-evaluation.md` (ATAM-lite: risks · non-risks · sensitivity · trade-offs → ADRs + fitness functions; `methods.md` §11) |
 | Within a single system | the software table below |
 
 **Software-level changes** (the common case):
 
 | Change archetype | ADR | SD | HLD | PRD | AD.md + checklist | Diagrams |
 | --- | --- | --- | --- | --- | --- | --- |
-| **Trivial** — typo, rename, formatting, comment, internal refactor; no change to structure, interface, dependency, data, or a quality attribute | — | only if a line is now wrong | — | — | — | — |
-| **Local** — behaviour change or small feature *inside* an existing component; no new contract | only if a real choice was made | update the affected section | — | — | — | only if the picture changed |
-| **New component / internal interface** within existing structure | if a choice was made | new or updated SD | add a components-table row | — | — | component view |
-| **New / breaking published interface** (API, event, RPC, file format) | **required** (breaking change) | update SD + link/refresh the contract (`api-spec:`, `references/interfaces.md`) | context view if external | — | — | context view |
-| **Architecturally significant** — new boundary/dependency/integration, data-model/schema change (`references/data-architecture.md`), cross-cutting mechanism, or pattern/style adoption (see `references/significance.md`) | **required** | update/add affected SD | update context/container/deployment as relevant | if a driver changed | only if it adds a concern/view | refresh affected views |
-| **New or changed quality target** | usually (how it's met) | maybe | note in trade-offs | **quality scenario (Q.xx)**; operational targets become SLOs (`references/operability.md`) | add concern + VP-QUAL view | — |
-| **New stakeholder / external consumer** | — | — | context view | maybe a driver | **stakeholders + concerns + viewpoint coverage** | context view |
-| **New feature / functional behaviour to specify** | — | maybe | — | new/updated `F.xx` **+ user story `US-NNN` (under an epic `EP-NNN`) with acceptance criteria, in the house format** (`business-analysis.md`) | — | — |
-| **Greenfield / docs don't exist yet & task is significant** | first ADR(s) | one SD for the area you touch | context + container | driver stub for what you build | minimal AD + checklist | context + container |
+| **Trivial** (`trivial`) — typo, rename, formatting, comment, internal refactor; no change to structure, interface, dependency, data, or a quality attribute | — | only if a line is now wrong | — | — | — | — |
+| **Local** (`local`) — behaviour change or small feature *inside* an existing component; no new contract | only if a real choice was made | update the affected section | — | — | — | only if the picture changed |
+| **New component / internal interface** (`new-component`) within existing structure | if a choice was made | new or updated SD | add a components-table row | — | — | component view |
+| **New / breaking published interface** (`published-interface`; API, event, RPC, file format) | **required** — a published contract is a commitment, additive or not | update SD + link/refresh the contract (`api-spec:`, `references/interfaces.md`) | context view if external | — | — | context view |
+| **Architecturally significant** (`significant`) — new boundary/dependency/integration, data-model/schema change (`references/data-architecture.md`), cross-cutting mechanism, or pattern/style adoption (see `references/significance.md`) | **required** | update/add affected SD | update context/container/deployment as relevant | if a driver changed | only if it adds a concern/view | refresh affected views |
+| **New or changed quality target** (`quality-target`) | usually (how it's met) | maybe | note in trade-offs | **quality scenario (Q.xx)**; operational targets become SLOs (`references/operability.md`) | add concern + VP-QUAL view | — |
+| **New stakeholder / external consumer** (`stakeholder`) | — | — | context view | maybe a driver | **stakeholders + concerns + viewpoint coverage** | context view |
+| **New feature / functional behaviour to specify** (`feature`) | — | maybe | — | new/updated `F.xx` **+ user story `US-NNN` (under an epic `EP-NNN`) with acceptance criteria, in the house format** (`business-analysis.md`) | — | — |
+| **Greenfield / docs don't exist yet & task is significant** (`greenfield`) | first ADR(s) | one SD for the area you touch | context + container | driver stub for what you build | minimal AD + checklist | context + container |
+
+The name in parentheses is the `archetype` the change workflow records (`arch.py new
+--archetype`). A change often sits on more than one row — a new published interface that
+also adds a feature and a schema column is three rows at once. Record the row with the
+heaviest obligations as the archetype and produce the other rows' artifacts too; the
+Triage section of `change.md` names all of them.
 
 Two rules that override the table: (1) when unsure whether a change is significant,
 read `references/significance.md` and bias toward a *short* ADR — an unrecorded
@@ -257,7 +263,8 @@ pure stdlib, `--json` on every command, and the source of truth for state.
 flowchart LR
     C[consult<br/>read-only] --> P[propose<br/>planning only] --> A[apply<br/>tasks] --> V[verify<br/>two gates] --> R[archive<br/>accept + log]
     B[bootstrap<br/>no docs yet] --> P
-    P -. decided .-> H[handoff<br/>OpenSpec / spec-kit seed]
+    A -. drivers on record .-> H[handoff<br/>OpenSpec / spec-kit seed]
+    P -. decides how an existing driver is met .-> H
 ```
 
 **From standards to implementation.** The record is kept in international standards
@@ -277,7 +284,7 @@ table is at the top of `scripts/arch_export.py`.
 | `references/workflows/verify.md` | Step 5: mechanical + judgement gate | reports, does not fix | `verify` | `/arch-verify` |
 | `references/workflows/archive.md` | accept records, sync the log, archive | only after the user's yes | `archive` | `/arch-archive` |
 | `references/workflows/bootstrap.md` | first docs for one slice | one slice, confirmed first | `init`, `new` | `/arch-bootstrap` |
-| `references/workflows/handoff.md` | seed an **OpenSpec** or **spec-kit** change from a decided change | derived, never invented; their validator is the gate | `export` | `/arch-handoff` |
+| `references/workflows/handoff.md` | seed an **OpenSpec** or **spec-kit** change from a decided change whose drivers are on record | derived, never invented; their validator checks shape, the read in step 4 checks meaning | `export` | `/arch-handoff` |
 
 When a request matches one of these, **read that workflow file and follow its steps** —
 with or without the command; `/principal-architect help` explains them to the user. A

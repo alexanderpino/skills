@@ -42,8 +42,9 @@ components it touches.
    ```bash
    ARCH consult --paths <files it will change> --affects <components> --json
    ```
-   Take component names from the existing records' `affects:` and the HLD's building
-   blocks, so they match how the docs already name things.
+   Take component names from `records[].affects` in the `context` result (that is how the
+   existing decisions name things) and from the HLD's building blocks, so the match is
+   on the names the docs already use.
 
    Parse `decisions` (each with `status`, `binding`, `strength`, `match`),
    `documents`, `warnings`, `overlapping_changes`, `suggested_reads`.

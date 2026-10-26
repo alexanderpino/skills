@@ -484,6 +484,25 @@ def select_change(ctx, cid):
                    else "there are no active changes", active=act)
 
 
+PATH_EXT = ("md", "markdown", "yaml", "yml", "json", "toml", "dsl", "py", "ts", "tsx", "js", "jsx", "go",
+            "rs", "java", "kt", "cs", "rb", "php", "sh", "sql", "proto", "graphql", "feature", "txt", "csv")
+ID_TOKEN = re.compile(r"^(?:[A-Z]{1,3}\.\d+|(?:ADR|RFC|US|EP|CAP|SD|PR|SH|CN|VP|V)-[\w.-]+)$")
+
+
+def task_paths(text):
+    """The file targets a task names in backticks — not every backticked token: an id like
+    `F.04`, a bare directory like `openspec/`, or a word with a dot is not a path."""
+    out = []
+    for tok in re.findall(r"`([^`\s]+)`", text):
+        if ID_TOKEN.match(tok) or tok.endswith("/") or tok.startswith(("http://", "https://", "#")):
+            continue
+        base = tok.rsplit("/", 1)[-1]
+        ext = base.rsplit(".", 1)[-1].lower() if "." in base else ""
+        if "/" in tok or ext in PATH_EXT:
+            out.append(tok)
+    return out
+
+
 def parse_tasks(path):
     tasks, section = [], None
     if not os.path.exists(path):
@@ -503,7 +522,7 @@ def parse_tasks(path):
             num = re.match(r"^(\d+(?:\.\d+)*)\s+", text)
             tasks.append({"line": n, "done": m.group(1) != " ", "text": text,
                           "number": num.group(1) if num else None, "section": section,
-                          "paths": re.findall(r"`([^`\s]+(?:/[^`\s]*|\.[A-Za-z0-9]{1,6}))`", text)})
+                          "paths": task_paths(text)})
     return tasks
 
 
@@ -884,11 +903,14 @@ def cmd_record(args):
     set_fm(path, "date", TODAY)
     set_fm(path, "status", "proposed" if kind == "ADR" else "draft")
     affects = as_list(cfm.get("affects"))
+    notes = []
     if affects:
         set_fm(path, "affects", affects)
+    else:
+        notes.append("change.md has no affects: yet, so the record got none; fill affects: in change.md and "
+                     "in the record (consult uses it to find this decision later)")
     if kind == "ADR":
         set_status_line(path, "Proposed")
-    notes = []
     if args.supersedes:
         old = find_record(ctx, args.supersedes)
         if not old or not args.supersedes.startswith("ADR-"):

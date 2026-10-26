@@ -119,6 +119,7 @@ class Repo:
         text = re.sub(r"^(deciders|reviewers|tags|satisfies|complies-with): \[[^\]]*<[^\]]*\].*$",
                       r"\1: [x]", text, flags=re.M)
         text = text.replace("affects: [<component>, <area>]", "affects: [api-keys]")
+        text = re.sub(r"^satisfies: \[x\].*$", "satisfies: [F.01]", text, flags=re.M)   # a real driver, as propose requires
         if "## Context" in text:
             text = text.split("## Context")[0] + ADR_BODY.lstrip("\n")
         else:  # RFC: keep the heading, replace the body
@@ -141,6 +142,14 @@ class PlaceholderTests(unittest.TestCase):
         text = ("<!-- <in comment> -->\n```\n<in fence>\n```\nuse `<inline>` and <br> "
                 "and <https://x.y> and a <-> b and x < y > z\n")
         self.assertEqual(arch.placeholders(text), [])
+
+    def test_task_paths_are_targets_not_every_backticked_token(self):
+        self.assertEqual(arch.task_paths("Update `PRD.md` §4: add `F.04` (see `ADR-0002`, `openspec/`, `US-001`)"),
+                         ["PRD.md"])
+        self.assertEqual(arch.task_paths("Edit `software/SD-api-keys.md` and `src/keys.py`; bump `info.version`"),
+                         ["software/SD-api-keys.md", "src/keys.py"])
+        self.assertEqual(arch.task_paths("Run `arch.py verify` after `contracts/openapi.yaml` changes"),
+                         ["contracts/openapi.yaml"])          # a command with a space is not a target
 
     def test_tasks_inside_comments_are_not_tasks(self):
         r = Repo(with_git=False)
@@ -420,7 +429,9 @@ class ExportTests(unittest.TestCase):
         self.assertEqual(d["stories"], ["US-001"])
         self.assertEqual(d["capability"], "developer-platform")  # from realizes-capabilities: CAP-developer-platform
         self.assertIn("docs/architecture/contracts/openapi.yaml", d["contracts"])
-        self.assertEqual([g for g in dry["gaps"] if "openspec init" not in g], [])   # only "not initialised yet"
+        # only "not initialised yet" and the honest note that F.01 pre-dates this change (ADR-0002 decides
+        # how an existing driver is met, which is legitimate — and exactly what the note asks you to confirm)
+        self.assertEqual([g for g in dry["gaps"] if "openspec init" not in g and "already existed unchanged" not in g], [])
 
         done, _ = r.run("export", "openspec", "--yes", expect=0)
         self.assertTrue(done["applied"])
@@ -429,7 +440,7 @@ class ExportTests(unittest.TestCase):
         self.assertIn("### Requirement: Generate an API key", spec)
         self.assertIn("The system MUST let an authenticated integrator", spec)
         self.assertEqual(spec.count("#### Scenario:"), 3)                        # one per Gherkin scenario
-        self.assertIn("- **WHEN** I am an authenticated integrator with no API key\n- **AND** I POST /api/keys\n- **THEN** I receive a 201", spec)
+        self.assertIn("- **GIVEN** I am an authenticated integrator with no API key\n- **WHEN** I POST /api/keys\n- **THEN** I receive a 201", spec)   # precondition and trigger stay distinct
         self.assertIn("*(trace: F.01)*", spec)
         proposal = r.read("openspec/changes/add-key-rotation/proposal.md")
         self.assertIn("## Why\n\nRotate keys without downtime. Serves F.01.", proposal)
@@ -605,7 +616,7 @@ class ExportTests(unittest.TestCase):
                 .replace("- **F.02:** The system **MUST** let an integrator revoke",
                          "- **F.02:** The system **SHOULD** let an integrator revoke")
                 .replace("- **F.03:** The system **MUST** rate-limit", "- **F.03:** The system rate-limits"))
-        adr = r.read(rec["path"]).replace("satisfies: [x]", "satisfies: [F.01, F.02, F.03]")
+        adr = r.read(rec["path"]).replace("satisfies: [F.01]", "satisfies: [F.01, F.02, F.03]")
         adr = adr.split("## Consequences")[0] + (
             "## Considered options\n- Hard cutover\n- Overlap window\n\n## Pros and cons of the options\n\n"
             "### Hard cutover\n- Good, because simple\n- Bad, because every client sees downtime\n\n"
@@ -664,6 +675,79 @@ class ExportTests(unittest.TestCase):
                                cwd=r.dir, capture_output=True, text=True)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertNotIn("Archive would refuse", p.stdout + p.stderr)
+
+    def test_handoff_refuses_until_the_cited_driver_exists_and_then_describes_the_change(self):
+        """The scenario a fresh agent hit: the ADR satisfies F.04, which an apply task will
+        write; Intent cites F.01/F.02 to describe the status quo. The old exporter handed over
+        F.01/F.02 as the work and reported no gap."""
+        r, rec = self.planned()
+        cpath = "docs/architecture/changes/add-key-rotation/change.md"
+        r.write(cpath, r.read(cpath).replace("## Intent\nRotate keys without downtime. Serves F.01.",
+                                             "## Intent\nToday F.01 issues and F.02 revokes (see US-001); nothing bounds the "
+                                             "old key. This change adds rotation, driver F.04 (written in apply)."))
+        r.write(rec["path"], r.read(rec["path"]).replace("satisfies: [F.01]", "satisfies: [F.04, Q.01]"))
+        e, rc = r.run("export", "openspec")
+        self.assertEqual((rc, e["error"]), (2, "drivers_missing"))
+        self.assertEqual(e["missing"], ["F.04"])
+        forced, _ = r.run("export", "openspec", "--force", expect=0)      # dry run, marks the gap instead
+        self.assertEqual(forced["derived"]["drivers"], [])                 # F.01/F.02 from the Intent are NOT the work
+        self.assertTrue(any("F.04 is cited by a record but not defined" in g for g in forced["gaps"]))
+
+        # apply writes the driver and its story; now the hand-over describes rotation
+        prd = "docs/architecture/PRD.md"
+        r.write(prd, r.read(prd).replace("- **F.03:**", "- **F.04:** The system **MUST** let an integrator rotate an API key, keeping the old key valid for the configured overlap window.\n- **F.03:**"))
+        r.write("docs/architecture/requirements/US-002-rotate-key.md",
+                "---\nid: US-002\ntitle: Rotate an API key\nstatus: ready\nlevel: software\nupdated: 2026-01-01\n"
+                "epic: EP-001\nsatisfies: [F.04]\nrealizes-capabilities: [CAP-developer-platform]\npriority: must\n---\n"
+                "# US-002\n\n## Story\n**As an** external integrator\n**I want** to rotate my key\n**so that** I never lack a valid credential.\n\n"
+                "## Acceptance criteria\n\n```gherkin\nScenario: Rotate with overlap\n  Given I hold key A\n  When  I POST /api/keys/A/rotate\n"
+                "  Then  I receive key B shown once\n  And   key A still verifies until its expiry\n```\n")
+        r.tasks("add-key-rotation", "## 1\n- [x] 1.1 Fill the ADR\n- [x] 1.2 Add F.04 to `PRD.md`\n\n## 2\n- [ ] 2.1 Mark the expiry check in `src/keys.py` with ARCH-REF: ADR-0002\n")
+        out, _ = r.run("export", "openspec", "--yes", expect=0)
+        self.assertEqual(out["derived"]["drivers"], ["F.04"])
+        self.assertEqual(out["derived"]["stories"], ["US-002"])
+        self.assertFalse(any("already existed unchanged" in g for g in out["gaps"]))
+        spec = r.read("openspec/changes/add-key-rotation/specs/developer-platform/spec.md")
+        self.assertIn("### Requirement: Rotate an API key", spec)
+        self.assertNotIn("Generate an API key", spec)                      # the status quo is not handed over
+        self.assertIn("- **GIVEN** I hold key A\n- **WHEN** I POST /api/keys/A/rotate\n- **THEN** I receive key B shown once\n- **AND** key A still verifies", spec)
+        self.assertIn("The API-key data store SHALL ensure that stored material cannot be reversed", spec)   # Q.01, readable
+        tasks = r.read("openspec/changes/add-key-rotation/tasks.md")
+        self.assertIn("`ARCH-REF: ADR-0002` in `src/keys.py`", tasks)       # the file the change names, not a component
+        proposal = r.read("openspec/changes/add-key-rotation/proposal.md")
+        self.assertNotIn("**BREAKING**", proposal)
+        self.assertIn("docs/architecture/contracts/openapi.yaml", proposal)  # api_keys vs api-keys no longer loses the contract
+
+    def test_published_interface_is_breaking_only_when_the_record_says_so(self):
+        r, rec = self.planned()
+        cpath = "docs/architecture/changes/add-key-rotation/change.md"
+        r.write(cpath, r.read(cpath).replace("archetype: significant", "archetype: published-interface")
+                .replace("Software altitude, significant.", "Software altitude, published interface; additive, not breaking."))
+        r.tasks("add-key-rotation", "## 1\n- [ ] 1.1 x\n")
+        out, _ = r.run("export", "openspec", "--yes", expect=0)
+        proposal = r.read("openspec/changes/add-key-rotation/proposal.md")
+        self.assertIn("Alters a published interface (archetype `published-interface`); the record calls it additive", proposal)
+        self.assertNotIn("**BREAKING**", proposal)
+        r.write(cpath, r.read(cpath).replace("additive, not breaking.", "this is a breaking change for v1 clients."))
+        r.run("export", "openspec", "--yes", "--force", expect=0)
+        self.assertIn("**BREAKING**: alters a published interface (the record calls it breaking)",
+                      r.read("openspec/changes/add-key-rotation/proposal.md"))
+
+    def test_multiline_bullets_and_madr_alternatives_survive_whole(self):
+        r, rec = self.planned()
+        adr = r.read(rec["path"]).split("## Consequences")[0] + (
+            "Alternatives weighed:\n\n- **No new endpoint — document issue, roll out, revoke as the recipe.**\n"
+            "  Rejected because a recipe cannot bound anything: forgotten old keys live\n  forever.\n\n"
+            "## Consequences\n\n**Negative / costs / risks**\n\n- During the overlap a stolen old key stays usable for up to\n"
+            "  the window length unless revoked explicitly.\n")
+        r.write(rec["path"], adr)
+        r.tasks("add-key-rotation", "## 1\n- [ ] 1.1 x\n")
+        r.run("export", "openspec", "--yes", expect=0)
+        design = r.read("openspec/changes/add-key-rotation/design.md")
+        self.assertIn("- No new endpoint — document issue, roll out, revoke as the recipe. — rejected because "
+                      "a recipe cannot bound anything: forgotten old keys live forever.", design)
+        self.assertIn("[During the overlap a stolen old key stays usable for up to the window length unless revoked explicitly.]", design)
+        self.assertNotIn("Alternatives weighed: (ADR-0002)", r.read("openspec/changes/add-key-rotation/proposal.md"))
 
     def test_house_format_and_wont_stories_are_reported_not_guessed(self):
         r, rec = self.planned()

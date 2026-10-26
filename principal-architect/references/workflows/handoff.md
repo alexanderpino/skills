@@ -50,8 +50,13 @@ apply it; a changed driver the main spec does not hold is ADDED, and `gaps` says
    ```
    - `blocked` or `not_needed` → stop; a design that is not planned cannot be handed
      over (propose workflow).
-   - `ready`, `in_progress`, `all_done`, `archived` → continue. `ready` is enough: the
-     implementation needs the decisions, not the finished documentation.
+   - `ready`, `in_progress`, `all_done`, `archived` → continue, with one condition: every
+     driver the records cite (`satisfies:`) must exist in the PRD. The seed's
+     requirements are derived from the PRD and the stories, not from the ADR text, so a
+     change whose driver is written by an apply task (a new `F.xx`) has nothing to hand
+     over until apply has run — the export refuses with `drivers_missing` and names
+     them. Usual order for a change that adds behaviour: propose → apply → handoff;
+     for a change that decides how existing behaviour is met: propose → handoff.
 
 2. **Dry-run the export and read what it derived**
 
@@ -62,9 +67,17 @@ apply it; a changed driver the main spec does not hold is ADDED, and `gaps` says
    `capability`, `contracts`, `principles_cited`, `prd_delta`), `gaps`, `gate`, `next`.
    - `error: "target_exists"` → the seed was written before. Ask whether to regenerate
      (`--force` rewrites only the seeded files) or leave it.
+   - `error: "drivers_missing"` → the records cite a driver the PRD does not define yet.
+     Stop; the apply workflow writes it. Do not `--force` past this unless the user asks
+     for a seed that marks the gap.
    - `derived.drivers` and `derived.stories` empty → the record is not tied to behaviour.
      Go back: add `satisfies: [F.xx]` to the decision record, or confirm with the user
      that behaviour does not change (OpenSpec then needs `skip_specs: true`).
+   - Read `derived.drivers` against the change's Intent: the drivers come from the
+     records' `satisfies:` and the PRD diff, never from prose — but if a record cites an
+     existing, unchanged driver, the seed describes behaviour that already runs. `gaps`
+     says so when every driver pre-dates the change; decide whether that is right (a
+     decision about *how* an existing driver is met) or a missing driver.
    - `derived.capability` → for OpenSpec, compare with `openspec list --specs` when the
      project has specs; reuse an existing path over a near-duplicate. The seed says in
      `proposal.md` whether the path came from `realizes-capabilities` or was guessed
@@ -81,11 +94,21 @@ apply it; a changed driver the main spec does not hold is ADDED, and `gaps` says
    and archive can see where the implementation lives. For spec-kit it also writes
    `.specify/feature.json` when `.specify/` exists, so `/speckit.plan` finds the feature.
 
-4. **Read the seed as the implementer will**
+4. **Read the seed as the implementer will — this is the gate the validator is not**
 
-   Open every file in `plan` and check the mapping held: a requirement per driver, a
-   scenario per acceptance criterion, decisions with their alternatives, the
-   `ARCH-REF` verification task. Fix a wrong derivation at its source (the ADR, the
+   `openspec validate` and spec-kit's checklist check shape; neither can tell a seed
+   that describes the status quo from one that describes the change. Open every file in
+   `plan` and answer, with the record beside you:
+   - Does every requirement and task describe behaviour **this change adds or alters**,
+     traced to a driver the records serve — not behaviour that already runs?
+   - Is there a requirement for each driver the change serves, and a scenario for each
+     acceptance criterion?
+   - Are the decisions there with their alternatives and consequences, whole, not cut
+     mid-sentence?
+   - Does the seed claim anything the record does not say (BREAKING, a capability
+     "introduced", a contract omitted although the SD names one)?
+   - Does the `ARCH-REF` task name a file, as the change's own tasks do?
+   A "no" on the first question means the seed is wrong, whatever the validator says. Fix a wrong derivation at its source (the ADR, the
    story, the PRD) and re-export with `--force`; do not patch a derivation in the seed,
    or the two records drift. A re-export is safe for the implementer's work: files
    untouched since seeding are regenerated, files edited since are kept and listed in
@@ -150,8 +173,9 @@ inventing a constitution the architecture does not hold.
 ## Handed over: <id> — <title> → <target>
 
 **Seed:** <dest>/ (<n> files) · **Derived from:** <records>; <drivers>; <stories>; capability `<capability>`
-**Gaps the record does not fill:** <list, or none>
-**Gate:** <gate command>
+**Gaps the CLI reported:** <list, or none>
+**What the read in step 4 found:** <the seed describes the change / what misleads, says too little, or is not on record>
+**Gate:** <gate command and result>
 
 Next: <the `next` text from the CLI>
 ```

@@ -67,8 +67,10 @@ pass `--json`. The CLI is the source of truth for state; never infer what it rep
 
    Open `<path>/change.md` and fill every section; the template's guidance is in HTML
    comments and `<placeholders>`, which must all go.
-   - **Front-matter.** `affects:` with the component names the records already use;
-     `conflicts:` with every accepted ADR id step 3 found contradicted.
+   - **Front-matter first, before step 7.** `affects:` with the component names the
+     records already use (`arch.py record` copies it into every record it mints — a
+     record minted before this is filled gets none); `conflicts:` with every accepted
+     ADR id step 3 found contradicted.
    - **Intent.** What and why, with driver IDs. No driver on record → say so and list
      it as a gap.
    - **Evidence.** What you read, as paths and `path:line`, split into observed and
@@ -101,7 +103,12 @@ pass `--json`. The CLI is the source of truth for state; never infer what it rep
    record yourself or edit its `status:`. Fill `satisfies:` with the `F.xx` / `Q.xx`
    the decision serves: it is the join between the decision and the behaviour, and the
    handoff workflow derives the implementation's requirements from it — a record
-   without it hands over a change with no behaviour contract. Then fill the record at the returned `path`:
+   without it hands over a change with no behaviour contract. A driver this change
+   creates (an `F.xx` that a task in `tasks.md` will add to the PRD) may be cited
+   before it exists; say so under Assumptions and gaps, and hand over only after apply
+   has written it. Template fields that do not apply (`complies-with` when there are no
+   enterprise principles, `supersedes`, `derived-from-rfc`) are removed or left empty,
+   never filled with a placeholder. Then fill the record at the returned `path`:
    Nygård sections (`references/conventions.md` §3), MADR optional sections only when
    the decision needs them, the two §1 questions answered separately when it keeps,
    works around or replaces an existing design, and numbers with their model
@@ -118,11 +125,15 @@ pass `--json`. The CLI is the source of truth for state; never infer what it rep
    - [ ] 3.1 Mark the rotation entry point in `src/keys.py` with `ARCH-REF: ADR-0002`
    ```
    Derive the tasks from SKILL.md Steps 2–4: the living documents the triage names,
-   the `ARCH-REF:` markers where a decision is enacted, the index row for any new
-   document, `AD.md` for any new stakeholder, concern or view, and every
-   corresponding view the AD §7 rules tie to what changes. Keep the groups the triage
-   calls for and delete the rest. Do not add tasks for the decision log or for
-   accepting records; archive does both.
+   the `ARCH-REF:` markers where a decision is enacted **in code that exists today**,
+   the index row for any new document, `AD.md` for any new stakeholder, concern or
+   view, and every corresponding view the AD §7 rules tie to what changes. Keep the
+   groups the triage calls for and delete the rest. No task for the records (written
+   here, accepted by archive), and no marker task for code the implementation will
+   create: the hand-over seed carries that marker as one of its own tasks, and
+   `verify` checks breadcrumbs only in code the change actually touched. Put only the
+   target in backticks; `status` reports each task's `paths`, so check that an id or a
+   directory did not become a target by accident.
 
 9. **Loop on status until ready**
 
@@ -163,7 +174,8 @@ The plan is ready for review. When it is approved, run `/arch-apply <id>`.
 
 - Planning only. An implementation instruction in the request does not carry over;
   do not edit living documents, the decision log, or code here.
-- Every planning artifact is re-read from disk before the next one is written.
+- Every planning artifact is re-read from disk before the next one is written: the
+  CLI adds fields (`records:`), and a file may have been edited since you last saw it.
 - Ask about anything that would change scope, a published interface, a quality
   target, or ownership; record smaller unknowns as assumptions.
 - Records start `proposed`/`draft`. Only archive accepts them.
