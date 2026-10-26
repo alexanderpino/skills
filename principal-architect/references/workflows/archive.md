@@ -55,9 +55,12 @@ if that is ambiguous, list the changes and ask.
    ```bash
    ARCH archive --change <id> [--leave-proposed] [--allow-incomplete] --json
    ```
-   Parse `refused`, `refusals`, `plan`. Refused → report each refusal and stop.
-   Otherwise show the `plan` lines to the user and ask: "Archive <id> with these
-   changes?"
+   Parse `refused`, `refusals`, `plan`, `implementation`. Refused → report each refusal
+   and stop. Otherwise show the `plan` lines to the user and ask: "Archive <id> with
+   these changes?" The plan names the state of any hand-over (an OpenSpec or spec-kit
+   change still open, a seed behind the record). That is information for the user, not
+   a refusal: the decision is accepted when it is made, and delivery is tracked on the
+   implementation side (handoff workflow, "Two lifecycles, one visible link").
 
 5. **Archive, on the user's yes**
 

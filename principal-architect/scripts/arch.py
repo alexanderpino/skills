@@ -15,7 +15,8 @@ Commands (add --json for machine-readable output; every workflow uses it):
                               scaffold <root>/changes/<id>/ (change.md + tasks.md)
   record   adr|rfc --change ID --title T [--supersedes ADR-NNNN] [--from-rfc RFC-NNNN]
                               mint the next ADR/RFC number into decisions/, linked to the change
-  status   [--change ID]      planning completeness, task progress, state, next step
+  status   [--change ID]      planning completeness, task progress, state, next step,
+                              and where any hand-over (OpenSpec / spec-kit) stands
   list                        active changes with state and progress
   verify   [--change ID] [--strict]
                               mechanical gate: arch_lint + change checks, CRITICAL/WARNING/SUGGESTION
@@ -593,7 +594,66 @@ def change_state(ctx, cid, cdir, archived):
         "conflicts": as_list(fm.get("conflicts")), "records": records, "missing": missing,
         "progress": {"total": len(tasks), "done": done, "remaining": len(tasks) - done},
         "tasks": [dict(t, source=rel(tpath, ctx["repo"])) for t in tasks], "next": nxt,
+        "handoff": as_list(fm.get("handoff")),
     }
+
+
+# ---------------------------------------------------------------- hand-over state
+# A decision is accepted when it is made (MADR, TOGAF implementation governance); delivery
+# is tracked in the implementation tool. The link between the two is kept visible in both
+# directions and is never a lock: nothing here refuses, it only reports.
+HANDOFF = re.compile(r"^([a-z]+):(.+?)(?:@([0-9a-f]{6,64}))?$")
+
+
+def current_fingerprint(ctx, state):
+    import arch_export
+    return arch_export.fingerprint(arch_export.Source(sys.modules[__name__], ctx, state).build())
+
+
+def handoff_state(ctx, state):
+    """Where each hand-over of a change lives now, how far it is, and whether the seed
+    still matches the architecture record it was derived from."""
+    entries = state.get("handoff") or []
+    if not entries:
+        return []
+    fp_now = current_fingerprint(ctx, state)
+    out = []
+    for raw in entries:
+        m = HANDOFF.match(raw)
+        if not m:
+            out.append({"raw": raw, "target": None, "path": None, "state": "unparseable",
+                        "exists": False, "archived": False, "progress": None, "seed_current": None})
+            continue
+        target, path, fp = m.groups()
+        full = os.path.join(ctx["repo"], path)
+        found, archived = (full if os.path.isdir(full) else None), False
+        if found is None and target == "openspec":
+            # openspec archive moves the change to changes/archive/<date>-<id>/
+            arch_dir = os.path.join(os.path.dirname(full), "archive")
+            name = os.path.basename(full)
+            if os.path.isdir(arch_dir):
+                for d in sorted(os.listdir(arch_dir)):
+                    if d.endswith("-" + name) and os.path.isdir(os.path.join(arch_dir, d)):
+                        found, archived = os.path.join(arch_dir, d), True
+        entry = {"raw": raw, "target": target, "path": rel(found, ctx["repo"]) if found else path,
+                 "exists": found is not None, "archived": archived, "fingerprint": fp,
+                 "seed_current": None if fp is None else fp == fp_now, "progress": None}
+        if found is None:
+            entry["state"] = "missing"
+        else:
+            tasks = parse_tasks(os.path.join(found, "tasks.md"))
+            done = sum(t["done"] for t in tasks)
+            entry["progress"] = {"total": len(tasks), "done": done}
+            entry["state"] = ("archived" if archived else "seeded" if not tasks else
+                              "not_started" if done == 0 else "in_progress" if done < len(tasks) else "done")
+        out.append(entry)
+    return out
+
+
+def _handoff_line(h):
+    prog = f" {h['progress']['done']}/{h['progress']['total']} tasks" if h.get("progress") else ""
+    seed = "" if h.get("seed_current") in (True, None) else " — record changed since the seed"
+    return f"{h['target'] or '?'} {h['state']}{prog} at {h['path'] or h['raw']}{seed}"
 
 
 # ---------------------------------------------------------------- commands
@@ -820,10 +880,13 @@ def cmd_status(args):
     cid, cdir, archived, how = select_change(ctx, args.change)
     out = change_state(ctx, cid, cdir, archived)
     out["selected_by"] = how
+    out["implementation"] = handoff_state(ctx, out)
 
     def human(r):
         lines = [f"change: {r['change']} — {r['title']}  [{r['state']}]",
                  f"progress: {r['progress']['done']}/{r['progress']['total']} tasks"]
+        for h in r["implementation"]:
+            lines.append(f"implementation: {_handoff_line(h)}")
         for m in r["missing"]:
             lines.append(f"  missing: {m['artifact']}: {m['problem']}")
         for t in r["tasks"]:
@@ -1147,6 +1210,33 @@ def verify(ctx, cid=None, strict=False):
                 issue("SUGGESTION", "Coherence", f"archetype '{state['archetype']}' usually adds a "
                       f"stakeholder, concern or view; confirm AD.md needs no change", ad)
 
+        # 9. hand-over: the implementation seed must still match the record (visibility, not a lock)
+        hand = handoff_state(ctx, state)
+        if not hand:
+            check("handoff", "Implementation", "passed", "no hand-over recorded")
+        else:
+            bad = 0
+            for h in hand:
+                if h["state"] == "unparseable":
+                    bad += 1
+                    issue("WARNING", "Implementation", f"handoff entry '{h['raw']}' is not target:path", state["path"])
+                elif h["state"] == "missing":
+                    bad += 1
+                    issue("WARNING", "Implementation", f"hand-over target {h['path']} ({h['target']}) no longer "
+                          f"exists; re-export it or remove it from handoff:", state["path"])
+                elif h["seed_current"] is False:
+                    bad += 1
+                    issue("WARNING", "Implementation", f"the architecture record changed after the {h['target']} "
+                          f"seed at {h['path']} was written; re-export with --force, or carry the change into "
+                          f"the seed and re-export to refresh the fingerprint", h["path"])
+                elif h["seed_current"] is None:
+                    issue("SUGGESTION", "Implementation", f"{h['target']} seed at {h['path']} carries no "
+                          f"fingerprint (older export); re-export so drift becomes detectable", h["path"])
+            check("handoff", "Implementation", "failed" if bad else "passed",
+                  "; ".join(_handoff_line(h) for h in hand))
+    else:
+        hand = []
+
     crit = sum(i["severity"] == "CRITICAL" for i in issues)
     skipped = [c for c in checks if c["status"] == "skipped"]
     if crit:
@@ -1158,7 +1248,7 @@ def verify(ctx, cid=None, strict=False):
     return {
         "change": cid, "base": base, "base_resolved": base_ok, "verdict": verdict,
         "summary": {s: sum(i["severity"] == s for i in issues) for s in ("CRITICAL", "WARNING", "SUGGESTION")},
-        "checks": checks, "issues": issues, "judgement_gate": JUDGEMENT_GATE,
+        "checks": checks, "issues": issues, "judgement_gate": JUDGEMENT_GATE, "implementation": hand,
         "note": "mechanically_clean is not ready: the judgement gate is yours to walk, and a "
                 "skipped check is never a pass.",
     }
@@ -1266,9 +1356,16 @@ def cmd_archive(args):
     plan += ["decision log: sync rows with the ADR files",
              f"change.md: status -> done, archived {TODAY}",
              f"move {state['path']} -> {rel(dest, ctx['repo'])} (relative links rewritten)"]
+    # delivery is reported, never required: the decision stands on its own merits
+    hand = report["implementation"]
+    for h in hand:
+        plan.append(f"implementation ({h['target']}): {h['state']}"
+                    + (f" {h['progress']['done']}/{h['progress']['total']} tasks" if h.get("progress") else "")
+                    + f" at {h['path'] or h['raw']} — not held back by this archive; the link stays on the change"
+                    + ("" if h.get("seed_current") in (True, None) else "; the seed is behind the record"))
     out = {"change": cid, "selected_by": how, "refused": bool(refusals), "refusals": refusals,
-           "plan": plan, "applied": False, "verify": {"verdict": report["verdict"], "summary": report["summary"],
-                                                     "critical": crit}}
+           "plan": plan, "applied": False, "implementation": hand,
+           "verify": {"verdict": report["verdict"], "summary": report["summary"], "critical": crit}}
     if not refusals and args.yes:
         for a in actions:
             if a[0] == "accept":
@@ -1362,7 +1459,8 @@ def cmd_export(args):
 
     def human(r):
         lines = [f"{'wrote' if r['applied'] else 'would write'} {r['target']} seed at {r['dest']}/"]
-        lines += [f"  {p['action']:<5} {p['path']}{'  (overwrites)' if p['overwrites'] else ''}" for p in r["plan"]]
+        lines += [f"  {p['action']:<5} {p['path']}" + (f"  ({p['reason']})" if p.get("reason") else
+                                                      ("  (overwrites)" if p["overwrites"] else "")) for p in r["plan"]]
         d = r["derived"]
         lines.append(f"derived from: {', '.join(d['records']) or 'no records'}; drivers {', '.join(d['drivers']) or '-'}; "
                      f"quality {', '.join(d['quality']) or '-'}; stories {', '.join(d['stories']) or '-'}; capability {d['capability']}")

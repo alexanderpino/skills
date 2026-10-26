@@ -286,6 +286,14 @@ archetype that requires a decision record cannot leave `blocked` without one, a
 contradicted ADR (`conflicts:`) blocks until a record in the change supersedes it, and
 archive refuses while verify reports anything CRITICAL.
 
+**Decided and delivered are two lifecycles.** A decision record is accepted when the
+decision is made, not when the code ships (MADR; TOGAF's implementation governance is a
+separate concern), so archive never waits for an OpenSpec or spec-kit change. What the
+record keeps is sight: `status`, `verify` and `archive` report each hand-over's state and
+progress, and `verify` warns when the record moved on after the seed was written (a
+fingerprint of the derived facts travels with the hand-over). Visibility in both
+directions, never a lock.
+
 ## Step 0 — Locate the docs root
 
 Resolve where architecture docs live, in this order, and **use the first hit**:

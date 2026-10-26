@@ -444,7 +444,7 @@ class ExportTests(unittest.TestCase):
         self.assertRegex(tasks, r"(?m)^- \[ \] 2\.1 Implement US-001")
         self.assertIn("schema: spec-driven", r.read("openspec/changes/add-key-rotation/.openspec.yaml"))
         self.assertRegex(r.read("docs/architecture/changes/add-key-rotation/change.md"),
-                         r"(?m)^handoff: \[openspec:openspec/changes/add-key-rotation\]")
+                         r"(?m)^handoff: \[openspec:openspec/changes/add-key-rotation@[0-9a-f]{12}\]")
 
         e, rc = r.run("export", "openspec", "--yes")
         self.assertEqual((rc, e["error"]), (2, "target_exists"))
@@ -503,7 +503,7 @@ class ExportTests(unittest.TestCase):
         self.assertTrue(os.path.exists(r.path("specs/003-add-key-rotation/contracts/openapi.yaml")))
         self.assertTrue(os.path.exists(r.path("specs/003-add-key-rotation/checklists/requirements.md")))
         self.assertRegex(r.read("docs/architecture/changes/add-key-rotation/change.md"),
-                         r"(?m)^handoff: \[speckit:specs/003-add-key-rotation\]")
+                         r"(?m)^handoff: \[speckit:specs/003-add-key-rotation@[0-9a-f]{12}\]")
 
     def test_constitution_from_principles(self):
         r = Repo()
@@ -525,6 +525,71 @@ class ExportTests(unittest.TestCase):
         self.assertIn("**Version**: 1.0.0", text)
         e, rc = r.run("export", "constitution", "--yes")
         self.assertEqual(e["error"], "target_exists")
+
+    def test_handoff_is_visible_and_drift_is_detected_but_nothing_locks(self):
+        r, rec = self.planned()
+        r.tasks("add-key-rotation", "## 1\n- [x] 1.1 Fill the ADR\n")
+        r.append("src/keys.py", "\n# ARCH-REF: ADR-0002\n")
+        cpath = "docs/architecture/changes/add-key-rotation/change.md"
+        out, _ = r.run("export", "openspec", "--yes", expect=0)
+        self.assertRegex(r.read(cpath), r"(?m)^handoff: \[openspec:openspec/changes/add-key-rotation@[0-9a-f]{12}\]")
+        self.assertIn(f"record fingerprint {out['fingerprint']}", r.read("openspec/changes/add-key-rotation/proposal.md"))
+
+        st, _ = r.run("status", expect=0)
+        h = st["implementation"][0]
+        self.assertEqual((h["target"], h["state"], h["seed_current"]), ("openspec", "not_started", True))
+        v, _ = r.run("verify", expect=0)
+        self.assertEqual(next(c for c in v["checks"] if c["name"] == "handoff")["status"], "passed")
+
+        # the implementer ticks a task: progress is visible from the architecture side
+        tp = "openspec/changes/add-key-rotation/tasks.md"
+        r.write(tp, r.read(tp).replace("- [ ] 2.1", "- [x] 2.1"))
+        st, _ = r.run("status", expect=0)
+        self.assertEqual(st["implementation"][0]["state"], "in_progress")
+
+        # the record moves on after the seed: drift is reported, with the way out
+        r.write(rec["path"], r.read(rec["path"]).replace("24-hour", "48-hour"))
+        v, _ = r.run("verify", expect=0)
+        drift = [i for i in v["issues"] if i["dimension"] == "Implementation"]
+        self.assertEqual(len(drift), 1)
+        self.assertIn("changed after the openspec seed", drift[0]["message"])
+        self.assertEqual(drift[0]["severity"], "WARNING")
+
+        # the implementer also refined proposal.md by hand; a re-export must not undo either
+        pp = "openspec/changes/add-key-rotation/proposal.md"
+        r.append(pp, "\nHand-written note from the implementer.\n")
+        re_out, _ = r.run("export", "openspec", "--yes", "--force", expect=0)
+        self.assertEqual(re_out["kept"], ["proposal.md"])
+        self.assertIn("Hand-written note", r.read(pp))                          # kept
+        self.assertIn("48-hour", r.read("openspec/changes/add-key-rotation/design.md"))   # regenerated
+        self.assertIn("- [x] 2.1", r.read(tp))                                   # tick carried over
+        self.assertTrue(any(p["action"] == "keep" and p["path"].endswith("proposal.md") for p in re_out["plan"]))
+        self.assertTrue(any("carry the record" in g for g in re_out["gaps"]))
+        v, _ = r.run("verify", expect=0)
+        self.assertEqual([i for i in v["issues"] if i["dimension"] == "Implementation"], [])
+
+        # archive is not held back by an open implementation, but says where it stands
+        a, _ = r.run("archive", expect=0)
+        self.assertFalse(a["refused"])
+        self.assertTrue(any(p.startswith("implementation (openspec): in_progress 1/") for p in a["plan"]), a["plan"])
+        a, _ = r.run("archive", "--yes", expect=0)
+        self.assertTrue(a["applied"])
+        st, _ = r.run("status", "--change", "add-key-rotation", expect=0)
+        self.assertEqual((st["state"], st["implementation"][0]["state"]), ("archived", "in_progress"))
+        self.assertTrue(st["implementation"][0]["seed_current"])  # accepting the ADR is not drift
+
+        # OpenSpec archives its change: the link follows it into changes/archive/
+        os.makedirs(r.path("openspec/changes/archive"))
+        shutil.move(r.path("openspec/changes/add-key-rotation"),
+                    r.path("openspec/changes/archive/2026-11-01-add-key-rotation"))
+        st, _ = r.run("status", "--change", "add-key-rotation", expect=0)
+        self.assertEqual(st["implementation"][0]["state"], "archived")
+        self.assertEqual(st["implementation"][0]["path"], "openspec/changes/archive/2026-11-01-add-key-rotation")
+
+        # the target disappears: a warning, never a crash or a lock
+        shutil.rmtree(r.path("openspec/changes/archive/2026-11-01-add-key-rotation"))
+        v, _ = r.run("verify", "--change", "add-key-rotation", expect=0)
+        self.assertTrue(any("no longer exists" in i["message"] for i in v["issues"]))
 
 
 if __name__ == "__main__":

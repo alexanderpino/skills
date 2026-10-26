@@ -39,6 +39,10 @@ user asks for a health check, verify the whole tree (`--tree`).
    - An issue prefixed "pre-existing" is a lint failure in a file this change did not
      touch. Report it, separately; it is not this change's to fix, but CI will still
      fail on it.
+   - `implementation` lists every hand-over (OpenSpec / spec-kit) with its `state` and
+     `progress`. An Implementation issue is about the link, never a reason to hold the
+     change: a missing target or a seed behind the record (see the handoff workflow,
+     "Two lifecycles, one visible link"). Report progress as information.
 
 3. **Walk the judgement gate**
 
@@ -92,6 +96,7 @@ user asks for a health check, verify the whole tree (`--tree`).
 | Completeness | <n/m tasks, planning complete?> |
 | Traceability | <breadcrumbs, index> |
 | Coherence | <review flags, AD root> |
+| Implementation | <per hand-over: target, state, progress, seed current? — or "no hand-over"> |
 | Judgement | <questions passed / issues / not verified> |
 
 ### CRITICAL — fix before archiving

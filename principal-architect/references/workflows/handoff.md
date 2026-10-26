@@ -68,12 +68,43 @@ decides it.
    Open every file in `plan` and check the mapping held: a requirement per driver, a
    scenario per acceptance criterion, decisions with their alternatives, the
    `ARCH-REF` verification task. Fix a wrong derivation at its source (the ADR, the
-   story, the PRD) and re-export with `--force`; do not patch the seed by hand, or the
-   two records drift.
+   story, the PRD) and re-export with `--force`; do not patch a derivation in the seed,
+   or the two records drift. A re-export is safe for the implementer's work: files
+   untouched since seeding are regenerated, files edited since are kept and listed in
+   `kept` (carry the record's change into those by hand), and `tasks.md` keeps its
+   ticked boxes.
 
 5. **Hand over and stop**, in the format below. The target tool's own flow finishes
    the artifacts and is the gate: `openspec validate <id> --strict`, or
    `/speckit.clarify` → `/speckit.plan` → `/speckit.tasks` → `/speckit.analyze`.
+
+## Two lifecycles, one visible link
+
+The architecture change and the implementation change do not wait for each other.
+A decision record is **accepted when the decision is made** (MADR; TOGAF separates
+decision from implementation governance), so `arch.py archive` accepts the records
+and archives the change whether or not the implementation is finished. Holding an
+ADR in `proposed` until the code ships would make the next `consult` treat a decision
+already taken as non-binding — worse than any drift. Delivery is the implementation
+tool's job and is tracked there.
+
+What the architecture side keeps is **sight of the implementation**, from the
+`handoff:` entry the export writes (`<target>:<path>@<fingerprint>`):
+
+- `arch.py status` reports each hand-over's `state` (`seeded`, `not_started`,
+  `in_progress`, `done`, `archived` — an OpenSpec change is followed into
+  `changes/archive/` — or `missing`) and its task progress.
+- `arch.py verify` adds an **Implementation** dimension: WARNING when a hand-over
+  target no longer exists, WARNING when the architecture record changed after the seed
+  was written (the fingerprint no longer matches: an ADR, driver, story, scope or
+  contract moved on), SUGGESTION when a seed predates fingerprints. Accepting an ADR or
+  archiving the change is not drift; only the facts the seed derives from count.
+- `arch.py archive` lists the implementation state in its plan so the user sees it
+  before saying yes, and never refuses because of it.
+
+On a drift warning: re-export with `--force` (step 4 says what that keeps), or, when
+the implementer has already carried the change into the seed, re-export anyway so the
+fingerprint is refreshed; a hand-edited file is kept either way.
 
 ## Constitution (spec-kit only)
 

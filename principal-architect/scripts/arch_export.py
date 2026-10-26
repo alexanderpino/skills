@@ -33,6 +33,7 @@ Mapping (source → target), kept here so it can be audited:
 from __future__ import annotations
 
 import datetime
+import hashlib
 import json
 import os
 import re
@@ -336,7 +337,7 @@ class Source:
             return [b for b in _bullets(tech)][:8]
         return []
 
-    def build(self):
+    def _build(self):
         ch = self.change()
         adrs, rfcs = self.records()
         prd = self.prd()
@@ -386,16 +387,55 @@ class Source:
             "stories": sorted(stories, key=lambda s: (s["rank"], s["id"])),
             "epic": epic, "capability": capability, "capabilities": caps,
             "contracts": self.contracts(ch["affects"]), "principles": self.principles(),
-            "hld_tech": self.hld_tech(), "notes": self.notes,
+            "hld_tech": self.hld_tech(), "notes": self.notes, "repo": self.repo,
         }
+
+    def build(self):
+        model = self._build()
+        model["fingerprint"] = fingerprint(model)
+        return model
+
+
+# ---------------------------------------------------------------- fingerprint
+RECORD_KEYS = ("id", "title", "satisfies", "complies_with", "affects", "supersedes", "context",
+               "decision", "decision_bullets", "alternatives", "positive", "negative", "tradeoffs",
+               "consequences", "confirmation", "summary")
+CHANGE_KEYS = ("id", "title", "level", "archetype", "affects", "intent", "evidence", "decisions",
+               "triage", "assumptions")
+STORY_KEYS = ("id", "title", "role", "want", "so_that", "priority", "satisfies", "scenarios", "checklist")
+
+
+def fingerprint(model):
+    """A short hash of everything the seed is derived from — so a later `verify` can tell
+    whether the architecture record moved on after the hand-over. Record *status* and
+    file paths are left out on purpose: accepting an ADR or archiving the change is not
+    drift, and neither is a link rewritten by the archive move."""
+    facts = {
+        "change": {k: model["change"][k] for k in CHANGE_KEYS},
+        "records": [{k: r[k] for k in RECORD_KEYS} for r in model["adrs"] + model["rfcs"]],
+        "F": model["F"], "Q": model["Q"], "C": model["C"],
+        "stories": [{k: s[k] for k in STORY_KEYS} for s in model["stories"]],
+        "epic": model["epic"], "capability": model["capability"],
+        "principles": [(p["id"], p["statement"]) for p in model["principles"]],
+        "contracts": [],
+    }
+    for c in model["contracts"]:
+        try:
+            with open(os.path.join(model["repo"], c), "rb") as fh:
+                facts["contracts"].append((c, hashlib.sha256(fh.read()).hexdigest()[:12]))
+        except OSError:
+            facts["contracts"].append((c, None))
+    dumped = json.dumps(facts, sort_keys=True, default=str)
+    dumped = re.sub(r"\]\([^)]*\)", "]()", dumped)  # markdown link targets move with the folder
+    return hashlib.sha256(dumped.encode("utf-8")).hexdigest()[:12]
 
 
 # ---------------------------------------------------------------- shared rendering
 def _provenance(model, cmd):
     ids = ", ".join(r["id"] for r in model["adrs"] + model["rfcs"]) or "no decision records"
-    return (f"<!-- Seeded by principal-architect from {model['change']['path']} ({ids}). "
-            f"Facts come from the architecture record; markers show what it does not say. "
-            f"Regenerate with: {cmd} -->\n")
+    return (f"<!-- Seeded by principal-architect from {model['change']['path']} ({ids}); "
+            f"record fingerprint {model['fingerprint']}. Facts come from the architecture record; "
+            f"markers show what it does not say. Regenerate with: {cmd} -->\n")
 
 
 def _req_name(model, fid):
@@ -786,6 +826,30 @@ def render_constitution(principles, project, extra_sections):
 
 
 # ---------------------------------------------------------------- entry points
+SIDECAR = ".principal-architect.json"
+TASK_TEXT = re.compile(r"^\s*[-*]\s+\[[ xX]\]\s+(?:T\d+\s+)?(?:\d+(?:\.\d+)*\s+)?(.*\S)\s*$")
+
+
+def _sha(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _carry_ticks(old, new):
+    """Re-seed a task list without losing the boxes the implementer already ticked."""
+    done = set()
+    for line in old.splitlines():
+        m = TASK_TEXT.match(line)
+        if m and re.match(r"^\s*[-*]\s+\[[xX]\]", line):
+            done.add(" ".join(m.group(1).split()))
+    out = []
+    for line in new.splitlines():
+        m = TASK_TEXT.match(line)
+        if m and " ".join(m.group(1).split()) in done:
+            line = re.sub(r"\[ \]", "[x]", line, count=1)
+        out.append(line)
+    return "\n".join(out) + ("\n" if new.endswith("\n") else "")
+
+
 def export(arch, ctx, state, target, yes=False, force=False, out=None):
     """Build the model and write (or plan) the target. Returns the result dict."""
     if state["state"] in ("blocked", "not_needed"):
@@ -839,17 +903,64 @@ def export(arch, ctx, state, target, yes=False, force=False, out=None):
                     "contracts": model["contracts"], "principles_cited": sorted({pr for r in model["adrs"] for pr in r["complies_with"]}),
                     "prd_delta": model["delta"]},
         "gaps": model["notes"] + [f"[NEEDS CLARIFICATION: {c}]" for c in clar],
-        "gate": gate, "next": after,
+        "gate": gate, "next": after, "fingerprint": model["fingerprint"],
     }
+    # A re-export must never destroy work done on the implementation side. The sidecar
+    # remembers what each seeded file looked like; a file that still looks like that is
+    # the seed's to rewrite, anything edited since is kept and reported.
+    sidecar = os.path.join(dest, SIDECAR)
+    seeded = {}
+    if os.path.exists(sidecar):
+        try:
+            with open(sidecar, encoding="utf-8") as fh:
+                seeded = json.load(fh).get("files", {})
+        except (OSError, ValueError):
+            seeded = {}
+    kept = []
+    for entry in plan:
+        p = os.path.relpath(entry["path"], arch.rel(dest, repo)).replace(os.sep, "/")
+        if not entry["overwrites"]:
+            continue
+        path = os.path.join(dest, p)
+        v = files[p]
+        if isinstance(v, tuple):
+            with open(path, "rb") as fh:
+                current = hashlib.sha256(fh.read()).hexdigest()
+            edited = seeded.get(p) != current
+        else:
+            with open(path, encoding="utf-8") as fh:
+                text = fh.read()
+            unticked = re.sub(r"\[[xX]\]", "[ ]", text)
+            edited = seeded.get(p) not in (_sha(text), _sha(unticked))
+            if not edited and p.endswith("tasks.md"):
+                files[p] = _carry_ticks(text, v)
+        if edited:
+            kept.append(p)
+            entry["action"] = "keep"
+            entry["reason"] = "edited since it was seeded" if p in seeded else "no seed record for it"
+    result["kept"] = kept
+    if kept:
+        result["gaps"].append("kept " + ", ".join(kept) + " as edited by hand; carry the record's change into them yourself")
     if yes:
+        written = {}
         for p, v in files.items():
+            if p in kept:
+                written[p] = seeded.get(p)
+                continue
             path = os.path.join(dest, p)
             os.makedirs(os.path.dirname(path), exist_ok=True)
             if isinstance(v, tuple):
                 shutil.copyfile(v[1], path)
+                with open(path, "rb") as fh:
+                    written[p] = hashlib.sha256(fh.read()).hexdigest()
             else:
                 with open(path, "w", encoding="utf-8") as fh:
                     fh.write(v)
+                written[p] = _sha(re.sub(r"\[[xX]\]", "[ ]", v)) if p.endswith("tasks.md") else _sha(v)
+        with open(sidecar, "w", encoding="utf-8") as fh:
+            json.dump({"change": cid, "target": target, "exported": TODAY, "fingerprint": model["fingerprint"],
+                       "files": {k: v for k, v in written.items() if v}}, fh, indent=2)
+            fh.write("\n")
         if target == "speckit":
             fj = os.path.join(repo, ".specify", "feature.json")
             if os.path.isdir(os.path.dirname(fj)):
@@ -859,7 +970,7 @@ def export(arch, ctx, state, target, yes=False, force=False, out=None):
         cpath = os.path.join(repo, state["path"], "change.md")
         fm, _ = arch.frontmatter(cpath)
         hand = [h for h in arch.as_list(fm.get("handoff")) if not h.startswith(target + ":")]
-        arch.set_fm(cpath, "handoff", hand + [f"{target}:{arch.rel(dest, repo)}"])
+        arch.set_fm(cpath, "handoff", hand + [f"{target}:{arch.rel(dest, repo)}@{model['fingerprint']}"])
         result["applied"] = True
     return result
 
