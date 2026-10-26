@@ -420,7 +420,7 @@ class ExportTests(unittest.TestCase):
         self.assertEqual(d["stories"], ["US-001"])
         self.assertEqual(d["capability"], "developer-platform")  # from realizes-capabilities: CAP-developer-platform
         self.assertIn("docs/architecture/contracts/openapi.yaml", d["contracts"])
-        self.assertEqual(dry["gaps"], [])
+        self.assertEqual([g for g in dry["gaps"] if "openspec init" not in g], [])   # only "not initialised yet"
 
         done, _ = r.run("export", "openspec", "--yes", expect=0)
         self.assertTrue(done["applied"])
@@ -590,6 +590,96 @@ class ExportTests(unittest.TestCase):
         shutil.rmtree(r.path("openspec/changes/archive/2026-11-01-add-key-rotation"))
         v, _ = r.run("verify", "--change", "add-key-rotation", expect=0)
         self.assertTrue(any("no longer exists" in i["message"] for i in v["issues"]))
+        # ... and the whole-tree check sees it too, although the change is archived
+        v, _ = r.run("verify", "--tree", expect=0)
+        self.assertEqual([c["name"] for c in v["checks"] if c["dimension"] == "Implementation"],
+                         ["handoff:add-key-rotation"])
+        self.assertTrue(any("add-key-rotation: hand-over target" in i["message"] for i in v["issues"]))
+        self.assertEqual(v["implementation"][0]["change"], "add-key-rotation")
+
+    def test_obligation_levels_madr_options_and_modified_against_a_hand_written_spec(self):
+        r, rec = self.planned()
+        # a SHOULD driver, a driver without any RFC 2119 keyword, and a MADR-style ADR
+        prd = "docs/architecture/PRD.md"
+        r.write(prd, r.read(prd)
+                .replace("- **F.02:** The system **MUST** let an integrator revoke",
+                         "- **F.02:** The system **SHOULD** let an integrator revoke")
+                .replace("- **F.03:** The system **MUST** rate-limit", "- **F.03:** The system rate-limits"))
+        adr = r.read(rec["path"]).replace("satisfies: [x]", "satisfies: [F.01, F.02, F.03]")
+        adr = adr.split("## Consequences")[0] + (
+            "## Considered options\n- Hard cutover\n- Overlap window\n\n## Pros and cons of the options\n\n"
+            "### Hard cutover\n- Good, because simple\n- Bad, because every client sees downtime\n\n"
+            "### Overlap window\n- Good, because no downtime\n\n## Consequences\nTwo hashes per key during the window.\n")
+        r.write(rec["path"], adr.replace("We will keep the old key valid for a 24-hour overlap window.",
+                                         "We will use an overlap window: the old key stays valid for 24 hours."))
+        out, _ = r.run("export", "openspec", "--yes", expect=0)
+        spec = r.read("openspec/changes/add-key-rotation/specs/developer-platform/spec.md")
+        self.assertIn("The system SHALL treat the following as a SHOULD-level obligation (RFC 2119): "
+                      "The system SHOULD let an integrator revoke", spec)
+        self.assertNotIn("SHALL let an integrator revoke", spec)                 # never upgraded
+        self.assertIn("### Requirement: Let an integrator revoke one of their API keys", spec)   # clause, not a mid-phrase cut
+        self.assertIn("### Requirement: Rate-limits requests per API key independently of other keys", spec)
+        self.assertIn("Stated as a SHALL-level obligation (no RFC 2119 keyword in the source): "
+                      "The system rate-limits requests per API key", spec)           # verbatim, and says what was done
+        self.assertTrue(any("F.03 carries no RFC 2119 keyword" in g for g in out["gaps"]))
+        design = r.read("openspec/changes/add-key-rotation/design.md")
+        self.assertIn("- Hard cutover — rejected because every client sees downtime", design)
+        self.assertNotIn("- Overlap window — rejected", design)                    # the chosen option is not an alternative
+        speck, _ = r.run("export", "speckit", "--yes", expect=0)
+        skspec = r.read(speck["dest"] + "/spec.md")
+        self.assertIn("- **FR-002**: The system SHOULD let an integrator revoke", skspec)   # spec-kit keeps the level as is
+        self.assertIn("NEEDS CLARIFICATION  # the architecture record names components, not directories: api-keys",
+                      r.read(speck["dest"] + "/plan.md"))
+
+        # a hand-written main spec with its own header and an extra scenario: MODIFIED must
+        # use that header and keep that scenario, or `openspec archive` refuses the delta
+        r.write("openspec/specs/developer-platform/spec.md",
+                "# developer-platform\n\n## Purpose\n\nKeys for integrators.\n\n## Requirements\n\n"
+                "### Requirement: Key issuance\nThe system SHALL issue keys. *(trace: F.01)*\n\n"
+                "#### Scenario: Integrator generates a key\n- **WHEN** old\n- **THEN** old\n\n"
+                "#### Scenario: Only in the main spec\n- **WHEN** c\n- **THEN** d\n")
+        r.git("add", "-A")
+        r.git("commit", "-q", "-m", "main spec")
+        r.write(prd, r.read(prd).replace("returning the key value exactly once.",
+                                         "returning the key value exactly once and a rotation handle."))
+        out, _ = r.run("export", "openspec", "--yes", "--force", expect=0)
+        # F.02 and F.03 were edited above and committed with the main spec, so they are "modified"
+        # against main too — but only F.01 has a counterpart in the main spec, so only F.01 is MODIFIED
+        self.assertEqual(out["derived"]["prd_delta"]["modified"], ["F.01", "F.02", "F.03"])
+        self.assertTrue(any("F.02 changed in the PRD but developer-platform's main spec has no requirement"
+                            in g for g in out["gaps"]), out["gaps"])
+        spec = r.read("openspec/changes/add-key-rotation/specs/developer-platform/spec.md")
+        added, mod = spec.split("## MODIFIED Requirements")
+        self.assertIn("### Requirement: Let an integrator revoke one of their API keys", added)   # F.02 stays ADDED
+        self.assertIn("### Requirement: Key issuance", mod)                        # the main spec's header, by trace
+        self.assertIn("a rotation handle", mod)
+        self.assertIn("#### Scenario: Only in the main spec\n- **WHEN** c\n- **THEN** d", mod)  # carried over
+        self.assertIn("carried over from the main spec unchanged", mod)
+        self.assertEqual(mod.count("#### Scenario: Integrator generates a key"), 1)   # ours replaces the old one
+        self.assertIn("### Requirement: Rate-limits requests per API key", spec.split("## MODIFIED")[0])  # unchanged F.03 stays ADDED
+        if self.OPENSPEC:
+            subprocess.run([self.OPENSPEC, "init", "--tools", "none", "--no-animation", "."], cwd=r.dir,
+                           capture_output=True, text=True, check=True)
+            p = subprocess.run([self.OPENSPEC, "validate", "add-key-rotation", "--strict", "--no-interactive"],
+                               cwd=r.dir, capture_output=True, text=True)
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertNotIn("Archive would refuse", p.stdout + p.stderr)
+
+    def test_house_format_and_wont_stories_are_reported_not_guessed(self):
+        r, rec = self.planned()
+        r.write("docs/architecture/requirements/US-002-house-format.md",
+                "---\nid: US-002\ntitle: Revoke a key\nstatus: ready\nlevel: software\nupdated: 2026-01-01\n"
+                "satisfies: [F.01]\npriority: must\n---\n# US-002\n\n## Verhaal\nAls integrator wil ik ...\n\n"
+                "## Acceptatiecriteria\n- werkt\n")
+        r.write("docs/architecture/requirements/US-003-wont.md",
+                "---\nid: US-003\ntitle: Not this release\nstatus: ready\nlevel: software\nupdated: 2026-01-01\n"
+                "satisfies: [F.01]\npriority: won't\n---\n# US-003\n\n## Story\n**As a** x\n**I want** y\n"
+                "**so that** z.\n\n## Acceptance criteria\n- [ ] never\n")
+        out, _ = r.run("export", "openspec", expect=0)
+        self.assertEqual(out["derived"]["stories"], ["US-001"])
+        self.assertTrue(any("1 story file(s) not in the default shape" in g and "US-002-house-format.md" in g
+                            for g in out["gaps"]), out["gaps"])
+        self.assertTrue(any("openspec/config.yaml not found" in g for g in out["gaps"]))
 
 
 if __name__ == "__main__":

@@ -98,7 +98,10 @@ pass `--json`. The CLI is the source of truth for state; never infer what it rep
 
    The CLI picks the number, writes the file from the template, sets the id, title,
    date, level and starting status, and adds the id to `records:`. Never number a
-   record yourself or edit its `status:`. Then fill the record at the returned `path`:
+   record yourself or edit its `status:`. Fill `satisfies:` with the `F.xx` / `Q.xx`
+   the decision serves: it is the join between the decision and the behaviour, and the
+   handoff workflow derives the implementation's requirements from it — a record
+   without it hands over a change with no behaviour contract. Then fill the record at the returned `path`:
    Nygård sections (`references/conventions.md` §3), MADR optional sections only when
    the decision needs them, the two §1 questions answered separately when it keeps,
    works around or replaces an existing design, and numbers with their model

@@ -21,6 +21,24 @@ pass `--json`. The CLI is the source of truth for state; never infer what it rep
 target, ask which — unless the repository already has `openspec/` or `.specify/`, which
 decides it.
 
+**Prerequisites.** The target tool must be initialised in the repository (`openspec
+init`, or `specify init --here`); the export warns in `gaps` when it is not, and
+writes the seed anyway so the initialisation can follow. The export reads the skill's
+default document shapes: `- **F.NN:**` driver lines in the PRD, stories with `## Story`
+(**As a** / **I want** / **so that**) and `## Acceptance criteria` holding a Gherkin
+fence or a checklist. A house format that differs is reported in `gaps` as skipped,
+never guessed at; extend the record in the default shape or write those parts of the
+seed by hand.
+
+**What the export will not do to the record's meaning.** A `SHOULD` or `MAY` driver
+stays that: OpenSpec's validator wants SHALL/MUST in every requirement, so the seed
+states "The system SHALL treat the following as a SHOULD-level obligation (RFC 2119):
+…" rather than upgrading it. A requirement the main spec already holds (matched by its
+`(trace: F.xx)` marker or its name) is a MODIFIED delta under the main spec's own
+header, with the main spec's other scenarios carried over, so `openspec archive` can
+apply it; a changed driver the main spec does not hold is ADDED, and `gaps` says so.
+`won't`-priority stories are left out.
+
 ## Steps
 
 1. **Select the change and check it is decided**
@@ -101,6 +119,14 @@ What the architecture side keeps is **sight of the implementation**, from the
   archiving the change is not drift; only the facts the seed derives from count.
 - `arch.py archive` lists the implementation state in its plan so the user sees it
   before saying yes, and never refuses because of it.
+- `arch.py verify --tree` runs the Implementation checks for **every** change that was
+  ever handed over, archived ones included — the whole-tree health check is where a
+  seed that quietly fell behind the record gets caught once nobody runs `status` on
+  that change any more.
+
+`arch.py` is an agent-side tool: it lives in the skill and is not copied into the
+repository by `init --with-ci`. The CI gate stays `arch_lint.py`; hand-over drift is
+caught at agent time, by `verify`.
 
 On a drift warning: re-export with `--force` (step 4 says what that keeps), or, when
 the implementer has already carried the change into the seed, re-export anyway so the

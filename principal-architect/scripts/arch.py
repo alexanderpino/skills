@@ -18,8 +18,9 @@ Commands (add --json for machine-readable output; every workflow uses it):
   status   [--change ID]      planning completeness, task progress, state, next step,
                               and where any hand-over (OpenSpec / spec-kit) stands
   list                        active changes with state and progress
-  verify   [--change ID] [--strict]
-                              mechanical gate: arch_lint + change checks, CRITICAL/WARNING/SUGGESTION
+  verify   [--change ID | --tree] [--strict]
+                              mechanical gate: arch_lint + change checks, CRITICAL/WARNING/SUGGESTION;
+                              --tree also checks every hand-over ever made, archived changes included
   log      [--write]          check (or sync) the decision log against the ADR files
   archive  [--change ID] [--yes] [--leave-proposed] [--allow-incomplete]
                               accept records, sync the log, move the change to changes/archive/
@@ -650,6 +651,47 @@ def handoff_state(ctx, state):
     return out
 
 
+def all_changes(ctx):
+    """(id, dir, archived) for every change, active first, then the archive."""
+    out = [(cid, os.path.join(ctx["changes"], cid), False) for cid in active_changes(ctx)]
+    arch_dir = os.path.join(ctx["changes"], "archive")
+    if os.path.isdir(arch_dir):
+        for d in sorted(os.listdir(arch_dir)):
+            m = re.match(r"^\d{4}-\d{2}-\d{2}-(.+)$", d)
+            if m and os.path.isfile(os.path.join(arch_dir, d, "change.md")):
+                out.append((m.group(1), os.path.join(arch_dir, d), True))
+    return out
+
+
+def _handoff_checks(ctx, state, check, issue, label="handoff"):
+    """The Implementation checks of verify for one change; returns its hand-over entries."""
+    hand = handoff_state(ctx, state)
+    if not hand:
+        check(label, "Implementation", "passed", "no hand-over recorded")
+        return hand
+    bad = 0
+    for h in hand:
+        if h["state"] == "unparseable":
+            bad += 1
+            issue("WARNING", "Implementation", f"{state['change']}: handoff entry '{h['raw']}' is not target:path",
+                  state["path"])
+        elif h["state"] == "missing":
+            bad += 1
+            issue("WARNING", "Implementation", f"{state['change']}: hand-over target {h['path']} ({h['target']}) "
+                  f"no longer exists; re-export it or remove it from handoff:", state["path"])
+        elif h["seed_current"] is False:
+            bad += 1
+            issue("WARNING", "Implementation", f"{state['change']}: the architecture record changed after the "
+                  f"{h['target']} seed at {h['path']} was written; re-export with --force, or carry the change "
+                  f"into the seed and re-export to refresh the fingerprint", h["path"])
+        elif h["seed_current"] is None:
+            issue("SUGGESTION", "Implementation", f"{state['change']}: {h['target']} seed at {h['path']} carries "
+                  f"no fingerprint (older export); re-export so drift becomes detectable", h["path"])
+        h["change"] = state["change"]
+    check(label, "Implementation", "failed" if bad else "passed", "; ".join(_handoff_line(h) for h in hand))
+    return hand
+
+
 def _handoff_line(h):
     prog = f" {h['progress']['done']}/{h['progress']['total']} tasks" if h.get("progress") else ""
     seed = "" if h.get("seed_current") in (True, None) else " — record changed since the seed"
@@ -902,10 +944,14 @@ def cmd_list(args):
     rows = []
     for cid in active_changes(ctx):
         s = change_state(ctx, cid, os.path.join(ctx["changes"], cid), False)
-        rows.append({k: s[k] for k in ("change", "title", "state", "archetype", "progress", "path")})
+        row = {k: s[k] for k in ("change", "title", "state", "archetype", "progress", "path")}
+        row["implementation"] = [f"{h['target']}:{h['state']}" for h in handoff_state(ctx, s)]
+        rows.append(row)
     emit({"changes": rows}, args.json,
          lambda r: "\n".join(f"{c['change']:<32} {c['state']:<12} {c['progress']['done']}/"
-                             f"{c['progress']['total']}  {c['title']}" for c in r["changes"])
+                             f"{c['progress']['total']}  {c['title']}"
+                             + (f"  [{', '.join(c['implementation'])}]" if c["implementation"] else "")
+                             for c in r["changes"])
          or "no active changes")
 
 
@@ -1211,31 +1257,17 @@ def verify(ctx, cid=None, strict=False):
                       f"stakeholder, concern or view; confirm AD.md needs no change", ad)
 
         # 9. hand-over: the implementation seed must still match the record (visibility, not a lock)
-        hand = handoff_state(ctx, state)
-        if not hand:
-            check("handoff", "Implementation", "passed", "no hand-over recorded")
-        else:
-            bad = 0
-            for h in hand:
-                if h["state"] == "unparseable":
-                    bad += 1
-                    issue("WARNING", "Implementation", f"handoff entry '{h['raw']}' is not target:path", state["path"])
-                elif h["state"] == "missing":
-                    bad += 1
-                    issue("WARNING", "Implementation", f"hand-over target {h['path']} ({h['target']}) no longer "
-                          f"exists; re-export it or remove it from handoff:", state["path"])
-                elif h["seed_current"] is False:
-                    bad += 1
-                    issue("WARNING", "Implementation", f"the architecture record changed after the {h['target']} "
-                          f"seed at {h['path']} was written; re-export with --force, or carry the change into "
-                          f"the seed and re-export to refresh the fingerprint", h["path"])
-                elif h["seed_current"] is None:
-                    issue("SUGGESTION", "Implementation", f"{h['target']} seed at {h['path']} carries no "
-                          f"fingerprint (older export); re-export so drift becomes detectable", h["path"])
-            check("handoff", "Implementation", "failed" if bad else "passed",
-                  "; ".join(_handoff_line(h) for h in hand))
+        hand = _handoff_checks(ctx, state, check, issue)
     else:
+        # whole-tree: every change that was ever handed over, archived ones included — that is
+        # where a seed quietly falls behind the record once nobody runs status on it any more
         hand = []
+        for cid_, cdir_, archived_ in all_changes(ctx):
+            st_ = change_state(ctx, cid_, cdir_, archived_)
+            if st_["handoff"]:
+                hand += _handoff_checks(ctx, st_, check, issue, label=f"handoff:{cid_}")
+        if not hand:
+            check("handoff", "Implementation", "passed", "no change has been handed over")
 
     crit = sum(i["severity"] == "CRITICAL" for i in issues)
     skipped = [c for c in checks if c["status"] == "skipped"]

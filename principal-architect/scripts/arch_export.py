@@ -132,6 +132,7 @@ class Source:
         self.arch, self.ctx, self.state = arch, ctx, state
         self.repo, self.root = ctx["repo"], ctx["root"]
         self.notes = []  # what could not be derived, for the report and the seeds
+        self.unparsed_stories = []  # US files whose shape the default parser does not know
 
     def note(self, text):
         if text not in self.notes:
@@ -171,11 +172,22 @@ class Source:
             fm, body = self.arch.frontmatter(path)
             secs = self.arch.sections(body)
             cons = secs.get("consequences", "")
+            decision_text = " ".join(_paragraphs(secs.get("decision", ""))).lower()
             alts = []
             for b in _bullets(secs.get("decision", "")):
                 m = re.match(r"(.+?)\s+[—-]+\s+(?:rejected|not chosen|declined)[,:]?\s*(?:because\s+)?(.*)", b, re.I)
                 if m:
                     alts.append((m.group(1).strip(), m.group(2).strip()))
+            # MADR superset: "## Considered options" + "## Pros and cons of the options"
+            pros_cons = secs.get("pros and cons of the options", "")
+            for opt in _bullets(secs.get("considered options", "")):
+                name = opt.strip().rstrip(".")
+                if name.lower() in decision_text or any(name.lower() == a.lower() for a, _ in alts):
+                    continue  # the chosen option, or already listed with its reason
+                cons_lines = [c for c in _bullets(_sub_section(pros_cons, name.lower()))
+                              if re.match(r"^bad\b", c, re.I)]
+                reason = "; ".join(re.sub(r"^bad,?\s*(because\s*)?", "", c, flags=re.I) for c in cons_lines)
+                alts.append((name, reason or "see the pros and cons in " + r["id"]))
             rec = {
                 "id": r["id"], "kind": r["kind"], "status": r.get("status"), "path": r["path"],
                 "title": _s(fm.get("title")), "level": _s(fm.get("level")),
@@ -276,6 +288,11 @@ class Source:
             else:
                 checklist = _bullets(ac)
             pri = _s(fm.get("priority")).lower()
+            if pri in ("won't", "wont", "won’t", "will not"):
+                continue  # MoSCoW "won't": not in this release, so not in the hand-over
+            if not (role or want or scenarios or checklist):
+                self.unparsed_stories.append(self.arch.rel(path, self.repo))
+                continue
             out.append({
                 "id": _s(fm.get("id")), "title": _s(fm.get("title")), "path": self.arch.rel(path, self.repo),
                 "role": role.group(1).strip() if role else "", "want": want.group(1).strip() if want else "",
@@ -366,6 +383,18 @@ class Source:
         if not f_ids and not q_ids:
             self.note("no F.xx or Q.xx driver is tied to this change (records' satisfies:, Intent, "
                       "or a story); the behaviour contract could not be derived")
+        if prd["path"] and not prd["F"]:
+            self.note(f"{prd['path']} has no '- **F.NN:**' lines; a house-format PRD is not read by "
+                      f"the hand-over (it reads the default template shape)")
+        if self.unparsed_stories:
+            self.note(f"{len(self.unparsed_stories)} story file(s) not in the default shape (## Story with "
+                      f"**As a** / **I want**, ## Acceptance criteria with a gherkin fence or a checklist) "
+                      f"were skipped: {', '.join(self.unparsed_stories[:5])}"
+                      + (" …" if len(self.unparsed_stories) > 5 else ""))
+        for f, text in prd["F"].items():
+            if f in f_ids and not re.search(r"\b(MUST|SHALL|SHOULD|MAY|MUST NOT|SHALL NOT)\b", text):
+                self.note(f"{f} carries no RFC 2119 keyword; the OpenSpec seed states it as SHALL and says "
+                          f"so in the requirement text — fix the obligation level in the PRD")
         caps = []
         for s in stories:
             caps += s["capabilities"]
@@ -442,15 +471,27 @@ def _req_name(model, fid):
     for s in model["stories"]:
         if fid in s["satisfies"]:
             return s["title"]
-    text = re.sub(r"^(The system|Users?|The \w+)\s+(MUST|SHALL|SHOULD|MAY)\s+(NOT\s+)?", "", model["F"][fid]).rstrip(".")
-    words = text.split()
-    return _clip(" ".join(words[:7]), 60).rstrip("…,")
+    text = re.sub(r"^(The system|Users?|The \w+)\s+(?:(MUST|SHALL|SHOULD|MAY)\s+(NOT\s+)?)?", "", model["F"][fid])
+    clause = re.split(r"[,;:]|\s+(?:after which|so that|unless|when|where)\s+", text, maxsplit=1)[0].rstrip(". ")
+    words = clause.split()
+    name = " ".join(words[:10])
+    return (name[:1].upper() + name[1:]) if name else fid
+
+
+RFC2119 = re.compile(r"\b(MUST NOT|SHALL NOT|MUST|SHALL|SHOULD NOT|SHOULD|MAY)\b")
 
 
 def _normative(text):
-    if re.search(r"\b(SHALL|MUST)\b", text):
+    """OpenSpec's validator wants SHALL/MUST in every requirement; ISO 29148 / RFC 2119
+    say a SHOULD is not a SHALL. Keep the driver's obligation level visible instead of
+    silently upgrading it."""
+    kws = RFC2119.findall(text)
+    if any(k in ("MUST", "SHALL", "MUST NOT", "SHALL NOT") for k in kws):
         return text
-    return re.sub(r"\b(should|may|will|can)\b", "SHALL", text, count=1, flags=re.I)
+    if kws:
+        return f"The system SHALL treat the following as a {kws[0]}-level obligation (RFC 2119): {text}"
+    # no keyword at all: keep the source verbatim and say what was done to it, in the text itself
+    return f"Stated as a SHALL-level obligation (no RFC 2119 keyword in the source): {text}"
 
 
 def _gherkin_to_openspec(sc):
@@ -483,7 +524,24 @@ def _trace(fid):
 
 
 # ---------------------------------------------------------------- OpenSpec
+REQ_BLOCK = re.compile(r"(?ms)^### Requirement:\s*(.+?)\s*$(.*?)(?=^###? |\Z)")
+
+
+def _main_spec_requirements(text):
+    """Requirement blocks of an existing OpenSpec main spec: [(name, body, trace ids, scenarios)]."""
+    out = []
+    for m in REQ_BLOCK.finditer(text or ""):
+        name, body = m.group(1), m.group(2)
+        traces = set(re.findall(r"\(trace: ([A-Z]\.\d{2})\)", body))
+        scenarios = []
+        for sm in re.finditer(r"(?ms)^#### Scenario:\s*(.+?)\s*$(.*?)(?=^####? |\Z)", body):
+            scenarios.append((sm.group(1).strip(), sm.group(2).strip("\n")))
+        out.append({"name": name, "body": body, "traces": traces, "scenarios": scenarios})
+    return out
+
+
 def render_openspec(model, cmd, existing_specs):
+    """existing_specs: {capability path: main spec text} for capabilities under openspec/specs/."""
     ch, adrs, rfcs = model["change"], model["adrs"], model["rfcs"]
     recs = adrs + rfcs
     files = {}
@@ -578,15 +636,30 @@ def render_openspec(model, cmd, existing_specs):
     for s in model["stories"]:
         for f in s["satisfies"]:
             story_by_f.setdefault(f, []).append(s)
+    # requirements already in the main spec, so a MODIFIED delta keeps their header and scenarios
+    main_reqs = _main_spec_requirements(existing_specs.get(cap)) if cap_exists else []
+    matched_main = {}
+    for fid in model["F"]:
+        hit = next((r for r in main_reqs if fid in r["traces"]), None) or \
+              next((r for r in main_reqs if r["name"].strip().lower() == _req_name(model, fid).strip().lower()), None)
+        if hit:
+            matched_main[fid] = hit
     for fid, text in model["F"].items():
-        name = _req_name(model, fid)
-        desc = _clip(_normative(text), 480) + _trace(fid)
-        scen = []
+        name = matched_main[fid]["name"] if fid in matched_main else _req_name(model, fid)
+        desc = _normative(_clip(text, 400 if not RFC2119.search(text) else 480)) + _trace(fid)
+        scen, scen_names = [], set()
         for s in story_by_f.get(fid, []):
             for sc in s["scenarios"]:
                 scen.append(f"#### Scenario: {sc['name']}\n{_gherkin_to_openspec(sc)}")
+                scen_names.add(sc["name"].strip().lower())
             for i, item in enumerate(s["checklist"], 1):
-                scen.append(f"#### Scenario: {s['id']} criterion {i}\n- **WHEN** the condition in {s['id']} is exercised\n- **THEN** {item}")
+                scen.append(f"#### Scenario: {s['id']} criterion {i}\n- **WHEN** the condition in {s['id']} is exercised "
+                            f"<!-- principal-architect: derived from a checklist criterion; write the real WHEN -->\n- **THEN** {item}")
+                scen_names.add(f"{s['id']} criterion {i}".lower())
+        if fid in matched_main:
+            for sname, sbody in matched_main[fid]["scenarios"]:
+                if sname.strip().lower() not in scen_names:
+                    scen.append(f"#### Scenario: {sname}\n{sbody}\n<!-- principal-architect: carried over from the main spec unchanged -->")
         if not scen:
             scen.append(f"#### Scenario: {name}\n- **WHEN** <!-- principal-architect: no user story with acceptance criteria satisfies {fid}; write the scenario -->\n- **THEN** {_clip(text, 200)}")
         reqs.append((fid, f"### Requirement: {name}\n{desc}\n\n" + "\n\n".join(scen)))
@@ -601,8 +674,14 @@ def render_openspec(model, cmd, existing_specs):
         if q.get("verification"):
             scen += f"\n- **AND** verified by: {q['verification']}"
         reqs.append((qid, f"### Requirement: {q['name']}\n{_clip(desc, 480)}{_trace(qid)}\n\n{scen}"))
-    added = [b for fid, b in reqs if fid not in model["delta"]["modified"] or not cap_exists]
-    modified = [b for fid, b in reqs if fid in model["delta"]["modified"] and cap_exists]
+    # MODIFIED only for a requirement the main spec already holds (OpenSpec archive refuses an
+    # unknown header); a changed driver with no counterpart in the main spec is ADDED
+    modified = [b for fid, b in reqs if fid in model["delta"]["modified"] and fid in matched_main]
+    added = [b for fid, b in reqs if not (fid in model["delta"]["modified"] and fid in matched_main)]
+    for fid in model["delta"]["modified"]:
+        if cap_exists and fid not in matched_main and fid in model["F"]:
+            model["notes"].append(f"{fid} changed in the PRD but {cap}'s main spec has no requirement tracing to "
+                                  f"it, so it is ADDED; if it exists under another name, rename it there to match")
     spec = prov + "# Spec Delta\n\n"
     if not cap_exists:
         spec += f"## Purpose\n\n{_capability_blurb(model)}\n\n"
@@ -692,7 +771,8 @@ def render_speckit(model, cmd, feature_dir):
             t = " and ".join(sc["then"]) or "the expected outcome holds"
             acc.append(f"**Given** {g}, **When** {w}, **Then** {t}")
         for item in s["checklist"]:
-            acc.append(f"**Given** the context of {s['id']}, **When** the behaviour is exercised, **Then** {item}")
+            acc.append(f"**Given** the context of {s['id']}, **When** the behaviour is exercised, **Then** {item} "
+                       f"<!-- principal-architect: derived from a checklist criterion; write the real Given/When -->")
         if not acc:
             acc.append(need(f"acceptance scenarios for {s['id']}"))
         us.append(f"### User Story {i} - {s['title']} (Priority: P{p})\n\n{journey}\n\n**Why this priority**: {why}\n\n"
@@ -711,7 +791,7 @@ def render_speckit(model, cmd, feature_dir):
         edges += [f"{n} ({r['id']})" for n in r["negative"]]
     frs = []
     for i, (fid, text) in enumerate(model["F"].items(), 1):
-        frs.append(f"- **FR-{i:03d}**: {_normative(text)}{_trace(fid)}")
+        frs.append(f"- **FR-{i:03d}**: {text}{_trace(fid)}")  # spec-kit has no SHALL rule: keep the driver's own obligation level
     if not frs:
         frs.append("- **FR-001**: " + need("functional requirements: no F.xx tied to this change"))
     scs = []
@@ -774,8 +854,10 @@ def render_speckit(model, cmd, feature_dir):
         "\n\n## Constitution Check\n\n*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*\n\n" + const + \
         "\n\n## Project Structure\n\n### Documentation (this feature)\n\n```text\n" + feature_dir + "/\n├── plan.md\n├── research.md          # seeded from the decision records\n├── spec.md\n" + \
         ("├── contracts/           # seeded from the SD api-spec\n" if model["contracts"] else "") + "├── checklists/requirements.md\n└── tasks.md\n```\n\n### Source Code (repository root)\n\n```text\n" + \
-        ("\n".join(f"{a}/" for a in ch["affects"]) or "NEEDS CLARIFICATION") + "\n```\n\n**Structure Decision**: components named in the architecture change's `affects:`" + \
-        (f"; see {', '.join(r['id'] for r in adrs)}" if adrs else "") + ".\n\n## Complexity Tracking\n\n" + \
+        "NEEDS CLARIFICATION  # the architecture record names components, not directories" + \
+        (f": {', '.join(ch['affects'])}" if ch["affects"] else "") + "\n```\n\n**Structure Decision**: NEEDS CLARIFICATION — " \
+        "map the components in `affects:` to the repository's real directories" + \
+        (f"; the enacting sites will carry `ARCH-REF: {', '.join(r['id'] for r in adrs)}`" if adrs else "") + ".\n\n## Complexity Tracking\n\n" + \
         ("| Violation | Why Needed | Simpler Alternative Rejected Because |\n|-----------|------------|-------------------------------------|\n" + "\n".join(complexity) if complexity else "No constitution violations to justify.") + "\n"
 
     # checklists/requirements.md — spec-kit's own quality gate, left unticked on purpose
@@ -860,16 +942,20 @@ def export(arch, ctx, state, target, yes=False, force=False, out=None):
     cid = state["change"]
     if target == "openspec":
         root = out or os.path.join(repo, "openspec")
-        existing = set()
+        existing = {}
         specs_dir = os.path.join(root, "specs")
         if os.path.isdir(specs_dir):
-            for d in os.listdir(specs_dir):
-                if os.path.exists(os.path.join(specs_dir, d, "spec.md")):
-                    existing.add(d)
+            for dp, _, fnames in os.walk(specs_dir):
+                if "spec.md" in fnames:
+                    with open(os.path.join(dp, "spec.md"), encoding="utf-8") as fh:
+                        existing[os.path.relpath(dp, specs_dir).replace(os.sep, "/")] = fh.read()
         dest = os.path.join(root, "changes", cid)
         cmd = f"arch.py export openspec --change {cid}"
         files = render_openspec(model, cmd, existing)
         clar = []
+        if not any(os.path.exists(os.path.join(root, f)) for f in ("config.yaml", "config.yml")):
+            model["notes"].append(f"{arch.rel(root, repo)}/config.yaml not found: run `openspec init` in the "
+                                  f"repository before `openspec validate`")
         gate = f"openspec validate {cid} --strict"
         after = (f"Finish the seed with OpenSpec's own flow: `openspec status --change {cid}`, then "
                  f"`openspec instructions <artifact> --change {cid} --json` per artifact, and `{gate}`.")
@@ -887,6 +973,9 @@ def export(arch, ctx, state, target, yes=False, force=False, out=None):
         for c in model["contracts"]:
             files[f"contracts/{os.path.basename(c)}"] = ("copy", os.path.join(repo, c))
         gate = "/speckit.analyze (after /speckit.plan)"
+        if not os.path.isdir(os.path.join(repo, ".specify")):
+            model["notes"].append(".specify/ not found: run `specify init --here` first, so /speckit.* commands "
+                                  "exist and .specify/feature.json can point at the seeded feature")
         after = (f"Finish with spec-kit's own flow: `/speckit.clarify` for the {len(clar)} marker(s), "
                  f"`/speckit.plan` (research.md and plan.md are seeded; it adds data-model.md and quickstart.md), "
                  f"`/speckit.tasks`, `/speckit.analyze`.")
