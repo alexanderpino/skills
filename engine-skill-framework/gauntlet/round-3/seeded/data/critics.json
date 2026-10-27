@@ -1,0 +1,456 @@
+{
+ "_doc": "Critic framework. scope selectors: 'all', 'tier:<tier>', 'subtree:<skill-id>' (the skill and all descendants), or a bare skill id. Stages: G1 = framework gauntlet (this phase; every critic reviews the whole framework), G2 = SKILL.md gauntlet (per-skill, scoped), S1 = ADR review, S2 = design/contract review, S3 = implementation review, S4 = validation & release review.",
+ "stages": {
+  "G1": "Framework gauntlet: capability map, skill graph, contracts, hierarchy (whole framework)",
+  "G2": "SKILL.md gauntlet: per-skill description quality, technique currency, validation criteria",
+  "S1": "ADR review: evidence, alternatives, revisit conditions",
+  "S2": "Design & contract review: API/contract drafts, data layouts, threading model",
+  "S3": "Implementation review: code, tests, instrumentation",
+  "S4": "Validation & release review: benchmarks, scalability runs, certification readiness"
+ },
+ "critics": [
+  {
+   "id": "K-ARCH",
+   "name": "Engine Architecture Critic",
+   "mandate": "Architectural completeness and subsystem boundaries: ownership overlaps, missing contracts, wrong layering, contracts that leak internals, hierarchy that does not match coupling.",
+   "checks": [
+    "every capability has exactly one owner and the owner is the right expertise",
+    "non-responsibilities point to the real owner",
+    "contracts are minimal, stable and layered",
+    "no hidden cyclic build dependencies",
+    "leads have real territory, not just coordination"
+   ],
+   "scope": [
+    "all",
+    "tier:orchestrator",
+    "research-evidence",
+    "subtree:api-lifecycle-migration",
+    "subtree:world-architect",
+    "developer-experience-docs"
+   ],
+   "stages": [
+    "G1",
+    "G2",
+    "S1",
+    "S2"
+   ]
+  },
+  {
+   "id": "K-RENDER",
+   "name": "Rendering Critic",
+   "mandate": "Graphics architecture and currency of rendering techniques; GPU-driven, bindless, explicit-API assumptions; scalability from 2D mobile to path tracing.",
+   "checks": [
+    "no draw-call-centric or DX11-era assumptions on capable tiers; CPU-batched submission on TBDR/lite3d follows RND.ARCH.submission-strategy",
+    "render graph owns sync and aliasing",
+    "technique maturity labels are honest",
+    "scale-down path exists for each feature"
+   ],
+   "scope": [
+    "subtree:render-architect",
+    "render-validation",
+    "gpu-performance",
+    "terrain",
+    "vegetation-foliage",
+    "water-ocean",
+    "atmosphere-weather",
+    "deformation-skinning",
+    "xr-runtime",
+    "ml-inference-runtime",
+    "subtree:gpu-platform-architect",
+    "media-playback",
+    "voxel-worlds",
+    "platform-console"
+   ],
+   "stages": [
+    "G1",
+    "G2",
+    "S1",
+    "S2",
+    "S3",
+    "S4"
+   ]
+  },
+  {
+   "id": "K-SYSTEMS",
+   "name": "Systems Critic",
+   "mandate": "Concurrency, memory, scheduling, IO and low-level architecture.",
+   "checks": [
+    "no single-thread-first assumptions",
+    "explicit ownership and lifetimes",
+    "synchronization minimized and justified",
+    "async IO end to end",
+    "heterogeneous cores and NUMA considered"
+   ],
+   "scope": [
+    "subtree:core-runtime-architect",
+    "subtree:resource-streaming-architect",
+    "observability-telemetry",
+    "crash-diagnostics",
+    "determinism-replay",
+    "hot-reload-iteration",
+    "rhi-core",
+    "gpu-memory-resources",
+    "render-graph-scheduling",
+    "audio-architect",
+    "network-transport",
+    "ml-inference-runtime",
+    "subtree:world-architect",
+    "subtree:gpu-platform-architect",
+    "runtime-scalability",
+    "media-playback"
+   ],
+   "stages": [
+    "G1",
+    "G2",
+    "S1",
+    "S2",
+    "S3",
+    "S4"
+   ]
+  },
+  {
+   "id": "K-SIM",
+   "name": "Physics & Simulation Critic",
+   "mandate": "Simulation domains: physics, destruction, fluids, cloth, crowds, large-scale simulation, determinism of simulation.",
+   "checks": [
+    "stepping and sync with frame phases are explicit",
+    "determinism levels are declared",
+    "simulation LOD exists for large scales",
+    "build-vs-integrate evidence"
+   ],
+   "scope": [
+    "subtree:physics-architect",
+    "crowd-simulation",
+    "ik-procedural-animation",
+    "prediction-rollback",
+    "determinism-replay",
+    "procedural-generation",
+    "water-ocean",
+    "vfx-particles",
+    "character-movement",
+    "simulation-validation",
+    "voxel-worlds",
+    "systems-simulation"
+   ],
+   "stages": [
+    "G1",
+    "G2",
+    "S1",
+    "S2",
+    "S3",
+    "S4"
+   ]
+  },
+  {
+   "id": "K-NET",
+   "name": "Networking Critic",
+   "mandate": "Online and multiplayer architecture: models, replication, prediction, servers, security, online-service boundaries.",
+   "checks": [
+    "netcode model matches game type",
+    "authority and trust explicit",
+    "bandwidth and scale budgets",
+    "version compatibility",
+    "service boundaries clear"
+   ],
+   "scope": [
+    "subtree:network-architect",
+    "anti-cheat-integrity",
+    "platform-services",
+    "destruction-fracture",
+    "persistence-save",
+    "packaging-release-patching",
+    "character-movement",
+    "online-services-liveops",
+    "narrative-dialogue",
+    "vehicle-physics",
+    "gameplay-systems-toolkit",
+    "animation-architect",
+    "animation-runtime",
+    "voxel-worlds",
+    "cinematics-sequencer",
+    "determinism-replay",
+    "input-system",
+    "editor-architect",
+    "functional-automation-soak",
+    "simulation-validation",
+    "net-session",
+    "server-scaleout-persistence"
+   ],
+   "stages": [
+    "G1",
+    "G2",
+    "S1",
+    "S2",
+    "S3",
+    "S4"
+   ]
+  },
+  {
+   "id": "K-TOOLS",
+   "name": "Tools & Editor Critic",
+   "mandate": "Production tooling and content workflows: editor, pipeline, collaboration, iteration speed.",
+   "checks": [
+    "tooling as thorough as runtime",
+    "undo/transactions universal",
+    "large teams can collaborate without lock contention",
+    "iteration time measured",
+    "pipeline deterministic and cached"
+   ],
+   "scope": [
+    "subtree:editor-architect",
+    "subtree:content-pipeline-architect",
+    "hot-reload-iteration",
+    "developer-experience-docs",
+    "ui-architect",
+    "terrain",
+    "procedural-generation",
+    "cinematics-sequencer",
+    "scripting-runtime",
+    "world-data-model",
+    "subtree:build-release-architect",
+    "owns-area:TOOL",
+    "kind:tool",
+    "api-lifecycle-migration"
+   ],
+   "stages": [
+    "G1",
+    "G2",
+    "S1",
+    "S2",
+    "S3",
+    "S4"
+   ]
+  },
+  {
+   "id": "K-PLATFORM",
+   "name": "Platform Critic",
+   "mandate": "Hardware, operating systems, consoles, graphics APIs, packaging and platform requirements.",
+   "checks": [
+    "PAL is the only platform-specific layer",
+    "console, mobile and web constraints represented",
+    "certification requirements traced",
+    "packaging and patching per platform"
+   ],
+   "scope": [
+    "subtree:platform-architect",
+    "rhi-core",
+    "subtree:build-release-architect",
+    "certification-compliance",
+    "async-io-storage",
+    "crash-diagnostics",
+    "rhi-d3d12",
+    "rhi-vulkan",
+    "rhi-metal",
+    "rhi-webgpu"
+   ],
+   "stages": [
+    "G1",
+    "G2",
+    "S1",
+    "S2",
+    "S4",
+    "S3"
+   ]
+  },
+  {
+   "id": "K-PERF",
+   "name": "Performance Critic",
+   "mandate": "Scalability bottlenecks: serialization points, excess synchronization, cache inefficiency, GPU stalls, bandwidth, poor asymptotics.",
+   "checks": [
+    "budgets exist for each subsystem",
+    "benchmarks include realistic workloads",
+    "no hidden global sync points",
+    "asymptotics stated for world-scale data"
+   ],
+   "scope": [
+    "all",
+    "subtree:performance-architect",
+    "subtree:world-architect",
+    "runtime-scalability"
+   ],
+   "stages": [
+    "G1",
+    "G2",
+    "S2",
+    "S3",
+    "S4"
+   ]
+  },
+  {
+   "id": "K-PROD",
+   "name": "Production Critic",
+   "mandate": "Could a real team ship games with this: workflows, content scale, team scale, schedules, live operations.",
+   "checks": [
+    "content creators are first-class",
+    "features have an owner through ship",
+    "live-ops and patching covered",
+    "scale-down keeps small teams productive"
+   ],
+   "scope": [
+    "all",
+    "tier:orchestrator",
+    "developer-experience-docs",
+    "subtree:build-release-architect",
+    "engine-product-management",
+    "reference-games"
+   ],
+   "stages": [
+    "G1",
+    "G2",
+    "S4"
+   ]
+  },
+  {
+   "id": "K-FUTURE",
+   "name": "Future-Technology Critic",
+   "mandate": "Does the architecture block likely next-5-year technologies: neural rendering, work graphs, cluster RT, ML animation, new storage and memory, new platforms.",
+   "checks": [
+    "extension points exist for emerging techniques",
+    "maturity labels allow promotion",
+    "no hard-coding of today's API limits"
+   ],
+   "scope": [
+    "all"
+   ],
+   "stages": [
+    "G1",
+    "G2",
+    "S1"
+   ]
+  },
+  {
+   "id": "K-COMPLETE",
+   "name": "Completeness Critic",
+   "mandate": "Exactly one responsibility: find engine capabilities or engineering disciplines that are missing.",
+   "checks": [
+    "compare against shipped engines' feature sets",
+    "compare against platform requirements",
+    "compare against production pipelines end to end"
+   ],
+   "scope": [
+    "all"
+   ],
+   "stages": [
+    "G1",
+    "G2"
+   ]
+  },
+  {
+   "id": "K-LEGACY",
+   "name": "Anti-Legacy Critic",
+   "mandate": "Find accidental legacy architecture: central sequential update loops, deep inheritance, global state, hot-path virtual dispatch, CPU-driven rendering, coarse locks, global renderer sync, frame-tied lifetimes, universal scene graphs, synchronous IO/loading, single-thread-first design, OpenGL/DX11 assumptions, monoliths. A flagged pattern needs justification, not removal.",
+   "checks": [
+    "each pattern in data/legacy-patterns.json absent or justified by an ADR"
+   ],
+   "scope": [
+    "all"
+   ],
+   "stages": [
+    "G1",
+    "G2",
+    "S1",
+    "S2",
+    "S3",
+    "S4"
+   ]
+  },
+  {
+   "id": "K-GAMEPLAY",
+   "name": "Game Systems & Content Critic",
+   "mandate": "Animation, audio, AI, gameplay framework, UI, text, localization and accessibility: whether game teams get what they need.",
+   "checks": [
+    "designers and animators have authoring paths",
+    "accessibility and localization built in, not bolted on",
+    "gameplay extension points"
+   ],
+   "scope": [
+    "subtree:animation-architect",
+    "subtree:audio-architect",
+    "subtree:gameplay-architect",
+    "subtree:ui-architect",
+    "accessibility",
+    "input-system",
+    "input-devices-haptics",
+    "character-physics",
+    "cinematics-sequencer",
+    "systems-simulation",
+    "gameplay-camera"
+   ],
+   "stages": [
+    "G1",
+    "G2",
+    "S1",
+    "S2",
+    "S4",
+    "S3"
+   ]
+  },
+  {
+   "id": "K-TEST",
+   "name": "Testing & Validation Critic",
+   "mandate": "Validation, oracles, determinism and concurrency testing, agent-output integrity: can an independent critic objectively decide correctness?",
+   "checks": [
+    "each skill has objective validation with an independent oracle",
+    "tests cannot be weakened silently",
+    "determinism & concurrency testable via seams",
+    "evidence bundle defined for S3/S4"
+   ],
+   "scope": [
+    "all",
+    "subtree:test-architect",
+    "subtree:performance-architect"
+   ],
+   "stages": [
+    "G1",
+    "G2",
+    "S1",
+    "S2",
+    "S3",
+    "S4"
+   ]
+  },
+  {
+   "id": "K-SEC",
+   "name": "Security Critic",
+   "mandate": "Threat model, trust boundaries, memory safety, supply chain, privacy, incident response — reviewed at design time as well as in code.",
+   "checks": [
+    "every untrusted input has a validating owner and a fuzz target",
+    "trust boundaries explicit",
+    "hardening & key custody",
+    "privacy of telemetry, crash and player data"
+   ],
+   "scope": [
+    "all",
+    "subtree:security-engineering",
+    "network-transport",
+    "scripting-runtime",
+    "modding-ugc",
+    "plugin-system",
+    "serialization-schema",
+    "package-formats-vfs",
+    "persistence-save",
+    "platform-services",
+    "online-services-liveops",
+    "packaging-release-patching",
+    "ci-cd-automation",
+    "build-system-toolchains",
+    "observability-telemetry",
+    "crash-diagnostics",
+    "editor-architect",
+    "ai-assisted-authoring",
+    "ai-behavior-perception",
+    "dedicated-server",
+    "asset-import-interchange",
+    "privacy-data-protection"
+   ],
+   "stages": [
+    "G1",
+    "G2",
+    "S1",
+    "S2",
+    "S3",
+    "S4"
+   ]
+  }
+ ]
+}

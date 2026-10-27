@@ -1,0 +1,605 @@
+{
+ "_doc": "Anti-legacy pattern catalogue. A pattern is not forbidden; if present it needs an ADR by the justification owner. Checked by K-LEGACY at G2 and S1–S4.",
+ "patterns": [
+  {
+   "id": "L01",
+   "pattern": "Central sequential update loop",
+   "detection": "one function calls subsystems in order each frame",
+   "default_stance": "Task graph of phases with derived ordering (C-FRAME)",
+   "justification_owner": "frame-orchestration",
+   "stance_capabilities": [
+    "CORE.FRAME.access-model",
+    "CORE.FRAME.phases"
+   ]
+  },
+  {
+   "id": "L02",
+   "pattern": "Per-object virtual Tick()",
+   "detection": "tick functions on objects/components",
+   "default_stance": "Scheduled systems with declared access; opt-in budgeted ticks",
+   "justification_owner": "gameplay-architect",
+   "stance_capabilities": [
+    "GAM.FW.execution",
+    "CORE.FRAME.amortized"
+   ]
+  },
+  {
+   "id": "L03",
+   "pattern": "Game-thread / render-thread dichotomy",
+   "detection": "named long-lived render thread",
+   "default_stance": "Render work as tasks in overlapping task-graph frames; dedicated threads only by ADR (thread inventory in CORE.JOBS.thread-model)",
+   "justification_owner": "frame-orchestration",
+   "stance_capabilities": [
+    "CORE.FRAME.pipelining",
+    "RND.GPU.recording",
+    "CORE.JOBS.thread-model"
+   ]
+  },
+  {
+   "id": "L04",
+   "pattern": "Main-thread-only engine APIs",
+   "detection": "UI, scripting or platform callbacks require the OS main thread",
+   "default_stance": "PAL isolates OS-thread-bound APIs behind queues",
+   "justification_owner": "platform-architect",
+   "stance_capabilities": [
+    "PLAT.PAL.thread-affinity",
+    "CORE.JOBS.pinned"
+   ]
+  },
+  {
+   "id": "L05",
+   "pattern": "Pervasive inheritance object hierarchies",
+   "detection": "Actor→Pawn→Character chains",
+   "default_stance": "Composition of components/systems + services",
+   "justification_owner": "entity-object-model",
+   "stance_capabilities": [
+    "CORE.OBJ.hybrid"
+   ]
+  },
+  {
+   "id": "L06",
+   "pattern": "Possession / controller-pawn model by habit",
+   "detection": "universal possession concept",
+   "default_stance": "Control binding as data, chosen per game by ADR",
+   "justification_owner": "gameplay-architect",
+   "stance_capabilities": [
+    "GAM.FW.control"
+   ]
+  },
+  {
+   "id": "L07",
+   "pattern": "Universal scene graph",
+   "detection": "one tree holds the world",
+   "default_stance": "Partitioned data-oriented world; hierarchy only for attachment",
+   "justification_owner": "world-architect",
+   "stance_capabilities": [
+    "WLD.MODEL.strategy",
+    "WLD.SPACE.transforms"
+   ]
+  },
+  {
+   "id": "L08",
+   "pattern": "Hidden globals & singletons",
+   "detection": "static instances initialized implicitly",
+   "default_stance": "Service registry + init graph",
+   "justification_owner": "core-runtime-architect",
+   "stance_capabilities": [
+    "CORE.LIFE.services",
+    "CORE.LIFE.boot"
+   ]
+  },
+  {
+   "id": "L09",
+   "pattern": "Process-global mutable cvars read anywhere",
+   "detection": "cvar reads inside parallel tasks",
+   "default_stance": "Immutable config snapshots latched at sync points",
+   "justification_owner": "core-runtime-architect",
+   "stance_capabilities": [
+    "CORE.LIFE.config-snapshots"
+   ]
+  },
+  {
+   "id": "L10",
+   "pattern": "Hot-path virtual dispatch across contracts",
+   "detection": "virtual call per draw/body/query",
+   "default_stance": "Batch-granular interfaces; binding at build/load time",
+   "justification_owner": "engine-architect",
+   "stance_capabilities": [
+    "ARCH.STRUCT.binding"
+   ]
+  },
+  {
+   "id": "L11",
+   "pattern": "Coarse locks",
+   "detection": "mutex around a subsystem; renderer-wide flush",
+   "default_stance": "Declared access, channels, lock-free where justified (renderer sync: L28)",
+   "justification_owner": "concurrency-primitives",
+   "stance_capabilities": [
+    "CORE.CONC.sync",
+    "CORE.CONC.lockfree"
+   ]
+  },
+  {
+   "id": "L12",
+   "pattern": "Draw-call-centric CPU submission on capable tiers",
+   "detection": "one CPU draw per object on desktop/console",
+   "default_stance": "GPU-driven on capable tiers; CPU-batched on TBDR/lite3d by ADR",
+   "justification_owner": "render-architect",
+   "stance_capabilities": [
+    "RND.ARCH.submission-strategy",
+    "RND.GEO.cpu-submission"
+   ]
+  },
+  {
+   "id": "L13",
+   "pattern": "DX11/OpenGL binding & sync assumptions",
+   "detection": "slot binding, immediate context, driver-managed hazards",
+   "default_stance": "Binding tiers + render-graph-derived barriers",
+   "justification_owner": "rhi-core",
+   "stance_capabilities": [
+    "RND.RHI.binding-tiers",
+    "RND.GRAPH.barriers"
+   ]
+  },
+  {
+   "id": "L14",
+   "pattern": "Per-object render proxy mirror",
+   "detection": "proxy objects created/synced per object per frame",
+   "default_stance": "Change-tracked delta extraction, O(changes)",
+   "justification_owner": "render-architect",
+   "stance_capabilities": [
+    "RND.ARCH.scene-sync",
+    "RND.GEO.gpu-scene"
+   ]
+  },
+  {
+   "id": "L15",
+   "pattern": "Frame-tied resource lifetimes",
+   "detection": "resources freed at end of frame/level",
+   "default_stance": "Explicit lifetimes + retirement keyed to completion tokens",
+   "justification_owner": "concurrency-primitives",
+   "stance_capabilities": [
+    "CORE.CONC.retirement",
+    "RND.MEM.lifetime"
+   ]
+  },
+  {
+   "id": "L16",
+   "pattern": "Synchronous IO / blocking loads",
+   "detection": "file read on a frame-critical thread",
+   "default_stance": "Async staged pipeline with deadlines",
+   "justification_owner": "async-io-storage",
+   "stance_capabilities": [
+    "RES.MGMT.pipeline",
+    "RES.IO.backends"
+   ]
+  },
+  {
+   "id": "L17",
+   "pattern": "Page-fault-driven streaming",
+   "detection": "mmap reads on latency-critical workers",
+   "default_stance": "Explicit IO requests; mmap only prefetched/tool-side",
+   "justification_owner": "async-io-storage",
+   "stance_capabilities": [
+    "RES.IO.mmap"
+   ]
+  },
+  {
+   "id": "L18",
+   "pattern": "Blocking whole-level load before play",
+   "detection": "whole level loaded before play",
+   "default_stance": "Async non-blocking loading; cell streaming with budgeted activation for 3D/openworld",
+   "justification_owner": "world-architect",
+   "stance_capabilities": [
+    "WLD.PART.activation",
+    "WLD.MODEL.unit-load"
+   ]
+  },
+  {
+   "id": "L19",
+   "pattern": "Immediate synchronous observer callbacks across subsystems",
+   "detection": "callbacks invoked on the producer's thread mid-update",
+   "default_stance": "Deferred batched events at declared consumption points",
+   "justification_owner": "entity-object-model",
+   "stance_capabilities": [
+    "CORE.OBJ.events"
+   ]
+  },
+  {
+   "id": "L20",
+   "pattern": "Stringly-typed reflection on runtime paths",
+   "detection": "name lookups per frame",
+   "default_stance": "Static reflection & resolved IDs; strings at tool/script boundaries",
+   "justification_owner": "reflection-metadata",
+   "stance_capabilities": [
+    "CORE.REFL.static-default"
+   ]
+  },
+  {
+   "id": "L21",
+   "pattern": "Tracing-GC-managed engine objects",
+   "detection": "engine objects reachable via GC",
+   "default_stance": "Explicit ownership + generational handles; weak script refs",
+   "justification_owner": "entity-object-model",
+   "stance_capabilities": [
+    "CORE.OBJ.references"
+   ]
+  },
+  {
+   "id": "L22",
+   "pattern": "Global script VM on one thread",
+   "detection": "single interpreter mutating the world",
+   "default_stance": "Per-worker VMs/isolates, deferred mutation",
+   "justification_owner": "scripting-runtime",
+   "stance_capabilities": [
+    "GAM.SCR.concurrency"
+   ]
+  },
+  {
+   "id": "L23",
+   "pattern": "Editor-in-runtime monolith",
+   "detection": "editor code linked into shipping builds",
+   "default_stance": "Tool-side modules; tools target only",
+   "justification_owner": "editor-architect",
+   "stance_capabilities": [
+    "ED.ARCH.separation"
+   ]
+  },
+  {
+   "id": "L24",
+   "pattern": "Blocking cook-before-play",
+   "detection": "full cook required before running",
+   "default_stance": "On-demand cooking & cook-server streaming",
+   "justification_owner": "content-pipeline-architect",
+   "stance_capabilities": [
+    "CNT.COOK.on-demand"
+   ]
+  },
+  {
+   "id": "L25",
+   "pattern": "Single-thread-first design",
+   "detection": "systems that must run serially by construction",
+   "default_stance": "Parallel by construction, correct on one worker (inline mode)",
+   "justification_owner": "architecture-governance",
+   "stance_capabilities": [
+    "CORE.JOBS.scheduler",
+    "CORE.JOBS.degenerate",
+    "ARCH.GOV.fitness"
+   ]
+  },
+  {
+   "id": "L26",
+   "pattern": "Monolithic subsystems",
+   "detection": "one module owning a whole domain",
+   "default_stance": "Contracts + focused experts",
+   "justification_owner": "engine-architect",
+   "stance_capabilities": [
+    "ARCH.STRUCT.contracts",
+    "ARCH.STRUCT.replaceability"
+   ]
+  },
+  {
+   "id": "L27",
+   "pattern": "ECS for everything / GPU-driven everywhere (new dogma)",
+   "detection": "technique applied where access patterns do not fit",
+   "default_stance": "Per-domain ADR with workload evidence",
+   "justification_owner": "architecture-governance",
+   "stance_capabilities": [
+    "ARCH.GOV.adr"
+   ]
+  },
+  {
+   "id": "L28",
+   "pattern": "Global renderer sync & CPU/GPU flushes",
+   "detection": "WaitForIdle / flush calls on frame paths",
+   "default_stance": "Render-graph-derived barriers; external work imported with queue transfers",
+   "justification_owner": "render-graph-scheduling",
+   "stance_capabilities": [
+    "RND.GRAPH.barriers",
+    "RND.GRAPH.external-work"
+   ]
+  },
+  {
+   "id": "L29",
+   "pattern": "Runtime shader/PSO compilation on first use",
+   "detection": "PSO created on first draw; hitch on new material",
+   "default_stance": "PSO coverage from play traces, precompiled/pipeline libraries, async creation with fallbacks",
+   "justification_owner": "shader-system",
+   "stance_capabilities": [
+    "RND.SHADER.pso-lists",
+    "RND.SHADER.cache"
+   ]
+  },
+  {
+   "id": "L30",
+   "pattern": "Frame-coupled variable-timestep simulation",
+   "detection": "simulation stepped by render delta",
+   "default_stance": "Fixed/declared step with interpolation per C-FRAME",
+   "justification_owner": "frame-orchestration",
+   "stance_capabilities": [
+    "CORE.FRAME.fixed-step"
+   ]
+  },
+  {
+   "id": "L31",
+   "pattern": "Hard-reference transitive load graphs",
+   "detection": "loading one asset pulls large dependency closures",
+   "default_stance": "Soft references, dependency-aware loading with budgets",
+   "justification_owner": "resource-streaming-architect",
+   "stance_capabilities": [
+    "RES.MGMT.dependencies"
+   ]
+  },
+  {
+   "id": "L32",
+   "pattern": "Process-global current world",
+   "detection": "static world accessor",
+   "default_stance": "World handles; multiple isolated worlds",
+   "justification_owner": "entity-object-model",
+   "stance_capabilities": [
+    "CORE.OBJ.world-instances"
+   ]
+  },
+  {
+   "id": "L33",
+   "pattern": "Per-connection property polling replication",
+   "detection": "shadow-state comparison per object per connection",
+   "default_stance": "Push/dirty tracking, serialize once, O(changes)",
+   "justification_owner": "replication",
+   "stance_capabilities": [
+    "NET.REP.change-tracking",
+    "NET.REP.state"
+   ]
+  },
+  {
+   "id": "L34",
+   "pattern": "Global shared RNG used from parallel tasks",
+   "detection": "one generator object shared by jobs",
+   "default_stance": "Counter-based / per-stream RNG for parallel determinism",
+   "justification_owner": "math-simd-numerics",
+   "stance_capabilities": [
+    "CORE.MATH.random"
+   ]
+  },
+  {
+   "id": "L35",
+   "pattern": "Stringly-typed or polling UI binding",
+   "detection": "property paths resolved and evaluated every frame",
+   "default_stance": "Change-notified view models with resolved bindings",
+   "justification_owner": "ui-architect",
+   "stance_capabilities": [
+    "UI.FW.architecture",
+    "UI.FW.logic"
+   ]
+  },
+  {
+   "id": "L36",
+   "pattern": "Per-body sync callbacks & mid-step world mutation",
+   "detection": "O(bodies) transform write-back; queries mid-step",
+   "default_stance": "Active-set/change-set output, batched queries, deferred commands",
+   "justification_owner": "physics-architect",
+   "stance_capabilities": [
+    "PHY.ARCH.events",
+    "PHY.ARCH.async"
+   ]
+  },
+  {
+   "id": "L37",
+   "pattern": "Modal, blocking editor operations",
+   "detection": "synchronous import/save/compile/bake on the editor UI thread",
+   "default_stance": "Asynchronous, cancellable editor jobs with progress",
+   "justification_owner": "editor-architect",
+   "stance_capabilities": [
+    "ED.ARCH.process"
+   ]
+  },
+  {
+   "id": "L38",
+   "pattern": "Snapshot-based undo",
+   "detection": "whole-object serialization per transaction",
+   "default_stance": "Serializable, diff-based commands",
+   "justification_owner": "editor-architect",
+   "stance_capabilities": [
+    "ED.ARCH.transactions"
+   ]
+  },
+  {
+   "id": "L39",
+   "pattern": "Monolithic binary scene/asset files",
+   "detection": "one binary level file edited by exclusive lock",
+   "default_stance": "One-file-per-object layout with semantic merge",
+   "justification_owner": "world-data-model",
+   "stance_capabilities": [
+    "WLD.MODEL.file-per-object"
+   ]
+  },
+  {
+   "id": "L40",
+   "pattern": "Editor-only data fields in runtime types",
+   "detection": "editor fields compiled into runtime structs",
+   "default_stance": "Editor/runtime data separation",
+   "justification_owner": "editor-architect",
+   "stance_capabilities": [
+    "ED.ARCH.separation"
+   ]
+  },
+  {
+   "id": "L41",
+   "pattern": "Full re-cook or re-bake after local edits",
+   "detection": "any edit triggers a full rebuild",
+   "default_stance": "Incremental cooking with region invalidation, proven equal to clean cook",
+   "justification_owner": "content-pipeline-architect",
+   "stance_capabilities": [
+    "CNT.COOK.incremental-equivalence"
+   ]
+  },
+  {
+   "id": "L42",
+   "pattern": "TCP or all-reliable channels for real-time state",
+   "detection": "state over reliable ordered stream",
+   "default_stance": "UDP-class channels with per-message reliability classes",
+   "justification_owner": "network-transport",
+   "stance_capabilities": [
+    "NET.TRANS.reliability"
+   ]
+  },
+  {
+   "id": "L43",
+   "pattern": "Client-authoritative gameplay, hits or economy",
+   "detection": "server trusts client results",
+   "default_stance": "Server authority with bounded-rewind validation",
+   "justification_owner": "network-architect",
+   "stance_capabilities": [
+    "NET.ARCH.authority",
+    "XC.SEC.server-validation"
+   ]
+  },
+  {
+   "id": "L44",
+   "pattern": "RPC-as-state-sync",
+   "detection": "state changes sent as RPCs",
+   "default_stance": "State replication plus events",
+   "justification_owner": "replication",
+   "stance_capabilities": [
+    "NET.REP.state"
+   ]
+  },
+  {
+   "id": "L45",
+   "pattern": "Exact-build version lock",
+   "detection": "clients rejected on any build difference",
+   "default_stance": "Compatibility windows",
+   "justification_owner": "network-architect",
+   "stance_capabilities": [
+    "NET.ARCH.versioning"
+   ]
+  },
+  {
+   "id": "L46",
+   "pattern": "Exposed peer IP addresses",
+   "detection": "direct P2P addressing of players",
+   "default_stance": "Relay-shielded addressing",
+   "justification_owner": "network-transport",
+   "stance_capabilities": [
+    "NET.TRANS.nat"
+   ]
+  },
+  {
+   "id": "L47",
+   "pattern": "Lockstep without desync detection",
+   "detection": "no state hashing in lockstep",
+   "default_stance": "State-hash desync detection & tooling",
+   "justification_owner": "determinism-replay",
+   "stance_capabilities": [
+    "XC.DET.desync"
+   ]
+  },
+  {
+   "id": "L48",
+   "pattern": "Content encryption as protection; long-lived secrets in clients",
+   "detection": "pak keys or API secrets in binaries",
+   "default_stance": "Server-held secrets, short-lived tokens, signing with custody",
+   "justification_owner": "security-engineering",
+   "stance_capabilities": [
+    "XC.SEC.secrets",
+    "XC.SEC.key-custody"
+   ]
+  },
+  {
+   "id": "L49",
+   "pattern": "Client-side receipt validation",
+   "detection": "client grants purchases",
+   "default_stance": "Server-side verification & transactions",
+   "justification_owner": "platform-services",
+   "stance_capabilities": [
+    "PLAT.COMM.receipts"
+   ]
+  },
+  {
+   "id": "L50",
+   "pattern": "Unsandboxed native mods by default",
+   "detection": "mods load native code without opt-in",
+   "default_stance": "Sandboxed by default; native only by explicit opt-in; signed distribution",
+   "justification_owner": "modding-ugc",
+   "stance_capabilities": [
+    "XC.EXT.ugc-integrity",
+    "XC.SEC.sandbox"
+   ]
+  },
+  {
+   "id": "L51",
+   "pattern": "Hand-written parsers of hostile input without hardening",
+   "detection": "unfuzzed C/C++ parser of network/UGC data",
+   "default_stance": "Registered untrusted input, fuzzed, hardened or memory-safe parser",
+   "justification_owner": "security-engineering",
+   "stance_capabilities": [
+    "XC.SEC.memory-safety",
+    "XC.SEC.trust"
+   ]
+  },
+  {
+   "id": "L52",
+   "pattern": "Dev surfaces reachable in shipping",
+   "detection": "console/ports/live coding present in shipping binaries",
+   "default_stance": "Dev-surface manifest, exclusion fitness function & binary scan",
+   "justification_owner": "build-system-toolchains",
+   "stance_capabilities": [
+    "BLD.SYS.dev-surface-exclusion"
+   ]
+  },
+  {
+   "id": "L53",
+   "pattern": "Unkeyed hashing of attacker-controlled keys",
+   "detection": "default hash on untrusted keys",
+   "default_stance": "Keyed hashing",
+   "justification_owner": "containers-core-types",
+   "stance_capabilities": [
+    "CORE.TYPES.hash-dos"
+   ]
+  },
+  {
+   "id": "L54",
+   "pattern": "Collect-everything telemetry",
+   "detection": "telemetry without data classes or minimization",
+   "default_stance": "Data inventory, sensitivity classes, minimization & consent",
+   "justification_owner": "privacy-data-protection",
+   "stance_capabilities": [
+    "XC.SEC.privacy",
+    "XC.SEC.data-rights"
+   ]
+  },
+  {
+   "id": "L55",
+   "pattern": "Kernel-mode anti-cheat as the default posture",
+   "detection": "kernel driver required by default",
+   "default_stance": "Server authority, attestation and user-mode anti-cheat first",
+   "justification_owner": "anti-cheat-integrity",
+   "stance_capabilities": [
+    "XC.SEC.usermode-anticheat",
+    "XC.SEC.attestation"
+   ]
+  },
+  {
+   "id": "L56",
+   "pattern": "Late or implementer-owned validation",
+   "detection": "tests written after features by their implementer",
+   "default_stance": "Oracles by declared oracle authors, tests before features",
+   "justification_owner": "test-architect",
+   "stance_capabilities": [
+    "QA.AGENT.oracle-independence",
+    "QA.STRAT.dod"
+   ]
+  },
+  {
+   "id": "L57",
+   "pattern": "Wall-clock time and exact-pixel goldens in tests",
+   "detection": "sleeps, real clocks, bit-exact images across GPUs",
+   "default_stance": "Injectable clocks, perceptual metrics with per-GPU tolerances",
+   "justification_owner": "test-architect",
+   "stance_capabilities": [
+    "QA.STRAT.oracles",
+    "CORE.FRAME.test-clock"
+   ]
+  }
+ ]
+}

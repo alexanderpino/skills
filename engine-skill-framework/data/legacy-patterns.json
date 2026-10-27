@@ -1,0 +1,1087 @@
+{
+ "_doc": "Anti-legacy pattern catalogue. A pattern is not forbidden; if present it needs an ADR by the justification owner. Checked by K-LEGACY at G2 and S1–S4. contradiction_terms are regexes: check.py fails when a capability name, contract name/summary or skill purpose matches one, unless adr_exceptions names the pattern and the item with its ADR.",
+ "patterns": [
+  {
+   "id": "L01",
+   "pattern": "Central sequential update loop",
+   "detection": "one function calls subsystems in order each frame",
+   "default_stance": "Task graph of phases with derived ordering (C-FRAME)",
+   "justification_owner": "frame-orchestration",
+   "stance_capabilities": [
+    "CORE.FRAME.access-model",
+    "CORE.FRAME.phases"
+   ]
+  },
+  {
+   "id": "L02",
+   "pattern": "Per-object virtual Tick()",
+   "detection": "tick functions on objects/components",
+   "default_stance": "Scheduled systems with declared access; opt-in budgeted ticks",
+   "justification_owner": "gameplay-architect",
+   "stance_capabilities": [
+    "GAM.FW.execution",
+    "CORE.FRAME.amortized"
+   ]
+  },
+  {
+   "id": "L03",
+   "pattern": "Game-thread / render-thread dichotomy",
+   "detection": "named long-lived render thread",
+   "default_stance": "Render work as tasks in overlapping task-graph frames; dedicated threads only by ADR (thread inventory in CORE.JOBS.thread-model)",
+   "justification_owner": "frame-orchestration",
+   "stance_capabilities": [
+    "CORE.FRAME.pipelining",
+    "RND.GPU.recording",
+    "CORE.JOBS.thread-model"
+   ]
+  },
+  {
+   "id": "L04",
+   "pattern": "Main-thread-only engine APIs",
+   "detection": "UI, scripting or platform callbacks require the OS main thread",
+   "default_stance": "PAL isolates OS-thread-bound APIs behind queues",
+   "justification_owner": "platform-architect",
+   "stance_capabilities": [
+    "PLAT.PAL.thread-affinity",
+    "CORE.JOBS.pinned"
+   ]
+  },
+  {
+   "id": "L05",
+   "pattern": "Pervasive inheritance object hierarchies",
+   "detection": "Actor→Pawn→Character chains",
+   "default_stance": "Composition of components/systems + services",
+   "justification_owner": "entity-object-model",
+   "stance_capabilities": [
+    "CORE.OBJ.hybrid"
+   ]
+  },
+  {
+   "id": "L06",
+   "pattern": "Possession / controller-pawn model by habit",
+   "detection": "universal possession concept",
+   "default_stance": "Control binding as data, chosen per game by ADR",
+   "justification_owner": "gameplay-architect",
+   "stance_capabilities": [
+    "GAM.FW.control"
+   ]
+  },
+  {
+   "id": "L07",
+   "pattern": "Universal scene graph",
+   "detection": "one tree holds the world",
+   "default_stance": "Partitioned data-oriented world; hierarchy only for attachment",
+   "justification_owner": "world-architect",
+   "stance_capabilities": [
+    "WLD.MODEL.strategy",
+    "WLD.SPACE.transforms"
+   ]
+  },
+  {
+   "id": "L08",
+   "pattern": "Hidden globals & singletons",
+   "detection": "static instances initialized implicitly",
+   "default_stance": "Service registry + init graph",
+   "justification_owner": "core-runtime-architect",
+   "stance_capabilities": [
+    "CORE.LIFE.services",
+    "CORE.LIFE.boot"
+   ]
+  },
+  {
+   "id": "L09",
+   "pattern": "Process-global mutable cvars read anywhere",
+   "detection": "cvar reads inside parallel tasks",
+   "default_stance": "Immutable config snapshots latched at sync points",
+   "justification_owner": "core-runtime-architect",
+   "stance_capabilities": [
+    "CORE.LIFE.config-snapshots"
+   ]
+  },
+  {
+   "id": "L10",
+   "pattern": "Hot-path virtual dispatch across contracts",
+   "detection": "virtual call per draw/body/query",
+   "default_stance": "Batch-granular interfaces; binding at build/load time",
+   "justification_owner": "engine-architect",
+   "stance_capabilities": [
+    "ARCH.STRUCT.binding"
+   ]
+  },
+  {
+   "id": "L11",
+   "pattern": "Coarse locks",
+   "detection": "mutex around a subsystem; renderer-wide flush",
+   "default_stance": "Declared access, channels, lock-free where justified (renderer sync: L28)",
+   "justification_owner": "concurrency-primitives",
+   "stance_capabilities": [
+    "CORE.CONC.sync",
+    "CORE.CONC.lockfree"
+   ]
+  },
+  {
+   "id": "L12",
+   "pattern": "Draw-call-centric CPU submission on capable tiers",
+   "detection": "one CPU draw per object on desktop/console",
+   "default_stance": "GPU-driven on capable tiers; CPU-batched on TBDR/lite3d by ADR",
+   "justification_owner": "render-architect",
+   "stance_capabilities": [
+    "RND.ARCH.submission-strategy",
+    "RND.GEO.cpu-submission"
+   ]
+  },
+  {
+   "id": "L13",
+   "pattern": "DX11/OpenGL binding & sync assumptions",
+   "detection": "slot binding, immediate context, driver-managed hazards",
+   "default_stance": "Binding tiers + render-graph-derived barriers",
+   "justification_owner": "rhi-core",
+   "stance_capabilities": [
+    "RND.RHI.binding-tiers",
+    "RND.GRAPH.barriers"
+   ]
+  },
+  {
+   "id": "L14",
+   "pattern": "Per-object render proxy mirror",
+   "detection": "proxy objects created/synced per object per frame",
+   "default_stance": "Change-tracked delta extraction, O(changes)",
+   "justification_owner": "render-architect",
+   "stance_capabilities": [
+    "RND.ARCH.scene-sync",
+    "RND.GEO.gpu-scene"
+   ],
+   "contradiction_terms": [
+    "mirrored copy|O\\(scene objects\\)"
+   ]
+  },
+  {
+   "id": "L15",
+   "pattern": "Frame-tied resource lifetimes",
+   "detection": "resources freed at end of frame/level",
+   "default_stance": "Explicit lifetimes + retirement keyed to completion tokens",
+   "justification_owner": "concurrency-primitives",
+   "stance_capabilities": [
+    "CORE.CONC.retirement",
+    "RND.MEM.lifetime"
+   ]
+  },
+  {
+   "id": "L16",
+   "pattern": "Synchronous IO / blocking loads",
+   "detection": "file read on a frame-critical thread",
+   "default_stance": "Async staged pipeline with deadlines",
+   "justification_owner": "async-io-storage",
+   "stance_capabilities": [
+    "RES.MGMT.pipeline",
+    "RES.IO.backends"
+   ],
+   "contradiction_terms": [
+    "blocking waits on the host thread"
+   ]
+  },
+  {
+   "id": "L17",
+   "pattern": "Page-fault-driven streaming",
+   "detection": "mmap reads on latency-critical workers",
+   "default_stance": "Explicit IO requests; mmap only prefetched/tool-side",
+   "justification_owner": "async-io-storage",
+   "stance_capabilities": [
+    "RES.IO.mmap"
+   ]
+  },
+  {
+   "id": "L18",
+   "pattern": "Blocking whole-level load before play",
+   "detection": "whole level loaded before play",
+   "default_stance": "Async non-blocking loading; cell streaming with budgeted activation for 3D/openworld",
+   "justification_owner": "world-architect",
+   "stance_capabilities": [
+    "WLD.PART.activation",
+    "WLD.MODEL.unit-load"
+   ]
+  },
+  {
+   "id": "L19",
+   "pattern": "Immediate synchronous observer callbacks across subsystems",
+   "detection": "callbacks invoked on the producer's thread mid-update",
+   "default_stance": "Deferred batched events at declared consumption points",
+   "justification_owner": "entity-object-model",
+   "stance_capabilities": [
+    "CORE.OBJ.events",
+    "PHY.ARCH.events"
+   ],
+   "contradiction_terms": [
+    "immediate synchronous|global event bus"
+   ]
+  },
+  {
+   "id": "L20",
+   "pattern": "Stringly-typed reflection on runtime paths",
+   "detection": "name lookups per frame",
+   "default_stance": "Static reflection & resolved IDs; strings at tool/script boundaries",
+   "justification_owner": "reflection-metadata",
+   "stance_capabilities": [
+    "CORE.REFL.static-default"
+   ]
+  },
+  {
+   "id": "L21",
+   "pattern": "Tracing-GC-managed engine objects",
+   "detection": "engine objects reachable via GC",
+   "default_stance": "Explicit ownership + generational handles; weak script refs",
+   "justification_owner": "entity-object-model",
+   "stance_capabilities": [
+    "CORE.OBJ.references"
+   ]
+  },
+  {
+   "id": "L22",
+   "pattern": "Global script VM on one thread",
+   "detection": "single interpreter mutating the world",
+   "default_stance": "Per-worker VMs/isolates, deferred mutation",
+   "justification_owner": "scripting-runtime",
+   "stance_capabilities": [
+    "GAM.SCR.concurrency"
+   ]
+  },
+  {
+   "id": "L23",
+   "pattern": "Editor-in-runtime monolith",
+   "detection": "editor code linked into shipping builds",
+   "default_stance": "Tool-side modules; tools target only",
+   "justification_owner": "editor-architect",
+   "stance_capabilities": [
+    "ARCH.STRUCT.layering",
+    "BLD.SYS.dev-surface-exclusion",
+    "ED.ARCH.separation"
+   ]
+  },
+  {
+   "id": "L24",
+   "pattern": "Blocking cook-before-play",
+   "detection": "full cook required before running",
+   "default_stance": "On-demand cooking & cook-server streaming",
+   "justification_owner": "content-pipeline-architect",
+   "stance_capabilities": [
+    "CNT.COOK.on-demand"
+   ]
+  },
+  {
+   "id": "L25",
+   "pattern": "Single-thread-first design",
+   "detection": "systems that must run serially by construction",
+   "default_stance": "Parallel by construction, correct on one worker (inline mode)",
+   "justification_owner": "architecture-governance",
+   "stance_capabilities": [
+    "CORE.JOBS.scheduler",
+    "CORE.JOBS.degenerate",
+    "ARCH.GOV.fitness"
+   ]
+  },
+  {
+   "id": "L26",
+   "pattern": "Monolithic subsystems",
+   "detection": "one module owning a whole domain",
+   "default_stance": "Contracts + focused experts",
+   "justification_owner": "engine-architect",
+   "stance_capabilities": [
+    "ARCH.STRUCT.contracts",
+    "ARCH.STRUCT.replaceability"
+   ]
+  },
+  {
+   "id": "L27",
+   "pattern": "ECS for everything (new dogma)",
+   "detection": "technique applied where access patterns do not fit",
+   "default_stance": "Per-domain ADR with workload evidence",
+   "justification_owner": "architecture-governance",
+   "stance_capabilities": [
+    "CORE.OBJ.hybrid",
+    "CORE.ECS.bridges",
+    "ARCH.GOV.adr"
+   ]
+  },
+  {
+   "id": "L28",
+   "pattern": "Global renderer sync & CPU/GPU flushes",
+   "detection": "WaitForIdle / flush calls on frame paths",
+   "default_stance": "Render-graph-derived barriers; external work imported with queue transfers",
+   "justification_owner": "render-graph-scheduling",
+   "stance_capabilities": [
+    "RND.GRAPH.barriers",
+    "RND.GRAPH.external-work"
+   ]
+  },
+  {
+   "id": "L29",
+   "pattern": "Runtime shader/PSO compilation on first use",
+   "detection": "PSO created on first draw; hitch on new material",
+   "default_stance": "PSO coverage from play traces, precompiled/pipeline libraries, async creation with fallbacks",
+   "justification_owner": "shader-system",
+   "stance_capabilities": [
+    "RND.MAT.pso-miss-policy",
+    "RND.RHI.pso",
+    "RND.SHADER.cache",
+    "RND.SHADER.precache",
+    "RND.SHADER.pso-lists"
+   ]
+  },
+  {
+   "id": "L30",
+   "pattern": "Frame-coupled variable-timestep simulation",
+   "detection": "simulation stepped by render delta",
+   "default_stance": "Fixed/declared step with interpolation per C-FRAME",
+   "justification_owner": "frame-orchestration",
+   "stance_capabilities": [
+    "CORE.FRAME.fixed-step"
+   ],
+   "contradiction_terms": [
+    "variable[- ]timestep|render frame delta"
+   ]
+  },
+  {
+   "id": "L31",
+   "pattern": "Hard-reference transitive load graphs",
+   "detection": "loading one asset pulls large dependency closures",
+   "default_stance": "Soft references, dependency-aware loading with budgets",
+   "justification_owner": "resource-streaming-architect",
+   "stance_capabilities": [
+    "RES.MGMT.dependencies"
+   ]
+  },
+  {
+   "id": "L32",
+   "pattern": "Process-global current world",
+   "detection": "static world accessor",
+   "default_stance": "World handles; multiple isolated worlds",
+   "justification_owner": "entity-object-model",
+   "stance_capabilities": [
+    "CORE.OBJ.world-instances"
+   ]
+  },
+  {
+   "id": "L33",
+   "pattern": "Per-connection property polling replication",
+   "detection": "shadow-state comparison per object per connection",
+   "default_stance": "Push/dirty tracking, serialize once, O(changes)",
+   "justification_owner": "replication",
+   "stance_capabilities": [
+    "NET.REP.change-tracking",
+    "NET.REP.state"
+   ]
+  },
+  {
+   "id": "L34",
+   "pattern": "Global shared RNG used from parallel tasks",
+   "detection": "one generator object shared by jobs",
+   "default_stance": "Counter-based / per-stream RNG for parallel determinism",
+   "justification_owner": "math-simd-numerics",
+   "stance_capabilities": [
+    "CORE.MATH.random"
+   ]
+  },
+  {
+   "id": "L35",
+   "pattern": "Stringly-typed or polling UI binding",
+   "detection": "property paths resolved and evaluated every frame",
+   "default_stance": "Change-notified view models with resolved bindings",
+   "justification_owner": "ui-architect",
+   "stance_capabilities": [
+    "UI.FW.architecture",
+    "UI.FW.logic"
+   ],
+   "contradiction_terms": [
+    "(?<!no )per-frame (?:property )?polling|string-keyed bindings"
+   ]
+  },
+  {
+   "id": "L36",
+   "pattern": "Per-body sync callbacks & mid-step world mutation",
+   "detection": "O(bodies) transform write-back; queries mid-step",
+   "default_stance": "Active-set/change-set output, batched queries, deferred commands",
+   "justification_owner": "physics-architect",
+   "stance_capabilities": [
+    "PHY.ARCH.events",
+    "PHY.ARCH.async"
+   ],
+   "contradiction_terms": [
+    "step-time callbacks|modify bodies during the step"
+   ]
+  },
+  {
+   "id": "L37",
+   "pattern": "Modal, blocking editor operations",
+   "detection": "synchronous import/save/compile/bake on the editor UI thread",
+   "default_stance": "Asynchronous, cancellable editor jobs with progress",
+   "justification_owner": "editor-architect",
+   "stance_capabilities": [
+    "ED.ARCH.async-jobs"
+   ]
+  },
+  {
+   "id": "L38",
+   "pattern": "Snapshot-based undo",
+   "detection": "whole-object serialization per transaction",
+   "default_stance": "Serializable, diff-based commands",
+   "justification_owner": "editor-architect",
+   "stance_capabilities": [
+    "ED.ARCH.transactions"
+   ],
+   "contradiction_terms": [
+    "full copy of the affected",
+    "snapshot-based undo"
+   ]
+  },
+  {
+   "id": "L39",
+   "pattern": "Monolithic binary scene/asset files",
+   "detection": "one binary level file edited by exclusive lock",
+   "default_stance": "One-file-per-object layout with semantic merge",
+   "justification_owner": "world-data-model",
+   "stance_capabilities": [
+    "WLD.MODEL.file-per-object"
+   ],
+   "contradiction_terms": [
+    "monolithic binary"
+   ]
+  },
+  {
+   "id": "L40",
+   "pattern": "Editor-only data fields in runtime types",
+   "detection": "editor fields compiled into runtime structs",
+   "default_stance": "Editor/runtime data separation",
+   "justification_owner": "editor-architect",
+   "stance_capabilities": [
+    "ED.ARCH.separation"
+   ]
+  },
+  {
+   "id": "L41",
+   "pattern": "Full re-cook or re-bake after local edits",
+   "detection": "any edit triggers a full rebuild",
+   "default_stance": "Incremental cooking with region invalidation, proven equal to clean cook",
+   "justification_owner": "content-pipeline-architect",
+   "stance_capabilities": [
+    "CNT.COOK.incremental-equivalence"
+   ]
+  },
+  {
+   "id": "L42",
+   "pattern": "TCP or all-reliable channels for real-time state",
+   "detection": "state over reliable ordered stream",
+   "default_stance": "UDP-class channels with per-message reliability classes",
+   "justification_owner": "network-transport",
+   "stance_capabilities": [
+    "NET.TRANS.reliability",
+    "NET.TRANS.web"
+   ],
+   "contradiction_terms": [
+    "\\bTCP\\b|all-reliable"
+   ]
+  },
+  {
+   "id": "L43",
+   "pattern": "Client-authoritative gameplay, hits or economy",
+   "detection": "server trusts client results",
+   "default_stance": "Server authority with bounded-rewind validation",
+   "justification_owner": "network-architect",
+   "stance_capabilities": [
+    "NET.ARCH.authority",
+    "NET.ARCH.distributed-authority",
+    "XC.SEC.server-validation"
+   ]
+  },
+  {
+   "id": "L44",
+   "pattern": "RPC-as-state-sync",
+   "detection": "state changes sent as RPCs",
+   "default_stance": "State replication plus events",
+   "justification_owner": "replication",
+   "stance_capabilities": [
+    "NET.REP.state"
+   ]
+  },
+  {
+   "id": "L45",
+   "pattern": "Exact-build version lock",
+   "detection": "clients rejected on any build difference",
+   "default_stance": "Compatibility windows",
+   "justification_owner": "network-architect",
+   "stance_capabilities": [
+    "NET.ARCH.versioning",
+    "NET.REP.compat"
+   ],
+   "contradiction_terms": [
+    "exact-build"
+   ]
+  },
+  {
+   "id": "L46",
+   "pattern": "Exposed peer IP addresses",
+   "detection": "direct P2P addressing of players",
+   "default_stance": "Relay-shielded addressing",
+   "justification_owner": "network-transport",
+   "stance_capabilities": [
+    "NET.TRANS.nat"
+   ]
+  },
+  {
+   "id": "L47",
+   "pattern": "Lockstep without desync detection",
+   "detection": "no state hashing in lockstep",
+   "default_stance": "State-hash desync detection & tooling",
+   "justification_owner": "determinism-replay",
+   "stance_capabilities": [
+    "XC.DET.desync"
+   ]
+  },
+  {
+   "id": "L48",
+   "pattern": "Content encryption as protection; long-lived secrets in clients",
+   "detection": "pak keys or API secrets in binaries",
+   "default_stance": "Server-held secrets, short-lived tokens, signing with custody",
+   "justification_owner": "security-engineering",
+   "stance_capabilities": [
+    "XC.SEC.secrets",
+    "XC.SEC.key-custody"
+   ]
+  },
+  {
+   "id": "L49",
+   "pattern": "Client-side receipt validation",
+   "detection": "client grants purchases",
+   "default_stance": "Server-side verification & transactions",
+   "justification_owner": "platform-services",
+   "stance_capabilities": [
+    "PLAT.COMM.receipts"
+   ]
+  },
+  {
+   "id": "L50",
+   "pattern": "Unsandboxed native mods by default",
+   "detection": "mods load native code without opt-in",
+   "default_stance": "Sandboxed by default; native only by explicit opt-in; signed distribution",
+   "justification_owner": "modding-ugc",
+   "stance_capabilities": [
+    "XC.EXT.ugc-integrity",
+    "XC.SEC.sandbox"
+   ]
+  },
+  {
+   "id": "L51",
+   "pattern": "Hand-written parsers of hostile input without hardening",
+   "detection": "unfuzzed C/C++ parser of network/UGC data",
+   "default_stance": "Registered untrusted input, fuzzed, hardened or memory-safe parser",
+   "justification_owner": "security-engineering",
+   "stance_capabilities": [
+    "XC.SEC.memory-safety",
+    "XC.SEC.trust"
+   ]
+  },
+  {
+   "id": "L52",
+   "pattern": "Dev surfaces reachable in shipping",
+   "detection": "console/ports/live coding present in shipping binaries",
+   "default_stance": "Dev-surface manifest, exclusion fitness function & binary scan",
+   "justification_owner": "build-system-toolchains",
+   "stance_capabilities": [
+    "BLD.SYS.dev-surface-exclusion"
+   ]
+  },
+  {
+   "id": "L53",
+   "pattern": "Unkeyed hashing of attacker-controlled keys",
+   "detection": "default hash on untrusted keys",
+   "default_stance": "Keyed hashing",
+   "justification_owner": "containers-core-types",
+   "stance_capabilities": [
+    "CORE.TYPES.hash-dos"
+   ]
+  },
+  {
+   "id": "L54",
+   "pattern": "Collect-everything telemetry",
+   "detection": "telemetry without data classes or minimization",
+   "default_stance": "Data inventory, sensitivity classes, minimization & consent",
+   "justification_owner": "privacy-data-protection",
+   "stance_capabilities": [
+    "XC.SEC.privacy",
+    "XC.SEC.data-rights"
+   ]
+  },
+  {
+   "id": "L55",
+   "pattern": "Kernel-mode anti-cheat as the default posture",
+   "detection": "kernel driver required by default",
+   "default_stance": "Server authority, attestation and user-mode anti-cheat first",
+   "justification_owner": "anti-cheat-integrity",
+   "stance_capabilities": [
+    "XC.SEC.usermode-anticheat",
+    "XC.SEC.attestation"
+   ]
+  },
+  {
+   "id": "L56",
+   "pattern": "Late or implementer-owned validation",
+   "detection": "tests written after features by their implementer",
+   "default_stance": "Oracles by declared oracle authors, tests before features",
+   "justification_owner": "test-architect",
+   "stance_capabilities": [
+    "QA.AGENT.oracle-independence",
+    "QA.STRAT.dod"
+   ]
+  },
+  {
+   "id": "L57",
+   "pattern": "Wall-clock time and exact-pixel goldens in tests",
+   "detection": "sleeps, real clocks, bit-exact images across GPUs",
+   "default_stance": "Injectable clocks, perceptual metrics with per-GPU tolerances",
+   "justification_owner": "test-architect",
+   "stance_capabilities": [
+    "QA.STRAT.oracles",
+    "CORE.FRAME.test-clock"
+   ]
+  },
+  {
+   "id": "L58",
+   "pattern": "Display-referred / LDR effect pipeline",
+   "detection": "bloom, DOF or motion blur after tonemapping; 8-bit intermediate targets on HDR-capable tiers",
+   "default_stance": "Scene-referred linear HDR chain with a single output transform; only grain, dithering and UI-safe sharpening after it",
+   "justification_owner": "post-color-hdr",
+   "stance_capabilities": [
+    "RND.POST.color",
+    "RND.POST.effects"
+   ],
+   "contradiction_terms": [
+    "after tonemapping"
+   ]
+  },
+  {
+   "id": "L59",
+   "pattern": "Geometry shaders, HW tessellation and stream-out pipelines on capable tiers",
+   "detection": "GS/HS/DS stages or stream-out in material or LOD paths",
+   "default_stance": "Mesh shaders or compute expansion; cluster/displacement paths on GPU-driven tiers",
+   "justification_owner": "geometry-pipeline",
+   "stance_capabilities": [
+    "RND.GEO.mesh-shaders",
+    "RND.LOD.displacement"
+   ]
+  },
+  {
+   "id": "L60",
+   "pattern": "float32 world positions & whole-world origin rebasing",
+   "detection": "single-precision absolute positions; teleporting the world to hide jitter",
+   "default_stance": "Large-world coordinates: double/tiled positions and local-frame rendering",
+   "justification_owner": "world-architect",
+   "stance_capabilities": [
+    "WLD.SPACE.lwc",
+    "WLD.PART.lwc-policy"
+   ],
+   "contradiction_terms": [
+    "float32 world position|whole-world origin rebas"
+   ]
+  },
+  {
+   "id": "L61",
+   "pattern": "Locks, allocation or IO in the real-time audio callback",
+   "detection": "mutex, malloc or file read reachable from the audio render thread",
+   "default_stance": "Lock-free, allocation-free audio render thread; control via lock-free queues",
+   "justification_owner": "audio-architect",
+   "stance_capabilities": [
+    "AUD.ARCH.engine",
+    "CORE.JOBS.thread-model"
+   ],
+   "contradiction_terms": [
+    "locks? in the (?:audio )?callback"
+   ]
+  },
+  {
+   "id": "L62",
+   "pattern": "#ifdef über-shader permutation explosion",
+   "detection": "unbounded static permutations per material",
+   "default_stance": "Permutation budgets with specialization constants and pipeline libraries",
+   "justification_owner": "shader-system",
+   "stance_capabilities": [
+    "RND.SHADER.permutation-budget",
+    "RND.SHADER.permutations"
+   ],
+   "contradiction_terms": [
+    "über-?shader|permutation explosion"
+   ]
+  },
+  {
+   "id": "L63",
+   "pattern": "Gameplay reading raw device state or key codes",
+   "detection": "key/button codes or polling in gameplay code",
+   "default_stance": "Actions and contexts through C-INPUT mapping",
+   "justification_owner": "input-system",
+   "stance_capabilities": [
+    "INP.ACT.mapping"
+   ],
+   "contradiction_terms": [
+    "raw (?:key|device) (?:codes|state)"
+   ]
+  },
+  {
+   "id": "L64",
+   "pattern": "Raw struct-dump saves without a schema",
+   "detection": "memcpy'd structs as save files",
+   "default_stance": "Schema-versioned saves with migration",
+   "justification_owner": "persistence-save",
+   "stance_capabilities": [
+    "GAM.SAVE.model",
+    "GAM.SAVE.migration"
+   ],
+   "contradiction_terms": [
+    "struct[- ]dump"
+   ]
+  },
+  {
+   "id": "L65",
+   "pattern": "Fixed 30/60 Hz assumptions, sleep limiters and blocking vsync present",
+   "detection": "sleep-based frame limiting; constants of 1/60",
+   "default_stance": "Present timeline with pacing feedback and latency-aware limiters",
+   "justification_owner": "frame-orchestration",
+   "stance_capabilities": [
+    "CORE.FRAME.present-timeline",
+    "CORE.FRAME.latency"
+   ],
+   "contradiction_terms": [
+    "sleep[- ]based (?:frame )?limit|fixed 60 ?hz"
+   ]
+  },
+  {
+   "id": "L66",
+   "pattern": "Per-item general heap allocation on hot paths",
+   "detection": "malloc/new per entity, event or command",
+   "default_stance": "Pools, arenas and budget-enforced allocators",
+   "justification_owner": "memory-allocators",
+   "stance_capabilities": [
+    "CORE.MEM.allocators",
+    "CORE.MEM.budget-enforcement"
+   ],
+   "contradiction_terms": [
+    "per-item (?:heap )?allocation"
+   ]
+  },
+  {
+   "id": "L67",
+   "pattern": "#ifdef platform sprawl",
+   "detection": "platform conditionals in shared code",
+   "default_stance": "Platform backends behind contracts",
+   "justification_owner": "platform-architect",
+   "stance_capabilities": [
+    "ARCH.STRUCT.platform-backends"
+   ],
+   "contradiction_terms": [
+    "platform #ifdef|ifdef sprawl"
+   ]
+  },
+  {
+   "id": "L68",
+   "pattern": "Timestamp-based derived data",
+   "detection": "cook/build outputs keyed by file times",
+   "default_stance": "Content-addressed derived data cache",
+   "justification_owner": "content-pipeline-architect",
+   "stance_capabilities": [
+    "CNT.COOK.ddc"
+   ],
+   "contradiction_terms": [
+    "timestamp[- ]based (?:cook|derived)"
+   ]
+  },
+  {
+   "id": "L69",
+   "pattern": "Flaky-test tolerance (retry until green)",
+   "detection": "retries or quarantines that hide nondeterminism",
+   "default_stance": "Flake classification and root-cause policy",
+   "justification_owner": "test-architect",
+   "stance_capabilities": [
+    "QA.STRAT.flaky"
+   ],
+   "contradiction_terms": [
+    "retry until green"
+   ]
+  },
+  {
+   "id": "L70",
+   "pattern": "Average-fps performance targets",
+   "detection": "budgets stated as mean fps",
+   "default_stance": "Per-tier frame-time budgets with percentiles",
+   "justification_owner": "performance-architect",
+   "stance_capabilities": [
+    "PRF.METH.budgets"
+   ],
+   "contradiction_terms": [
+    "average[- ]fps|mean fps"
+   ]
+  },
+  {
+   "id": "L71",
+   "pattern": "Big-bang releases without staged rollout",
+   "detection": "all-at-once patch to every client",
+   "default_stance": "Canary/staged rollout with kill switches",
+   "justification_owner": "packaging-release-patching",
+   "stance_capabilities": [
+    "BLD.REL.staged-rollout"
+   ],
+   "contradiction_terms": [
+    "big-bang release"
+   ]
+  },
+  {
+   "id": "L72",
+   "pattern": "Baked-string localization",
+   "detection": "translated text embedded in code or textures",
+   "default_stance": "Keyed string tables with plural/gender rules",
+   "justification_owner": "localization-i18n",
+   "stance_capabilities": [
+    "UI.LOC.messageformat",
+    "UI.LOC.strings",
+    "UI.LOC.terms"
+   ],
+   "contradiction_terms": [
+    "hard-?coded (?:ui )?strings"
+   ]
+  },
+  {
+   "id": "L73",
+   "pattern": "Reconstruction/frame generation as budget substitute",
+   "detection": "budgets or latency judged on generated frames",
+   "default_stance": "Frame generation is an optional presentation layer, never counted toward latency or simulation budgets; upscaling is a declared budget input per tier (internal-resolution budget at base rate with the reconstruction mode)",
+   "justification_owner": "performance-architect",
+   "stance_capabilities": [
+    "RND.RECON.framegen",
+    "PRF.LOAD.pacing-latency"
+   ],
+   "contradiction_terms": [
+    "counted toward (?:the )?(?:simulation|latency) budget"
+   ]
+  },
+  {
+   "id": "L74",
+   "pattern": "Long-lived static CI/cloud credentials",
+   "detection": "keys in CI variables or images",
+   "default_stance": "OIDC workload identity, short-lived tokens, ephemeral runners",
+   "justification_owner": "ci-cd-automation",
+   "stance_capabilities": [
+    "BLD.CI.hardening"
+   ],
+   "contradiction_terms": [
+    "static (?:ci|cloud) credentials"
+   ]
+  },
+  {
+   "id": "L75",
+   "pattern": "Baked visibility (PVS/portals) on GPU-driven tiers",
+   "detection": "precomputed visibility sets used where HZB culling is available",
+   "default_stance": "GPU HZB culling; baked visibility only on the CPU-culled tier by ADR",
+   "justification_owner": "geometry-pipeline",
+   "stance_capabilities": [
+    "RND.GEO.culling",
+    "RND.GEO.cpu-occlusion",
+    "RND.GEO.precomputed-visibility"
+   ],
+   "contradiction_terms": [
+    "baked pvs (?:everywhere|default)"
+   ]
+  },
+  {
+   "id": "L76",
+   "pattern": "Discrete-only collision with speed clamps",
+   "detection": "speed caps or thick walls to stop tunnelling",
+   "default_stance": "Continuous collision for fast bodies",
+   "justification_owner": "physics-architect",
+   "stance_capabilities": [
+    "PHY.COL.ccd"
+   ],
+   "contradiction_terms": [
+    "speed clamps? instead of"
+   ]
+  },
+  {
+   "id": "L77",
+   "pattern": "Unbounded always-awake physics world",
+   "detection": "no sleeping, active set or simulation LOD",
+   "default_stance": "Islands and sleeping, physics LOD, tier transitions",
+   "justification_owner": "physics-architect",
+   "stance_capabilities": [
+    "PHY.DYN.islands",
+    "PHY.ARCH.lod",
+    "PHY.ARCH.tier-transitions"
+   ],
+   "contradiction_terms": [
+    "always-awake"
+   ]
+  },
+  {
+   "id": "L78",
+   "pattern": "Rollback over non-restorable physics state",
+   "detection": "rollback or lockstep over a backend that cannot restore solver caches",
+   "default_stance": "Restore/resimulate conformance and sync tests",
+   "justification_owner": "physics-architect",
+   "stance_capabilities": [
+    "PHY.ARCH.rewind",
+    "NET.PRED.sync-test"
+   ],
+   "contradiction_terms": [
+    "rollback over non-restorable"
+   ]
+  },
+  {
+   "id": "L79",
+   "pattern": "Thread-per-subsystem and fixed worker counts",
+   "detection": "per-subsystem loops for physics, audio, streaming or network; constant-size worker pools",
+   "default_stance": "One scheduler, worker count from topology and actuators",
+   "justification_owner": "job-system-task-graph",
+   "stance_capabilities": [
+    "CORE.JOBS.thread-model",
+    "CORE.JOBS.scheduler",
+    "CORE.SCALE.actuators",
+    "PRF.CPU.hybrid"
+   ],
+   "contradiction_terms": [
+    "thread-per-subsystem"
+   ]
+  },
+  {
+   "id": "L80",
+   "pattern": "Unbounded stage queues and benchmarks on non-profile builds",
+   "detection": "queues without back-pressure; timings from debug builds",
+   "default_stance": "Bounded queues with back-pressure; benchmarks on the profile build configuration",
+   "justification_owner": "performance-architect",
+   "stance_capabilities": [
+    "PRF.METH.gates",
+    "BLD.SYS.configs"
+   ],
+   "contradiction_terms": [
+    "unbounded stage queues"
+   ]
+  },
+  {
+   "id": "L81",
+   "pattern": "GPU-driven everywhere (new dogma)",
+   "detection": "GPU-driven path forced on tiers where it loses",
+   "default_stance": "Per-tier submission strategy by ADR",
+   "justification_owner": "render-architect",
+   "stance_capabilities": [
+    "RND.ARCH.submission-strategy"
+   ],
+   "contradiction_terms": [
+    "gpu-driven everywhere"
+   ]
+  },
+  {
+   "id": "L82",
+   "pattern": "Neural/ML by default (new dogma)",
+   "detection": "ML features without measured advantage or fallback",
+   "default_stance": "ML behind optional contracts with fallbacks and evidence ADRs",
+   "justification_owner": "ml-inference-runtime",
+   "stance_capabilities": [
+    "ML.RT.scheduling",
+    "ARCH.GOV.adr"
+   ],
+   "contradiction_terms": [
+    "ml by default"
+   ]
+  },
+  {
+   "id": "L83",
+   "pattern": "Async physics by default (new dogma)",
+   "detection": "decoupled physics stepping without rollback or determinism review",
+   "default_stance": "Stepping mode chosen per netcode family by ADR",
+   "justification_owner": "physics-architect",
+   "stance_capabilities": [
+    "PHY.ARCH.async",
+    "PHY.ARCH.stepping"
+   ],
+   "contradiction_terms": [
+    "async physics by default"
+   ]
+  },
+  {
+   "id": "L84",
+   "pattern": "Full asset-registry scan or residency at boot",
+   "detection": "registry loaded in full at startup",
+   "default_stance": "Cooked, chunked, on-demand registry with streamed indexes",
+   "justification_owner": "content-pipeline-architect",
+   "stance_capabilities": [
+    "CNT.ID.registry"
+   ],
+   "contradiction_terms": [
+    "full (?:asset-)?registry scan"
+   ]
+  },
+  {
+   "id": "L85",
+   "pattern": "Text without shaping or grapheme awareness",
+   "detection": "ASCII, bitmap-font or code-unit text handling",
+   "default_stance": "Shaping, bidi and grapheme segmentation",
+   "justification_owner": "text-fonts",
+   "stance_capabilities": [
+    "UI.TXT.shaping",
+    "UI.TXT.bidi"
+   ],
+   "contradiction_terms": [
+    "code-unit text"
+   ]
+  },
+  {
+   "id": "L86",
+   "pattern": "Sentence assembly by string concatenation",
+   "detection": "concatenated fragments for localized sentences",
+   "default_stance": "MessageFormat-class messages with terms and agreement",
+   "justification_owner": "localization-i18n",
+   "stance_capabilities": [
+    "UI.LOC.messageformat",
+    "UI.LOC.terms"
+   ],
+   "contradiction_terms": [
+    "string concatenation for (?:sentences|messages)"
+   ]
+  },
+  {
+   "id": "L87",
+   "pattern": "Synchronous per-request pathfinding and navmesh rebuild",
+   "detection": "path or rebuild on the calling thread",
+   "default_stance": "Batched async path queries and incremental rebuild",
+   "justification_owner": "navigation-pathfinding",
+   "stance_capabilities": [
+    "GAM.AI.pathfinding",
+    "GAM.AI.navmesh"
+   ],
+   "contradiction_terms": [
+    "synchronous (?:per-request )?pathfinding"
+   ]
+  },
+  {
+   "id": "L88",
+   "pattern": "Hard-coded gameplay tunables",
+   "detection": "constants in code",
+   "default_stance": "Data-driven tuning assets",
+   "justification_owner": "gameplay-data",
+   "stance_capabilities": [
+    "GAM.DATA.tuning"
+   ],
+   "contradiction_terms": [
+    "hard-?coded tunables"
+   ]
+  },
+  {
+   "id": "L89",
+   "pattern": "Independent per-domain streaming pools",
+   "detection": "each domain sizes and evicts its own pool",
+   "default_stance": "One arbitrated budget across pools",
+   "justification_owner": "resource-streaming-architect",
+   "stance_capabilities": [
+    "RES.MGMT.arbitration",
+    "CORE.MEM.uma"
+   ],
+   "contradiction_terms": [
+    "independent (?:per-domain )?streaming pools"
+   ]
+  }
+ ],
+ "adr_exceptions": []
+}

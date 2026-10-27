@@ -1,0 +1,138 @@
+[
+ {
+  "id": "K-SEC-1",
+  "fact_holds": true,
+  "material": true,
+  "severity_ok": false,
+  "checked": "untrusted-inputs.json saves/cloud-saves/config-layers; GAM.SAVE.integrity; docs/09",
+  "reason": "saves is trusted-local, cloud-saves/config-layers semi-trusted-signed; user-editable saves are attacker-controlled, so label is wrong. But saves stay registered with a fuzz harness and size/depth limits and the trust field is not consumed by check.py, so nothing is exempted: minor, not major."
+ },
+ {
+  "id": "K-SEC-2",
+  "fact_holds": true,
+  "material": true,
+  "severity_ok": true,
+  "checked": "capabilities.json BLD.REL.staged-rollout; BLD.REL.rollback; legacy-patterns; milestones M4 gate",
+  "reason": "Capability is literally defined as simultaneous global rollout with post-release kill switches; no phased/cohort/auto-halt capability exists anywhere. The M4 gate rests on it; the wording bakes in an all-at-once anti-pattern."
+ },
+ {
+  "id": "K-SEC-3",
+  "fact_holds": true,
+  "material": true,
+  "severity_ok": true,
+  "checked": "CNT.COOK.ddc, CNT.COOK.shared-cache, BLD.SYS.caching, RND.SHADER.cache, untrusted-inputs shared-ddc/shader-caches",
+  "reason": "CNT.COOK.ddc is keyed by path+mtime, contradicting shared-ddc limit 'content-addressed/verified'; no compile-cache or trusted-writer rule is registered. Real cache-poisoning/supply-chain gap."
+ },
+ {
+  "id": "K-SEC-4",
+  "fact_holds": true,
+  "material": true,
+  "severity_ok": true,
+  "checked": "contracts.json C-SIGN/C-SER/C-SCRIPT; milestones.json freeze vs skill staffing; check.py oracle checks",
+  "reason": "Recomputed: 29 contracts are frozen before their oracle author's first milestone; C-SIGN frozen M0 with modding-ugc (M4) as oracle author, and check.py only checks oracle != sole implementer. A crypto contract with a UGC skill as oracle author is a real defect."
+ },
+ {
+  "id": "K-SEC-5",
+  "fact_holds": true,
+  "material": true,
+  "severity_ok": true,
+  "checked": "skills.json workstreams; crosscutting.json independence; check.py independence loop; docs/00 workstreams",
+  "reason": "security-runtime and security-engineering are both workstream 'quality', the co-hosting unit; the (security-engineering, owning-skill) pair is skipped by the workstream check. Reviewer/author independence for crypto code is unenforced."
+ },
+ {
+  "id": "K-SEC-6",
+  "fact_holds": false,
+  "material": false,
+  "severity_ok": false,
+  "checked": "skills.json keys (access only NDA); XC.SEC.agent-boundary; ARCH.ORG.human-gates; XC.SEC.agent-redteam",
+  "reason": "Agent capability scoping, egress and prompt-injection model are already owned by XC.SEC.agent-boundary and CI/secret-scope changes are a human gate. A per-skill access schema plus a trifecta lint is a design preference for phase-2 SKILL.md, not a demonstrated defect."
+ },
+ {
+  "id": "K-SEC-7",
+  "fact_holds": true,
+  "material": true,
+  "severity_ok": true,
+  "checked": "untrusted-inputs.json (external-reports, vuln-reports, logged-untrusted-strings, crash-uploads); XC.SEC.agent-redteam; ARCH.ORG.change-requests; OBS.CRASH.feedback",
+  "reason": "No registry entry for CI/test output, inter-agent change requests/messages or player feedback read by triage agents; external-reports covers customer intake only. Agent-to-agent injection propagation is a real uncovered path."
+ },
+ {
+  "id": "K-SEC-8",
+  "fact_holds": true,
+  "material": false,
+  "severity_ok": false,
+  "checked": "untrusted-inputs project-content-to-llm; ED.ARCH.llm-agent-frontend (emerging); ED.ARCH.automation-security; milestones.json",
+  "reason": "Owner is ai-assisted-authoring (M6) as claimed, but the front end is an emerging capability with CLI fallback and milestones stage skills, not capabilities; editor-architect already owns workspace-trust/permission gating. No evidence the exposure exists at M2, and the input owner being the feature owner is defensible."
+ },
+ {
+  "id": "K-SEC-9",
+  "fact_holds": true,
+  "material": true,
+  "severity_ok": true,
+  "checked": "milestones.json M0-M2 skills and gates; skills.json kinds of ci-cd-automation/build-system-toolchains; XC.SEC.* caps",
+  "reason": "ci-cd-automation and build-system-toolchains first appear at M2 while M0 exit claims CI lanes; no milestone gates supply-chain, agent-boundary, secrets, key-custody, data-rights, childrens-data or vuln-response (only threats, hardening, sandbox). Store-facing M2 has only QA.CERT.prechecks."
+ },
+ {
+  "id": "K-SEC-10",
+  "fact_holds": true,
+  "material": true,
+  "severity_ok": true,
+  "checked": "capabilities BLD.CI.*, BLD.SYS.*, XC.SEC.supply-chain, BLD.REL.server-artifacts, NET.SRV.*",
+  "reason": "No capability for build provenance, hermetic/ephemeral runners, untrusted-vs-privileged job separation, OIDC identity or server secret delivery; XC.SEC.supply-chain lists only build-system-toolchains as contributor and ci-cd-automation has no security capability. Partly overlapped by XC.SEC.secrets/key-custody but the core gap stands."
+ },
+ {
+  "id": "K-SEC-11",
+  "fact_holds": true,
+  "material": true,
+  "severity_ok": true,
+  "checked": "crosscutting.json concerns (30, none on personal data); XC.SEC.data-rights, XC.SEC.privacy-review",
+  "reason": "No concern makes each skill declare personal data collected/logged/sent; privacy-review and data-rights need that input, and concerns are the framework's mechanism for SKILL.md obligations."
+ },
+ {
+  "id": "K-SEC-12",
+  "fact_holds": true,
+  "material": false,
+  "severity_ok": false,
+  "checked": "untrusted-inputs editor-plugins; XC.EXT.plugin-trust; XC.SEC.dev-trust; ED.ARCH.process; XC.EXT.mod-editor",
+  "reason": "Plugin signing, workspace trust and sandboxed tool plugins are already covered by XC.SEC.dev-trust and XC.EXT.mod-editor; ED.ARCH.process decides in/out-of-process. Remaining issue is wording of a manifest field, not a material omission."
+ },
+ {
+  "id": "K-SEC-13",
+  "fact_holds": true,
+  "material": true,
+  "severity_ok": true,
+  "checked": "PLAT.COMM.*, PLAT.SVC.identity/entitlements, NET.SRV.transactions, untrusted-inputs",
+  "reason": "No refund/void/revocation/clawback capability and no store-notification input; PLAT.SVC.identity mentions account linking but nothing on secure login flow or token storage. Refund abuse is a real integration-boundary hole; token/PKCE parts are weaker."
+ },
+ {
+  "id": "K-SEC-14",
+  "fact_holds": true,
+  "material": true,
+  "severity_ok": true,
+  "checked": "capabilities PLAT.WEB.runtime; CORE.JOBS.degenerate",
+  "reason": "Text literally says cross-origin isolation is assumed on every host, which is false for portal iframes; CORE.JOBS.degenerate (with platform-web) already gives the fallback that the capability fails to reference. Wrong assumption in the web runtime."
+ },
+ {
+  "id": "K-SEC-15",
+  "fact_holds": false,
+  "material": false,
+  "severity_ok": false,
+  "checked": "XC.SEC.tamper; XC.SEC.hardening; XC.SEC.anticheat; docs/00",
+  "reason": "XC.SEC.tamper is a policy/boundary capability of security-engineering like XC.SEC.hardening, with build/package implementation under BLD.REL.packaging; ownership is a defensible choice and the process-skill rule concerns code, not policy."
+ },
+ {
+  "id": "K-SEC-16",
+  "fact_holds": true,
+  "material": true,
+  "severity_ok": true,
+  "checked": "skills.json security-engineering purpose/expertise/non_responsibilities; XC.SEC.privacy owner",
+  "reason": "Purpose and expertise still say privacy engineering though XC.SEC.privacy is owned by privacy-data-protection, and non_responsibilities omit privacy and crypto code routing. Small text fix, correctly minor."
+ },
+ {
+  "id": "K-SEC-17",
+  "fact_holds": true,
+  "material": true,
+  "severity_ok": true,
+  "checked": "BLD.CI.build-distribution; BLD.SYS.dev-surface-exclusion; BLD.REL.preload-embargo",
+  "reason": "Build distribution has no dev-surface, watermarking or revocation requirement; dev-surface exclusion is scoped to shipping configurations. Small but real gap for external builds."
+ }
+]

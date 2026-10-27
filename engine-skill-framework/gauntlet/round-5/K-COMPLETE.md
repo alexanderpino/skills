@@ -1,0 +1,15 @@
+# K-COMPLETE (Completeness Critic, round 5)
+
+Sweep: shipped module sets (UE5, Unity, Godot 4, Frostbite, Decima, Snowdrop, id Tech, Northlight, RE, Source 2, CryEngine); pipeline concept to sunset; genres (platformer, RTS, racing, fighting, sim, MMO, XR, card/turn-based); platform/legal/business; engineering disciplines. About 250 keyword probes against all 1537 capability ids/names. Nearly everything is covered under some name; two genuine gaps remain.
+
+### K-COMPLETE-1 · major · omission
+- Target: QA.CERT.privacy, XC.SEC.privacy, NET.SRV.persistence, OBS.CRASH.privacy, OBS.LOG.analytics, XC.DET.replay-format, PLAT.SVC.voice-moderation
+- Finding: No capability owns executing data-subject rights (access/export, rectification, erasure, portability, retention expiry) across the engine-owned personal-data stores. Policy tracking (QA.CERT.privacy), engineering principles (XC.SEC.privacy) and redaction/retention of dumps exist, and store-policy lists "account deletion" as a compliance check. Nothing specifies the mechanism: a per-user data-class inventory, an erasure/export fan-out over server persistence (write-behind, leases, tombstones), telemetry, crash dumps, replays, voice-report captures, UGC and cloud saves, and backup/CDN/DDC propagation with an audit receipt.
+- Evidence: GDPR Arts. 15-20; Apple and Google Play mandate in-app account deletion; erasure is hard against write-behind persistence and immutable backups; replays and voice captures embed other players' data.
+- Proposed change: add capability PLAT.SVC.data-subject-rights (or NET.SRV.data-rights), owned by privacy-data-protection, contributors network-architect, crash-diagnostics, observability-telemetry, dedicated-server. Add an obligation in C-PRIVACY that every store registering a data class declares an export and erase hook; QA.CERT.privacy verifies it.
+
+### K-COMPLETE-2 · minor · omission
+- Target: BLD.REL.packaging, RES.PKG.install-layout, RES.PKG.vfs, QA.CERT.platform, PLAT.CON.patch-format
+- Finding: Physical-media SKUs (game card/cartridge, Blu-ray disc, gold master) are absent by name (no hit for cartridge, disc, physical, gold master). They impose engine-visible constraints that differ from digital: fixed ROM capacity tiers, read-only base content with a mandatory day-one patch layered over it (VFS precedence), a different random-read/seek profile for the streaming budget, a disc-only install gating policy, and a lot-check/master submission artifact.
+- Evidence: Nintendo Switch game-card capacity tiers and required update flow; PS5/Xbox disc install and day-one patch practice; the disc-layout optimization in RES.PKG.ordering assumes traces exist but names no physical target.
+- Proposed change: add BLD.REL.physical-media (packaging-release-patching, contributors package-formats-vfs, platform-console, certification-compliance): capacity budgeting, base+patch precedence tests with a patch-absent boot, media I/O profile in the hardware tiers, and the gold-master artifact. Tag it as a variant of BLD.REL.store-variants.

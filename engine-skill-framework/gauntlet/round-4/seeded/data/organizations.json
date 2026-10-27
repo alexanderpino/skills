@@ -1,0 +1,119 @@
+{
+ "_doc": "Organization tiers (checked). Each tier partitions the workstreams into agents; every workstream is hosted exactly once. check.py proves per tier that independence pairs and oracle authors vs owners/implementers land on different agents. The minimum agent count that keeps the independence pairs apart is 3 (build, verify, govern). Tier names are owned by ARCH.ORG.staffing; ARCH.GOV.process-tiers consumes them.",
+ "tiers": {
+  "small": {
+   "agents": {
+    "build": [
+     "foundation",
+     "platform",
+     "content",
+     "world",
+     "rendering",
+     "simulation",
+     "audio",
+     "online",
+     "gameplay",
+     "ui",
+     "tools",
+     "release"
+    ],
+    "verify": [
+     "quality",
+     "performance",
+     "assurance"
+    ],
+    "govern": [
+     "governance"
+    ]
+   }
+  },
+  "mid": {
+   "agents": {
+    "core-platform": [
+     "foundation",
+     "platform"
+    ],
+    "rendering": [
+     "rendering"
+    ],
+    "world-sim-audio": [
+     "world",
+     "simulation",
+     "audio"
+    ],
+    "game-content-tools": [
+     "gameplay",
+     "ui",
+     "content",
+     "tools"
+    ],
+    "online-release": [
+     "online",
+     "release"
+    ],
+    "quality": [
+     "quality"
+    ],
+    "perf-assurance": [
+     "performance",
+     "assurance"
+    ],
+    "govern": [
+     "governance"
+    ]
+   }
+  },
+  "large": {
+   "agents": {
+    "foundation": [
+     "foundation"
+    ],
+    "platform": [
+     "platform"
+    ],
+    "content": [
+     "content"
+    ],
+    "world": [
+     "world"
+    ],
+    "rendering": [
+     "rendering"
+    ],
+    "simulation": [
+     "simulation"
+    ],
+    "audio": [
+     "audio"
+    ],
+    "online": [
+     "online"
+    ],
+    "gameplay": [
+     "gameplay"
+    ],
+    "ui": [
+     "ui"
+    ],
+    "tools": [
+     "tools"
+    ],
+    "release": [
+     "release"
+    ],
+    "quality": [
+     "quality"
+    ],
+    "performance": [
+     "performance"
+    ],
+    "assurance": [
+     "assurance"
+    ],
+    "governance": [
+     "governance"
+    ]
+   }
+  }
+ }
+}

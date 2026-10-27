@@ -1,0 +1,182 @@
+{
+ "_doc": "Every cross-cutting requirement from the brief has one owning skill that defines the obligation and reviews every other skill against it. 'obligation' is what each skill's SKILL.md must address in phase 2.",
+ "concerns": [
+  {
+   "concern": "performance",
+   "owner": "performance-architect",
+   "obligation": "Declare budgets per tier, hot paths, and the benchmark that proves them."
+  },
+  {
+   "concern": "memory usage",
+   "owner": "memory-performance",
+   "obligation": "Declare allocation strategy, memory tags, peak/steady budgets and OOM behavior (mechanisms by memory-allocators)."
+  },
+  {
+   "concern": "cache behavior",
+   "owner": "cpu-performance",
+   "obligation": "Declare data layouts of hot data and access patterns; justify pointer chasing."
+  },
+  {
+   "concern": "concurrency",
+   "owner": "concurrency-primitives",
+   "obligation": "Declare shared state and synchronization; follow thread-safety annotation conventions."
+  },
+  {
+   "concern": "latency",
+   "owner": "frame-orchestration",
+   "obligation": "Declare frame phase placement and latency contribution; declare the network latency contribution (reviewed with network-architect)."
+  },
+  {
+   "concern": "determinism",
+   "owner": "determinism-replay",
+   "obligation": "Declare the determinism level provided and how it is tested."
+  },
+  {
+   "concern": "observability",
+   "owner": "observability-telemetry",
+   "obligation": "Declare trace zones, counters and logs; zero cost when compiled out."
+  },
+  {
+   "concern": "debugging",
+   "owner": "visual-debugging-tools",
+   "obligation": "Declare debug visualizations, inspectors and console commands."
+  },
+  {
+   "concern": "testing",
+   "owner": "test-architect",
+   "obligation": "Meet the test definition of done (unit, contract, integration, fuzz where untrusted)."
+  },
+  {
+   "concern": "scalability",
+   "owner": "performance-architect",
+   "obligation": "Declare behavior from the smallest to the largest configuration, scaling knobs, unit costs and asymptotic class per world-scale dimension; spatial replicas update in O(changes)."
+  },
+  {
+   "concern": "security",
+   "owner": "security-engineering",
+   "obligation": "Declare untrusted inputs and validation; follow the trust-boundary contract."
+  },
+  {
+   "concern": "platform portability",
+   "owner": "platform-architect",
+   "obligation": "No platform code above the PAL; declare capability-tier behavior."
+  },
+  {
+   "concern": "maintainability",
+   "owner": "architecture-governance",
+   "obligation": "Contracts documented, ADRs recorded, fitness functions pass."
+  },
+  {
+   "concern": "tooling",
+   "owner": "editor-architect",
+   "obligation": "Declare authoring path, inspectors and editor integration; tool logic is domain-owned, the editor provides the host."
+  },
+  {
+   "concern": "failure recovery",
+   "owner": "core-runtime-architect",
+   "obligation": "Follow the error model; declare degradation and recovery behavior."
+  },
+  {
+   "concern": "hot reload",
+   "owner": "hot-reload-iteration",
+   "obligation": "Declare what reloads live and how state is preserved."
+  },
+  {
+   "concern": "data migration",
+   "owner": "serialization-schema",
+   "obligation": "Version every persisted format and ship upgraders."
+  },
+  {
+   "concern": "backwards compatibility",
+   "owner": "api-lifecycle-migration",
+   "obligation": "Classify APIs public/internal and follow deprecation policy."
+  },
+  {
+   "concern": "developer usability",
+   "owner": "developer-experience-docs",
+   "obligation": "Ship docs, a sample, and actionable error messages."
+  },
+  {
+   "concern": "accessibility",
+   "owner": "accessibility",
+   "obligation": "Map player-facing features to accessibility requirements."
+  },
+  {
+   "concern": "evidence",
+   "owner": "research-evidence",
+   "obligation": "Every major decision cites graded evidence and a maturity class."
+  },
+  {
+   "concern": "thread placement",
+   "owner": "job-system-task-graph",
+   "obligation": "Declare frame-phase placement, dedicated threads (via the thread inventory) and OS-thread affinity needs."
+  },
+  {
+   "concern": "network authority & replication",
+   "owner": "network-architect",
+   "obligation": "Declare replicated state, authority, prediction/rollback participation, cosmetic-vs-simulated split and server-target behavior; declare what hidden state reaches clients."
+  },
+  {
+   "concern": "testability seams",
+   "owner": "test-architect",
+   "obligation": "Declare the test seam each external dependency uses (null device, fake backend, injectable clock, service emulator)."
+  },
+  {
+   "concern": "untrusted input",
+   "owner": "security-engineering",
+   "obligation": "Register every untrusted input (untrusted_inputs) with a validating owner and a fuzz target."
+  },
+  {
+   "concern": "agent operability",
+   "owner": "visual-debugging-tools",
+   "obligation": "Expose debug state and controls through C-AUTOMATION with structured results; dev-only."
+  },
+  {
+   "concern": "external requirements",
+   "owner": "certification-compliance",
+   "obligation": "Satisfy the entries of the C-CERT register mapped to your capabilities."
+  },
+  {
+   "concern": "authoring path",
+   "owner": "editor-architect",
+   "obligation": "Every user-facing runtime feature has tool logic in a <DOMAIN>.TOOL capability owned by the domain skill, hosted via C-EDCMD/C-EDHOST; ship creator-facing docs for every TOOL capability."
+  },
+  {
+   "concern": "localizability",
+   "owner": "localization-i18n",
+   "obligation": "Declare every player-visible text, audio and image output; use stable string IDs; support expansion, RTL and culturalized variants."
+  },
+  {
+   "concern": "live changeability",
+   "owner": "online-services-liveops",
+   "obligation": "Declare remote-tunable parameters, patch-stable data layout and behaviour under client/server/content version skew (with packaging-release-patching)."
+  }
+ ],
+ "independence": [
+  [
+   "engine-architect",
+   "architecture-governance",
+   "decider vs governance reviewer"
+  ],
+  [
+   "program-orchestration",
+   "architecture-governance",
+   "builder/scheduler vs adjudicator"
+  ],
+  [
+   "program-orchestration",
+   "reference-games",
+   "milestone owner vs gate content"
+  ],
+  [
+   "security-engineering",
+   "owning-skill",
+   "security reviewer vs reviewed code"
+  ],
+  [
+   "test-architect",
+   "owning-skill",
+   "oracle author vs implementer"
+  ]
+ ]
+}
