@@ -1,0 +1,5 @@
+# Stack table: one row per supported stack. `-` means empty. Read by resolve_config.py.
+stack	code_root	test_root	build	test	run
+Java-Spring	src/main/java	src/test/java	./mvnw -q package	./mvnw -q test	./mvnw spring-boot:run
+DotNet	src	tests	dotnet build	dotnet test	dotnet run --project src
+TypeScript-Node	src	tests	npm run build	npm test	npm start

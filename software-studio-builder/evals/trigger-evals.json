@@ -1,0 +1,11 @@
+[
+  {"query": "Create a Claude Code studio template for ERP software, with directors, leads and specialist agents", "should_trigger": true},
+  {"query": "I want an agent team with directors, leads and specialists for building CRM systems, as a Claude Code template", "should_trigger": true},
+  {"query": "Research what roles and workflows a public-sector case management team has and turn it into Claude Code agents, skills and hooks", "should_trigger": true},
+  {"query": "we build fintech back-office tools - can you research how such teams work and turn it into a .claude/ setup with agents, skills, rules and hooks?", "should_trigger": true},
+  {"query": "Build me an ERP system in Django", "should_trigger": false},
+  {"query": "Write one Claude Code subagent that reviews SQL migrations", "should_trigger": false},
+  {"query": "Refine this Jira ticket into subtasks", "should_trigger": false, "routes_to": "story-refinery"},
+  {"query": "Write an architecture decision record for our payroll service", "should_trigger": false, "routes_to": "principal-architect"},
+  {"query": "Make me a game where fish only bite at dusk", "should_trigger": false}
+]

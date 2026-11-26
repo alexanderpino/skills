@@ -1,0 +1,45 @@
+---
+name: start
+description: "First-session onboarding for HR Payroll Studio: asks where the project stands, writes project.yaml, and hands over to the right first step. Use when the user is new, just cloned the studio, or asks where to begin."
+argument-hint: "[no arguments]"
+user-invocable: true
+allowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash(python3 .claude/scripts/resolve_config.py*), Bash(python3 .claude/scripts/artifact_check.py*)
+---
+
+# /start — onboarding
+
+## Phase 1 — Read the state
+
+1. Run `python3 .claude/scripts/resolve_config.py` and read every line, including `notes:`.
+2. Run `python3 .claude/scripts/artifact_check.py` to see which workflow artifacts exist.
+3. If `production/session-state/active.md` exists, read it: a session may be resuming.
+
+## Phase 2 — One round of questions
+
+Ask together, each with its recommended answer first:
+
+1. **Where are you?** No project yet (recommended for a fresh clone) / an idea and some
+   notes / an existing codebase to bring in.
+2. **Stack** — one of the rows of `.claude/docs/stacks.tsv`, or "decide later".
+3. **Rigor** — `minimal` (recommended: light process, one feature at a time) /
+   `standard` / `full`.
+4. **Goal** — internal tool / product for customers / regulated system / other.
+
+## Phase 3 — Write the config
+
+Show the `project.yaml` values you will set (`project.name`, `project.goal`,
+`modes.rigor`, `stack.name`, `project.stage` = the first phase in
+`.claude/docs/workflow-catalog.json`). Ask "May I write this to `project.yaml`?" and
+write on a yes. Then run `python3 .claude/scripts/resolve_config.py --validate`; any
+`notes:` line is reported to the user, not hidden.
+
+## Phase 4 — Hand over
+
+Name exactly one next step, taken from the first phase of the workflow catalog whose
+required artifact is missing. For an existing codebase, recommend reading it first and
+writing the missing specs from the code.
+
+## Return
+
+End with one line: `START: CONFIGURED`, `START: PARTIAL — <what was skipped>` or
+`START: NOT ASSESSED — <why the state could not be read>`.

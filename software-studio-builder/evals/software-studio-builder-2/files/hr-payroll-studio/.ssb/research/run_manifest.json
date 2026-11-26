@@ -1,0 +1,8 @@
+{
+  "schema": "ssb-ledger/1",
+  "query": "FIXTURE: Claude Code studio template for HR & payroll back-office software",
+  "scope": "Test fixture only. Sources are placeholders marked unverified; no quotation below is real.",
+  "started": "2026-11-25",
+  "lanes": [],
+  "assumptions": []
+}

@@ -1,0 +1,46 @@
+---
+name: gate-check
+description: "Phase gate for HR Payroll Studio: checks the artifacts a phase requires and runs that phase's review gates, then answers READY / CONCERNS / NOT READY / NOT ASSESSED. Use when the user asks whether the project can move to the next phase."
+argument-hint: "<target-phase> [--review full|lean|solo]"
+user-invocable: true
+allowed-tools: Read, Glob, Grep, Agent, AskUserQuestion, Edit, Bash(python3 .claude/scripts/resolve_config.py*), Bash(python3 .claude/scripts/artifact_check.py*)
+---
+
+# /gate-check <target-phase>
+
+## Phase 1 — Resolve
+
+Run `python3 .claude/scripts/resolve_config.py --keys project.stage,modes.workflow,modes.review_mode`.
+`--review` on the command line overrides `modes.review_mode` for this run only.
+The phase being left is `project.stage`; `<target-phase>` must be its `next` in
+`.claude/docs/workflow-catalog.json`. A target that is not the next phase: say so and stop
+with `NOT ASSESSED — <target> does not follow <stage>`.
+
+## Phase 2 — Artifacts
+
+Run `python3 .claude/scripts/artifact_check.py --phase <stage>`. Every `expected=yes
+status=MISSING` row is a blocker. `status=NOT_ASSESSED` rows are listed by name.
+
+## Phase 3 — Review gates
+
+Read `.claude/docs/gates.md`. Spawn the owning agent (Agent tool, `subagent_type` = the
+gate's owner) for every gate whose **Phase** is `<stage>`, in parallel, according to the
+review mode:
+
+- `full` — every such gate.
+- `lean` — only the gates marked `lean: yes` in the index.
+- `solo` — none; the report says `Review gates: skipped — review_mode=solo`.
+
+Each brief names the gate file (`.claude/docs/gates/<ID>.md`) and the artifacts it reads;
+the agent reads the gate file itself and answers with the verdict token on its first line.
+
+## Phase 4 — Verdict
+
+`NOT READY` if any blocker or any gate answers its failing word; else `CONCERNS` if any
+gate has concerns; else `NOT ASSESSED` if any row or gate could not be assessed; else
+`READY`. Print the artifact rows, each gate's verdict, and the blockers.
+
+## Return
+
+On `READY`, ask "May I write `project.stage: <target-phase>` to `project.yaml`?"
+and write it on a yes. End with `GATE <stage> → <target>: <verdict>`.

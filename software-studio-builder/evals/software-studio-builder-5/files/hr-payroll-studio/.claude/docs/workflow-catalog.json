@@ -1,0 +1,128 @@
+{
+  "schema": "studio-catalog/1",
+  "phases": [
+    {
+      "id": "discovery",
+      "name": "Discovery",
+      "next": "requirements",
+      "steps": [
+        {
+          "id": "vision",
+          "name": "Product vision",
+          "command": null,
+          "owner": "product-director",
+          "required": true,
+          "min_workflow": "minimal",
+          "artifact": {
+            "glob": "docs/product-vision.md",
+            "min_count": 1
+          },
+          "template": ".claude/docs/templates/product-vision.md"
+        }
+      ]
+    },
+    {
+      "id": "requirements",
+      "name": "Requirements",
+      "next": "architecture",
+      "steps": [
+        {
+          "id": "specs",
+          "name": "Functional specs",
+          "command": "/functional-spec",
+          "owner": "business-analyst",
+          "required": true,
+          "min_workflow": "minimal",
+          "artifact": {
+            "glob": "docs/specs/*.md",
+            "min_count": 1
+          },
+          "template": ".claude/docs/templates/functional-spec.md"
+        },
+        {
+          "id": "rules",
+          "name": "Rule catalogs",
+          "command": "/business-rules",
+          "owner": "payroll-rules-specialist",
+          "required": true,
+          "min_workflow": "minimal",
+          "artifact": {
+            "glob": "docs/specs/rules/*.md",
+            "min_count": 1
+          },
+          "template": ".claude/docs/templates/rule-catalog.md"
+        }
+      ]
+    },
+    {
+      "id": "architecture",
+      "name": "Architecture",
+      "next": "build",
+      "steps": [
+        {
+          "id": "adrs",
+          "name": "Architecture decisions",
+          "command": "/architecture-decision",
+          "owner": "lead-engineer",
+          "required": true,
+          "min_workflow": "standard",
+          "artifact": {
+            "glob": "docs/architecture/adr-*.md",
+            "min_count": 1
+          },
+          "template": ".claude/docs/templates/adr.md"
+        }
+      ]
+    },
+    {
+      "id": "build",
+      "name": "Build",
+      "next": "acceptance",
+      "steps": [
+        {
+          "id": "stories",
+          "name": "Stories",
+          "command": "/create-stories",
+          "owner": "business-analysis-lead",
+          "required": true,
+          "min_workflow": "minimal",
+          "artifact": {
+            "glob": "production/stories/*.md",
+            "min_count": 1
+          },
+          "template": ".claude/docs/templates/story.md"
+        },
+        {
+          "id": "implement",
+          "name": "Implement stories",
+          "command": "/dev-story",
+          "owner": "backend-engineer",
+          "required": false,
+          "min_workflow": "minimal",
+          "artifact": null,
+          "template": null
+        }
+      ]
+    },
+    {
+      "id": "acceptance",
+      "name": "Acceptance",
+      "next": null,
+      "steps": [
+        {
+          "id": "uat",
+          "name": "User acceptance testing",
+          "command": "/uat-report",
+          "owner": "qa-lead",
+          "required": true,
+          "min_workflow": "minimal",
+          "artifact": {
+            "glob": "production/qa/uat-*.md",
+            "min_count": 1
+          },
+          "template": ".claude/docs/templates/uat-report.md"
+        }
+      ]
+    }
+  ]
+}

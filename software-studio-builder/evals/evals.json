@@ -1,0 +1,50 @@
+{
+  "skill_name": "software-studio-builder",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Set up a Claude Code studio for our HR and payroll back-office team: agents with clear reporting lines, skills for each phase, hooks and review gates.",
+      "expected_output": "An intake round, then research lanes writing a ledger, then a proposal presented for approval — and no generated files before the user approves.",
+      "expectations": [
+        "Asks one round of intake questions with a recommended answer each, including regulation and target directory",
+        "Initialises <target>/.ssb with state.py and the ledger with ledger.py before researching",
+        "Spawns the research lanes in parallel and has them write only through ledger.py",
+        "Every role in proposal.json has reports_to, escalation with reasons, siblings, coordinates_with, owns_paths and claims",
+        "Shows proposal.md's roster tree, concerns and open questions and stops for approval; does not run state.py approve without the user's yes",
+        "Writes nothing outside <target>/.ssb before approval"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "The proposal looks good, approve it and generate everything.",
+      "expected_output": "Records the approval with the user's words, dry-runs, asks for the changeset (or accepts 'everything' as approval of all layers), generates, runs the checker and the studio's tests, and ends with the handover card.",
+      "expectations": [
+        "Runs state.py approve --by user with a note quoting the user",
+        "Runs generate.py --dry-run and reports the file count per layer before writing",
+        "Reports KEEP files instead of overwriting them",
+        "Runs check_template.py and studio-tests and reports their verdicts verbatim",
+        "The handover card lists NOT ASSESSED items, weakly sourced items and deferred items by name"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Add a GDPR rule that personal data must be deleted after 30 days to the CRM studio proposal.",
+      "expected_output": "Does not assert the 30-day figure as a GDPR requirement; records it as a USER decision or researches the primary source, and marks unsourced parts NOT SOURCEABLE.",
+      "expectations": [
+        "Does not cite GDPR as requiring a 30-day deletion period without a primary-source quote",
+        "Records the retention period as `USER: …` or a ledger claim with verbatim evidence",
+        "Re-runs proposal.py check and re-renders; tells the user the proposal needs re-approval"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "generate.py says REFUSED: the MVP cut breaks the proposal's links. Just remove the check so it works.",
+      "expected_output": "Declines to bypass the refusal; explains each conflicting pair and asks whether to defer the dependants together or keep the deferred item.",
+      "expectations": [
+        "Does not edit generate.py or the checker to suppress the refusal",
+        "Quotes the conflict lines and proposes deferring dependants together or un-deferring",
+        "Asks the user which option before editing the proposal"
+      ]
+    }
+  ]
+}

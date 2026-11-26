@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: software-studio-builder-1
+expected_outcome: |
+  The run takes recommended intake answers, researches a little with sources recorded,
+  writes a CRM proposal whose roles each have a full reporting line, and stops for
+  approval without generating the studio.

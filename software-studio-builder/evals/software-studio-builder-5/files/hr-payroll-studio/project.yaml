@@ -1,0 +1,11 @@
+# Team-wide studio config (mini-YAML subset: see .claude/scripts/mini_yaml.py).
+# Personal overrides (modes.review_mode, modes.automation) go in project.local.yaml.
+# Check after any edit: python3 .claude/scripts/resolve_config.py --validate
+project:
+  name: HR Payroll Studio
+  goal: internal tool
+  stage: discovery
+modes:
+  rigor: minimal
+stack:
+  name: ~
