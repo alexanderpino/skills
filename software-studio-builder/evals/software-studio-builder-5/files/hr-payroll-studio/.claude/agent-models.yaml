@@ -1,0 +1,39 @@
+# Model and effort per agent. check_template.py (C06) checks every agent file agrees.
+# Change a row here AND in the agent's frontmatter.
+agents:
+  product-director:
+    model: opus
+    effort: high
+  technical-director:
+    model: opus
+    effort: high
+  delivery-director:
+    model: opus
+    effort: medium
+  business-analysis-lead:
+    model: opus
+    effort: high
+  lead-engineer:
+    model: opus
+    effort: high
+  qa-lead:
+    model: sonnet
+    effort: high
+  compliance-lead:
+    model: opus
+    effort: high
+  business-analyst:
+    model: sonnet
+    effort: medium
+  payroll-rules-specialist:
+    model: sonnet
+    effort: medium
+  backend-engineer:
+    model: sonnet
+    effort: medium
+  integration-engineer:
+    model: sonnet
+    effort: medium
+  qa-tester:
+    model: sonnet
+    effort: medium

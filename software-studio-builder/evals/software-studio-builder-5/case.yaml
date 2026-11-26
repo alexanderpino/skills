@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: software-studio-builder-5
+context:
+  scaffold_script: place-files.sh
+expected_outcome: |
+  The run adds the role to the proposal with a full reporting line, records the user's
+  approval of the changed proposal, regenerates so the new agent and the updated roster,
+  models and compliance-lead delegation are on disk, notices the two pre-existing defects in
+  the studio, runs the validation stage (mechanical checks, a refutation critic on the
+  changes, a review against the request) and quotes its verdict.

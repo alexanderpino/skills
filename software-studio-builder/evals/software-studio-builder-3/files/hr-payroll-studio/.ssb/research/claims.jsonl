@@ -1,0 +1,6 @@
+{"claim_id": "C001", "claim": "HR software teams separate product ownership, business analysis, engineering, QA and compliance roles.", "kind": "fact", "evidence_ids": ["E001"], "status": "unverified", "reason": "", "lane": ""}
+{"claim_id": "C002", "claim": "Business analysts own functional specifications and acceptance criteria.", "kind": "fact", "evidence_ids": ["E002"], "status": "unverified", "reason": "", "lane": ""}
+{"claim_id": "C003", "claim": "Payroll rules change with legislation and must be versioned with effective dates.", "kind": "fact", "evidence_ids": ["E003"], "status": "unverified", "reason": "", "lane": ""}
+{"claim_id": "C004", "claim": "HR systems process special-category personal data and need minimisation and audit trails.", "kind": "fact", "evidence_ids": ["E004"], "status": "unverified", "reason": "", "lane": ""}
+{"claim_id": "C005", "claim": "Business users accept the system through user acceptance testing before go-live.", "kind": "fact", "evidence_ids": ["E002"], "status": "unverified", "reason": "", "lane": ""}
+{"claim_id": "C006", "claim": "A typical payroll team size for a mid-market vendor.", "kind": "fact", "evidence_ids": [], "status": "not-sourceable", "reason": "fixture: not searched", "lane": ""}

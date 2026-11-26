@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 .claude/scripts/resolve_config.py*)",
+      "Bash(python3 .claude/scripts/artifact_check.py*)",
+      "Bash(python3 .claude/scripts/check_template.py*)",
+      "Bash(python3 -m unittest discover -s studio-tests*)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(rm -fr *)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push * --force*)",
+      "Bash(git push * -f*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean -f*)",
+      "Bash(sudo *)",
+      "Bash(chmod 777*)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(**/secrets/**)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {"hooks": [{"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh\""}]}
+    ],
+    "PreToolUse": [
+      {"matcher": "Bash", "hooks": [{"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/validate-commit.sh\""}]},
+      {"matcher": "Write|Edit", "hooks": [{"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/validate-write.sh\""}]},
+      {"matcher": "Read", "hooks": [{"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/validate-read.sh\""}]}
+    ],
+    "SubagentStart": [
+      {"hooks": [{"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/log-agent.sh\""}]}
+    ],
+    "SubagentStop": [
+      {"hooks": [{"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/log-agent.sh\""}]}
+    ]
+  }
+}

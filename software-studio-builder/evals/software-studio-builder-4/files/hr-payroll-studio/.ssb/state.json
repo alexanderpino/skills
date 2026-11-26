@@ -1,0 +1,22 @@
+{
+  "schema": "ssb-state/1",
+  "domain": "HR & payroll",
+  "target": "hr-payroll-studio",
+  "phase": "generate",
+  "intake": {},
+  "approval": {
+    "by": "user",
+    "at": "2026-11-26T05:51:50",
+    "sha256": "29b31ee796268fcc6aed956df619103f85c5e39f5f54223b81007eb69de57c7b",
+    "note": "approved, defer lead-engineer for now"
+  },
+  "layers": [],
+  "started": "2026-11-26",
+  "history": [
+    {
+      "at": "2026-11-26T05:51:50",
+      "cmd": "approve",
+      "arg": ""
+    }
+  ]
+}

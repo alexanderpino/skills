@@ -1,0 +1,1396 @@
+{
+  "schema": "ssb-proposal/1",
+  "studio": {
+    "name": "HR Payroll Studio",
+    "slug": "hr-payroll-studio",
+    "domain": "HR & payroll back-office software",
+    "summary": "A studio for building and maintaining HR and payroll back-office software: specs and versioned payroll rules first, test-first implementation, compliance review and user acceptance before release. (Test fixture \u2014 its sources are placeholders.)",
+    "goal": "internal tool",
+    "authorities": {
+      "product": "product-director",
+      "technical": "technical-director",
+      "delivery": "delivery-director"
+    }
+  },
+  "concept_map": [
+    {
+      "concept": "Design document per module",
+      "here": "Functional specification per module",
+      "claims": [
+        "C002"
+      ]
+    },
+    {
+      "concept": "Configurable parameters and calculations",
+      "here": "Payroll rule catalog with effective dates / configurable parameters",
+      "claims": [
+        "C003"
+      ]
+    },
+    {
+      "concept": "Product authority (director)",
+      "here": "product-director",
+      "claims": [
+        "C001"
+      ]
+    },
+    {
+      "concept": "Delivery authority (director)",
+      "here": "delivery-director",
+      "claims": [
+        "C001"
+      ]
+    },
+    {
+      "concept": "User acceptance evidence",
+      "here": "UAT report",
+      "claims": [
+        "C005"
+      ]
+    },
+    {
+      "concept": "Stack table",
+      "here": "stacks.tsv",
+      "claims": [
+        "USER: fixture"
+      ]
+    }
+  ],
+  "roles": [
+    {
+      "id": "product-director",
+      "title": "Product Director",
+      "tier": "director",
+      "description": "Owns the product vision, scope and the final word on business rules and priorities.",
+      "reports_to": "user",
+      "implements_specs_from": [],
+      "escalation": [
+        {
+          "to": "user",
+          "when": "a business rule conflicts with a legal obligation, the budget or the agreed scope"
+        }
+      ],
+      "siblings": [],
+      "coordinates_with": [
+        {
+          "with": "technical-director",
+          "for": "trade-offs between scope and technical risk"
+        },
+        {
+          "with": "delivery-director",
+          "for": "release scope and dates"
+        }
+      ],
+      "owns_paths": [
+        "docs/product-vision.md"
+      ],
+      "skills": [],
+      "model": "opus",
+      "effort": "high",
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write",
+        "Edit"
+      ],
+      "workflow": "question-first",
+      "responsibilities": [
+        "Set and guard the product vision and non-goals",
+        "Arbitrate conflicts between business rules",
+        "Approve functional specs through PD-SPEC-REVIEW"
+      ],
+      "standards": [],
+      "must_not": [
+        "Write code or tests",
+        "Approve a rule change that compliance has rejected"
+      ],
+      "mvp": true,
+      "claims": [
+        "C001"
+      ]
+    },
+    {
+      "id": "technical-director",
+      "title": "Technical Director",
+      "tier": "director",
+      "description": "Owns architecture, technology choices and technical risk across the product.",
+      "reports_to": "user",
+      "implements_specs_from": [],
+      "escalation": [
+        {
+          "to": "user",
+          "when": "an architecture decision changes cost, risk or a commitment made to the business"
+        }
+      ],
+      "siblings": [],
+      "coordinates_with": [
+        {
+          "with": "product-director",
+          "for": "scope versus technical risk"
+        },
+        {
+          "with": "delivery-director",
+          "for": "technical blockers to a release"
+        }
+      ],
+      "owns_paths": [
+        "docs/architecture/"
+      ],
+      "skills": [],
+      "model": "opus",
+      "effort": "high",
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write",
+        "Edit"
+      ],
+      "workflow": "question-first",
+      "responsibilities": [
+        "Decide the architecture and record it as ADRs",
+        "Review ADRs through TD-ADR-REVIEW",
+        "Own technical risk and the stack choice"
+      ],
+      "standards": [],
+      "must_not": [
+        "Change business rules",
+        "Merge code without the lead engineer's review"
+      ],
+      "mvp": true,
+      "claims": [
+        "C001"
+      ]
+    },
+    {
+      "id": "delivery-director",
+      "title": "Delivery Director",
+      "tier": "director",
+      "description": "Owns planning, release readiness and the propagation of changes across roles.",
+      "reports_to": "user",
+      "implements_specs_from": [],
+      "escalation": [
+        {
+          "to": "user",
+          "when": "a release date, budget or quality bar cannot be met"
+        }
+      ],
+      "siblings": [],
+      "coordinates_with": [
+        {
+          "with": "product-director",
+          "for": "release scope"
+        },
+        {
+          "with": "technical-director",
+          "for": "technical readiness"
+        }
+      ],
+      "owns_paths": [
+        "production/"
+      ],
+      "skills": [],
+      "model": "opus",
+      "effort": "medium",
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write",
+        "Edit"
+      ],
+      "workflow": "question-first",
+      "responsibilities": [
+        "Plan increments and track risks",
+        "Coordinate cross-role change propagation",
+        "Decide release readiness through DD-RELEASE-READINESS"
+      ],
+      "standards": [],
+      "must_not": [
+        "Decide business rules or architecture",
+        "Mark a release ready with open blocking defects"
+      ],
+      "mvp": true,
+      "claims": [
+        "C001"
+      ]
+    },
+    {
+      "id": "business-analysis-lead",
+      "title": "Business Analysis Lead",
+      "tier": "lead",
+      "description": "Leads requirements work: functional specs, rule catalogs and stories.",
+      "reports_to": "product-director",
+      "implements_specs_from": [],
+      "escalation": [
+        {
+          "to": "product-director",
+          "when": "two specs conflict or scope is unclear"
+        }
+      ],
+      "siblings": [
+        {
+          "with": "compliance-lead",
+          "for": "regulatory constraints on requirements"
+        },
+        {
+          "with": "lead-engineer",
+          "for": "feasibility of a requirement"
+        }
+      ],
+      "coordinates_with": [],
+      "owns_paths": [
+        "docs/specs/"
+      ],
+      "skills": [
+        "functional-spec"
+      ],
+      "model": "opus",
+      "effort": "high",
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write",
+        "Edit"
+      ],
+      "workflow": "question-first",
+      "responsibilities": [
+        "Assign spec and rule work to analysts",
+        "Keep requirements traceable to stories and tests",
+        "Break approved specs into stories"
+      ],
+      "standards": [],
+      "must_not": [
+        "Write production code",
+        "Approve its own specs \u2014 that is PD-SPEC-REVIEW's job"
+      ],
+      "mvp": true,
+      "claims": [
+        "C002"
+      ]
+    },
+    {
+      "id": "lead-engineer",
+      "title": "Lead Engineer",
+      "tier": "lead",
+      "description": "Leads implementation: code architecture, standards, review and assignment to engineers.",
+      "reports_to": "technical-director",
+      "implements_specs_from": [
+        "business-analysis-lead"
+      ],
+      "escalation": [
+        {
+          "to": "technical-director",
+          "when": "an ADR is needed or two ADRs conflict"
+        }
+      ],
+      "siblings": [
+        {
+          "with": "business-analysis-lead",
+          "for": "spec ambiguities"
+        },
+        {
+          "with": "qa-lead",
+          "for": "testability"
+        }
+      ],
+      "coordinates_with": [],
+      "owns_paths": [
+        "src/",
+        "docs/architecture/"
+      ],
+      "skills": [
+        "architecture-decision"
+      ],
+      "model": "opus",
+      "effort": "high",
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write",
+        "Edit",
+        "Bash"
+      ],
+      "workflow": "implementation",
+      "responsibilities": [
+        "Define module boundaries and coding standards",
+        "Review all code",
+        "Assign stories to engineers"
+      ],
+      "standards": [],
+      "must_not": [
+        "Change a business rule without the analysts",
+        "Skip tests for rule code"
+      ],
+      "mvp": true,
+      "claims": [
+        "C001"
+      ]
+    },
+    {
+      "id": "qa-lead",
+      "title": "QA Lead",
+      "tier": "lead",
+      "description": "Owns test strategy, UAT and the quality gates.",
+      "reports_to": "delivery-director",
+      "implements_specs_from": [],
+      "escalation": [
+        {
+          "to": "delivery-director",
+          "when": "quality blocks a release"
+        }
+      ],
+      "siblings": [
+        {
+          "with": "lead-engineer",
+          "for": "testability and defects"
+        },
+        {
+          "with": "business-analysis-lead",
+          "for": "acceptance criteria"
+        }
+      ],
+      "coordinates_with": [],
+      "owns_paths": [
+        "tests/",
+        "production/qa/"
+      ],
+      "skills": [
+        "uat-report"
+      ],
+      "model": "sonnet",
+      "effort": "high",
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write",
+        "Edit"
+      ],
+      "workflow": "question-first",
+      "responsibilities": [
+        "Write the test strategy",
+        "Run UAT with business users",
+        "Sign off through QL-UAT-SIGNOFF"
+      ],
+      "standards": [],
+      "must_not": [
+        "Fix product code",
+        "Sign off with failing acceptance tests"
+      ],
+      "mvp": true,
+      "claims": [
+        "C005"
+      ]
+    },
+    {
+      "id": "compliance-lead",
+      "title": "Compliance Lead",
+      "tier": "lead",
+      "description": "Owns regulatory and privacy requirements and reviews rule changes for compliance.",
+      "reports_to": "product-director",
+      "implements_specs_from": [],
+      "escalation": [
+        {
+          "to": "product-director",
+          "when": "a business demand conflicts with a legal requirement"
+        }
+      ],
+      "siblings": [
+        {
+          "with": "business-analysis-lead",
+          "for": "regulatory input to specs"
+        }
+      ],
+      "coordinates_with": [],
+      "owns_paths": [
+        "docs/compliance/"
+      ],
+      "skills": [
+        "business-rules"
+      ],
+      "model": "opus",
+      "effort": "high",
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write",
+        "Edit"
+      ],
+      "workflow": "question-first",
+      "responsibilities": [
+        "Maintain the regulatory obligations register",
+        "Review rule catalogs through CL-RULE-COMPLIANCE",
+        "Define personal-data handling rules"
+      ],
+      "standards": [
+        {
+          "heading": "Personal Data",
+          "rules": [
+            "Minimise personal data in every spec",
+            "Every access to salary data is audit-logged"
+          ]
+        }
+      ],
+      "must_not": [
+        "Give legal advice beyond the sourced obligations",
+        "Approve a rule without its effective date"
+      ],
+      "mvp": true,
+      "claims": [
+        "C004"
+      ]
+    },
+    {
+      "id": "business-analyst",
+      "title": "Business Analyst",
+      "tier": "specialist",
+      "description": "Writes functional specifications and acceptance criteria with the business.",
+      "reports_to": "business-analysis-lead",
+      "implements_specs_from": [],
+      "escalation": [
+        {
+          "to": "business-analysis-lead",
+          "when": "a requirement is contested"
+        }
+      ],
+      "siblings": [
+        {
+          "with": "payroll-rules-specialist",
+          "for": "calculations inside a spec"
+        }
+      ],
+      "coordinates_with": [],
+      "owns_paths": [
+        "docs/specs/"
+      ],
+      "skills": [
+        "functional-spec"
+      ],
+      "model": "sonnet",
+      "effort": "medium",
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write",
+        "Edit"
+      ],
+      "workflow": "question-first",
+      "responsibilities": [
+        "Interview stakeholders and draft functional specs",
+        "Write testable acceptance criteria"
+      ],
+      "standards": [],
+      "must_not": [
+        "Decide scope",
+        "Write code"
+      ],
+      "mvp": true,
+      "claims": [
+        "C002"
+      ]
+    },
+    {
+      "id": "payroll-rules-specialist",
+      "title": "Payroll Rules Specialist",
+      "tier": "specialist",
+      "description": "Models payroll calculations as a versioned rule catalog with effective dates.",
+      "reports_to": "business-analysis-lead",
+      "implements_specs_from": [],
+      "escalation": [
+        {
+          "to": "business-analysis-lead",
+          "when": "a rule's source is unclear"
+        },
+        {
+          "to": "compliance-lead",
+          "when": "a rule may conflict with legislation"
+        }
+      ],
+      "siblings": [
+        {
+          "with": "business-analyst",
+          "for": "rules referenced by specs"
+        }
+      ],
+      "coordinates_with": [],
+      "owns_paths": [
+        "docs/specs/rules/"
+      ],
+      "skills": [
+        "business-rules"
+      ],
+      "model": "sonnet",
+      "effort": "medium",
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write",
+        "Edit"
+      ],
+      "workflow": "question-first",
+      "responsibilities": [
+        "Write every rule with formula, inputs, effective date and source",
+        "Provide worked examples for tests"
+      ],
+      "standards": [
+        {
+          "heading": "Rule Versioning",
+          "rules": [
+            "Every rule has an effective-from date",
+            "Rules are never edited in place; a change is a new version"
+          ]
+        }
+      ],
+      "must_not": [
+        "Invent a statutory rate \u2014 write NOT SOURCEABLE instead"
+      ],
+      "mvp": true,
+      "claims": [
+        "C003"
+      ]
+    },
+    {
+      "id": "backend-engineer",
+      "title": "Backend Engineer",
+      "tier": "specialist",
+      "description": "Implements stories: domain logic, persistence and APIs, test-first for rules.",
+      "reports_to": "lead-engineer",
+      "implements_specs_from": [
+        "business-analyst",
+        "payroll-rules-specialist"
+      ],
+      "escalation": [
+        {
+          "to": "lead-engineer",
+          "when": "an interface or architecture question"
+        },
+        {
+          "to": "payroll-rules-specialist",
+          "when": "a rule is ambiguous"
+        }
+      ],
+      "siblings": [
+        {
+          "with": "integration-engineer",
+          "for": "contracts with external systems"
+        }
+      ],
+      "coordinates_with": [],
+      "owns_paths": [
+        "src/"
+      ],
+      "skills": [
+        "dev-story"
+      ],
+      "model": "sonnet",
+      "effort": "medium",
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write",
+        "Edit",
+        "Bash"
+      ],
+      "workflow": "implementation",
+      "responsibilities": [
+        "Implement stories against their acceptance criteria",
+        "Write unit tests first for every rule"
+      ],
+      "standards": [],
+      "must_not": [
+        "Hardcode a rate or threshold",
+        "Log personal data"
+      ],
+      "mvp": true,
+      "claims": [
+        "C001"
+      ]
+    },
+    {
+      "id": "integration-engineer",
+      "title": "Integration Engineer",
+      "tier": "specialist",
+      "description": "Builds interfaces to banks, tax authorities and time-tracking systems.",
+      "reports_to": "lead-engineer",
+      "implements_specs_from": [
+        "business-analyst"
+      ],
+      "escalation": [
+        {
+          "to": "lead-engineer",
+          "when": "an external contract changes"
+        }
+      ],
+      "siblings": [
+        {
+          "with": "backend-engineer",
+          "for": "internal interfaces"
+        }
+      ],
+      "coordinates_with": [],
+      "owns_paths": [
+        "src/integrations/"
+      ],
+      "skills": [
+        "dev-story"
+      ],
+      "model": "sonnet",
+      "effort": "medium",
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write",
+        "Edit",
+        "Bash"
+      ],
+      "workflow": "implementation",
+      "responsibilities": [
+        "Implement and version external interfaces",
+        "Write contract tests"
+      ],
+      "standards": [],
+      "must_not": [
+        "Store credentials in the repository"
+      ],
+      "mvp": true,
+      "claims": [
+        "C001"
+      ]
+    },
+    {
+      "id": "qa-tester",
+      "title": "QA Tester",
+      "tier": "specialist",
+      "description": "Writes test cases and executes them, including UAT scripts.",
+      "reports_to": "qa-lead",
+      "implements_specs_from": [],
+      "escalation": [
+        {
+          "to": "qa-lead",
+          "when": "a defect's severity is disputed"
+        }
+      ],
+      "siblings": [
+        {
+          "with": "backend-engineer",
+          "for": "defect reproduction"
+        }
+      ],
+      "coordinates_with": [],
+      "owns_paths": [
+        "tests/"
+      ],
+      "skills": [
+        "uat-report"
+      ],
+      "model": "sonnet",
+      "effort": "medium",
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write",
+        "Edit"
+      ],
+      "workflow": "question-first",
+      "responsibilities": [
+        "Write test cases from acceptance criteria",
+        "Record UAT results as evidence"
+      ],
+      "standards": [],
+      "must_not": [
+        "Change acceptance criteria"
+      ],
+      "mvp": true,
+      "claims": [
+        "C005"
+      ]
+    },
+    {
+      "id": "data-migration-specialist",
+      "title": "Data Migration Specialist",
+      "tier": "specialist",
+      "description": "Plans and verifies migration of employee and payroll history from legacy systems.",
+      "reports_to": "lead-engineer",
+      "implements_specs_from": [],
+      "escalation": [
+        {
+          "to": "lead-engineer",
+          "when": "migration needs a schema change"
+        }
+      ],
+      "siblings": [],
+      "coordinates_with": [],
+      "owns_paths": [
+        "docs/migration/"
+      ],
+      "skills": [
+        "migration-plan"
+      ],
+      "model": "sonnet",
+      "effort": "medium",
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write",
+        "Edit"
+      ],
+      "workflow": "question-first",
+      "responsibilities": [
+        "Write the migration plan",
+        "Reconcile migrated balances"
+      ],
+      "standards": [],
+      "must_not": [
+        "Migrate production data without a rehearsal"
+      ],
+      "mvp": false,
+      "claims": [
+        "C006"
+      ]
+    }
+  ],
+  "phases": [
+    {
+      "id": "discovery",
+      "name": "Discovery",
+      "next": "requirements",
+      "steps": [
+        {
+          "id": "vision",
+          "name": "Product vision",
+          "command": null,
+          "owner": "product-director",
+          "required": true,
+          "artifact": {
+            "glob": "docs/product-vision.md",
+            "min_count": 1
+          },
+          "template": "product-vision",
+          "min_workflow": "minimal",
+          "claims": [
+            "C001"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "requirements",
+      "name": "Requirements",
+      "next": "architecture",
+      "steps": [
+        {
+          "id": "specs",
+          "name": "Functional specs",
+          "command": "/functional-spec",
+          "owner": "business-analyst",
+          "required": true,
+          "artifact": {
+            "glob": "docs/specs/*.md",
+            "min_count": 1
+          },
+          "template": "functional-spec",
+          "min_workflow": "minimal",
+          "claims": [
+            "C002"
+          ]
+        },
+        {
+          "id": "rules",
+          "name": "Rule catalogs",
+          "command": "/business-rules",
+          "owner": "payroll-rules-specialist",
+          "required": true,
+          "artifact": {
+            "glob": "docs/specs/rules/*.md",
+            "min_count": 1
+          },
+          "template": "rule-catalog",
+          "min_workflow": "minimal",
+          "claims": [
+            "C003"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "architecture",
+      "name": "Architecture",
+      "next": "build",
+      "steps": [
+        {
+          "id": "adrs",
+          "name": "Architecture decisions",
+          "command": "/architecture-decision",
+          "owner": "lead-engineer",
+          "required": true,
+          "artifact": {
+            "glob": "docs/architecture/adr-*.md",
+            "min_count": 1
+          },
+          "template": "adr",
+          "min_workflow": "standard",
+          "claims": [
+            "USER: ADRs from standard rigor"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "build",
+      "name": "Build",
+      "next": "acceptance",
+      "steps": [
+        {
+          "id": "stories",
+          "name": "Stories",
+          "command": "/create-stories",
+          "owner": "business-analysis-lead",
+          "required": true,
+          "artifact": {
+            "glob": "production/stories/*.md",
+            "min_count": 1
+          },
+          "template": "story",
+          "min_workflow": "minimal",
+          "claims": [
+            "C002"
+          ]
+        },
+        {
+          "id": "implement",
+          "name": "Implement stories",
+          "command": "/dev-story",
+          "owner": "backend-engineer",
+          "required": false,
+          "artifact": null,
+          "template": null,
+          "min_workflow": "minimal",
+          "claims": [
+            "C001"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "acceptance",
+      "name": "Acceptance",
+      "next": null,
+      "steps": [
+        {
+          "id": "uat",
+          "name": "User acceptance testing",
+          "command": "/uat-report",
+          "owner": "qa-lead",
+          "required": true,
+          "artifact": {
+            "glob": "production/qa/uat-*.md",
+            "min_count": 1
+          },
+          "template": "uat-report",
+          "min_workflow": "minimal",
+          "claims": [
+            "C005"
+          ]
+        }
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "product-vision",
+      "name": "Product Vision",
+      "path": "docs/product-vision.md",
+      "owner": "product-director",
+      "sections": [
+        "Problem",
+        "Users",
+        "Goals",
+        "Non-goals",
+        "Success measures"
+      ],
+      "claims": [
+        "C001"
+      ]
+    },
+    {
+      "id": "functional-spec",
+      "name": "Functional Specification",
+      "path": "docs/specs/<module>.md",
+      "owner": "business-analyst",
+      "sections": [
+        {
+          "heading": "Overview",
+          "guidance": "One paragraph."
+        },
+        "Users and Roles",
+        "Detailed Rules",
+        "Data",
+        "Edge Cases",
+        "Dependencies",
+        "Configurable Parameters",
+        "Acceptance Criteria"
+      ],
+      "claims": [
+        "C002"
+      ]
+    },
+    {
+      "id": "rule-catalog",
+      "name": "Payroll Rule Catalog",
+      "path": "docs/specs/rules/<area>.md",
+      "owner": "payroll-rules-specialist",
+      "sections": [
+        "Rules",
+        "Formulas",
+        "Effective Dates",
+        "Sources",
+        "Worked Examples"
+      ],
+      "claims": [
+        "C003"
+      ]
+    },
+    {
+      "id": "adr",
+      "name": "Architecture Decision Record",
+      "path": "docs/architecture/adr-NNNN-<slug>.md",
+      "owner": "lead-engineer",
+      "sections": [
+        "Status",
+        "Context",
+        "Options",
+        "Decision",
+        "Consequences"
+      ],
+      "claims": [
+        "USER: record architecture decisions as ADRs"
+      ]
+    },
+    {
+      "id": "story",
+      "name": "Story",
+      "path": "production/stories/<id>.md",
+      "owner": "business-analysis-lead",
+      "sections": [
+        "Story",
+        "Acceptance Criteria",
+        "Spec References",
+        "Test Evidence"
+      ],
+      "claims": [
+        "C002"
+      ]
+    },
+    {
+      "id": "uat-report",
+      "name": "UAT Report",
+      "path": "production/qa/uat-<date>.md",
+      "owner": "qa-lead",
+      "sections": [
+        "Scope",
+        "Participants",
+        "Results",
+        "Defects",
+        "Sign-off"
+      ],
+      "claims": [
+        "C005"
+      ]
+    },
+    {
+      "id": "migration-plan",
+      "name": "Data Migration Plan",
+      "path": "docs/migration/plan.md",
+      "owner": "data-migration-specialist",
+      "sections": [
+        "Sources",
+        "Mapping",
+        "Rehearsals",
+        "Reconciliation"
+      ],
+      "mvp": false,
+      "claims": [
+        "C006"
+      ]
+    }
+  ],
+  "skills": [
+    {
+      "name": "functional-spec",
+      "owner": "business-analyst",
+      "description": "Section-by-section functional spec for one module. Use when a module needs its requirements written or revised.",
+      "argument_hint": "<module>",
+      "steps": [
+        {
+          "name": "Gather context",
+          "detail": "Read the product vision and related specs by section."
+        },
+        "Draft each section with the user",
+        {
+          "name": "Review",
+          "detail": "Run PD-SPEC-REVIEW."
+        }
+      ],
+      "verdicts": [
+        "COMPLETE",
+        "PARTIAL"
+      ],
+      "produces": "functional-spec",
+      "gates": [
+        "PD-SPEC-REVIEW"
+      ],
+      "mvp": true,
+      "claims": [
+        "C002"
+      ]
+    },
+    {
+      "name": "business-rules",
+      "owner": "payroll-rules-specialist",
+      "description": "Writes or updates a versioned payroll rule catalog with effective dates and sources. Use when a calculation or statutory rule is added or changes.",
+      "argument_hint": "<area>",
+      "steps": [
+        "Collect the rule and its legal source",
+        "Write formula, inputs and worked examples",
+        {
+          "name": "Compliance review",
+          "detail": "Run CL-RULE-COMPLIANCE."
+        }
+      ],
+      "verdicts": [
+        "COMPLETE",
+        "PARTIAL"
+      ],
+      "produces": "rule-catalog",
+      "gates": [
+        "CL-RULE-COMPLIANCE"
+      ],
+      "mvp": true,
+      "claims": [
+        "C003"
+      ]
+    },
+    {
+      "name": "architecture-decision",
+      "owner": "lead-engineer",
+      "description": "Records one architecture decision as an ADR with options and consequences. Use when a technical decision needs recording.",
+      "argument_hint": "<decision>",
+      "steps": [
+        "Frame the decision",
+        "Compare options",
+        "Record the decision",
+        {
+          "name": "Review",
+          "detail": "Run TD-ADR-REVIEW."
+        }
+      ],
+      "verdicts": [
+        "ACCEPTED",
+        "PROPOSED"
+      ],
+      "produces": "adr",
+      "gates": [
+        "TD-ADR-REVIEW"
+      ],
+      "mvp": true,
+      "claims": [
+        "USER: keep ADRs"
+      ]
+    },
+    {
+      "name": "create-stories",
+      "owner": "business-analysis-lead",
+      "description": "Breaks an approved functional spec into stories with acceptance criteria. Use when a spec is approved and work must be planned.",
+      "argument_hint": "<spec path>",
+      "steps": [
+        "Read the spec",
+        "Slice into stories",
+        "Write acceptance criteria"
+      ],
+      "verdicts": [
+        "COMPLETE",
+        "PARTIAL"
+      ],
+      "produces": "story",
+      "gates": [],
+      "mvp": true,
+      "claims": [
+        "C002"
+      ]
+    },
+    {
+      "name": "dev-story",
+      "owner": "backend-engineer",
+      "description": "Implements one story test-first and reports the evidence. Use when a story is ready to build.",
+      "argument_hint": "<story id>",
+      "steps": [
+        "Read the story and its spec sections",
+        "Write failing tests",
+        "Implement",
+        "Run the tests and record evidence"
+      ],
+      "verdicts": [
+        "DONE",
+        "BLOCKED"
+      ],
+      "produces": null,
+      "gates": [],
+      "mvp": true,
+      "claims": [
+        "C001"
+      ]
+    },
+    {
+      "name": "uat-report",
+      "owner": "qa-lead",
+      "description": "Runs and records user acceptance testing for a release candidate. Use when a release candidate is ready for business acceptance.",
+      "argument_hint": "[no arguments]",
+      "steps": [
+        "Plan scope with business users",
+        "Execute UAT scripts",
+        "Record results and defects",
+        {
+          "name": "Sign-off",
+          "detail": "Run QL-UAT-SIGNOFF."
+        }
+      ],
+      "verdicts": [
+        "ACCEPTED",
+        "CONCERNS",
+        "REJECTED"
+      ],
+      "produces": "uat-report",
+      "gates": [
+        "QL-UAT-SIGNOFF"
+      ],
+      "mvp": true,
+      "claims": [
+        "C005"
+      ]
+    },
+    {
+      "name": "migration-plan",
+      "owner": "data-migration-specialist",
+      "description": "Plans a data migration with rehearsals and reconciliation. Use when legacy data must move.",
+      "argument_hint": "[no arguments]",
+      "steps": [
+        "Inventory sources",
+        "Map fields",
+        "Plan rehearsals"
+      ],
+      "verdicts": [
+        "COMPLETE",
+        "PARTIAL"
+      ],
+      "produces": "migration-plan",
+      "gates": [],
+      "mvp": false,
+      "claims": [
+        "C006"
+      ]
+    }
+  ],
+  "rules": [
+    {
+      "id": "payroll-rules-code",
+      "title": "Payroll Rule Code",
+      "paths": [
+        "src/**/payroll/**",
+        "src/main/java/**/payroll/**"
+      ],
+      "owner": "lead-engineer",
+      "rules": [
+        "Every rate, threshold and bracket comes from versioned configuration with an effective date",
+        "Every rule has unit tests built from the catalog's worked examples",
+        "Money uses a decimal type, never floating point"
+      ],
+      "claims": [
+        "C003"
+      ]
+    },
+    {
+      "id": "personal-data",
+      "title": "Personal Data",
+      "paths": [
+        "src/**"
+      ],
+      "owner": "compliance-lead",
+      "rules": [
+        "Never log personal data or salary values",
+        "Every read of salary data goes through the audited access layer"
+      ],
+      "claims": [
+        "C004"
+      ]
+    },
+    {
+      "id": "tests",
+      "title": "Tests",
+      "paths": [
+        "tests/**",
+        "src/test/**"
+      ],
+      "owner": "qa-lead",
+      "rules": [
+        "Tests are deterministic: no wall-clock time, no random seeds without a fixed value",
+        "Test data is synthetic \u2014 never production personal data"
+      ],
+      "claims": [
+        "C004"
+      ]
+    }
+  ],
+  "stacks": [
+    {
+      "name": "Java-Spring",
+      "code_root": "src/main/java",
+      "test_root": "src/test/java",
+      "build": "./mvnw -q package",
+      "test": "./mvnw -q test",
+      "run": "./mvnw spring-boot:run",
+      "claims": [
+        "USER: fixture stack"
+      ]
+    },
+    {
+      "name": "DotNet",
+      "code_root": "src",
+      "test_root": "tests",
+      "build": "dotnet build",
+      "test": "dotnet test",
+      "run": "dotnet run --project src",
+      "claims": [
+        "USER: fixture stack"
+      ]
+    },
+    {
+      "name": "TypeScript-Node",
+      "code_root": "src",
+      "test_root": "tests",
+      "build": "npm run build",
+      "test": "npm test",
+      "run": "npm start",
+      "claims": [
+        "USER: fixture stack"
+      ]
+    }
+  ],
+  "gates": [
+    {
+      "id": "PD-SPEC-REVIEW",
+      "owner": "product-director",
+      "phase": "requirements",
+      "lean": true,
+      "verdicts": [
+        "APPROVE",
+        "CONCERNS",
+        "REJECT"
+      ],
+      "trigger": "A functional spec is drafted or revised",
+      "context": "The spec path and the product vision",
+      "prompt": "Does the spec serve the vision, stay in scope and give testable acceptance criteria?",
+      "claims": [
+        "C002"
+      ]
+    },
+    {
+      "id": "CL-RULE-COMPLIANCE",
+      "owner": "compliance-lead",
+      "phase": "requirements",
+      "lean": false,
+      "verdicts": [
+        "COMPLIANT",
+        "CONCERNS",
+        "NON-COMPLIANT"
+      ],
+      "trigger": "A rule catalog is written or changed",
+      "context": "The rule catalog and its sources",
+      "prompt": "Does every rule cite its legal source and effective date, and does it respect personal-data rules?",
+      "claims": [
+        "C003",
+        "C004"
+      ]
+    },
+    {
+      "id": "TD-ADR-REVIEW",
+      "owner": "technical-director",
+      "phase": "architecture",
+      "lean": true,
+      "verdicts": [
+        "APPROVE",
+        "CONCERNS",
+        "REJECT"
+      ],
+      "trigger": "An ADR is proposed",
+      "context": "The ADR and related ADRs",
+      "prompt": "Is the decision sound, are alternatives fair, and do consequences cover security and data?",
+      "claims": [
+        "USER: keep ADR review"
+      ]
+    },
+    {
+      "id": "DD-RELEASE-READINESS",
+      "owner": "delivery-director",
+      "phase": "build",
+      "lean": false,
+      "verdicts": [
+        "READY",
+        "CONCERNS",
+        "NOT READY"
+      ],
+      "trigger": "Leaving the build phase",
+      "context": "Open defects, test results, the UAT plan",
+      "prompt": "Is the increment ready for acceptance testing?",
+      "claims": [
+        "C005"
+      ]
+    },
+    {
+      "id": "QL-UAT-SIGNOFF",
+      "owner": "qa-lead",
+      "phase": "acceptance",
+      "lean": true,
+      "verdicts": [
+        "ACCEPT",
+        "CONCERNS",
+        "REJECT"
+      ],
+      "trigger": "UAT is complete",
+      "context": "The UAT report and open defects",
+      "prompt": "Did business users accept the release against its acceptance criteria?",
+      "claims": [
+        "C005"
+      ]
+    }
+  ],
+  "hooks": [
+    "session-start",
+    "validate-commit",
+    "validate-write",
+    "validate-read",
+    "log-agent"
+  ],
+  "rigor": {
+    "default": "minimal"
+  },
+  "scope": {
+    "generate": "mvp",
+    "later": [
+      "role:lead-engineer"
+    ]
+  },
+  "open_questions": [
+    "Which country's payroll legislation is in scope first?"
+  ]
+}

@@ -1,0 +1,8 @@
+schema_version: "1.1"
+name: software-studio-builder-2
+context:
+  scaffold_script: place-files.sh
+expected_outcome: |
+  The approval is recorded as the user's, the studio is generated in layer order without
+  overwriting anything, the checker and the studio's own tests run, and the result ends with
+  a handover that names what was not assessed, weakly sourced and deferred.
